@@ -2,6 +2,7 @@ import { usePortfolioMetrics, useCurrentPrices } from '@/hooks/usePortfolio'
 import { useState } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 import PositionModal from './PositionModal'
+import TransactionsView from './TransactionsView'
 
 interface HoldingsViewProps {
   name: string
@@ -19,6 +20,7 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
   const [positionModalMode, setPositionModalMode] = useState<'buy' | 'sell' | null>(null)
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null)
   const [selectedPositionData, setSelectedPositionData] = useState<any>(null)
+  const [filterTickerForTransactions, setFilterTickerForTransactions] = useState<string | null>(null)
 
   const positions = priceData?.positions || []
   const totalValue = priceData?.total_value || 0
@@ -150,51 +152,54 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
             </div>
           </div>
 
-          {/* Filters and Search */}
-          <div className="flex gap-3 mb-6">
-            <div className="flex-1 relative">
-              <input
-                type="text"
-                placeholder="Search by symbol or company..."
-                className="w-full px-4 py-2 bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg focus:outline-none focus:border-purple-600"
-              />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500">🔍</span>
+          {/* Filters and Search - Only for Positions tab */}
+          {activeTab === 'positions' && (
+            <div className="flex gap-3 mb-6">
+              <div className="flex-1 relative">
+                <input
+                  type="text"
+                  placeholder="Search by symbol or company..."
+                  className="w-full px-4 py-2 bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg focus:outline-none focus:border-purple-600"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500">🔍</span>
+              </div>
+
+              <select className="px-4 py-2 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:border-slate-600 transition">
+                <option>All positions</option>
+                <option>Long only</option>
+                <option>Short only</option>
+              </select>
+
+              <select className="px-4 py-2 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:border-slate-600 transition">
+                <option>All sectors</option>
+                {Array.from(sectorMap.keys())
+                  .sort()
+                  .map((sector: string) => (
+                    <option key={sector} value={sector}>
+                      {sector}
+                    </option>
+                  ))}
+              </select>
+
+              <select className="px-4 py-2 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:border-slate-600 transition">
+                <option>All assets</option>
+                {Array.from(new Set(positions.map((p: any) => p.asset_type || 'Stock')) as Set<string>)
+                  .sort()
+                  .map((type: string) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+              </select>
+
+              <button className="px-4 py-2 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:bg-slate-700 transition">
+                ⚙️
+              </button>
             </div>
+          )}
 
-            <select className="px-4 py-2 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:border-slate-600 transition">
-              <option>All positions</option>
-              <option>Long only</option>
-              <option>Short only</option>
-            </select>
-
-            <select className="px-4 py-2 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:border-slate-600 transition">
-              <option>All sectors</option>
-              {Array.from(sectorMap.keys())
-                .sort()
-                .map((sector: string) => (
-                  <option key={sector} value={sector}>
-                    {sector}
-                  </option>
-                ))}
-            </select>
-
-            <select className="px-4 py-2 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:border-slate-600 transition">
-              <option>All assets</option>
-              {Array.from(new Set(positions.map((p: any) => p.asset_type || 'Stock')) as Set<string>)
-                .sort()
-                .map((type: string) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-            </select>
-
-            <button className="px-4 py-2 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:bg-slate-700 transition">
-              ⚙️
-            </button>
-          </div>
-
-          {/* Holdings Table */}
+          {/* Tab Content */}
+          {activeTab === 'positions' && (
           <div className="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden">
             {positions.length === 0 ? (
               <div className="p-12 text-center text-slate-400">
@@ -266,7 +271,8 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
-                              onViewTransactions?.(pos.ticker)
+                              setFilterTickerForTransactions(pos.ticker)
+                              setActiveTab('transactions')
                             }}
                             className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded transition"
                             title="View and edit transactions"
@@ -319,6 +325,30 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
             </>
             )}
           </div>
+          )}
+
+          {/* Transactions Tab */}
+          {activeTab === 'transactions' && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-4 border-b border-slate-800">
+                <button
+                  onClick={() => {
+                    setFilterTickerForTransactions(null)
+                    setActiveTab('positions')
+                  }}
+                  className="text-slate-400 hover:text-slate-300 text-sm font-medium"
+                >
+                  ← Back to Positions
+                </button>
+                {filterTickerForTransactions && (
+                  <span className="text-slate-400 text-sm">
+                    Filtered by: <span className="text-white font-medium">{filterTickerForTransactions}</span>
+                  </span>
+                )}
+              </div>
+              <TransactionsView name={name} filterTicker={filterTickerForTransactions || undefined} />
+            </div>
+          )}
         </div>
 
         {/* Right Sidebar */}
