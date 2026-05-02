@@ -63,6 +63,7 @@ class CresusAPI {
     price: number
     fees?: number
     notes?: string
+    created_at?: string
   }) {
     return (await this.client.post(`/portfolios/${portfolioName}/transactions`, data)).data
   }

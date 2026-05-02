@@ -50,6 +50,7 @@ export default function PositionModal({ isOpen, mode, ticker, positionData, onCl
         price: parseFloat(formData.price),
         fees: formData.fees ? parseFloat(formData.fees) : 0,
         notes: formData.notes,
+        created_at: formData.date ? `${formData.date}T00:00:00` : undefined,
       })
 
       if (response.status === 'success') {

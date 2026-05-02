@@ -40,7 +40,7 @@ class Journal:
         df.to_csv(self.filepath, index=False)
 
     def add_transaction(self, operation: str, ticker: str, quantity: int, price: float,
-                       fees: float = 0, notes: str = "") -> str:
+                       fees: float = 0, notes: str = "", created_at: str = None) -> str:
         """Add a new transaction to journal.
 
         Returns the transaction ID.
@@ -49,11 +49,13 @@ class Journal:
 
         transaction_id = str(uuid.uuid4())[:8]
         now = datetime.now().isoformat()
+        # Use provided created_at or default to now
+        tx_created_at = created_at if created_at else now
         amount = quantity * price
 
         new_row = {
             "id": transaction_id,
-            "created_at": now,
+            "created_at": tx_created_at,
             "operation": operation.upper(),
             "ticker": ticker.upper(),
             "quantity": int(quantity),

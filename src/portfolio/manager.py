@@ -279,7 +279,7 @@ class PortfolioManager:
             ],
         }
 
-    def record_transaction(self, portfolio_name: str, operation: str, ticker: str, quantity: int, price: float, fees: float = 0, notes: str = "") -> Dict[str, Any]:
+    def record_transaction(self, portfolio_name: str, operation: str, ticker: str, quantity: int, price: float, fees: float = 0, notes: str = "", created_at: Optional[str] = None) -> Dict[str, Any]:
         """Record a transaction (BUY or SELL)."""
         journal = Journal(portfolio_name)
         operation_upper = operation.upper()
@@ -294,7 +294,8 @@ class PortfolioManager:
                 quantity=quantity,
                 price=price,
                 fees=fees,
-                notes=notes
+                notes=notes,
+                created_at=created_at
             )
             return {
                 "status": "success",

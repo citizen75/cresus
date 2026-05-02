@@ -207,6 +207,7 @@ async def record_transaction(name: str, data: Dict[str, Any]):
         data.get("price", 0),
         data.get("fees", 0),
         data.get("notes", ""),
+        data.get("created_at"),
     )
     return result
 
