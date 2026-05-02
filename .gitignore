@@ -19,6 +19,8 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+pip-log.txt
+pip-delete-this-directory.txt
 
 # Virtual environments
 venv/
@@ -26,26 +28,45 @@ venv/
 ENV/
 env/
 
+# TypeScript
+*.tsbuildinfo
+*.d.ts
+.ts-node/
+.tsconfig.json
+tsconfig.tsbuildinfo
+
+# Node/Frontend
+node_modules/
+dist/
+build/
+.env.local
+.env.*.local
+*.log
+
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-
-# Node/Frontend
-node_modules/
-dist/
-.env.local
-.env.*.local
+.DS_Store
+.project
+.pydevproject
 
 # Project specific
 logs/
+tmp/
 db/local/
 .pids/
 .claude/
-*.log
+cache/
+
+# Environment
+.env
+.env.development
+.env.production
 
 # OS
 .DS_Store
-.env
+Thumbs.db
+*.bak
