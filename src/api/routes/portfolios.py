@@ -108,18 +108,33 @@ async def get_portfolio_transactions(name: str, ticker: Optional[str] = None):
     # Convert to list of dicts
     transactions = []
     for _, row in df.iterrows():
+        # Helper to convert NaN to 0
+        def safe_float(val, default=0.0):
+            try:
+                f = float(pd.to_numeric(val, errors="coerce"))
+                return default if pd.isna(f) else f
+            except (TypeError, ValueError):
+                return default
+
+        def safe_int(val, default=0):
+            try:
+                i = int(pd.to_numeric(val, errors="coerce"))
+                return default if pd.isna(i) else i
+            except (TypeError, ValueError):
+                return default
+
         transactions.append({
-            "id": row.get("id", ""),
-            "created_at": row.get("created_at", ""),
-            "operation": row.get("operation", ""),
-            "ticker": row.get("ticker", ""),
-            "quantity": int(pd.to_numeric(row.get("quantity", 0), errors="coerce") or 0),
-            "price": float(pd.to_numeric(row.get("price", 0), errors="coerce") or 0),
-            "amount": float(pd.to_numeric(row.get("amount", 0), errors="coerce") or 0),
-            "fees": float(pd.to_numeric(row.get("fees", 0), errors="coerce") or 0),
-            "status": row.get("status", ""),
-            "status_at": row.get("status_at", ""),
-            "notes": row.get("notes", ""),
+            "id": str(row.get("id", "")),
+            "created_at": str(row.get("created_at", "")),
+            "operation": str(row.get("operation", "")),
+            "ticker": str(row.get("ticker", "")),
+            "quantity": safe_int(row.get("quantity", 0)),
+            "price": safe_float(row.get("price", 0)),
+            "amount": safe_float(row.get("amount", 0)),
+            "fees": safe_float(row.get("fees", 0)),
+            "status": str(row.get("status", "")),
+            "status_at": str(row.get("status_at", "")),
+            "notes": str(row.get("notes", "")),
         })
 
     return {
