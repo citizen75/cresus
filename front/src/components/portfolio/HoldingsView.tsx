@@ -264,7 +264,10 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
                         <td className="px-4 py-3 text-green-400 font-medium">+0.45%</td>
                         <td className="px-4 py-3">
                           <button
-                            onClick={() => onViewTransactions?.(pos.ticker)}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onViewTransactions?.(pos.ticker)
+                            }}
                             className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded transition"
                             title="View and edit transactions"
                           >
