@@ -14,3 +14,13 @@ portfolios:
   initial_capital: 10000.0
   name: Momentum cac
   type: paper
+- currency: EUR
+  description: Test portfolio for development
+  initial_capital: 100000.0
+  name: Test Portfolio
+  type: paper
+- currency: EUR
+  description: PEA Gilles
+  initial_capital: 10000.0
+  name: PEA Gilles
+  type: paper
