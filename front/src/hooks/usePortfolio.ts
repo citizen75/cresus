@@ -37,8 +37,8 @@ export function usePortfolioMetrics(name: string) {
 export function usePortfolioHistory(name: string) {
   return useQuery({
     queryKey: ['portfolio-history', name],
-    queryFn: () => api.getPortfolioHistory(name),
-    staleTime: 24 * 60 * 60_000,
+    queryFn: () => api.getPortfolioHistory(name, true), // Always recalculate for fresh data
+    staleTime: 60_000, // 1 minute
     enabled: !!name,
   })
 }

@@ -51,6 +51,7 @@ export default function PortfolioChart({ data, title }: PortfolioChartProps) {
             style={{ fontSize: '12px' }}
             tick={{ fill: '#94a3b8' }}
             label={{ value: '€', angle: -90, position: 'insideLeft' }}
+            domain={['dataMin', 'dataMax']}
           />
           <Tooltip
             contentStyle={{

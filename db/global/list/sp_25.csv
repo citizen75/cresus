@@ -1,0 +1,25 @@
+,TickerYahoo,Name,Market Cap,Price,Change,Revenue,Industry,Sector
+0,NVDA,NVIDIA Corporation,≈2.3 T USD,---,---,130.5 B USD,Semiconductors,Information Technology
+0,MSFT,Microsoft Corporation,≈4 T USD,---,---,281.7 B USD,Software - Infrastructure,Information Technology
+0,AAPL,Apple Inc.,---,---,---,394.3 B USD,Consumer Electronics,Information Technology
+0,AMZN,Amazon.com Inc.,---,---,---,574.8 B USD,Internet Retail,Consumer Discretionary
+0,GOOGL,Alphabet Inc. (Class A),---,---,---,282.8 B USD,Internet Content & Information,Communication Services
+0,GOOG,Alphabet Inc. (Class C),---,---,---,282.8 B USD,Internet Content & Information,Communication Services
+0,META,Meta Platforms Inc.,---,---,---,116.6 B USD,Interactive Media & Services,Communication Services
+0,AVGO,Broadcom Inc.,---,---,---,---,Semiconductors,Information Technology
+0,BRK-B,Berkshire Hathaway Inc.,---,---,---,---,Insurance,Financials
+0,TSLA,Tesla Inc.,---,---,---,---,Auto Manufacturers,Consumer Discretionary
+0,JPM,JPMorgan Chase & Co.,---,---,---,---,Commercial Banks,Financials
+0,V,Visa Inc.,---,---,---,---,Consumer Finance,Information Technology
+0,LLY,Eli Lilly and Co.,---,---,---,---,Pharmaceuticals,Health Care
+0,NFLX,Netflix Inc.,---,---,---,---,Entertainment,Communication Services
+0,XOM,Exxon Mobil Corp.,---,---,---,---,Oil & Gas Integrated,Energy
+0,MA,Mastercard Inc.,---,---,---,---,Consumer Finance,Information Technology
+0,WMT,Walmart Inc.,---,---,---,---,Hypermarkets & Super Centers,Consumer Staples
+0,COST,Costco Wholesale Corp.,---,---,---,---,Consumer Staples,Consumer Staples
+0,ORCL,Oracle Corp.,---,---,---,85.6 B USD,Application Software,Information Technology
+0,JNJ,Johnson & Johnson,---,---,---,---,Pharmaceuticals,Health Care
+0,HD,Home Depot Inc.,---,---,---,---,Specialty Retail,Consumer Discretionary
+0,PG,Procter & Gamble Co.,---,---,---,---,Household Products,Consumer Staples
+0,ABBV,AbbVie Inc.,---,---,---,---,Pharmaceuticals,Health Care
+0,BAC,Bank of America Corp.,---,---,---,---,Commercial Banks,Financials

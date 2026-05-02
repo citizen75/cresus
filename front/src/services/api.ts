@@ -30,8 +30,10 @@ class CresusAPI {
     return (await this.client.get(`/portfolios/${name}/metrics`)).data
   }
 
-  async getPortfolioHistory(name: string) {
-    return (await this.client.get(`/portfolios/${name}/history`)).data
+  async getPortfolioHistory(name: string, recalculate: boolean = false) {
+    return (await this.client.get(`/portfolios/${name}/history`, {
+      params: { recalculate }
+    })).data
   }
 
   async getPortfolioAllocation(name: string) {
@@ -82,6 +84,7 @@ class CresusAPI {
     price?: number
     fees?: number
     notes?: string
+    created_at?: string
   }) {
     return (await this.client.put(`/portfolios/${portfolioName}/transactions/${transactionId}`, data)).data
   }

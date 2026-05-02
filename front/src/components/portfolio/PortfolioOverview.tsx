@@ -20,20 +20,94 @@ export default function PortfolioOverview({ name }: PortfolioOverviewProps) {
     return <div className="text-slate-400">Loading portfolio...</div>
   }
 
-  const totalValue = details?.total_value || 0
-  const dailyChange = 12540.32 // Mock data
-  const dailyChangePercent = 1.87
+  // Calculate days to show based on time range
+  const getFilteredHistoryData = (range: string, data: any[]): any[] => {
+    if (!data || data.length === 0) {
+      return [
+        { date: '2026-01-01', value: 100000 },
+        { date: '2026-05-01', value: 100000 },
+      ]
+    }
+
+    switch (range) {
+      case '1D':
+        return data.slice(-1)
+      case '1W':
+        return data.slice(-7)
+      case '1M':
+        return data.slice(-30)
+      case '3M':
+        return data.slice(-90)
+      case 'YTD': {
+        // Find first entry from Jan 1 of current year
+        const today = new Date()
+        const currentYear = today.getFullYear()
+        const ytdStart = new Date(currentYear, 0, 1) // Jan 1 of current year
+        const ytdIndex = data.findIndex((entry) => {
+          const entryDate = new Date(entry.date)
+          return entryDate >= ytdStart
+        })
+        return ytdIndex >= 0 ? data.slice(ytdIndex) : data
+      }
+      case '1Y':
+        return data.slice(-365)
+      case 'All':
+        return data
+      default:
+        return data.slice(-30)
+    }
+  }
+
+  const performanceData = getFilteredHistoryData(timeRange, history?.history || [])
+
+  // Get total value from history (includes positions + cash)
+  let totalValue = details?.total_value || 0
+  let dailyChange = 0
+  let dailyChangePercent = 0
+  let changeLabel = 'Today'
+
+  if (history?.history && history.history.length > 0) {
+    const today = history.history[history.history.length - 1]
+    totalValue = today.value
+
+    // Calculate change from start of selected period
+    if (performanceData && performanceData.length > 0) {
+      const startOfPeriod = performanceData[0]
+      dailyChange = today.value - startOfPeriod.value
+      dailyChangePercent = (dailyChange / startOfPeriod.value) * 100
+
+      // Update label based on time range
+      switch (timeRange) {
+        case '1D':
+          changeLabel = 'Today'
+          break
+        case '1W':
+          changeLabel = 'This Week'
+          break
+        case '1M':
+          changeLabel = 'This Month'
+          break
+        case '3M':
+          changeLabel = 'Last 3 Months'
+          break
+        case 'YTD':
+          changeLabel = 'YTD'
+          break
+        case '1Y':
+          changeLabel = 'Last Year'
+          break
+        case 'All':
+          changeLabel = 'All Time'
+          break
+      }
+    }
+  }
 
   const chartColors = ['#a78bfa', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6']
   const allocationData = allocation?.positions?.map((pos: any) => ({
     name: pos.ticker,
     value: pos.weight,
   })) || []
-
-  const performanceData = history?.history?.slice(-30) || [
-    { date: '2026-01-01', value: 100000 },
-    { date: '2026-05-01', value: 100000 },
-  ]
 
   return (
     <div className="space-y-6">
@@ -43,7 +117,9 @@ export default function PortfolioOverview({ name }: PortfolioOverviewProps) {
           <div>
             <p className="text-slate-400 text-sm mb-2">Total value</p>
             <p className="text-5xl font-bold text-white">€{totalValue.toLocaleString('de-DE', { maximumFractionDigits: 2 })}</p>
-            <p className="text-green-400 text-lg mt-2">+€{dailyChange.toLocaleString()} (+{dailyChangePercent}%) Today</p>
+            <p className={`text-lg mt-2 ${dailyChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              {dailyChange >= 0 ? '+' : ''}€{dailyChange.toLocaleString('de-DE', { maximumFractionDigits: 2 })} ({dailyChangePercent >= 0 ? '+' : ''}{dailyChangePercent.toFixed(2)}%) {changeLabel}
+            </p>
           </div>
           <div className="flex gap-2">
             {['1D', '1W', '1M', '3M', 'YTD', '1Y', 'All'].map((range) => (
@@ -74,7 +150,7 @@ export default function PortfolioOverview({ name }: PortfolioOverviewProps) {
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
               <XAxis dataKey="date" stroke="#94a3b8" style={{ fontSize: '12px' }} />
-              <YAxis stroke="#94a3b8" style={{ fontSize: '12px' }} />
+              <YAxis stroke="#94a3b8" style={{ fontSize: '12px' }} domain={['dataMin', 'dataMax']} />
               <Tooltip
                 contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }}
                 labelStyle={{ color: '#f1f5f9' }}

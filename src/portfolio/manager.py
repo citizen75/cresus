@@ -9,6 +9,8 @@ from loguru import logger
 
 from portfolio.journal import Journal
 from portfolio.data import Fundamental, DataHistory
+from portfolio.cache import PortfolioCache
+from portfolio.portfolio_history import PortfolioHistory
 
 
 class PortfolioManager:
@@ -27,6 +29,7 @@ class PortfolioManager:
         self.orders_dir = Path(orders_dir or project_root / "db/local/orders")
         self.portfolios_dir.mkdir(parents=True, exist_ok=True)
         self.orders_dir.mkdir(parents=True, exist_ok=True)
+        self.cache = PortfolioCache()
 
     def list_portfolios(self) -> List[Dict[str, Any]]:
         """List all portfolios with metrics."""
@@ -94,6 +97,9 @@ class PortfolioManager:
 
             logger.info(f"Created portfolio '{name}'")
 
+            # Update cache for new portfolio
+            self.update_portfolio_cache(name)
+
             return {
                 "status": "success",
                 "portfolio": {
@@ -126,6 +132,9 @@ class PortfolioManager:
             journal = Journal(name)
             if journal.filepath.exists():
                 journal.filepath.unlink()
+
+            # Remove from cache
+            self.cache.delete_portfolio(name)
 
             logger.info(f"Deleted portfolio '{name}'")
 
@@ -214,6 +223,87 @@ class PortfolioManager:
             "total_gain_pct": 0.0,
         }
 
+    def get_portfolio_cash(self, name: str) -> float:
+        """Calculate available cash balance."""
+        # Get initial capital from config
+        initial_capital = 100000.0
+        if self.config_path.exists():
+            config = yaml.safe_load(self.config_path.read_text())
+            for p in config.get("portfolios", []):
+                if p.get("name") == name:
+                    initial_capital = float(p.get("initial_capital", 100000.0))
+                    break
+
+        # Calculate cash from transactions
+        journal = Journal(name)
+        df = journal.load_df()
+
+        if df.empty:
+            return initial_capital
+
+        cash = initial_capital
+        for _, row in df.iterrows():
+            operation = str(row["operation"]).upper()
+            quantity = int(row["quantity"])
+            price = float(row["price"])
+            fees = float(row.get("fees", 0))
+
+            if operation == "BUY":
+                cash -= (quantity * price + fees)
+            elif operation == "SELL":
+                cash += (quantity * price - fees)
+            elif operation == "CASH":
+                # For CASH: quantity is the amount (positive=deposit, negative=withdrawal)
+                cash += quantity
+
+        return round(cash, 2)
+
+    def update_portfolio_cache(self, name: str) -> None:
+        """Update portfolio cache with latest metrics."""
+        details = self.get_portfolio_details(name)
+        perf = self.get_portfolio_performance(name)
+        cash = self.get_portfolio_cash(name)
+
+        if not details or not perf:
+            return
+
+        # Get portfolio config
+        portfolio_config = {}
+        if self.config_path.exists():
+            config = yaml.safe_load(self.config_path.read_text())
+            for p in config.get("portfolios", []):
+                if p.get("name") == name:
+                    portfolio_config = p
+                    break
+
+        # Build cache entry
+        total_value = details.get("total_value", 0)
+        total_portfolio_value = total_value + cash
+        positions = details.get("positions", [])
+
+        cache_entry = {
+            "name": name,
+            "type": portfolio_config.get("type", "paper"),
+            "currency": portfolio_config.get("currency", "EUR"),
+            "description": portfolio_config.get("description", ""),
+            "initial_capital": float(portfolio_config.get("initial_capital", 100000.0)),
+            "positions": {
+                "count": details.get("num_positions", 0),
+                "data": positions,
+            },
+            "metrics": {
+                "total_positions_value": round(total_value, 2),
+                "cash": round(cash, 2),
+                "total_portfolio_value": round(total_portfolio_value, 2),
+                "num_trades": perf.get("num_trades", 0),
+                "buy_trades": perf.get("buy_trades", 0),
+                "sell_trades": perf.get("sell_trades", 0),
+                "total_fees": perf.get("total_fees", 0.0),
+            },
+        }
+
+        self.cache.update_portfolio(name, cache_entry)
+
     def get_portfolio_summary(self, name: str) -> Optional[Dict[str, Any]]:
         """Get portfolio summary."""
         details = self.get_portfolio_details(name)
@@ -234,57 +324,44 @@ class PortfolioManager:
         }
 
     def calculate_portfolio_history(self, name: str, recalculate: bool = False) -> Dict[str, Any]:
-        """Get portfolio value history."""
-        from portfolio.data import DataHistory
+        """Get portfolio value history from transactions.
 
-        positions = self.get_portfolio_positions(name)
-        if not positions:
+        Replays journal transactions to compute daily portfolio value including cash.
+        """
+        # Get initial capital
+        initial_capital = 100000.0
+        if self.config_path.exists():
+            config = yaml.safe_load(self.config_path.read_text())
+            for p in config.get("portfolios", []):
+                if p.get("name") == name:
+                    initial_capital = float(p.get("initial_capital", 100000.0))
+                    break
+
+        # Use PortfolioHistory to calculate
+        ph = PortfolioHistory(name, initial_capital)
+        result = ph.calculate(recalculate)
+
+        if result.get("status") == "error":
             return {
                 "portfolio_name": name,
                 "history": [
-                    {"date": "2026-01-01", "value": 100000},
-                    {"date": "2026-05-01", "value": 100000},
+                    {"date": "2026-01-01", "value": initial_capital},
+                    {"date": "2026-05-01", "value": initial_capital},
                 ],
             }
 
-        # Calculate daily portfolio values from position history
-        history = {}
+        return result
 
-        for pos in positions.get("positions", []):
-            ticker = pos["ticker"]
-            quantity = pos["quantity"]
-            data_hist = DataHistory(ticker)
-            df = data_hist.get_all()
-
-            if df.empty:
-                continue
-
-            df["timestamp"] = pd.to_datetime(df["timestamp"]).dt.tz_localize(None)
-
-            for _, row in df.iterrows():
-                date = row["timestamp"].strftime("%Y-%m-%d")
-                value = row.get("close", 0) * quantity
-                if date not in history:
-                    history[date] = 0
-                history[date] += value
-
-        # Sort by date
-        sorted_history = sorted(history.items())
-
-        return {
-            "portfolio_name": name,
-            "history": [
-                {"date": date, "value": round(value, 2)}
-                for date, value in sorted_history
-            ],
-        }
 
     def record_transaction(self, portfolio_name: str, operation: str, ticker: str, quantity: int, price: float, fees: float = 0, notes: str = "", created_at: Optional[str] = None) -> Dict[str, Any]:
-        """Record a transaction (BUY or SELL)."""
+        """Record a transaction (BUY, SELL, or CASH).
+
+        CASH operations: ticker should be "CASH", quantity is the amount (positive=deposit, negative=withdrawal)
+        """
         journal = Journal(portfolio_name)
         operation_upper = operation.upper()
 
-        if operation_upper not in ("BUY", "SELL"):
+        if operation_upper not in ("BUY", "SELL", "CASH"):
             return {"status": "error", "message": f"Unknown operation: {operation}"}
 
         try:
@@ -297,6 +374,8 @@ class PortfolioManager:
                 notes=notes,
                 created_at=created_at
             )
+            # Update cache after successful transaction
+            self.update_portfolio_cache(portfolio_name)
             return {
                 "status": "success",
                 "operation": "buy" if operation_upper == "BUY" else "sell",

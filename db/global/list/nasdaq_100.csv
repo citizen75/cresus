@@ -1,0 +1,102 @@
+,TickerYahoo,Name,Market Cap,Price,Change,Revenue,Industry,Sector
+1,NVDA,NVIDIA Corporation,3462.85B,141.92,0.50%,148.52B,Semiconductors,Technology
+2,MSFT,Microsoft Corporation,3447.73B,463.87,0.19%,270.01B,Software - Infrastructure,Technology
+3,AAPL,Apple Inc.,3029.28B,202.82,-0.22%,400.37B,Consumer Electronics,Technology
+4,AMZN,Amazon.com Inc.,2200.03B,207.23,0.74%,650.31B,Internet Retail,Consumer Discretionary
+5,GOOGL,Alphabet Inc.,2039.24B,168.05,1.13%,359.71B,Internet Content & Information,Communication Services
+6,GOOG,Alphabet Inc.,2024.91B,169.39,1.00%,359.71B,Internet Content & Information,Communication Services
+7,META,Meta Platforms Inc.,1729.73B,687.95,3.16%,170.36B,Internet Content & Information,Communication Services
+8,AVGO,Broadcom Inc.,1227.58B,261.08,1.65%,54.53B,Semiconductors,Technology
+9,TSLA,Tesla Inc.,1069.52B,332.05,-3.55%,95.72B,Auto Manufacturers,Consumer Discretionary
+10,NFLX,Netflix Inc.,527.56B,1239.66,1.78%,40.17B,Entertainment,Communication Services
+11,COST,Costco Wholesale Corporation,466.62B,1051.69,-0.37%,268.78B,Discount Stores,Consumer Staples
+12,PLTR,Palantir Technologies Inc.,306.81B,130.01,-2.37%,3.12B,Software - Infrastructure,Technology
+13,ASML,ASML Holding N.V.,293.13B,742.78,-0.60%,33.27B,Semiconductor Equipment & Materials,Technology
+14,TMUS,T-Mobile US Inc.,274.73B,241.96,-0.79%,82.69B,Telecom Services,Communication Services
+15,CSCO,Cisco Systems  Inc.,254.98B,64.39,0.05%,55.62B,Communication Equipment,Technology
+16,AZN,AstraZeneca PLC,226.47B,73.00,1.64%,54.98B,Drug Manufacturers - General,Healthcare
+17,LIN,Linde plc,223.02B,473.77,0.41%,33.02B,Specialty Chemicals,Materials
+18,INTU,Intuit Inc.,213.90B,766.81,0.28%,18.18B,Software - Application,Technology
+19,ISRG,Intuitive Surgical Inc.,199.98B,557.95,1.11%,8.71B,Medical Instruments & Supplies,Healthcare
+20,AMD,Advanced Micro Devices Inc.,192.27B,118.58,1.08%,27.75B,Semiconductors,Technology
+21,BKNG,Booking Holdings Inc.,180.83B,5557.00,1.50%,24.09B,Travel Services,Consumer Discretionary
+22,PEP,PepsiCo Inc.,180.63B,131.74,-0.08%,91.52B,Beverages - Non-Alcoholic,Consumer Staples
+23,ADBE,Adobe Inc.,176.41B,413.91,0.34%,22.04B,Software - Application,Technology
+24,TXN,Texas Instruments Incorporated,173.26B,190.72,1.40%,16.05B,Semiconductors,Technology
+25,QCOM,QUALCOMM Incorporated,162.31B,149.05,0.07%,42.29B,Semiconductors,Technology
+26,AMGN,Amgen Inc.,154.33B,287.01,-0.88%,34.13B,Drug Manufacturers - General,Healthcare
+27,HON,Honeywell International Inc.,146.18B,227.45,0.30%,39.22B,Conglomerates,Industrials
+28,PDD,PDD Holdings Inc.,141.47B,99.65,1.34%,55.49B,Internet Retail,Consumer Discretionary
+29,APP,AppLovin Corporation,140.94B,416.52,4.52%,5.14B,Advertising Agencies,Communication Services
+30,ARM,Arm Holdings plc,137.73B,130.36,1.23%,4.01B,Semiconductors,Technology
+31,GILD,Gilead Sciences  Inc.,135.61B,109.02,-0.28%,28.74B,Drug Manufacturers - General,Healthcare
+32,ADP,Automatic Data Processing Inc.,132.42B,326.21,-0.10%,20.20B,Software - Application,Technology
+33,MELI,MercadoLibre  Inc.,130.49B,2573.96,-1.09%,22.38B,Internet Retail,Consumer Discretionary
+34,AMAT,Applied Materials Inc.,129.95B,161.93,0.12%,28.09B,Semiconductor Equipment & Materials,Technology
+35,PANW,Palo Alto Networks Inc.,129.41B,194.07,-1.55%,8.87B,Software - Infrastructure,Technology
+36,CMCSA,Comcast Corporation,128.59B,34.44,-0.63%,123.56B,Telecom Services,Communication Services
+37,MU,Micron Technology Inc.,115.39B,103.25,0.98%,31.32B,Semiconductors,Technology
+38,CRWD,CrowdStrike Holdings Inc.,114.71B,460.56,-5.77%,4.14B,Software - Infrastructure,Technology
+39,VRTX,Vertex Pharmaceuticals Incorporated,114.49B,445.85,-0.14%,11.10B,Biotechnology,Healthcare
+40,LRCX,Lam Research Corporation,108.43B,84.77,1.33%,17.14B,Semiconductor Equipment & Materials,Technology
+41,ADI,Analog Devices Inc.,108.43B,218.50,0.03%,9.82B,Semiconductors,Technology
+42,MSTR,MicroStrategy Incorporated,105.62B,378.10,-2.41%,459.28M,Software - Application,Technology
+43,KLAC,KLA Corporation,103.42B,782.09,0.81%,11.55B,Semiconductor Equipment & Materials,Technology
+44,SBUX,Starbucks Corporation,100.13B,88.11,1.74%,36.35B,Restaurants,Consumer Discretionary
+45,CEG,Constellation Energy Corporation,93.88B,299.54,-4.31%,24.20B,Utilities - Renewable,Utilities
+46,DASH,DoorDash Inc.,93.32B,220.23,3.06%,11.24B,Internet Retail,Consumer Discretionary
+47,CTAS,Cintas Corporation,91.83B,227.41,-0.07%,10.14B,Specialty Business Services,Industrials
+48,INTC,Intel Corporation,88.33B,20.25,-0.20%,53.04B,Semiconductors,Technology
+49,MDLZ,Mondelez International Inc.,86.27B,66.63,-0.61%,36.46B,Confectioners,Consumer Staples
+50,ABNB,Airbnb Inc.,82.40B,133.51,0.46%,11.23B,Travel Services,Consumer Discretionary
+51,CDNS,Cadence Design Systems Inc.,80.38B,294.40,0.36%,4.87B,Software - Application,Technology
+52,ORLY,O'Reilly Automotive Inc.,77.88B,1366.59,-0.40%,16.87B,Auto Parts,Consumer Discretionary
+53,FTNT,Fortinet Inc.,77.78B,101.62,-1.22%,6.14B,Software - Infrastructure,Technology
+54,SNPS,Synopsys Inc.,73.42B,473.19,1.49%,6.22B,Software - Infrastructure,Technology
+55,MAR,Marriott International Inc.,71.74B,261.93,-0.93%,6.68B,Lodging,Consumer Discretionary
+56,PYPL,PayPal Holdings Inc.,70.80B,72.80,2.06%,31.89B,Credit Services,Financials
+57,WDAY,Workday Inc.,66.61B,249.48,-0.65%,8.70B,Software - Application,Technology
+58,ADSK,Autodesk Inc.,63.83B,298.36,-0.39%,6.35B,Software - Application,Technology
+59,MNST,Monster Beverage Corporation,61.60B,63.16,-1.30%,7.45B,Beverages - Non-Alcoholic,Consumer Staples
+60,ROP,Roper Technologies Inc.,61.04B,567.72,-0.03%,7.24B,Software - Application,Technology
+61,AXON,Axon Enterprise Inc.,60.72B,780.00,2.76%,2.23B,Aerospace & Defense,Industrials
+62,CHTR,Charter Communications Inc.,60.12B,388.77,-0.52%,55.14B,Telecom Services,Communication Services
+63,CSX,CSX Corporation,59.98B,31.93,0.22%,14.28B,Railroads,Industrials
+64,PAYX,Paychex Inc.,57.43B,159.45,0.76%,5.44B,Software - Application,Technology
+65,MRVL,Marvell Technology Inc.,57.16B,66.30,6.32%,6.50B,Semiconductors,Technology
+66,TEAM,Atlassian Corporation,55.37B,210.92,0.01%,4.96B,Software - Application,Technology
+67,AEP,American Electric Power Company Inc.,54.41B,101.85,-0.95%,20.16B,Utilities - Regulated Electric,Utilities
+68,NXPI,NXP Semiconductors N.V.,53.06B,210.02,5.56%,12.32B,Semiconductors,Technology
+69,REGN,Regeneron Pharmaceuticals Inc.,51.24B,484.93,-0.60%,14.09B,Biotechnology,Healthcare
+70,CPRT,Copart Inc.,48.71B,50.38,-1.24%,4.59B,Specialty Business Services,Industrials
+71,PCAR,PACCAR Inc,48.61B,92.59,-1.04%,32.36B,Farm & Heavy Construction Machinery,Industrials
+72,FAST,Fastenal Company,46.90B,40.88,-0.75%,7.61B,Industrial Distribution,Industrials
+73,ROST,Ross Stores Inc.,46.86B,142.51,-1.06%,21.26B,Apparel Retail,Consumer Discretionary
+74,ZS,Zscaler Inc.,46.22B,296.85,0.62%,2.55B,Software - Infrastructure,Technology
+75,VRSK,Verisk Analytics Inc.,44.95B,321.33,1.20%,2.93B,Consulting Services,Industrials
+76,KDP,Keurig Dr Pepper Inc.,44.55B,32.80,-0.06%,15.52B,Beverages - Non-Alcoholic,Consumer Staples
+77,EXC,Exelon Corporation,43.16B,42.75,-1.63%,23.70B,Utilities - Regulated Electric,Utilities
+78,IDXX,IDEXX Laboratories Inc.,42.21B,524.88,-0.18%,3.93B,Diagnostics & Research,Healthcare
+79,TTWO,Take-Two Interactive Software Inc.,41.91B,229.18,-0.20%,5.63B,Electronic Gaming & Multimedia,Communication Services
+80,CCEP,Coca-Cola Europacific Partners PLC,41.81B,90.97,0.14%,21.16B,Beverages - Non-Alcoholic,Consumer Staples
+81,DDOG,Datadog Inc.,41.34B,119.70,0.88%,2.83B,Software - Application,Technology
+82,FANG,Diamondback Energy Inc.,40.71B,139.35,-2.06%,12.29B,Oil & Gas Exploration & Production,Energy
+83,LULU,lululemon athletica inc.,40.27B,335.19,0.08%,10.59B,Apparel Retail,Consumer Discretionary
+84,XEL,Xcel Energy Inc.,39.51B,68.50,-1.20%,13.70B,Utilities - Regulated Electric,Utilities
+85,CTSH,Cognizant Technology Solutions Corporation,39.31B,79.74,-0.72%,20.09B,Information Technology Services,Technology
+86,TTD,The Trade Desk Inc.,37.38B,76.05,2.22%,2.57B,Advertising Agencies,Communication Services
+87,EA,Electronic Arts Inc.,37.23B,148.46,1.52%,7.46B,Electronic Gaming & Multimedia,Communication Services
+88,BKR,Baker Hughes Company,36.95B,37.29,-0.67%,27.84B,Oil & Gas Equipment & Services,Energy
+89,MCHP,Microchip Technology Incorporated,34.88B,64.67,1.30%,4.40B,Semiconductors,Technology
+90,ODFL,Old Dominion Freight Line Inc.,34.13B,161.49,-0.94%,5.73B,Trucking,Industrials
+91,DXCM,DexCom Inc.,33.57B,85.61,-1.36%,4.15B,Medical Devices,Healthcare
+92,GEHC,GE HealthCare Technologies Inc.,32.57B,71.13,-0.04%,19.80B,Health Information Services,Healthcare
+93,CSGP,CoStar Group Inc.,32.51B,77.06,1.81%,2.81B,Real Estate Services,Real Estate
+94,KHC,The Kraft Heinz Company,31.60B,26.70,-0.34%,25.43B,Packaged Foods,Consumer Staples
+95,ANSS,ANSYS Inc.,29.61B,336.83,0.58%,2.58B,Software - Application,Technology
+96,WBD,Warner Bros. Discovery Inc.,24.22B,9.79,-1.51%,38.34B,Entertainment,Communication Services
+97,CDW,CDW Corporation,23.28B,176.80,-1.42%,21.33B,Information Technology Services,Technology
+98,ON,ON Semiconductor Corporation,21.01B,50.28,6.14%,6.67B,Semiconductors,Technology
+99,GFS,GlobalFoundries Inc.,20.92B,37.71,2.28%,6.79B,Semiconductors,Technology
+100,BIIB,Biogen Inc.,19.32B,131.88,0.03%,9.82B,Drug Manufacturers - General,Healthcare
+101,MDB,MongoDB Inc.,16.22B,199.73,3.09%,2.01B,Software - Infrastructure,Technology

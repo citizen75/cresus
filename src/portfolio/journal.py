@@ -43,6 +43,9 @@ class Journal:
                        fees: float = 0, notes: str = "", created_at: str = None) -> str:
         """Add a new transaction to journal.
 
+        Operations: BUY, SELL, CASH (deposit/withdrawal)
+        For CASH: ticker should be "CASH", quantity is the amount (positive=deposit, negative=withdrawal)
+
         Returns the transaction ID.
         """
         df = self.load_df()
@@ -51,15 +54,28 @@ class Journal:
         now = datetime.now().isoformat()
         # Use provided created_at or default to now
         tx_created_at = created_at if created_at else now
-        amount = quantity * price
+
+        operation_upper = operation.upper()
+
+        # Handle CASH operations
+        if operation_upper == "CASH":
+            # For CASH: quantity is the amount, ticker is always "CASH"
+            amount = quantity
+            ticker_val = "CASH"
+            price_val = 1.0
+        else:
+            # For BUY/SELL: quantity * price = amount
+            amount = quantity * price
+            ticker_val = ticker.upper()
+            price_val = float(price)
 
         new_row = {
             "id": transaction_id,
             "created_at": tx_created_at,
-            "operation": operation.upper(),
-            "ticker": ticker.upper(),
+            "operation": operation_upper,
+            "ticker": ticker_val,
             "quantity": int(quantity),
-            "price": float(price),
+            "price": price_val,
             "amount": round(amount, 2),
             "fees": float(fees),
             "status": "completed",
@@ -90,6 +106,11 @@ class Journal:
 
             ticker = row["ticker"]
             operation = row["operation"].upper()
+
+            # Skip CASH operations - they don't create positions
+            if operation == "CASH":
+                continue
+
             quantity = row["quantity"]
             price = row["price"]
             fees = row["fees"] if pd.notna(row["fees"]) else 0

@@ -3,6 +3,7 @@
 import cmd2
 from pathlib import Path
 from cli.commands.service import ServiceManager
+from cli.commands.data import DataManager
 
 
 class CresusCLI(cmd2.Cmd):
@@ -21,6 +22,7 @@ Type 'help' for commands or 'quit' to exit.
         super().__init__()
         self.project_root = self._find_project_root()
         self.service_manager = ServiceManager(self.project_root)
+        self.data_manager = DataManager(self.project_root)
         self._setup_history()
 
     def _find_project_root(self) -> Path:
@@ -111,3 +113,159 @@ Type 'help' for commands or 'quit' to exit.
     def do_info(self, _):
         """Show project info."""
         print(f"\nProject Root: {self.project_root}\n")
+
+    def do_data(self, args):
+        """Manage historical and fundamental data: fetch|list|clear|stats [options]"""
+        args_str = str(args).strip() if args else ""
+
+        if not args_str:
+            print("Data management commands:")
+            print("  data fetch history <ticker> [start_date]    Fetch historical data")
+            print("  data fetch fundamental <ticker>             Fetch fundamental data")
+            print("  data fetch universe <name> [start_date]     Fetch all tickers in universe")
+            print("  data list [history|fundamentals|all]        List cached data")
+            print("  data clear [type] [ticker]                  Clear cache")
+            print("    Types: history, fundamentals, all (default: all)")
+            print("  data stats                                  Show cache statistics")
+            print("  data universes                              List available universes")
+            return
+
+        parts = args_str.split()
+        cmd = parts[0] if parts else None
+
+        if cmd == "fetch":
+            if len(parts) < 3:
+                print("Usage: data fetch <history|fundamental|universe> <ticker|name> [start_date]")
+                return
+            data_type = parts[1]
+            target = parts[2]
+            start_date = parts[3] if len(parts) > 3 else None
+
+            if data_type == "history":
+                result = self.data_manager.fetch_history(target, start_date)
+                self._print_result(result)
+            elif data_type == "fundamental":
+                result = self.data_manager.fetch_fundamental(target)
+                self._print_result(result)
+            elif data_type == "universe":
+                result = self.data_manager.fetch_universe(target, start_date)
+                self._print_universe_result(result)
+            else:
+                print(f"Unknown data type: {data_type}")
+
+        elif cmd == "list":
+            data_type = parts[1] if len(parts) > 1 else "all"
+            result = self.data_manager.list_cached(data_type)
+            self._print_list_result(result)
+
+        elif cmd == "clear":
+            data_type = parts[1] if len(parts) > 1 else "all"
+            ticker = parts[2] if len(parts) > 2 else None
+            result = self.data_manager.clear_cache(data_type, ticker)
+            self._print_result(result)
+
+        elif cmd == "stats":
+            result = self.data_manager.cache_stats()
+            self._print_stats_result(result)
+
+        elif cmd == "universes":
+            self._print_universes()
+
+        else:
+            print(f"Unknown command: {cmd}")
+            print("Try: data fetch|list|clear|stats|universes")
+
+    def _print_result(self, result):
+        """Print command result."""
+        status = result.get("status", "unknown")
+        icon = "✓" if status == "success" else "✗"
+        print(f"  {icon} {result.get('message', 'Command executed')}")
+        if status == "error":
+            return
+        for key, value in result.items():
+            if key not in ("status", "message", "ticker"):
+                if isinstance(value, (dict, list)):
+                    print(f"    {key}: {value}")
+                else:
+                    print(f"    {key}: {value}")
+
+    def _print_list_result(self, result):
+        """Print list result."""
+        if result.get("status") == "error":
+            print(f"  ✗ {result.get('message')}")
+            return
+
+        print(f"\n  History ({result.get('total_history', 0)} files):")
+        if result.get("history"):
+            for item in result["history"]:
+                print(f"    {item['ticker']:8} {item['size_kb']:8.1f} KB")
+        else:
+            print("    (empty)")
+
+        print(f"\n  Fundamentals ({result.get('total_fundamentals', 0)} files):")
+        if result.get("fundamentals"):
+            for item in result["fundamentals"]:
+                print(f"    {item['ticker']:8} {item['size_kb']:8.1f} KB")
+        else:
+            print("    (empty)")
+        print()
+
+    def _print_stats_result(self, result):
+        """Print stats result."""
+        if result.get("status") == "error":
+            print(f"  ✗ {result.get('message')}")
+            return
+
+        print("\n  Cache Statistics:")
+        hist = result.get("history", {})
+        print(f"    History:      {hist.get('count', 0)} files, {hist.get('size_mb', 0)} MB")
+        print(f"    Path:         {hist.get('path', 'N/A')}")
+
+        fund = result.get("fundamentals", {})
+        print(f"\n    Fundamentals: {fund.get('count', 0)} files, {fund.get('size_mb', 0)} MB")
+        print(f"    Path:         {fund.get('path', 'N/A')}")
+
+        print(f"\n    Total Size:   {result.get('total_size_mb', 0)} MB")
+        print()
+
+    def _print_universe_result(self, result):
+        """Print universe fetch result."""
+        status = result.get("status", "unknown")
+        icon = "✓" if status == "success" else "✗"
+
+        print(f"\n  {icon} {result.get('message', 'Command executed')}")
+
+        if status == "error":
+            if result.get("available"):
+                print(f"\n    Available universes: {', '.join(result.get('available', []))}")
+            return
+
+        print(f"\n    Universe:  {result.get('universe')}")
+        print(f"    Total:     {result.get('total')} tickers")
+        print(f"    Fetched:   {result.get('fetched')}")
+        print(f"    Failed:    {result.get('failed')}")
+
+        # Show summary stats
+        details = result.get("details", [])
+        successful = [d for d in details if d.get("status") == "success"]
+        if successful:
+            rows_fetched = sum(d.get("rows", 0) for d in successful)
+            print(f"    Rows:      {rows_fetched} total historical prices")
+        print()
+
+    def _print_universes(self):
+        """Print available universes."""
+        from portfolio.universe import Universe
+
+        universes = Universe.list_universes()
+
+        if not universes:
+            print("  No universes found")
+            return
+
+        print(f"\n  Available Universes ({len(universes)}):")
+        for universe_name in universes:
+            info = Universe.get_universe_info(universe_name)
+            if info:
+                print(f"    {universe_name:15} {info.get('count', 0):4} tickers, {info.get('file_size_kb', 0):.1f} KB")
+        print()

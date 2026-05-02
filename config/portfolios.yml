@@ -24,3 +24,8 @@ portfolios:
   initial_capital: 10000.0
   name: PEA Gilles
   type: paper
+- currency: EUR
+  description: Portfolio to test cache
+  initial_capital: 50000.0
+  name: Cache Test Portfolio
+  type: paper

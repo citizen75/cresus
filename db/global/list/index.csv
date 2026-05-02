@@ -1,0 +1,56 @@
+I,Name,TickerYahoo,Market,Currency
+1,S&P 500,^GSPC,USA,USD
+2,Nasdaq-100,^NDX,USA,USD
+3,Dow Jones Industrial Average,^DJI,USA,USD
+4,Russell 2000,^RUT,USA,USD
+5,S&P 100,^OEX,USA,USD
+6,NYSE Composite,^NYA,USA,USD
+7,Nasdaq Composite,^IXIC,USA,USD
+8,Wilshire 5000,^W5000,USA,USD
+9,Russell 1000,^RUI,USA,USD
+10,Russell Midcap,^RMC,USA,USD
+11,S&P 400,^MID,USA,USD
+12,CBOE Volatility Index,^VIX,USA,USD
+13,CAC 40,^FCHI,France,EUR
+14,DAX,^GDAXI,Germany,EUR
+15,FTSE 100,^FTSE,UK,GBP
+16,IBEX 35,^IBEX,Spain,EUR
+17,FTSE MIB,FTSEMIB.MI,Italy,EUR
+18,Stoxx Europe 50,^STOXX50E,Europe,EUR
+19,Stoxx Europe 600,^STOXX,Europe,EUR
+20,Euro Stoxx 50,^STOXX50E,Europe,EUR
+21,AEX,^AEX,Netherlands,EUR
+22,OMX Stockholm 30,^OMX,Sweden,SEK
+23,BEL 20,^BFX,Belgium,EUR
+24,SMI,^SSMI,Switzerland,CHF
+25,OMX Helsinki 25,^OMXH25,Finland,EUR
+26,WIG 20,^WIG20,Poland,PLN
+27,PX Index,^PX,Czech Republic,CZK
+28,BUX,^BUX,Hungary,HUF
+29,SOFIX,^SOFIX,Bulgaria,BGN
+30,Nikkei 225,^N225,Japan,JPY
+31,Topix,^TOPX,Japan,JPY
+32,Nikkei 400,^NK400,Japan,JPY
+33,Hang Seng,^HSI,Hong Kong,HKD
+34,Shanghai Composite,000001.SS,China,CNY
+35,Shenzhen Component,399001.SZ,China,CNY
+36,CSI 300,000300.SS,China,CNY
+37,BSE Sensex,^BSESN,India,INR
+38,NSE Nifty 50,^NSEI,India,INR
+39,Jakarta Composite,^JKSE,Indonesia,IDR
+40,SET Index,^SET,Thailand,THB
+41,KOSPI,^KS11,Korea,KRW
+42,Taiwan Weighted Index,^TWII,Taiwan,TWD
+43,Singapore Straits Times,^STI,Singapore,SGD
+44,Philippine SE Index,^PSI,Philippines,PHP
+45,Malaysia KLCI,^KLSE,Malaysia,MYR
+47,ASX 200,^AXJO,Australia,AUD
+48,NZX 50,^NZ50,New Zealand,NZD
+50,Istanbul SE Index,XU100.IS,Turkey,TRY
+55,Kuwait SE Price Index,^KWSE,Kuwait,KWD
+59,MERVAL,^MERV,Argentina,ARS
+60,Bovespa,^BVSP,Brazil,BRL
+61,Mexico IPC,^MXX,Mexico,MXN
+62,S&P CLX General Index,^IPSA,Chile,CLP
+66,MICEX,MOEX,Russia,RUB
+70,VIX Index,^VIX,USA,USD

@@ -52,6 +52,7 @@ export default function TransactionsView({ name, filterTicker }: TransactionsVie
   const handleEdit = (transaction: Transaction) => {
     setEditingId(transaction.id)
     setEditData({
+      created_at: transaction.created_at,
       quantity: transaction.quantity,
       price: transaction.price,
       fees: transaction.fees,
@@ -134,7 +135,20 @@ export default function TransactionsView({ name, filterTicker }: TransactionsVie
                   {paginatedTransactions.map((tx: Transaction) => (
                     <tr key={tx.id} className="border-t border-slate-800 hover:bg-slate-800/30 transition">
                       <td className="px-4 py-3 text-slate-300 text-sm">
-                        {new Date(tx.created_at).toLocaleDateString('de-DE')}
+                        {editingId === tx.id ? (
+                          <input
+                            type="date"
+                            value={editData.created_at.split('T')[0]}
+                            onChange={(e) => {
+                              const dateStr = e.target.value
+                              const fullDateTime = `${dateStr}T${editData.created_at.split('T')[1] || '00:00:00'}`
+                              setEditData({ ...editData, created_at: fullDateTime })
+                            }}
+                            className="w-32 px-2 py-1 bg-slate-700 border border-slate-600 text-white rounded"
+                          />
+                        ) : (
+                          new Date(tx.created_at).toLocaleDateString('de-DE')
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <span

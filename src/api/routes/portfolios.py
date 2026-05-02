@@ -39,6 +39,17 @@ async def list_portfolios():
     return {"portfolios": pm.list_portfolios()}
 
 
+@router.get("/cache/all")
+async def get_portfolio_cache():
+    """Get all portfolios from cache."""
+    pm = _get_portfolio_manager()
+    cached = pm.cache.get_all_portfolios()
+    return {
+        "cached_portfolios": cached,
+        "count": len(cached),
+    }
+
+
 @router.post("")
 async def create_portfolio(req: CreatePortfolioRequest):
     """Create new portfolio with default strategy."""
@@ -177,7 +188,10 @@ async def get_portfolio_value(name: str, use_cache: bool = True):
 
 @router.get("/{name}/history")
 async def get_portfolio_history(name: str, recalculate: bool = False):
-    """Get portfolio value history."""
+    """Get portfolio value history from transactions.
+
+    Returns daily portfolio values (positions + cash) replayed from journal.
+    """
     pm = _get_portfolio_manager()
     result = pm.calculate_portfolio_history(name, recalculate)
     if "error" in result:
@@ -197,14 +211,18 @@ async def refresh_portfolio(name: str):
 
 @router.post("/{name}/transactions")
 async def record_transaction(name: str, data: Dict[str, Any]):
-    """Record a transaction."""
+    """Record a transaction.
+
+    Operations: BUY, SELL, CASH
+    For CASH: ticker should be "CASH", quantity is the amount (positive=deposit, negative=withdrawal)
+    """
     pm = _get_portfolio_manager()
     result = pm.record_transaction(
         name,
         data.get("operation", ""),
-        data.get("ticker", ""),
+        data.get("ticker", "CASH") if data.get("operation", "").upper() == "CASH" else data.get("ticker", ""),
         data.get("quantity", 0),
-        data.get("price", 0),
+        data.get("price", 1.0) if data.get("operation", "").upper() == "CASH" else data.get("price", 0),
         data.get("fees", 0),
         data.get("notes", ""),
         data.get("created_at"),
@@ -348,10 +366,16 @@ async def get_current_prices(name: str):
             "last_updated": Fundamental(ticker).load().get("timestamp") if Fundamental(ticker).load() else None,
         })
 
+    # Get cash balance
+    cash = pm.get_portfolio_cash(name)
+    total_value_with_cash = total_value + cash
+
     return {
         "name": name,
         "positions": positions_with_prices,
         "total_value": round(total_value, 2),
+        "cash": round(cash, 2),
+        "total_portfolio_value": round(total_value_with_cash, 2),
         "timestamp": datetime.now().isoformat(),
     }
 
@@ -375,9 +399,15 @@ async def update_transaction(name: str, transaction_id: str, data: Dict[str, Any
         df.loc[idx, "amount"] = float(df.loc[idx, "quantity"]) * float(df.loc[idx, "price"])
         df.loc[idx, "fees"] = float(data.get("fees", df.loc[idx, "fees"]))
         df.loc[idx, "notes"] = data.get("notes", df.loc[idx, "notes"])
+        if "created_at" in data and data["created_at"]:
+            df.loc[idx, "created_at"] = data["created_at"]
         df.loc[idx, "status_at"] = datetime.now().isoformat()
 
         journal.save(df)
+
+        # Update portfolio cache
+        pm = _get_portfolio_manager()
+        pm.update_portfolio_cache(name)
 
         return {
             "status": "success",
@@ -402,6 +432,10 @@ async def delete_transaction(name: str, transaction_id: str):
     try:
         df = df[df["id"] != transaction_id]
         journal.save(df)
+
+        # Update portfolio cache
+        pm = _get_portfolio_manager()
+        pm.update_portfolio_cache(name)
 
         return {
             "status": "success",

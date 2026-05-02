@@ -1,4 +1,4 @@
-import { usePortfolioMetrics, useCurrentPrices } from '@/hooks/usePortfolio'
+import { usePortfolioMetrics, useCurrentPrices, usePortfolioHistory } from '@/hooks/usePortfolio'
 import { useState } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 import PositionModal from './PositionModal'
@@ -14,6 +14,7 @@ const chartColors = ['#a78bfa', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b
 export default function HoldingsView({ name, onViewTransactions }: HoldingsViewProps) {
   const { data: metrics } = usePortfolioMetrics(name)
   const { data: priceData, isLoading: isPricesLoading, error: pricesError } = useCurrentPrices(name)
+  const { data: history } = usePortfolioHistory(name)
   const [activeTab, setActiveTab] = useState('positions')
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedPosition, setSelectedPosition] = useState<string | null>(null)
@@ -21,12 +22,105 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null)
   const [selectedPositionData, setSelectedPositionData] = useState<any>(null)
   const [filterTickerForTransactions, setFilterTickerForTransactions] = useState<string | null>(null)
+  const [sortColumn, setSortColumn] = useState<string | null>(null)
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
   const positions = priceData?.positions || []
   const totalValue = priceData?.total_value || 0
+  const cash = priceData?.cash || 0
+  const totalPortfolioValue = priceData?.total_portfolio_value || totalValue
   const itemsPerPage = 10
-  const totalPages = Math.ceil(positions.length / itemsPerPage)
-  const paginatedPositions = positions.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+
+  // Sorting logic
+  const getSortedPositions = () => {
+    if (!sortColumn) return positions
+
+    return [...positions].sort((a: any, b: any) => {
+      let aVal, bVal
+
+      switch (sortColumn) {
+        case 'symbol':
+          aVal = a.ticker.toLowerCase()
+          bVal = b.ticker.toLowerCase()
+          break
+        case 'company':
+          aVal = (a.company_name || a.ticker).toLowerCase()
+          bVal = (b.company_name || b.ticker).toLowerCase()
+          break
+        case 'sector':
+          aVal = (a.sector || 'unknown').toLowerCase()
+          bVal = (b.sector || 'unknown').toLowerCase()
+          break
+        case 'type':
+          aVal = (a.asset_type || 'stock').toLowerCase()
+          bVal = (b.asset_type || 'stock').toLowerCase()
+          break
+        case 'weight':
+          aVal = (a.position_value / totalValue) * 100
+          bVal = (b.position_value / totalValue) * 100
+          break
+        case 'shares':
+          aVal = a.quantity
+          bVal = b.quantity
+          break
+        case 'avg_cost':
+          aVal = a.avg_entry_price
+          bVal = b.avg_entry_price
+          break
+        case 'price':
+          aVal = a.current_price
+          bVal = b.current_price
+          break
+        case 'market_value':
+          aVal = a.position_value
+          bVal = b.position_value
+          break
+        case 'unrealized_pnl':
+          aVal = a.position_gain
+          bVal = b.position_gain
+          break
+        case 'pnl_pct':
+          aVal = a.position_gain_pct
+          bVal = b.position_gain_pct
+          break
+        default:
+          return 0
+      }
+
+      // String comparison
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        return sortDirection === 'asc'
+          ? aVal.localeCompare(bVal)
+          : bVal.localeCompare(aVal)
+      }
+
+      // Numeric comparison
+      if (sortDirection === 'asc') {
+        return aVal > bVal ? 1 : aVal < bVal ? -1 : 0
+      } else {
+        return bVal > aVal ? 1 : bVal < aVal ? -1 : 0
+      }
+    })
+  }
+
+  const handleColumnSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortColumn(column)
+      setSortDirection('asc')
+    }
+    setCurrentPage(1)
+  }
+
+  const getSortIndicator = (column: string) => {
+    if (sortColumn !== column) return ''
+    return sortDirection === 'asc' ? ' ↑' : ' ↓'
+  }
+
+  const sortedPositions = getSortedPositions()
+  const totalPages = Math.ceil(sortedPositions.length / itemsPerPage)
+  const paginatedPositions = sortedPositions.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
 
   // Calculate sector exposure from positions
   const sectorMap = new Map<string, number>()
@@ -43,12 +137,23 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
   // Calculate summary metrics
   const unrealizedPNL = positions.reduce((sum: number, pos: any) => sum + (pos.position_gain || 0), 0)
   const unrealizedPNLPercent = totalValue > 0 ? (unrealizedPNL / (totalValue - unrealizedPNL)) * 100 : 0
-  const dayPNL = 0  // Would need historical data to calculate
-  const dayPNLPercent = 0
-  const cash = 0  // Would come from portfolio cash balance
-  const cashPercent = 0
+
+  // Calculate Day P&L from history
+  let dayPNL = 0
+  let dayPNLPercent = 0
+  if (history && history.history && Array.isArray(history.history) && history.history.length >= 2) {
+    const historyData = history.history
+    const today = historyData[historyData.length - 1]
+    const yesterday = historyData[historyData.length - 2]
+    if (today && yesterday && typeof today.value === 'number' && typeof yesterday.value === 'number') {
+      dayPNL = today.value - yesterday.value
+      dayPNLPercent = yesterday.value > 0 ? (dayPNL / yesterday.value) * 100 : 0
+    }
+  }
+
+  const cashPercent = totalPortfolioValue > 0 ? (cash / totalPortfolioValue) * 100 : 0
   const invested = totalValue
-  const investedPercent = 100
+  const investedPercent = totalPortfolioValue > 0 ? (totalValue / totalPortfolioValue) * 100 : 0
 
   const tabs = ['Overview', 'Positions', 'Allocation', 'Performance', 'Risk', 'Transactions', 'Exposure', 'Income']
 
@@ -100,14 +205,14 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
       <div className="grid grid-cols-5 gap-4">
         <div className="bg-slate-900 rounded-lg p-4 border border-slate-800">
           <p className="text-slate-400 text-xs uppercase mb-2">Total Value</p>
-          <p className="text-white font-bold text-2xl">€{totalValue.toLocaleString('de-DE', { maximumFractionDigits: 2 })}</p>
+          <p className="text-white font-bold text-2xl">€{totalPortfolioValue.toLocaleString('de-DE', { maximumFractionDigits: 2 })}</p>
           <p className="text-green-400 text-sm mt-1">+€12,540.32 (+1.87%)</p>
         </div>
 
         <div className="bg-slate-900 rounded-lg p-4 border border-slate-800">
           <p className="text-slate-400 text-xs uppercase mb-2">Day P&L</p>
-          <p className="text-green-400 font-bold text-2xl">+€{dayPNL.toLocaleString('de-DE', { maximumFractionDigits: 2 })}</p>
-          <p className="text-green-400 text-sm mt-1">(+{dayPNLPercent.toFixed(2)}%)</p>
+          <p className={`${dayPNL >= 0 ? 'text-green-400' : 'text-red-400'} font-bold text-2xl`}>{dayPNL >= 0 ? '+' : ''}€{dayPNL.toLocaleString('de-DE', { maximumFractionDigits: 2 })}</p>
+          <p className={`${dayPNL >= 0 ? 'text-green-400' : 'text-red-400'} text-sm mt-1`}>({dayPNL >= 0 ? '+' : ''}{dayPNLPercent.toFixed(2)}%)</p>
         </div>
 
         <div className="bg-slate-900 rounded-lg p-4 border border-slate-800">
@@ -215,17 +320,39 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
                   <table className="w-full text-sm">
                     <thead className="bg-slate-800/50 border-b border-slate-800">
                       <tr>
-                        <th className="px-4 py-3 text-left text-slate-400 font-medium">Symbol</th>
-                        <th className="px-4 py-3 text-left text-slate-400 font-medium">Company</th>
-                        <th className="px-4 py-3 text-left text-slate-400 font-medium">Sector</th>
-                        <th className="px-4 py-3 text-left text-slate-400 font-medium">Type</th>
-                        <th className="px-4 py-3 text-left text-slate-400 font-medium">Weight</th>
-                        <th className="px-4 py-3 text-left text-slate-400 font-medium">Shares</th>
-                        <th className="px-4 py-3 text-left text-slate-400 font-medium">Avg. Cost</th>
-                        <th className="px-4 py-3 text-left text-slate-400 font-medium">Price</th>
-                        <th className="px-4 py-3 text-left text-slate-400 font-medium">Market Value</th>
-                        <th className="px-4 py-3 text-left text-slate-400 font-medium">Unrealized P&L</th>
-                        <th className="px-4 py-3 text-left text-slate-400 font-medium">P&L %</th>
+                        <th className="px-4 py-3 text-left text-slate-400 font-medium cursor-pointer hover:text-slate-200 transition" onClick={() => handleColumnSort('symbol')}>
+                          Symbol{getSortIndicator('symbol')}
+                        </th>
+                        <th className="px-4 py-3 text-left text-slate-400 font-medium cursor-pointer hover:text-slate-200 transition" onClick={() => handleColumnSort('company')}>
+                          Company{getSortIndicator('company')}
+                        </th>
+                        <th className="px-4 py-3 text-left text-slate-400 font-medium cursor-pointer hover:text-slate-200 transition" onClick={() => handleColumnSort('sector')}>
+                          Sector{getSortIndicator('sector')}
+                        </th>
+                        <th className="px-4 py-3 text-left text-slate-400 font-medium cursor-pointer hover:text-slate-200 transition" onClick={() => handleColumnSort('type')}>
+                          Type{getSortIndicator('type')}
+                        </th>
+                        <th className="px-4 py-3 text-left text-slate-400 font-medium cursor-pointer hover:text-slate-200 transition" onClick={() => handleColumnSort('weight')}>
+                          Weight{getSortIndicator('weight')}
+                        </th>
+                        <th className="px-4 py-3 text-left text-slate-400 font-medium cursor-pointer hover:text-slate-200 transition" onClick={() => handleColumnSort('shares')}>
+                          Shares{getSortIndicator('shares')}
+                        </th>
+                        <th className="px-4 py-3 text-left text-slate-400 font-medium cursor-pointer hover:text-slate-200 transition" onClick={() => handleColumnSort('avg_cost')}>
+                          Avg. Cost{getSortIndicator('avg_cost')}
+                        </th>
+                        <th className="px-4 py-3 text-left text-slate-400 font-medium cursor-pointer hover:text-slate-200 transition" onClick={() => handleColumnSort('price')}>
+                          Price{getSortIndicator('price')}
+                        </th>
+                        <th className="px-4 py-3 text-left text-slate-400 font-medium cursor-pointer hover:text-slate-200 transition" onClick={() => handleColumnSort('market_value')}>
+                          Market Value{getSortIndicator('market_value')}
+                        </th>
+                        <th className="px-4 py-3 text-left text-slate-400 font-medium cursor-pointer hover:text-slate-200 transition" onClick={() => handleColumnSort('unrealized_pnl')}>
+                          Unrealized P&L{getSortIndicator('unrealized_pnl')}
+                        </th>
+                        <th className="px-4 py-3 text-left text-slate-400 font-medium cursor-pointer hover:text-slate-200 transition" onClick={() => handleColumnSort('pnl_pct')}>
+                          P&L %{getSortIndicator('pnl_pct')}
+                        </th>
                         <th className="px-4 py-3 text-left text-slate-400 font-medium">Actions</th>
                       </tr>
                     </thead>
@@ -290,7 +417,7 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
             {/* Pagination */}
             <div className="px-6 py-4 border-t border-slate-800 bg-slate-900 flex items-center justify-between text-sm">
               <p className="text-slate-400">
-                Showing {Math.min((currentPage - 1) * itemsPerPage + 1, positions.length)}-{Math.min(currentPage * itemsPerPage, positions.length)} of {positions.length} positions
+                Showing {Math.min((currentPage - 1) * itemsPerPage + 1, sortedPositions.length)}-{Math.min(currentPage * itemsPerPage, sortedPositions.length)} of {sortedPositions.length} positions
               </p>
               <div className="flex items-center gap-2">
                 <button
