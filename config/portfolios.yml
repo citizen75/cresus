@@ -1,0 +1,16 @@
+portfolios:
+- currency: EUR
+  description: Main portfolio
+  gsheet:
+    enabled: false
+    sheet_id: ''
+    sheet_name: Positions
+    sheet_range: A1:J500
+  initial_capital: 100000
+  name: main
+  type: paper
+- currency: EUR
+  description: Momentum for cac40
+  initial_capital: 10000.0
+  name: Momentum cac
+  type: paper

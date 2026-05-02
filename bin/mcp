@@ -1,0 +1,24 @@
+#!/usr/bin/env python3
+"""Entry point for Cresus MCP server."""
+import os
+import sys
+
+# CRITICAL: Set project root BEFORE any other code
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.environ.setdefault("CRESUS_PROJECT_ROOT", project_root)
+
+# Set up paths
+sys.path.insert(0, project_root)
+sys.path.insert(0, os.path.join(project_root, "src"))
+os.chdir(project_root)
+
+# CRITICAL: Configure logging to stderr BEFORE importing anything else
+from loguru import logger
+logger.remove()
+logger.add(sys.stderr, level=os.environ.get("CRESUS_LOG_LEVEL", "INFO"))
+logger.add("logs/mcp.log", rotation="10 MB", retention="7 days", level="DEBUG")
+
+from src.mcp.main import main
+
+if __name__ == "__main__":
+    main()

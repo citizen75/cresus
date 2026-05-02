@@ -1,0 +1,21 @@
+servers:
+  api:
+    host: "0.0.0.0"
+    port: 8000
+    log_file: "logs/api.log"
+  mcp:
+    log_file: "logs/mcp.log"
+  front:
+    port: 5173
+    api_url: "http://localhost:8000"
+    log_file: "logs/front.log"
+
+db:
+  portfolios_dir: "db/local/portfolios"
+  cache_dir: "db/local/cache"
+  orders_dir: "db/local/orders"
+  history_dir: "db/local/history"
+
+gsheet:
+  credentials_path: "~/.config/cresus/gsheet_credentials.json"
+  token_path: "~/.config/cresus/gsheet_token.json"

@@ -1,0 +1,21 @@
+#!/bin/bash
+# Entry point for Cresus frontend (Vite dev server)
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+export CRESUS_PROJECT_ROOT="$PROJECT_ROOT"
+export VITE_API_URL="http://localhost:8000"
+
+cd "$PROJECT_ROOT/front"
+
+# Check if node_modules exists, install if needed
+if [ ! -d "node_modules" ]; then
+    echo "Installing npm dependencies..."
+    npm install
+fi
+
+# Start Vite dev server
+echo "Starting Cresus frontend on http://localhost:5173"
+npm run dev

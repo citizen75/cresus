@@ -1,0 +1,13 @@
+server:
+  name: "cresus-portfolio"
+  version: "1.0.0"
+  description: "Cresus Portfolio MCP Server"
+
+tools:
+  - portfolio_list
+  - portfolio_details
+  - portfolio_value
+  - portfolio_performance
+  - portfolio_metrics
+  - portfolio_history
+  - portfolio_positions
