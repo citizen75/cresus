@@ -23,7 +23,7 @@ class TestWatchlistFlow:
 		assert flow.strategy_name == "test_strategy"
 		assert flow.context is not None
 		assert isinstance(flow.context, AgentContext)
-		assert flow.strategy_agent is not None
+		assert len(flow.steps) == 2  # strategy and watchlist steps
 
 	def test_watchlist_flow_initialization_creates_context(self):
 		"""Test that WatchlistFlow creates a new context."""
@@ -32,10 +32,13 @@ class TestWatchlistFlow:
 		assert flow.context is not None
 
 	def test_watchlist_flow_initialization_creates_strategy_agent(self):
-		"""Test that WatchlistFlow creates a StrategyAgent with correct name."""
+		"""Test that WatchlistFlow creates steps with correct agents."""
 		flow = WatchlistFlow("my_strategy")
-		assert flow.strategy_agent.name == "StrategyAgent[my_strategy]"
-		assert flow.strategy_agent.context is flow.context
+		assert len(flow.steps) == 2
+		assert flow.steps[0].name == "strategy"
+		assert flow.steps[0].agent_name == "StrategyAgent[my_strategy]"
+		assert flow.steps[1].name == "watchlist"
+		assert flow.steps[1].agent_name == "WatchListAgent"
 
 	def test_watchlist_flow_process_with_valid_input(self):
 		"""Test that process returns success with valid input."""
@@ -113,7 +116,7 @@ class TestWatchlistFlow:
 		flow2.process({"tickers": ["GOOGL"]})
 
 		assert flow1.context is not flow2.context
-		assert flow1.strategy_agent.context is not flow2.strategy_agent.context
+		assert flow1.steps[0].agent_class == flow2.steps[0].agent_class
 
 	def test_watchlist_flow_with_complex_input(self):
 		"""Test process with complex nested input data."""
@@ -185,7 +188,7 @@ class TestWatchlistFlow:
 		for strategy in strategies:
 			flow = WatchlistFlow(strategy)
 			assert flow.strategy_name == strategy
-			assert flow.strategy_agent.name == f"StrategyAgent[{strategy}]"
+			assert flow.steps[0].agent_name == f"StrategyAgent[{strategy}]"
 
 	def test_watchlist_flow_context_shares_between_agents(self):
 		"""Test that context is shared between strategy and watchlist agents."""
@@ -267,9 +270,9 @@ class TestWatchlistFlow:
 		assert "watchlist" in result
 
 	def test_watchlist_flow_agent_names_are_unique_per_flow(self):
-		"""Test that each flow instance creates unique agents."""
+		"""Test that each flow instance creates unique agent names."""
 		flow1 = WatchlistFlow("strategy1")
 		flow2 = WatchlistFlow("strategy2")
 
-		assert flow1.strategy_agent.name != flow2.strategy_agent.name
-		assert flow1.strategy_agent.context is not flow2.strategy_agent.context
+		assert flow1.steps[0].agent_name != flow2.steps[0].agent_name
+		assert flow1.context is not flow2.context
