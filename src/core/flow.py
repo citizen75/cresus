@@ -23,20 +23,29 @@ class Flow:
 	and handling errors at each step.
 	"""
 
-	def __init__(self, name: str):
+	def __init__(self, name: str, context: Optional[AgentContext] = None):
 		"""Initialize a flow.
 
 		Args:
 			name: Name of the flow
+			context: Optional existing AgentContext. If None, a new context is created
 		"""
 		if not name or not isinstance(name, str):
 			raise ValueError("Flow name must be a non-empty string")
 
 		self.name = name
 		self.steps: List[Dict[str, Any]] = []
-		self.context = AgentContext()
+
+		# Use provided context or create new one
+		if context is None:
+			self.context = AgentContext()
+		else:
+			self.context = context
+
 		self.context.set("flow_name", name)
-		self.context.set("logger", AgentLogger(name))
+		# Only set logger if not already present
+		if not self.context.get("logger"):
+			self.context.set("logger", AgentLogger(name))
 		self.logger = self.context.get("logger")
 		self.execution_history: List[Dict[str, Any]] = []
 		self.start_time: Optional[datetime] = None
