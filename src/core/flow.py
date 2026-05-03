@@ -1,24 +1,247 @@
 
+"""Base Flow class for orchestrating multi-agent workflows."""
+
+import sys
+from pathlib import Path
+from typing import Any, Dict, Optional, List
+from datetime import datetime
+
+# Ensure agents module is in path
+agents_path = Path(__file__).parent.parent / "agents"
+if str(agents_path) not in sys.path:
+	sys.path.insert(0, str(agents_path))
+
+from agents.core.context import AgentContext
+from agents.core.logger import AgentLogger
+from agents.core.agent import Agent
 
 
 class Flow:
-    def __init__(self, name: str):
-        self.name = name
-        self.steps = []
-        self.context = AgentContext()  # Shared context for all agents in the flow
-        self.context.set("flow_name", name)  # Store flow name in context for reference
-        self.context.set("logger", AgentLogger(name))  # Add logger to context for agents to use
-        self.logger = self.context.get("logger")  # Flow logger for flow-level logging
-        
+	"""Base class for orchestrating multi-agent workflows.
 
-    def add_step(self, agent_instance: Agent):
-        # Implement logic to add an agent step to the flow
-        pass
+	Manages a sequence of agents that execute in order, sharing context
+	and handling errors at each step.
+	"""
 
-    def process(self):
-        # Implement the logic to run the flow using the strategy, data, and market data
-        for step in self.steps:
-            result = step.run()
-            if result.get("status") == "error":
-                self.logger.error(f"Step {step.name} failed: {result.get('message')}")
-                return {"status": "error", "message": f"Step {step.name} failed: {result.get('message')}"}
+	def __init__(self, name: str):
+		"""Initialize a flow.
+
+		Args:
+			name: Name of the flow
+		"""
+		if not name or not isinstance(name, str):
+			raise ValueError("Flow name must be a non-empty string")
+
+		self.name = name
+		self.steps: List[Dict[str, Any]] = []
+		self.context = AgentContext()
+		self.context.set("flow_name", name)
+		self.context.set("logger", AgentLogger(name))
+		self.logger = self.context.get("logger")
+		self.execution_history: List[Dict[str, Any]] = []
+		self.start_time: Optional[datetime] = None
+		self.end_time: Optional[datetime] = None
+
+	def add_step(self, agent: Agent, step_name: Optional[str] = None, required: bool = True) -> "Flow":
+		"""Add an agent step to the flow.
+
+		Args:
+			agent: Agent instance to add
+			step_name: Optional name for the step (defaults to agent name)
+			required: Whether step failure halts the flow
+
+		Returns:
+			Self for method chaining
+		"""
+		if not isinstance(agent, Agent):
+			raise TypeError("step must be an Agent instance")
+
+		step = {
+			"name": step_name or agent.name,
+			"agent": agent,
+			"required": required,
+			"result": None,
+			"error": None,
+			"start_time": None,
+			"end_time": None,
+		}
+
+		self.steps.append(step)
+		self.logger.debug(f"Added step '{step['name']}' to flow '{self.name}'")
+		return self
+
+	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+		"""Execute the flow.
+
+		Runs all steps sequentially, sharing context between agents.
+		Stops on first required step failure.
+
+		Args:
+			input_data: Initial input data for the flow
+
+		Returns:
+			Flow result with status and execution history
+		"""
+		if input_data is None:
+			input_data = {}
+
+		self.start_time = datetime.now()
+		self.execution_history = []
+		current_input = input_data
+
+		self.logger.info(f"Starting flow '{self.name}' with {len(self.steps)} steps")
+
+		for step in self.steps:
+			step["start_time"] = datetime.now()
+
+			try:
+				self.logger.debug(f"Executing step '{step['name']}'")
+				agent = step["agent"]
+				result = agent.run(current_input)
+				step["result"] = result
+				step["error"] = None
+
+				self.execution_history.append({
+					"step": step["name"],
+					"status": result.get("status"),
+					"output": result.get("output"),
+				})
+
+				# Check for step failure
+				if result.get("status") == "error":
+					self.logger.error(f"Step '{step['name']}' failed: {result.get('message')}")
+
+					if step["required"]:
+						self.end_time = datetime.now()
+						return self._build_error_response(step, result)
+					else:
+						self.logger.warning(f"Optional step '{step['name']}' failed, continuing")
+
+				# Update input for next step
+				current_input = result.get("output", {})
+
+			except Exception as e:
+				error_msg = str(e)
+				step["error"] = error_msg
+				self.logger.exception(f"Step '{step['name']}' raised exception: {error_msg}")
+
+				if step["required"]:
+					self.end_time = datetime.now()
+					return {
+						"status": "error",
+						"flow": self.name,
+						"failed_step": step["name"],
+						"message": f"Step '{step['name']}' failed: {error_msg}",
+						"error": error_msg,
+						"execution_history": self.execution_history,
+					}
+
+			finally:
+				step["end_time"] = datetime.now()
+
+		self.end_time = datetime.now()
+		return self._build_success_response()
+
+	def _build_error_response(self, failed_step: Dict[str, Any], result: Dict[str, Any]) -> Dict[str, Any]:
+		"""Build error response when a step fails.
+
+		Args:
+			failed_step: The step that failed
+			result: The step result
+
+		Returns:
+			Error response dictionary
+		"""
+		return {
+			"status": "error",
+			"flow": self.name,
+			"failed_step": failed_step["name"],
+			"message": result.get("message", "Step failed"),
+			"error": result.get("message"),
+			"execution_history": self.execution_history,
+		}
+
+	def _build_success_response(self) -> Dict[str, Any]:
+		"""Build success response when all steps complete.
+
+		Returns:
+			Success response dictionary
+		"""
+		return {
+			"status": "success",
+			"flow": self.name,
+			"steps_completed": len([s for s in self.steps if s.get("result") is not None]),
+			"total_steps": len(self.steps),
+			"duration_ms": self._get_duration_ms(),
+			"execution_history": self.execution_history,
+		}
+
+	def _get_duration_ms(self) -> Optional[float]:
+		"""Get flow execution duration in milliseconds.
+
+		Returns:
+			Duration in milliseconds or None
+		"""
+		if self.start_time and self.end_time:
+			delta = self.end_time - self.start_time
+			return delta.total_seconds() * 1000
+		return None
+
+	def get_step(self, step_name: str) -> Optional[Dict[str, Any]]:
+		"""Get a step by name.
+
+		Args:
+			step_name: Name of the step
+
+		Returns:
+			Step dictionary or None if not found
+		"""
+		for step in self.steps:
+			if step["name"] == step_name:
+				return step
+		return None
+
+	def get_step_result(self, step_name: str) -> Optional[Dict[str, Any]]:
+		"""Get the result of a specific step.
+
+		Args:
+			step_name: Name of the step
+
+		Returns:
+			Step result or None
+		"""
+		step = self.get_step(step_name)
+		return step.get("result") if step else None
+
+	def run(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+		"""Alias for process() for backward compatibility.
+
+		Args:
+			input_data: Input data for the flow
+
+		Returns:
+			Flow result
+		"""
+		return self.process(input_data)
+
+	def reset(self) -> "Flow":
+		"""Reset flow state for reuse.
+
+		Returns:
+			Self for method chaining
+		"""
+		self.execution_history = []
+		self.start_time = None
+		self.end_time = None
+
+		for step in self.steps:
+			step["result"] = None
+			step["error"] = None
+			step["start_time"] = None
+			step["end_time"] = None
+
+		return self
+
+	def __repr__(self) -> str:
+		"""String representation of the flow."""
+		return f"Flow(name='{self.name}', steps={len(self.steps)})"
