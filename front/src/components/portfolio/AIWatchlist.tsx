@@ -412,19 +412,20 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
                 </div>
 
                 {/* Chart */}
-                <div className="p-4 h-48">
+                <div className="p-4 h-48 bg-slate-800/20">
                   {historicalData[item.ticker] && historicalData[item.ticker].length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={historicalData[item.ticker]}>
+                      <LineChart
+                        data={historicalData[item.ticker]}
+                        margin={{ top: 5, right: 10, left: -20, bottom: 0 }}
+                      >
                         <XAxis
                           dataKey="date"
-                          tick={false}
-                          height={0}
+                          hide={true}
                         />
                         <YAxis
-                          domain="dataMin"
-                          tick={false}
-                          width={0}
+                          hide={true}
+                          domain={['dataMin - 5', 'dataMax + 5']}
                         />
                         <Tooltip
                           contentStyle={{
@@ -440,13 +441,13 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
                           dataKey="close"
                           stroke="#a78bfa"
                           dot={false}
-                          strokeWidth={2}
+                          strokeWidth={2.5}
                           isAnimationActive={false}
                         />
                       </LineChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="flex items-center justify-center h-full text-slate-500">
+                    <div className="flex items-center justify-center h-full text-slate-500 text-sm">
                       Loading chart...
                     </div>
                   )}
