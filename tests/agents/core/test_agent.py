@@ -18,6 +18,12 @@ class TestAgent:
 		"""Test that Agent can be initialized with a name."""
 		agent = Agent("test_agent")
 		assert agent.name == "test_agent"
+		assert agent.logger is not None
+
+	def test_agent_has_logger(self):
+		"""Test that Agent has a logger instance."""
+		agent = Agent("test_agent")
+		assert hasattr(agent, 'logger')
 
 	def test_agent_process_returns_dict(self):
 		"""Test that process() returns a dictionary."""
@@ -45,6 +51,14 @@ class TestAgent:
 		result = agent.process(context, input_data)
 
 		assert result["input"] == input_data
+
+	def test_agent_process_with_none_input(self):
+		"""Test that process() handles None input data."""
+		agent = Agent("test_agent")
+		context = AgentContext()
+		result = agent.process(context, None)
+
+		assert result["input"] == {}
 
 	def test_agent_run_calls_process(self):
 		"""Test that run() calls process()."""
@@ -86,7 +100,7 @@ class TestAgent:
 	def test_agent_run_handles_exception(self):
 		"""Test that run() catches exceptions from process()."""
 		class FailingAgent(Agent):
-			def process(self, context, input_data={}):
+			def process(self, context, input_data=None):
 				raise ValueError("Test error")
 
 		agent = FailingAgent("failing_agent")
@@ -104,7 +118,7 @@ class TestAgent:
 				super().__init__(name)
 				self.exception_type = exception_type
 
-			def process(self, context, input_data={}):
+			def process(self, context, input_data=None):
 				if self.exception_type == "value":
 					raise ValueError("Value error")
 				elif self.exception_type == "key":
@@ -135,7 +149,9 @@ class TestAgent:
 	def test_agent_with_context_data(self):
 		"""Test that agent can access context data."""
 		class ContextAwareAgent(Agent):
-			def process(self, context, input_data={}):
+			def process(self, context, input_data=None):
+				if input_data is None:
+					input_data = {}
 				context_value = context.get("shared_data")
 				return {
 					"status": "success",
@@ -155,7 +171,6 @@ class TestAgent:
 		agent_str = Agent("string_name")
 		assert agent_str.name == "string_name"
 
-		# Agent should accept string names
 		agent_underscore = Agent("agent_with_underscore")
 		assert agent_underscore.name == "agent_with_underscore"
 
@@ -165,7 +180,9 @@ class TestAgent:
 	def test_agent_custom_subclass(self):
 		"""Test that custom agent subclasses work."""
 		class CustomAgent(Agent):
-			def process(self, context, input_data={}):
+			def process(self, context, input_data=None):
+				if input_data is None:
+					input_data = {}
 				output = {
 					"processed": True,
 					"input_keys": list(input_data.keys()),
@@ -185,3 +202,36 @@ class TestAgent:
 		assert result["output"]["agent_name"] == "custom"
 		assert "key1" in result["output"]["input_keys"]
 		assert "key2" in result["output"]["input_keys"]
+
+	def test_agent_process_override(self):
+		"""Test that process() can be overridden in subclasses."""
+		class ProcessingAgent(Agent):
+			def process(self, context, input_data=None):
+				if input_data is None:
+					input_data = {}
+				return {
+					"status": "success",
+					"input": input_data,
+					"output": {"processed": "modified"}
+				}
+
+		agent = ProcessingAgent("processor")
+		context = AgentContext()
+		result = agent.run(context, {"original": "data"})
+
+		assert result["status"] == "success"
+		assert result["output"]["processed"] == "modified"
+		assert result["input"]["original"] == "data"
+
+	def test_agent_exception_in_run(self):
+		"""Test exception handling in run() method."""
+		class ThrowingAgent(Agent):
+			def process(self, context, input_data=None):
+				raise Exception("Custom exception message")
+
+		agent = ThrowingAgent("thrower")
+		context = AgentContext()
+		result = agent.run(context)
+
+		assert result["status"] == "error"
+		assert result["message"] == "Custom exception message"
