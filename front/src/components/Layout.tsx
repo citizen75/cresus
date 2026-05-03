@@ -37,11 +37,11 @@ export default function Layout({ children }: LayoutProps) {
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto">
-          {menuItems.map((item) => {
+          {menuItems.map((item, index) => {
             const isActive = location.pathname === item.path
             return (
               <Link
-                key={item.path}
+                key={`${item.label}-${index}`}
                 to={item.path}
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg transition text-sm font-medium ${
                   isActive

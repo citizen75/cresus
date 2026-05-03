@@ -32,13 +32,26 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
         setLoading(true)
         // Use portfolio name as strategy name (e.g., "Momentum cac" -> "momentum_cac")
         const strategyName = name.toLowerCase().replace(/\s+/g, '_')
-        const response = await fetch(`http://localhost:8000/api/v1/watchlists/${strategyName}`)
+        const apiUrl = `http://localhost:8000/api/v1/watchlists/${strategyName}`
+
+        const response = await fetch(apiUrl, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
 
         if (!response.ok) {
-          throw new Error('Failed to load watchlist')
+          if (response.status === 404) {
+            throw new Error(`Watchlist '${name}' not found. Make sure the strategy has been executed to generate watchlist data.`)
+          }
+          throw new Error(`API error: ${response.status}`)
         }
 
         const data = await response.json()
+
+        if (!data.watchlist || data.watchlist.length === 0) {
+          throw new Error('No watchlist data available for this strategy')
+        }
 
         // Transform API data to table format
         const transformedWatchlist: WatchlistItem[] = data.watchlist.map((item: any, index: number) => ({
@@ -55,7 +68,8 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
         setWatchlist(transformedWatchlist)
         setError(null)
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load watchlist')
+        const errorMsg = err instanceof Error ? err.message : 'Failed to load watchlist'
+        setError(errorMsg)
         setWatchlist([])
       } finally {
         setLoading(false)
@@ -87,8 +101,22 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
   if (error) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-red-400">Error: {error}</div>
+        <div className="bg-slate-900 rounded-lg border border-red-800/30 p-6">
+          <div className="flex items-start gap-4">
+            <div className="text-red-500 text-2xl">⚠️</div>
+            <div>
+              <h3 className="text-red-400 font-medium mb-2">Unable to load watchlist</h3>
+              <p className="text-slate-400 text-sm mb-4">{error}</p>
+              <div className="text-slate-500 text-xs space-y-1">
+                <p>To use this feature:</p>
+                <ol className="list-decimal list-inside space-y-1 ml-2">
+                  <li>Start the API server: <code className="bg-slate-800 px-2 py-1 rounded">cresus service start api -d</code></li>
+                  <li>Run the strategy: <code className="bg-slate-800 px-2 py-1 rounded">cresus flow run premarket momentum_cac</code></li>
+                  <li>Refresh this page</li>
+                </ol>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     )
