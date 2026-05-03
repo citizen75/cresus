@@ -17,7 +17,6 @@ class CresusCLI(cmd2.Cmd):
 	"""Cresus portfolio management CLI."""
 
 	intro = ""
-	prompt = "[cyan]cresus>[/cyan] "
 
 	def __init__(self):
 		super().__init__()
@@ -25,7 +24,12 @@ class CresusCLI(cmd2.Cmd):
 		self.service_manager = ServiceManager(self.project_root)
 		self.data_manager = DataManager(self.project_root)
 		self._setup_history()
+		self._setup_prompt()
 		self._print_intro()
+
+	def _setup_prompt(self):
+		"""Set up dynamic prompt with context."""
+		self.prompt = "cresus> "
 
 	def _print_intro(self):
 		"""Print welcome banner."""
@@ -35,7 +39,20 @@ class CresusCLI(cmd2.Cmd):
 			box=box.DOUBLE
 		)
 		console.print(banner)
-		console.print("Type [bold]help[/bold] for commands or [bold]quit[/bold] to exit.\n")
+
+		# Print helpful info
+		info_table = Table(box=box.SIMPLE)
+		info_table.add_column("Command", style="cyan")
+		info_table.add_column("Description")
+		info_table.add_row("[bold]help[/bold]", "Show all available commands")
+		info_table.add_row("[bold]service[/bold]", "Manage services (api, mcp, front)")
+		info_table.add_row("[bold]data[/bold]", "Manage portfolio data and cache")
+		info_table.add_row("[bold]history[/bold]", "View command history")
+		info_table.add_row("[bold]quit[/bold] or [bold]exit[/bold]", "Exit the CLI")
+
+		console.print(info_table)
+		console.print(f"\n[dim]Project Root:[/dim] {self.project_root}")
+		console.print("[dim]Command history is saved to ~/.cresus/history[/dim]\n")
 
 	def _find_project_root(self) -> Path:
 		"""Find project root by looking for config/cresus.yml."""
@@ -49,7 +66,23 @@ class CresusCLI(cmd2.Cmd):
 		"""Set up persistent command history."""
 		history_dir = Path.home() / ".cresus"
 		history_dir.mkdir(exist_ok=True)
-		self.persistent_history_file = str(history_dir / "history")
+
+		history_file = history_dir / "history"
+		self.persistent_history_file = str(history_file)
+
+		# Configure cmd2 history settings
+		self.history_file = str(history_file)
+		self.max_history_length = 1000
+		self.debug_mode = False
+
+		# Load existing history if available
+		if history_file.exists():
+			try:
+				with open(history_file, 'r') as f:
+					lines = f.readlines()
+					console.print(f"[dim]Loaded {len(lines)} command(s) from history[/dim]")
+			except Exception as e:
+				console.print(f"[yellow]Warning:[/yellow] Could not load history: {e}")
 
 	def do_service(self, args):
 		"""Manage services: start|stop|status|logs [service] [-d]"""
@@ -342,6 +375,48 @@ class CresusCLI(cmd2.Cmd):
 			table.add_row("Total Rows", str(rows_fetched))
 
 		console.print(table)
+
+	def do_history(self, args):
+		"""View command history: history [N] shows last N commands (default: 20)"""
+		try:
+			count = int(str(args).strip()) if args else 20
+		except ValueError:
+			console.print("[red]✗[/red] Invalid number of commands")
+			return
+
+		if not self.history:
+			console.print("[yellow]No command history[/yellow]")
+			return
+
+		# Get last N commands
+		commands = list(self.history)[-count:]
+
+		table = Table(title=f"Command History (last {len(commands)})", box=box.ROUNDED)
+		table.add_column("#", style="dim")
+		table.add_column("Command", style="cyan")
+
+		for idx, cmd in enumerate(commands, 1):
+			table.add_row(str(idx), str(cmd))
+
+		console.print(table)
+
+	def do_clear(self, _):
+		"""Clear the screen."""
+		console.clear()
+
+	def do_motd(self, _):
+		"""Show welcome banner."""
+		self._print_intro()
+
+	def do_pwd(self, _):
+		"""Show current project root."""
+		panel = Panel(
+			f"[cyan]Project Root:[/cyan]\n{self.project_root}",
+			style="cyan",
+			box=box.ROUNDED,
+			title="Working Directory"
+		)
+		console.print(panel)
 
 	def _print_universes(self):
 		"""Print available universes as a table."""
