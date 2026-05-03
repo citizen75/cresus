@@ -19,24 +19,31 @@ class TestAgent:
 		agent = Agent("test_agent")
 		assert agent.name == "test_agent"
 		assert agent.logger is not None
+		assert agent.context is not None
 
 	def test_agent_has_logger(self):
 		"""Test that Agent has a logger instance."""
 		agent = Agent("test_agent")
 		assert hasattr(agent, 'logger')
+		assert hasattr(agent, 'context')
+
+	def test_agent_initialization_with_context(self):
+		"""Test that Agent can be initialized with a shared context."""
+		context = AgentContext()
+		agent = Agent("test_agent", context=context)
+		assert agent.context is context
+		assert agent.name == "test_agent"
 
 	def test_agent_process_returns_dict(self):
 		"""Test that process() returns a dictionary."""
 		agent = Agent("test_agent")
-		context = AgentContext()
-		result = agent.process(context)
+		result = agent.process()
 		assert isinstance(result, dict)
 
 	def test_agent_process_default_response(self):
 		"""Test that process() returns default response structure."""
 		agent = Agent("test_agent")
-		context = AgentContext()
-		result = agent.process(context)
+		result = agent.process()
 
 		assert "status" in result
 		assert result["status"] == "success"
@@ -46,26 +53,23 @@ class TestAgent:
 	def test_agent_process_with_input_data(self):
 		"""Test that process() handles input data."""
 		agent = Agent("test_agent")
-		context = AgentContext()
 		input_data = {"key": "value", "number": 42}
-		result = agent.process(context, input_data)
+		result = agent.process(input_data)
 
 		assert result["input"] == input_data
 
 	def test_agent_process_with_none_input(self):
 		"""Test that process() handles None input data."""
 		agent = Agent("test_agent")
-		context = AgentContext()
-		result = agent.process(context, None)
+		result = agent.process(None)
 
 		assert result["input"] == {}
 
 	def test_agent_run_calls_process(self):
 		"""Test that run() calls process()."""
 		agent = Agent("test_agent")
-		context = AgentContext()
 		input_data = {"test": "data"}
-		result = agent.run(context, input_data)
+		result = agent.run(input_data)
 
 		assert result["status"] == "success"
 		assert result["input"] == input_data
@@ -73,8 +77,7 @@ class TestAgent:
 	def test_agent_run_with_empty_input(self):
 		"""Test that run() works with empty input data."""
 		agent = Agent("test_agent")
-		context = AgentContext()
-		result = agent.run(context)
+		result = agent.run()
 
 		assert result["status"] == "success"
 		assert result["input"] == {}
@@ -82,8 +85,7 @@ class TestAgent:
 	def test_agent_process_empty_output(self):
 		"""Test that process() returns empty output by default."""
 		agent = Agent("test_agent")
-		context = AgentContext()
-		result = agent.process(context)
+		result = agent.process()
 
 		assert "output" in result
 		assert result["output"] == {}
@@ -100,12 +102,11 @@ class TestAgent:
 	def test_agent_run_handles_exception(self):
 		"""Test that run() catches exceptions from process()."""
 		class FailingAgent(Agent):
-			def process(self, context, input_data=None):
+			def process(self, input_data=None):
 				raise ValueError("Test error")
 
 		agent = FailingAgent("failing_agent")
-		context = AgentContext()
-		result = agent.run(context)
+		result = agent.run()
 
 		assert result["status"] == "error"
 		assert "message" in result
@@ -118,7 +119,7 @@ class TestAgent:
 				super().__init__(name)
 				self.exception_type = exception_type
 
-			def process(self, context, input_data=None):
+			def process(self, input_data=None):
 				if self.exception_type == "value":
 					raise ValueError("Value error")
 				elif self.exception_type == "key":
@@ -126,44 +127,42 @@ class TestAgent:
 				elif self.exception_type == "runtime":
 					raise RuntimeError("Runtime error")
 
-		context = AgentContext()
-
 		# Test ValueError
 		agent1 = FailingAgent("agent1", "value")
-		result1 = agent1.run(context)
+		result1 = agent1.run()
 		assert result1["status"] == "error"
 		assert "Value error" in result1["message"]
 
 		# Test KeyError
 		agent2 = FailingAgent("agent2", "key")
-		result2 = agent2.run(context)
+		result2 = agent2.run()
 		assert result2["status"] == "error"
 		assert "Key error" in result2["message"]
 
 		# Test RuntimeError
 		agent3 = FailingAgent("agent3", "runtime")
-		result3 = agent3.run(context)
+		result3 = agent3.run()
 		assert result3["status"] == "error"
 		assert "Runtime error" in result3["message"]
 
 	def test_agent_with_context_data(self):
-		"""Test that agent can access context data."""
+		"""Test that agent can access context data via self.context."""
 		class ContextAwareAgent(Agent):
-			def process(self, context, input_data=None):
+			def process(self, input_data=None):
 				if input_data is None:
 					input_data = {}
-				context_value = context.get("shared_data")
+				context_value = self.context.get("shared_data")
 				return {
 					"status": "success",
 					"input": input_data,
 					"output": {"context_data": context_value}
 				}
 
-		agent = ContextAwareAgent("aware_agent")
 		context = AgentContext()
 		context.set("shared_data", "test_value")
+		agent = ContextAwareAgent("aware_agent", context=context)
 
-		result = agent.run(context, {"test": "input"})
+		result = agent.run({"test": "input"})
 		assert result["output"]["context_data"] == "test_value"
 
 	def test_agent_name_types(self):
@@ -180,7 +179,7 @@ class TestAgent:
 	def test_agent_custom_subclass(self):
 		"""Test that custom agent subclasses work."""
 		class CustomAgent(Agent):
-			def process(self, context, input_data=None):
+			def process(self, input_data=None):
 				if input_data is None:
 					input_data = {}
 				output = {
@@ -195,8 +194,7 @@ class TestAgent:
 				}
 
 		agent = CustomAgent("custom")
-		context = AgentContext()
-		result = agent.run(context, {"key1": "value1", "key2": "value2"})
+		result = agent.run({"key1": "value1", "key2": "value2"})
 
 		assert result["output"]["processed"] is True
 		assert result["output"]["agent_name"] == "custom"
@@ -206,7 +204,7 @@ class TestAgent:
 	def test_agent_process_override(self):
 		"""Test that process() can be overridden in subclasses."""
 		class ProcessingAgent(Agent):
-			def process(self, context, input_data=None):
+			def process(self, input_data=None):
 				if input_data is None:
 					input_data = {}
 				return {
@@ -216,8 +214,7 @@ class TestAgent:
 				}
 
 		agent = ProcessingAgent("processor")
-		context = AgentContext()
-		result = agent.run(context, {"original": "data"})
+		result = agent.run({"original": "data"})
 
 		assert result["status"] == "success"
 		assert result["output"]["processed"] == "modified"
@@ -226,12 +223,11 @@ class TestAgent:
 	def test_agent_exception_in_run(self):
 		"""Test exception handling in run() method."""
 		class ThrowingAgent(Agent):
-			def process(self, context, input_data=None):
+			def process(self, input_data=None):
 				raise Exception("Custom exception message")
 
 		agent = ThrowingAgent("thrower")
-		context = AgentContext()
-		result = agent.run(context)
+		result = agent.run()
 
 		assert result["status"] == "error"
 		assert result["message"] == "Custom exception message"

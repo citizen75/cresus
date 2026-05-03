@@ -17,25 +17,32 @@ class Agent:
 	- process(): Override in subclasses for custom logic
 	"""
 
-	def __init__(self, name: str):
-		"""Initialize agent with a name.
+	def __init__(self, name: str, context: Optional[AgentContext] = None):
+		"""Initialize agent with a name and optional context.
 
 		Args:
 			name: The name identifier for this agent
+			context: Optional AgentContext. If None, a new context is created
 		"""
 		if not name or not isinstance(name, str):
 			raise ValueError("Agent name must be a non-empty string")
 		self.name = name
-		self.logger = AgentLogger(name)
+		if context is None:
+			context = AgentContext()
+		self.context = context
+		# Ensure logger is set in context
+		if not self.context.get("logger"):
+			self.context.set("logger", AgentLogger(name))
+		self.logger = self.context.get("logger")
 
-	def process(self, context: AgentContext, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+
+	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
 		"""Process input data and return output.
 
 		Override this method in subclasses to implement agent-specific logic.
 		The base implementation returns a success response with empty output.
 
 		Args:
-			context: AgentContext for accessing shared resources
 			input_data: Optional dictionary of input data (normalized to {} if None)
 
 		Returns:
@@ -53,14 +60,14 @@ class Agent:
 			"output": {},
 		}
 
-	def run(self, context: AgentContext, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+	def run(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
 		"""Run the agent with error handling and validation.
 
 		This is the public API method. It validates inputs, calls process(),
-		and handles any exceptions that occur during execution.
+		and handles any exceptions that occur during execution. Context is
+		accessed via self.context.
 
 		Args:
-			context: AgentContext for accessing shared resources
 			input_data: Optional dictionary of input data
 
 		Returns:
@@ -73,15 +80,6 @@ class Agent:
 		Raises:
 			Logs exceptions but does not raise - always returns a response dict
 		"""
-		if not isinstance(context, AgentContext):
-			self.logger.error(f"Invalid context type: {type(context).__name__}")
-			return {
-				"status": STATUS_ERROR,
-				"input": {},
-				"output": {},
-				"message": "Invalid agent context",
-			}
-
 		if input_data is None:
 			input_data = {}
 		elif not isinstance(input_data, dict):
@@ -95,7 +93,7 @@ class Agent:
 
 		try:
 			self.logger.debug(f"Starting {self.name} with input keys: {list(input_data.keys())}")
-			response = self.process(context, input_data)
+			response = self.process(input_data)
 			self.logger.debug(f"Completed {self.name} with status: {response.get('status')}")
 			return response
 		except Exception as e:
