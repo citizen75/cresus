@@ -245,7 +245,7 @@ class CresusCLI(cmd2.Cmd):
 			console.print("Try: data fetch|list|clear|stats|universes")
 
 	def do_flow(self, args):
-		"""Execute workflows: run <workflow_name> [strategy] [tickers...]"""
+		"""Execute workflows: run <workflow_name> [strategy] [tickers...] [--context]"""
 		args_str = str(args).strip() if args else ""
 
 		if not args_str:
@@ -255,6 +255,7 @@ class CresusCLI(cmd2.Cmd):
 			table.add_row("flow list", "List available workflows")
 			table.add_row("flow run <workflow> [strategy] [tickers...]", "Run a workflow")
 			table.add_row("flow run watchlist [strategy]", "Run watchlist workflow with default tickers")
+			table.add_row("flow run <workflow> [strategy] [--context]", "Run workflow and display context")
 			console.print(table)
 			return
 
@@ -267,18 +268,24 @@ class CresusCLI(cmd2.Cmd):
 
 		elif cmd == "run":
 			if len(parts) < 2:
-				console.print("[red]✗[/red] Usage: flow run <workflow_name> [strategy] [tickers...]")
+				console.print("[red]✗[/red] Usage: flow run <workflow_name> [strategy] [tickers...] [--context]")
 				return
 
 			workflow_name = parts[1]
-			strategy = parts[2] if len(parts) > 2 else "default_strategy"
-			tickers = parts[3:] if len(parts) > 3 else None
+			include_context = "--context" in parts
+
+			# Remove workflow name and flags from parts
+			remaining = [p for p in parts[2:] if not p.startswith("--")]
+
+			# First remaining item is strategy, rest are tickers
+			strategy = remaining[0] if remaining else "default_strategy"
+			tickers = remaining[1:] if len(remaining) > 1 else None
 
 			input_data = None
 			if tickers:
 				input_data = {"tickers": tickers}
 
-			result = self.flow_manager.run_workflow(workflow_name, strategy, input_data)
+			result = self.flow_manager.run_workflow(workflow_name, strategy, input_data, include_context)
 			self._print_flow_result(result)
 
 		else:
@@ -375,6 +382,24 @@ class CresusCLI(cmd2.Cmd):
 					step_status = step_info.get("status", "unknown")
 					hist_table.add_row(step_name, step_status)
 				console.print(hist_table)
+
+		# Display context if present
+		if "_context" in result:
+			context = result["_context"]
+			if context:
+				context_table = Table(title="Flow Context", box=box.ROUNDED)
+				context_table.add_column("Key", style="cyan")
+				context_table.add_column("Value", style="yellow")
+				for key, value in context.items():
+					# Format value for display
+					if isinstance(value, (dict, list)):
+						value_str = str(value)[:100]
+					else:
+						value_str = str(value)
+					context_table.add_row(key, value_str)
+				console.print(context_table)
+			else:
+				console.print("[yellow]Flow context is empty[/yellow]")
 
 	def _print_result(self, result):
 		"""Print command result."""

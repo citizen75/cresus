@@ -23,13 +23,14 @@ class FlowManager:
 		"""
 		self.project_root = project_root
 
-	def run_workflow(self, workflow_name: str, strategy: str = "default", input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+	def run_workflow(self, workflow_name: str, strategy: str = "default", input_data: Optional[Dict[str, Any]] = None, include_context: bool = False) -> Dict[str, Any]:
 		"""Run a workflow.
 
 		Args:
 			workflow_name: Name of the workflow to run (e.g., 'watchlist')
 			strategy: Strategy name for the workflow
 			input_data: Optional input data for the workflow
+			include_context: Whether to include flow context in result
 
 		Returns:
 			Workflow result dictionary
@@ -42,6 +43,14 @@ class FlowManager:
 				input_data = {"tickers": ["AAPL", "GOOGL", "MSFT"]}
 
 			result = flow.process(input_data)
+
+			# Include context if requested
+			if include_context:
+				result["_context"] = {
+					key: value for key, value in flow.context.__dict__.items()
+					if not key.startswith("_") and key != "logger"
+				}
+
 			return result
 		else:
 			return {
