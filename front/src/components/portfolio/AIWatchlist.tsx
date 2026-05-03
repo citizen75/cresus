@@ -95,14 +95,24 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
   // Load 1 year historical data for charts
   const loadHistoricalData = async (tickers: string[]) => {
     try {
+      const strategyName = name.toLowerCase().replace(/\s+/g, '_')
       const historical: HistoricalData = {}
 
       for (const ticker of tickers) {
         try {
-          // Fetch from yfinance API or use cached data
-          // For now, generate mock data with realistic patterns
-          const data = generateMockHistoricalData(ticker)
-          historical[ticker] = data
+          const response = await fetch(
+            `http://localhost:8000/api/v1/watchlists/${strategyName}/historical/${ticker}?days=365`
+          )
+
+          if (response.ok) {
+            const data = await response.json()
+            if (data.historical_data && data.historical_data.length > 0) {
+              historical[ticker] = data.historical_data.map((item: any) => ({
+                date: item.date,
+                close: item.close,
+              }))
+            }
+          }
         } catch (err) {
           console.warn(`Failed to load historical data for ${ticker}:`, err)
         }
@@ -112,30 +122,6 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
     } catch (err) {
       console.warn('Failed to load historical data:', err)
     }
-  }
-
-  // Generate mock historical data for 1 year
-  const generateMockHistoricalData = (ticker: string) => {
-    const data = []
-    const basePrice = Math.random() * 100 + 20 // Random price 20-120
-    const startDate = new Date()
-    startDate.setFullYear(startDate.getFullYear() - 1)
-
-    for (let i = 0; i < 252; i++) { // 252 trading days in a year
-      const date = new Date(startDate)
-      date.setDate(date.getDate() + i)
-
-      const volatility = (Math.random() - 0.5) * 2
-      const trend = Math.sin(i / 50) * 0.5 // Add some trend
-      const price = basePrice * (1 + (volatility + trend) / 100)
-
-      data.push({
-        date: date.toISOString().split('T')[0],
-        close: Math.round(price * 100) / 100,
-      })
-    }
-
-    return data
   }
 
   const filtered = watchlist.filter(item =>

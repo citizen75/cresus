@@ -112,3 +112,63 @@ async def get_watchlist_tickers(strategy_name: str):
 
 	except Exception as e:
 		raise HTTPException(500, f"Error loading watchlist: {str(e)}")
+
+
+@router.get("/{strategy_name}/historical/{ticker}")
+async def get_ticker_historical(strategy_name: str, ticker: str, days: int = 365):
+	"""Get historical OHLCV data for a ticker.
+
+	Returns historical price data (1 year by default) for a ticker in a watchlist.
+	"""
+	try:
+		from tools.data import DataHistory
+
+		# Verify ticker is in the watchlist
+		manager = WatchlistManager(strategy_name)
+		watchlist_tickers = manager.list_tickers()
+
+		if not watchlist_tickers:
+			raise HTTPException(404, f"Watchlist '{strategy_name}' not found")
+
+		if ticker not in watchlist_tickers:
+			raise HTTPException(404, f"Ticker '{ticker}' not in watchlist '{strategy_name}'")
+
+		# Fetch historical data
+		history = DataHistory(ticker)
+		df = history.load_all()
+
+		if df.empty:
+			raise HTTPException(404, f"No historical data for {ticker}")
+
+		# Filter to last N days
+		df = df.tail(days)
+
+		# Convert to list of dicts
+		records = []
+		for _, row in df.iterrows():
+			date = row.get('timestamp', row.name)
+			if pd.notna(date):
+				records.append({
+					'date': str(date).split(' ')[0],  # Just the date part
+					'open': float(row['open']) if pd.notna(row.get('open')) else None,
+					'high': float(row['high']) if pd.notna(row.get('high')) else None,
+					'low': float(row['low']) if pd.notna(row.get('low')) else None,
+					'close': float(row['close']) if pd.notna(row.get('close')) else None,
+					'volume': int(row['volume']) if pd.notna(row.get('volume')) else None,
+				})
+
+		if not records:
+			raise HTTPException(404, f"No historical data available for {ticker}")
+
+		return {
+			"ticker": ticker,
+			"strategy": strategy_name,
+			"historical_data": records,
+			"count": len(records),
+			"days": days,
+		}
+
+	except HTTPException:
+		raise
+	except Exception as e:
+		raise HTTPException(500, f"Error loading historical data: {str(e)}")
