@@ -36,12 +36,15 @@ class FlowManager:
 			Workflow result dictionary
 		"""
 		if workflow_name.lower() == "watchlist":
+			# Validate input data
+			if input_data is None or not input_data.get("tickers"):
+				return {
+					"status": "error",
+					"message": "Tickers are required for watchlist workflow",
+					"example": "flow run watchlist my_strategy AAPL GOOGL MSFT"
+				}
+
 			flow = WatchlistFlow(strategy)
-
-			# Default input if none provided
-			if input_data is None:
-				input_data = {"tickers": ["AAPL", "GOOGL", "MSFT"]}
-
 			result = flow.process(input_data)
 
 			# Include context if requested
