@@ -3,7 +3,7 @@
 import cmd2
 from pathlib import Path
 from cli.commands.service import ServiceManager
-from cli.commands.data import DataManager
+from tools.data.manager import DataManager
 
 
 class CresusCLI(cmd2.Cmd):
