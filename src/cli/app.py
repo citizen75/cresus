@@ -116,12 +116,22 @@ class CresusCLI(cmd2.Cmd):
 			if service == "all":
 				for svc in ["api", "mcp", "front"]:
 					result = self.service_manager.start(svc, daemon)
-					status = "[green]✓[/green]" if "started" in result.lower() else "[red]✗[/red]"
-					console.print(f"{status} {svc}: {result}")
+					svc_status = result.get("status", "error") if isinstance(result, dict) else str(result)
+					is_success = svc_status in ["started", "already_running"]
+					status = "[green]✓[/green]" if is_success else "[red]✗[/red]"
+					msg = f"{svc}: {svc_status}"
+					if result.get("pid"):
+						msg += f" (PID: {result.get('pid')})"
+					console.print(f"{status} {msg}")
 			else:
 				result = self.service_manager.start(service, daemon)
-				status = "[green]✓[/green]" if "started" in result.lower() else "[red]✗[/red]"
-				console.print(f"{status} {result}")
+				svc_status = result.get("status", "error") if isinstance(result, dict) else str(result)
+				is_success = svc_status in ["started", "already_running"]
+				status = "[green]✓[/green]" if is_success else "[red]✗[/red]"
+				msg = f"{service}: {svc_status}"
+				if result.get("pid"):
+					msg += f" (PID: {result.get('pid')})"
+				console.print(f"{status} {msg}")
 
 		elif cmd == "stop":
 			if not service:
@@ -130,12 +140,16 @@ class CresusCLI(cmd2.Cmd):
 			if service == "all":
 				for svc in ["api", "mcp", "front"]:
 					result = self.service_manager.stop(svc)
-					status = "[green]✓[/green]" if "stopped" in result.lower() else "[red]✗[/red]"
-					console.print(f"{status} {svc}: {result}")
+					svc_status = result.get("status", "error") if isinstance(result, dict) else str(result)
+					is_success = svc_status == "stopped"
+					status = "[green]✓[/green]" if is_success else "[red]✗[/red]"
+					console.print(f"{status} {svc}: {svc_status}")
 			else:
 				result = self.service_manager.stop(service)
-				status = "[green]✓[/green]" if "stopped" in result.lower() else "[red]✗[/red]"
-				console.print(f"{status} {result}")
+				svc_status = result.get("status", "error") if isinstance(result, dict) else str(result)
+				is_success = svc_status == "stopped"
+				status = "[green]✓[/green]" if is_success else "[red]✗[/red]"
+				console.print(f"{status} {service}: {svc_status}")
 
 		elif cmd == "status":
 			status = self.service_manager.status(service)
