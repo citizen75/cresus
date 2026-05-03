@@ -2,6 +2,7 @@
 
 from typing import Any, Dict, Optional
 from ..core.agent import Agent
+from ..data.agent import DataAgent
 
 
 class WatchListAgent(Agent):

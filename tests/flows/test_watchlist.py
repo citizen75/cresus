@@ -50,18 +50,18 @@ class TestWatchlistFlow:
 	def test_watchlist_flow_process_with_empty_input(self):
 		"""Test that process handles empty input data."""
 		flow = WatchlistFlow("test_strategy")
-		result = flow.process({})
+		result = flow.process({"tickers": []})
 
-		assert result.get("status") == "success"
-		assert "watchlist" in result
+		# Empty ticker list should fail
+		assert result.get("status") == "error"
 
 	def test_watchlist_flow_process_with_none_input(self):
 		"""Test that process handles None input data."""
 		flow = WatchlistFlow("test_strategy")
 		result = flow.process(None)
 
-		assert result.get("status") == "success"
-		assert "watchlist" in result
+		# None input should fail because no tickers are provided
+		assert result.get("status") == "error"
 
 	def test_watchlist_flow_process_passes_data_to_strategy_agent(self):
 		"""Test that process passes input data to strategy agent."""
@@ -140,22 +140,22 @@ class TestWatchlistFlow:
 		input_data = {"tickers": []}
 		result = flow.process(input_data)
 
-		assert result.get("status") == "success"
-		assert isinstance(result.get("watchlist"), (list, dict))
+		# Empty ticker list should fail
+		assert result.get("status") == "error"
 
 	def test_watchlist_flow_strategy_name_preservation(self):
 		"""Test that strategy name is correctly preserved."""
 		strategy_name = "my_test_strategy_v1"
 		flow = WatchlistFlow(strategy_name)
 
-		result = flow.process({"test": "data"})
+		result = flow.process({"tickers": ["AAPL"]})
 		assert result.get("strategy") == strategy_name
 
 	def test_watchlist_flow_with_special_characters_strategy_name(self):
 		"""Test flow with strategy name containing special characters."""
 		flow = WatchlistFlow("strategy-v2_test.1")
 		assert flow.strategy_name == "strategy-v2_test.1"
-		result = flow.process({"test": "data"})
+		result = flow.process({"tickers": ["GOOGL"]})
 		assert result.get("strategy") == "strategy-v2_test.1"
 
 	def test_watchlist_flow_process_sequential_calls(self):
@@ -170,11 +170,11 @@ class TestWatchlistFlow:
 		assert result2.get("status") == "success"
 
 	def test_watchlist_flow_response_has_watchlist_field(self):
-		"""Test that response always contains watchlist field."""
+		"""Test that response contains watchlist field for valid inputs."""
 		flow = WatchlistFlow("test_strategy")
 
-		# Test with various inputs
-		for input_data in [None, {}, {"tickers": []}, {"tickers": ["AAPL"]}]:
+		# Test with valid inputs
+		for input_data in [{"tickers": ["AAPL"]}, {"tickers": ["GOOGL", "MSFT"]}]:
 			result = flow.process(input_data)
 			assert "watchlist" in result
 
@@ -212,7 +212,7 @@ class TestWatchlistFlow:
 	def test_watchlist_flow_return_value_includes_strategy_name(self):
 		"""Test that return value includes the strategy name."""
 		flow = WatchlistFlow("my_strategy")
-		result = flow.process({"data": "test"})
+		result = flow.process({"tickers": ["AAPL", "GOOGL"]})
 
 		assert result.get("strategy") == "my_strategy"
 
