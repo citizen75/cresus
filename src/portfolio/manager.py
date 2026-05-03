@@ -8,7 +8,7 @@ import pandas as pd
 from loguru import logger
 
 from portfolio.journal import Journal
-from portfolio.data import Fundamental, DataHistory
+from tools.data import Fundamental, DataHistory
 from portfolio.cache import PortfolioCache
 from portfolio.portfolio_history import PortfolioHistory
 
@@ -428,7 +428,7 @@ class PortfolioManager:
         details = self.get_portfolio_details(name)
         perf = self.get_portfolio_performance(name)
 
-        from portfolio.data import DataHistory
+        from tools.data import DataHistory
         from datetime import datetime
 
         total_value = details.get("total_value", 0)

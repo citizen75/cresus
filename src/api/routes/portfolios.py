@@ -325,7 +325,7 @@ async def get_current_prices(name: str):
     if not details:
         raise HTTPException(404, f"Portfolio '{name}' not found")
 
-    from portfolio.data import Fundamental
+    from tools.data import Fundamental
 
     positions_with_prices = []
     total_value = 0

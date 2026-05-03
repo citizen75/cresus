@@ -11,7 +11,7 @@ import pandas as pd
 from loguru import logger
 
 from portfolio.journal import Journal
-from portfolio.data import DataHistory
+from tools.data import DataHistory
 
 
 class PortfolioHistory:
