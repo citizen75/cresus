@@ -8,6 +8,7 @@ from rich.panel import Panel
 from rich.text import Text
 from rich import box
 from cli.commands.service import ServiceManager
+from cli.commands.flow import FlowManager
 from tools.data.manager import DataManager
 
 console = Console()
@@ -22,6 +23,7 @@ class CresusCLI(cmd2.Cmd):
 		super().__init__()
 		self.project_root = self._find_project_root()
 		self.service_manager = ServiceManager(self.project_root)
+		self.flow_manager = FlowManager(self.project_root)
 		self.data_manager = DataManager(self.project_root)
 		self._setup_history()
 		self._setup_prompt()
@@ -46,6 +48,7 @@ class CresusCLI(cmd2.Cmd):
 		info_table.add_column("Description")
 		info_table.add_row("[bold]help[/bold]", "Show all available commands")
 		info_table.add_row("[bold]service[/bold]", "Manage services (api, mcp, front)")
+		info_table.add_row("[bold]flow[/bold]", "Execute workflows (e.g., flow run watchlist)")
 		info_table.add_row("[bold]data[/bold]", "Manage portfolio data and cache")
 		info_table.add_row("[bold]history[/bold]", "View command history")
 		info_table.add_row("[bold]quit[/bold] or [bold]exit[/bold]", "Exit the CLI")
@@ -240,6 +243,138 @@ class CresusCLI(cmd2.Cmd):
 		else:
 			console.print(f"[red]✗[/red] Unknown command: {cmd}")
 			console.print("Try: data fetch|list|clear|stats|universes")
+
+	def do_flow(self, args):
+		"""Execute workflows: run <workflow_name> [strategy] [tickers...]"""
+		args_str = str(args).strip() if args else ""
+
+		if not args_str:
+			table = Table(title="Workflow Management Commands", box=box.ROUNDED)
+			table.add_column("Command", style="cyan")
+			table.add_column("Description")
+			table.add_row("flow list", "List available workflows")
+			table.add_row("flow run <workflow> [strategy] [tickers...]", "Run a workflow")
+			table.add_row("flow run watchlist [strategy]", "Run watchlist workflow with default tickers")
+			console.print(table)
+			return
+
+		parts = args_str.split()
+		cmd = parts[0] if parts else None
+
+		if cmd == "list":
+			result = self.flow_manager.list_workflows()
+			self._print_workflows_result(result)
+
+		elif cmd == "run":
+			if len(parts) < 2:
+				console.print("[red]✗[/red] Usage: flow run <workflow_name> [strategy] [tickers...]")
+				return
+
+			workflow_name = parts[1]
+			strategy = parts[2] if len(parts) > 2 else "default_strategy"
+			tickers = parts[3:] if len(parts) > 3 else None
+
+			input_data = None
+			if tickers:
+				input_data = {"tickers": tickers}
+
+			result = self.flow_manager.run_workflow(workflow_name, strategy, input_data)
+			self._print_flow_result(result)
+
+		else:
+			console.print(f"[red]✗[/red] Unknown command: {cmd}")
+			console.print("Try: flow list|run")
+
+	def _print_workflows_result(self, result):
+		"""Print available workflows."""
+		if result.get("status") == "error":
+			panel = Panel(
+				f"[red]✗[/red] {result.get('message')}",
+				style="red",
+				box=box.ROUNDED
+			)
+			console.print(panel)
+			return
+
+		workflows = result.get("workflows", [])
+		if not workflows:
+			panel = Panel(
+				"[yellow]No workflows available[/yellow]",
+				style="yellow",
+				box=box.ROUNDED
+			)
+			console.print(panel)
+			return
+
+		table = Table(title=f"Available Workflows ({len(workflows)})", box=box.ROUNDED)
+		table.add_column("Name", style="cyan")
+		table.add_column("Description")
+		table.add_column("Parameters", style="dim")
+
+		for wf in workflows:
+			params = ", ".join(wf.get("parameters", []))
+			table.add_row(wf["name"], wf["description"], params)
+
+		console.print(table)
+
+	def _print_flow_result(self, result):
+		"""Print workflow execution result."""
+		status = result.get("status", "unknown")
+
+		if status == "error":
+			panel = Panel(
+				f"[red]✗[/red] {result.get('message')}",
+				style="red",
+				box=box.ROUNDED
+			)
+			console.print(panel)
+			if result.get("available"):
+				avail = ", ".join(result.get("available", []))
+				console.print(f"[cyan]Available workflows:[/cyan] {avail}")
+			return
+
+		# Success case
+		panel = Panel(
+			f"[green]✓[/green] Workflow executed successfully",
+			style="green",
+			box=box.ROUNDED
+		)
+		console.print(panel)
+
+		# Display result details
+		if "flow" in result:
+			console.print(f"[cyan]Flow:[/cyan] {result['flow']}")
+		if "strategy" in result:
+			console.print(f"[cyan]Strategy:[/cyan] {result['strategy']}")
+		if "steps_completed" in result:
+			console.print(f"[cyan]Steps Completed:[/cyan] {result['steps_completed']}/{result.get('total_steps', '?')}")
+		if "duration_ms" in result:
+			console.print(f"[cyan]Duration:[/cyan] {result['duration_ms']:.0f}ms")
+
+		# Display watchlist if present
+		if "watchlist" in result:
+			watchlist = result["watchlist"]
+			if watchlist:
+				table = Table(title="Generated Watchlist", box=box.ROUNDED)
+				table.add_column("Ticker", style="cyan")
+				for ticker in watchlist:
+					table.add_row(ticker)
+				console.print(table)
+			else:
+				console.print("[yellow]No tickers in watchlist[/yellow]")
+
+		# Display execution history
+		if "execution_history" in result:
+			history = result["execution_history"]
+			if history:
+				hist_table = Table(title="Execution History", box=box.ROUNDED)
+				hist_table.add_column("Step", style="cyan")
+				hist_table.add_column("Status", style="yellow")
+				for step_info in history:
+					step_name = step_info.get("step", "unknown")
+					step_status = step_info.get("status", "unknown")
+					hist_table.add_row(step_name, step_status)
+				console.print(hist_table)
 
 	def _print_result(self, result):
 		"""Print command result."""

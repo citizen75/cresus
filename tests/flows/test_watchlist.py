@@ -35,10 +35,10 @@ class TestWatchlistFlow:
 		"""Test that WatchlistFlow creates steps with correct agents."""
 		flow = WatchlistFlow("my_strategy")
 		assert len(flow.steps) == 2
-		assert flow.steps[0].name == "strategy"
-		assert flow.steps[0].agent_name == "StrategyAgent[my_strategy]"
-		assert flow.steps[1].name == "watchlist"
-		assert flow.steps[1].agent_name == "WatchListAgent"
+		assert flow.steps[0]["name"] == "strategy"
+		assert flow.steps[0]["agent"].name == "StrategyAgent[my_strategy]"
+		assert flow.steps[1]["name"] == "watchlist"
+		assert flow.steps[1]["agent"].name == "WatchListAgent"
 
 	def test_watchlist_flow_process_with_valid_input(self):
 		"""Test that process returns success with valid input."""
@@ -116,7 +116,7 @@ class TestWatchlistFlow:
 		flow2.process({"tickers": ["GOOGL"]})
 
 		assert flow1.context is not flow2.context
-		assert flow1.steps[0].agent_class == flow2.steps[0].agent_class
+		assert flow1.steps[0]["agent"].__class__ == flow2.steps[0]["agent"].__class__
 
 	def test_watchlist_flow_with_complex_input(self):
 		"""Test process with complex nested input data."""
@@ -188,7 +188,7 @@ class TestWatchlistFlow:
 		for strategy in strategies:
 			flow = WatchlistFlow(strategy)
 			assert flow.strategy_name == strategy
-			assert flow.steps[0].agent_name == f"StrategyAgent[{strategy}]"
+			assert flow.steps[0]["agent"].name == f"StrategyAgent[{strategy}]"
 
 	def test_watchlist_flow_context_shares_between_agents(self):
 		"""Test that context is shared between strategy and watchlist agents."""
@@ -274,5 +274,5 @@ class TestWatchlistFlow:
 		flow1 = WatchlistFlow("strategy1")
 		flow2 = WatchlistFlow("strategy2")
 
-		assert flow1.steps[0].agent_name != flow2.steps[0].agent_name
+		assert flow1.steps[0]["agent"].name != flow2.steps[0]["agent"].name
 		assert flow1.context is not flow2.context
