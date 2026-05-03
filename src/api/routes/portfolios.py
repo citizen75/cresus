@@ -7,8 +7,8 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 import pandas as pd
 
-from portfolio.manager import PortfolioManager
-from portfolio.metrics import PortfolioMetrics
+from tools.portfolio.manager import PortfolioManager
+from tools.portfolio.metrics import PortfolioMetrics
 
 
 class CreatePortfolioRequest(BaseModel):
@@ -99,7 +99,7 @@ async def get_portfolio_positions(name: str):
 @router.get("/{name}/transactions")
 async def get_portfolio_transactions(name: str, ticker: Optional[str] = None):
     """Get all transactions for a portfolio, optionally filtered by ticker."""
-    from portfolio.journal import Journal
+    from tools.portfolio.journal import Journal
 
     journal = Journal(name)
     df = journal.load_df()
@@ -383,7 +383,7 @@ async def get_current_prices(name: str):
 @router.put("/{name}/transactions/{transaction_id}")
 async def update_transaction(name: str, transaction_id: str, data: Dict[str, Any]):
     """Update a transaction."""
-    from portfolio.journal import Journal
+    from tools.portfolio.journal import Journal
 
     journal = Journal(name)
     df = journal.load_df()
@@ -421,7 +421,7 @@ async def update_transaction(name: str, transaction_id: str, data: Dict[str, Any
 @router.delete("/{name}/transactions/{transaction_id}")
 async def delete_transaction(name: str, transaction_id: str):
     """Delete a transaction."""
-    from portfolio.journal import Journal
+    from tools.portfolio.journal import Journal
 
     journal = Journal(name)
     df = journal.load_df()

@@ -7,10 +7,10 @@ import yaml
 import pandas as pd
 from loguru import logger
 
-from portfolio.journal import Journal
+from .journal import Journal
 from tools.data import Fundamental, DataHistory
-from portfolio.cache import PortfolioCache
-from portfolio.portfolio_history import PortfolioHistory
+from .cache import PortfolioCache
+from .portfolio_history import PortfolioHistory
 
 
 class PortfolioManager:

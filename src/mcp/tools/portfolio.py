@@ -1,7 +1,7 @@
 """MCP portfolio tools."""
 
 from functools import lru_cache
-from portfolio.metrics import PortfolioMetrics
+from tools.portfolio.metrics import PortfolioMetrics
 
 
 @lru_cache(maxsize=1)

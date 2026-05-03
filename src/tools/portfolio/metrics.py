@@ -2,7 +2,7 @@
 
 import numpy as np
 import pandas as pd
-from portfolio.manager import PortfolioManager
+from .manager import PortfolioManager
 
 
 class PortfolioMetrics(PortfolioManager):

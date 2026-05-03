@@ -16,8 +16,8 @@ from loguru import logger
 import aiohttp
 from playwright.async_api import async_playwright, Browser, BrowserContext
 
-from portfolio.journal import Journal
-from portfolio.manager import PortfolioManager
+from tools.portfolio.journal import Journal
+from tools.portfolio.manager import PortfolioManager
 
 
 @dataclass

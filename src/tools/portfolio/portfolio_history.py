@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 from loguru import logger
 
-from portfolio.journal import Journal
+from .journal import Journal
 from tools.data import DataHistory
 
 
