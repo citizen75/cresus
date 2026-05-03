@@ -9,8 +9,8 @@ from unittest.mock import Mock, patch
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from core.flow import Flow
-from agents.core.context import AgentContext
-from agents.core.agent import Agent
+from core.context import AgentContext
+from core.agent import Agent
 
 
 class TestFlowInitialization:

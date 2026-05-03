@@ -1,7 +1,7 @@
 """Data agent for managing and processing data-related tasks."""
 
 from typing import Any, Dict, Optional
-from ..core.agent import Agent
+from core.agent import Agent
 
 
 class DataAgent(Agent):

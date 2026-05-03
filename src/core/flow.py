@@ -11,9 +11,9 @@ agents_path = Path(__file__).parent.parent / "agents"
 if str(agents_path) not in sys.path:
 	sys.path.insert(0, str(agents_path))
 
-from agents.core.context import AgentContext
-from agents.core.logger import AgentLogger
-from agents.core.agent import Agent
+from .context import AgentContext
+from .logger import AgentLogger
+from .agent import Agent
 
 
 class Flow:

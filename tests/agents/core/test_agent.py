@@ -7,8 +7,8 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
-from agents.core.agent import Agent
-from agents.core.context import AgentContext
+from core.agent import Agent
+from core.context import AgentContext
 
 
 class TestAgent:

@@ -4,7 +4,7 @@ from typing import Any, Callable, Dict, List, Optional, Union
 class AgentContext:
     """Context for agents to access shared resources."""
     def __init__(self):
-        pass    
+        pass
 
     def set(self, key: str, value: Any) -> None:
         """Set a value in the context."""

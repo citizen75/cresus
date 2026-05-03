@@ -9,7 +9,7 @@ from unittest.mock import Mock, patch, MagicMock
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from flows.watchlist import WatchlistFlow
-from agents.core.context import AgentContext
+from core.context import AgentContext
 from agents.strategy.agent import StrategyAgent
 from agents.watchlist.agent import WatchListAgent
 
