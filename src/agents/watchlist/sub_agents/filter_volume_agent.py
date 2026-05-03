@@ -2,30 +2,30 @@
 
 from typing import Any, Dict, Optional
 from core.agent import Agent
+from core.context import AgentContext
 
 
 class FilterVolumeAgent(Agent):
 	"""Filter watchlist by minimum trading volume.
 
-	Reads tickers from context, filters by minimum volume requirement,
-	stores result in context.
+	Reads tickers and data_history from context, extracts latest volume,
+	filters by minimum volume requirement, stores result in context.
+	Supports both fixed min_volume and dynamic ratio-based filtering.
 	"""
 
-	def __init__(self, name: str = "FilterVolumeAgent", min_volume: int = 1000000):
+	def __init__(self, name: str = "FilterVolumeAgent"):
 		"""Initialize filter volume agent.
 
 		Args:
 			name: Agent name
-			min_volume: Minimum trading volume to keep ticker
 		"""
 		super().__init__(name)
-		self.min_volume = min_volume
 
 	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-		"""Filter tickers by volume.
+		"""Filter tickers by latest trading volume from data_history.
 
-		Reads 'tickers' and 'volume_data' from context, filters by min_volume,
-		stores filtered tickers back in context.
+		Reads 'tickers' and 'data_history' from context, extracts latest volume,
+		filters by strategy config volume parameters, stores filtered tickers back in context.
 
 		Args:
 			input_data: Input data (not used, uses context instead)
@@ -36,44 +36,75 @@ class FilterVolumeAgent(Agent):
 		if input_data is None:
 			input_data = {}
 
-		# Get tickers and volume data from context
-		tickers = self.context.get("tickers")
-		volume_data = self.context.get("volume_data")
+		watchlist = self.context.get("watchlist")
+		data_history = self.context.get("data_history")
+		strategy_config = self.context.get("strategy_config")
 
-		if not tickers:
+		if not watchlist:
 			return {
 				"status": "error",
 				"input": input_data,
 				"output": {},
-				"message": "No tickers in context"
+				"message": "No watchlist in context"
 			}
 
-		# If no volume data, skip filtering and return all tickers
-		if not volume_data:
+		if not data_history:
+			self.logger.error("No data history available for volume filtering")
 			return {
-				"status": "success",
+				"status": "error",
 				"input": input_data,
-				"output": {
-					"filtered_count": len(tickers),
-					"removed_count": 0,
-					"volume_data_available": False
-				}
+				"output": {},
+				"message": "No data history available for volume filtering"
 			}
 
-		# Filter tickers by volume
-		filtered_tickers = [
-			t for t in tickers
-			if volume_data.get(t, 0) >= self.min_volume
-		]
+		# Get volume parameters from strategy config
+		min_volume = None
+		min_volume_ratio = None
+		if strategy_config:
+			watchlist_config = strategy_config.get("watchlist", {})
+			volume_config = watchlist_config.get("parameters", {}).get("volume", {})
+			min_volume = volume_config.get("min_volume")
+			min_volume_ratio = volume_config.get("min_volume_ratio", 0.5)
 
-		removed_count = len(tickers) - len(filtered_tickers)
-		self.context.set("tickers", filtered_tickers)
+		# Filter watchlist by latest volume from data_history
+		filtered_watchlist = []
+		for ticker in watchlist:
+			if ticker in data_history:
+				ticker_data = data_history[ticker]
+				# Get latest volume value
+				try:
+					if hasattr(ticker_data, 'iloc') and len(ticker_data) > 0:
+						latest_volume = ticker_data["volume"].iloc[-1].item()
+
+						# Determine minimum volume threshold
+						threshold = None
+						if min_volume is not None:
+							# Fixed volume threshold
+							threshold = min_volume
+						elif min_volume_ratio is not None and "volume_ma_20" in ticker_data.columns:
+							# Dynamic volume ratio threshold
+							volume_ma_20 = ticker_data["volume_ma_20"].iloc[-1].item()
+							threshold = volume_ma_20 * min_volume_ratio
+
+						# Apply filter if threshold is set
+						if threshold is not None and latest_volume >= threshold:
+							filtered_watchlist.append(ticker)
+						elif threshold is None:
+							# No threshold means pass all
+							filtered_watchlist.append(ticker)
+					else:
+						continue
+				except (ValueError, TypeError, AttributeError):
+					continue
+
+		removed_count = len(watchlist) - len(filtered_watchlist)
+		self.context.set("watchlist", filtered_watchlist)
 
 		return {
 			"status": "success",
 			"input": input_data,
 			"output": {
-				"filtered_count": len(filtered_tickers),
+				"filtered_count": len(filtered_watchlist),
 				"removed_count": removed_count,
 				"volume_data_available": True
 			}

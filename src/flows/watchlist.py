@@ -6,6 +6,7 @@ Extends Flow for strategy-specific workflow orchestration.
 import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
+import os
 
 # Ensure src is in path for imports
 src_path = Path(__file__).parent.parent
@@ -48,7 +49,7 @@ class WatchlistFlow(Flow):
 		"""Process input data through the watchlist flow.
 
 		Executes strategy and watchlist agents sequentially with shared context.
-		Stores strategy results in context for downstream agents.
+		StrategyAgent loads strategy config and stores in context for downstream agents.
 
 		Args:
 			input_data: Input dictionary for the flow
@@ -56,7 +57,7 @@ class WatchlistFlow(Flow):
 		Returns:
 			Final flow result with watchlist
 		"""
-		# Execute parent flow logic
+		# Execute parent flow logic (StrategyAgent loads strategy config)
 		result = super().process(input_data)
 
 		# Store strategy result in context for watchlist agent if strategy was successful

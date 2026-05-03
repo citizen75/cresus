@@ -61,16 +61,30 @@ class StrategyManager:
 	def _get_strategy_file(self, strategy_name: str) -> Path:
 		"""Get the full path for a strategy file.
 
+		Looks for YAML file first, then falls back to JSON.
+
 		Args:
 			strategy_name: Name of the strategy
 
 		Returns:
-			Path to the strategy JSON file
+			Path to the strategy file (YAML or JSON)
 		"""
-		return self.strategies_dir / f"{strategy_name}.json"
+		yaml_file = self.strategies_dir / f"{strategy_name}.yml"
+		if yaml_file.exists():
+			return yaml_file
+
+		json_file = self.strategies_dir / f"{strategy_name}.json"
+		if json_file.exists():
+			return json_file
+
+		# Return YAML path by default (for new files)
+		return yaml_file
 
 	def save_strategy(self, strategy_name: str, strategy_data: Dict[str, Any]) -> Dict[str, Any]:
-		"""Save a strategy to db/local/strategies.
+		"""Save a strategy to db/local/strategies only if changed.
+
+		Saves as YAML if file exists as .yml, otherwise defaults to YAML format.
+		Only saves if the configuration has changed.
 
 		Args:
 			strategy_name: Name of the strategy
@@ -87,14 +101,34 @@ class StrategyManager:
 			if "name" not in strategy_data:
 				strategy_data["name"] = strategy_name
 
+			# Check if file exists and compare with existing content
+			if strategy_file.exists():
+				# Load existing strategy
+				with open(strategy_file, "r") as f:
+					if strategy_file.suffix.lower() == ".yml":
+						existing_data = yaml.safe_load(f)
+					else:
+						existing_data = json.load(f)
+
+				# Compare: if no changes, return without saving
+				if existing_data == strategy_data:
+					return {
+						"status": "success",
+						"message": f"Strategy '{strategy_name}' unchanged, no save needed",
+						"file": str(strategy_file),
+						"changed": False,
+					}
+
+			# Save as YAML (there are changes or file doesn't exist)
 			with open(strategy_file, "w") as f:
-				json.dump(strategy_data, f, indent=2)
+				yaml.dump(strategy_data, f, default_flow_style=False, sort_keys=False)
 
 			return {
 				"status": "success",
 				"message": f"Strategy '{strategy_name}' saved successfully",
 				"file": str(strategy_file),
 				"size": strategy_file.stat().st_size,
+				"changed": True,
 			}
 		except Exception as e:
 			return {
@@ -105,6 +139,8 @@ class StrategyManager:
 
 	def load_strategy(self, strategy_name: str) -> Dict[str, Any]:
 		"""Load strategy configuration by name.
+
+		Supports both YAML and JSON file formats.
 
 		Args:
 			strategy_name: Name of the strategy
@@ -118,12 +154,16 @@ class StrategyManager:
 			if not strategy_file.exists():
 				return {
 					"status": "error",
-					"message": f"Strategy '{strategy_name}' not found at {strategy_file}",
+					"message": f"Strategy '{strategy_name}' not found",
 					"error_type": "FileNotFoundError",
 				}
 
 			with open(strategy_file, "r") as f:
-				strategy_data = json.load(f)
+				# Load YAML or JSON based on file extension
+				if strategy_file.suffix.lower() == ".yml":
+					strategy_data = yaml.safe_load(f)
+				else:
+					strategy_data = json.load(f)
 
 			return {
 				"status": "success",
@@ -133,11 +173,11 @@ class StrategyManager:
 				"source": strategy_data.get("source"),
 				"file": str(strategy_file),
 			}
-		except json.JSONDecodeError as e:
+		except (json.JSONDecodeError, yaml.YAMLError) as e:
 			return {
 				"status": "error",
-				"message": f"JSON parsing error: {str(e)}",
-				"error_type": "JSONError",
+				"message": f"File parsing error: {str(e)}",
+				"error_type": type(e).__name__,
 			}
 		except Exception as e:
 			return {
@@ -181,6 +221,8 @@ class StrategyManager:
 	def list_strategies(self) -> Dict[str, Any]:
 		"""List all available strategies.
 
+		Supports both YAML and JSON file formats.
+
 		Returns:
 			Dict with list of strategy names and metadata
 		"""
@@ -195,10 +237,20 @@ class StrategyManager:
 					"directory": str(self.strategies_dir),
 				}
 
-			for strategy_file in sorted(self.strategies_dir.glob("*.json")):
+			# Get both YAML and JSON strategy files
+			strategy_files = sorted(
+				list(self.strategies_dir.glob("*.yml")) +
+				list(self.strategies_dir.glob("*.json"))
+			)
+
+			for strategy_file in strategy_files:
 				try:
 					with open(strategy_file, "r") as f:
-						strategy_data = json.load(f)
+						# Load YAML or JSON based on file extension
+						if strategy_file.suffix.lower() == ".yml":
+							strategy_data = yaml.safe_load(f)
+						else:
+							strategy_data = json.load(f)
 
 					strategies_info.append({
 						"name": strategy_data.get("name"),
@@ -227,6 +279,8 @@ class StrategyManager:
 	def get_strategy_by_source(self, source_name: str) -> Dict[str, Any]:
 		"""Get all strategies filtered by data source.
 
+		Supports both YAML and JSON file formats.
+
 		Args:
 			source_name: Source name (e.g., 'cac40')
 
@@ -244,10 +298,20 @@ class StrategyManager:
 					"total_count": 0,
 				}
 
-			for strategy_file in sorted(self.strategies_dir.glob("*.json")):
+			# Get both YAML and JSON strategy files
+			strategy_files = sorted(
+				list(self.strategies_dir.glob("*.yml")) +
+				list(self.strategies_dir.glob("*.json"))
+			)
+
+			for strategy_file in strategy_files:
 				try:
 					with open(strategy_file, "r") as f:
-						strategy_data = json.load(f)
+						# Load YAML or JSON based on file extension
+						if strategy_file.suffix.lower() == ".yml":
+							strategy_data = yaml.safe_load(f)
+						else:
+							strategy_data = json.load(f)
 
 					if strategy_data.get("source") == source_name:
 						strategies_info.append({

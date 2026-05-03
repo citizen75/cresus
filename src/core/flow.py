@@ -1,6 +1,7 @@
 
 """Base Flow class for orchestrating multi-agent workflows."""
 
+import re
 import sys
 from pathlib import Path
 from typing import Any, Dict, Optional, List
@@ -56,7 +57,7 @@ class Flow:
 
 		Args:
 			agent: Agent instance to add
-			step_name: Optional name for the step (defaults to agent name)
+			step_name: Optional name for the step. If not provided, derives from agent's class name
 			required: Whether step failure halts the flow
 
 		Returns:
@@ -65,8 +66,19 @@ class Flow:
 		if not isinstance(agent, Agent):
 			raise TypeError("step must be an Agent instance")
 
+		# Derive step name from class name if not provided
+		if step_name is None:
+			class_name = agent.__class__.__name__
+			# Convert CamelCase to snake_case
+			snake_case = re.sub(r'(?<!^)(?=[A-Z])', '_', class_name).lower()
+			# Remove 'agent' suffix if present
+			if snake_case.endswith('_agent'):
+				step_name = snake_case[:-6]  # Remove '_agent'
+			else:
+				step_name = snake_case
+
 		step = {
-			"name": step_name or agent.name,
+			"name": step_name,
 			"agent": agent,
 			"required": required,
 			"result": None,
@@ -98,6 +110,9 @@ class Flow:
 		self.execution_history = []
 		current_input = input_data
 
+		# Store execution history in context so agents can access it
+		self.context.set("execution_history", [])
+
 		self.logger.info(f"Starting flow '{self.name}' with {len(self.steps)} steps")
 
 		for step in self.steps:
@@ -106,15 +121,29 @@ class Flow:
 			try:
 				self.logger.debug(f"Executing step '{step['name']}'")
 				agent = step["agent"]
+				# Inject Flow's context into agent for execution
+				agent.context = self.context
 				result = agent.run(current_input)
 				step["result"] = result
 				step["error"] = None
 
-				self.execution_history.append({
+				# Build execution history entry
+				history_entry = {
 					"step": step["name"],
 					"status": result.get("status"),
 					"output": result.get("output"),
-				})
+				}
+
+				# Include nested execution history if present (from sub-flows)
+				if "execution_history" in result and result["execution_history"]:
+					history_entry["substeps"] = result["execution_history"]
+
+				self.execution_history.append(history_entry)
+
+				# Update execution history in context so agents can access it
+				current_history = self.context.get("execution_history") or []
+				current_history.append(history_entry)
+				self.context.set("execution_history", current_history)
 
 				# Check for step failure
 				if result.get("status") == "error":
@@ -250,6 +279,27 @@ class Flow:
 			step["end_time"] = None
 
 		return self
+
+	def format_execution_history(self) -> str:
+		"""Format execution history as indented tree.
+
+		Returns:
+			Formatted string showing step hierarchy with statuses
+		"""
+		lines = []
+		for entry in self.execution_history:
+			step_name = entry.get("step", "unknown")
+			status = entry.get("status", "unknown")
+			lines.append(f"{step_name:<20} │ {status}")
+
+			# Add substeps if present
+			if "substeps" in entry:
+				for substep in entry["substeps"]:
+					substep_name = substep.get("step", "unknown")
+					substep_status = substep.get("status", "unknown")
+					lines.append(f"  - {substep_name:<16} │ {substep_status}")
+
+		return "\n".join(lines)
 
 	def __repr__(self) -> str:
 		"""String representation of the flow."""

@@ -78,13 +78,14 @@ class TestFlowAddStep:
 		assert flow.steps[0]["name"] == "custom_step"
 
 	def test_add_step_defaults_to_agent_name(self):
-		"""Test that step defaults to agent name."""
+		"""Test that step defaults to agent class name in snake_case."""
 		flow = Flow("test_flow")
 		agent = Agent("my_agent")
 
 		flow.add_step(agent)
 
-		assert flow.steps[0]["name"] == "my_agent"
+		# Agent class name converts to "agent"
+		assert flow.steps[0]["name"] == "agent"
 
 	def test_add_step_required_flag(self):
 		"""Test required flag for steps."""
@@ -206,7 +207,7 @@ class TestFlowProcess:
 		result = flow.process({})
 
 		assert result.get("status") == "error"
-		assert result.get("failed_step") == "failing_agent"
+		assert result.get("failed_step") == "failing"
 
 	def test_process_continues_on_optional_step_failure(self):
 		"""Test flow continues on optional step failure."""
@@ -282,7 +283,8 @@ class TestFlowGetters:
 		flow.add_step(agent)
 
 		flow.process({})
-		result = flow.get_step_result("test_agent")
+		# Step name is auto-derived from class name: "agent"
+		result = flow.get_step_result("agent")
 
 		assert result is not None
 		assert result.get("status") == "success"
@@ -441,7 +443,7 @@ class TestFlowErrorHandling:
 
 		result = flow.process({})
 
-		assert result.get("failed_step") == "failing_agent"
+		assert result.get("failed_step") == "failing"
 
 
 class TestFlowStateManagement:

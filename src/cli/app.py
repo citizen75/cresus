@@ -1,5 +1,6 @@
 """Cresus CLI application."""
 
+import os
 import cmd2
 from pathlib import Path
 from rich.console import Console
@@ -22,6 +23,7 @@ class CresusCLI(cmd2.Cmd):
 	def __init__(self):
 		super().__init__()
 		self.project_root = self._find_project_root()
+		os.environ["CRESUS_PROJECT_ROOT"] = str(self.project_root)
 		self.service_manager = ServiceManager(self.project_root)
 		self.flow_manager = FlowManager(self.project_root)
 		self.data_manager = DataManager(self.project_root)
@@ -358,6 +360,26 @@ class CresusCLI(cmd2.Cmd):
 		if "duration_ms" in result:
 			console.print(f"[cyan]Duration:[/cyan] {result['duration_ms']:.0f}ms")
 
+		# Display sorted tickers with scores (for signals workflow)
+		if "sorted_tickers" in result:
+			sorted_tickers = result.get("sorted_tickers", [])
+			if sorted_tickers:
+				table = Table(title="Tickers by Signal Score (Descending)", box=box.ROUNDED)
+				table.add_column("Rank", style="dim")
+				table.add_column("Ticker", style="cyan")
+				table.add_column("Score", style="green")
+				table.add_column("Signals", style="yellow")
+				for i, ticker_info in enumerate(sorted_tickers, 1):
+					ticker = ticker_info.get("ticker", "?")
+					score = ticker_info.get("score", 0)
+					signal_count = ticker_info.get("signal_count", 0)
+					signals = ticker_info.get("triggered_signals", [])
+					signal_str = ", ".join(signals) if signals else "none"
+					table.add_row(str(i), ticker, f"{score:.3f}", signal_str)
+				console.print(table)
+			else:
+				console.print("[yellow]No ticker scores available[/yellow]")
+
 		# Display watchlist if present
 		if "watchlist" in result:
 			watchlist = result["watchlist"]
@@ -381,6 +403,14 @@ class CresusCLI(cmd2.Cmd):
 					step_name = step_info.get("step", "unknown")
 					step_status = step_info.get("status", "unknown")
 					hist_table.add_row(step_name, step_status)
+
+					# Add substeps if present (from nested flows)
+					if "substeps" in step_info:
+						for substep in step_info["substeps"]:
+							substep_name = f"  - {substep.get('step', 'unknown')}"
+							substep_status = substep.get("status", "unknown")
+							hist_table.add_row(substep_name, substep_status)
+
 				console.print(hist_table)
 
 		# Display context if present

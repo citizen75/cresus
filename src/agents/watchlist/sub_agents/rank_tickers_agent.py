@@ -2,6 +2,7 @@
 
 from typing import Any, Dict, Optional
 from core.agent import Agent
+from core.context import AgentContext
 
 
 class RankTickersAgent(Agent):
@@ -36,14 +37,14 @@ class RankTickersAgent(Agent):
 		if input_data is None:
 			input_data = {}
 
-		# Get tickers from context
-		tickers = self.context.get("tickers")
-		if not tickers:
+		# Get watchlist from context
+		watchlist = self.context.get("watchlist")
+		if not watchlist:
 			return {
 				"status": "error",
 				"input": input_data,
 				"output": {},
-				"message": "No tickers in context"
+				"message": "No watchlist in context"
 			}
 
 		# Get metric data from context
@@ -54,26 +55,26 @@ class RankTickersAgent(Agent):
 				"status": "success",
 				"input": input_data,
 				"output": {
-					"ranked_count": len(tickers),
+					"ranked_count": len(watchlist),
 					"metric": self.metric,
 					"metric_data_available": False
 				}
 			}
 
-		# Sort tickers by metric (descending)
-		ranked_tickers = sorted(
-			tickers,
+		# Sort watchlist by metric (descending)
+		ranked_watchlist = sorted(
+			watchlist,
 			key=lambda t: metric_data.get(t, 0),
 			reverse=True
 		)
 
-		self.context.set("tickers", ranked_tickers)
+		self.context.set("watchlist", ranked_watchlist)
 
 		return {
 			"status": "success",
 			"input": input_data,
 			"output": {
-				"ranked_count": len(ranked_tickers),
+				"ranked_count": len(ranked_watchlist),
 				"metric": self.metric,
 				"metric_data_available": True
 			}

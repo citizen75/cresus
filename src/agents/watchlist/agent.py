@@ -1,12 +1,10 @@
 """Watchlist agent for managing stock watchlists."""
 
 from typing import Any, Dict, Optional
-from pathlib import Path
 from core.agent import Agent
 from core.flow import Flow
 from agents.data.agent import DataAgent
-from agents.watchlist.sub_agents import MaxTickersAgent, FilterVolumeAgent, RankTickersAgent
-from tools.strategy.strategy import StrategyManager
+from agents.watchlist.sub_agents import MaxTickersAgent, FilterVolumeAgent, RankTickersAgent, TrendAgent, VolatilityAgent
 
 
 class WatchListAgent(Agent):
@@ -45,26 +43,37 @@ class WatchListAgent(Agent):
 				'message': data_result['message']
 			}
 
-		# Step 2: Load strategy configuration to get watchlist parameters
-		strategy_input = self.context.get("strategy_input") or {}
-		strategy_name = strategy_input.get("strategy") if isinstance(strategy_input, dict) else None
-		if not strategy_name:
-			strategy_name = self.context.get("strategy_name")
+		# Step 2: Get watchlist parameters from context strategy config
+		watchlist_params = self._get_watchlist_parameters()
 
-		watchlist_params = self._get_watchlist_parameters(strategy_name)
+		# Step 3: Initialize watchlist from tickers
+		tickers = self.context.get("tickers") or []
+		self.context.set("watchlist", tickers)
 
-		# Step 3: Create a watchlist processing flow with sub-agents
+		# Step 4: Create a watchlist processing flow with sub-agents
 		# The flow uses the same context as this agent
 		watchlist_flow = Flow("WatchlistProcessingFlow", context=self.context)
 
 		# Add processing steps with parameters from strategy
 		if watchlist_params.get("volume_enabled", True):
 			watchlist_flow.add_step(
-				FilterVolumeAgent(
-					"FilterVolumeStep",
-					min_volume=watchlist_params.get("min_volume", 1000000)
+				FilterVolumeAgent("FilterVolumeStep"),
+				required=False
+			)
+
+		if watchlist_params.get("trend_enabled", True):
+			watchlist_flow.add_step(
+				TrendAgent(
+					"TrendStep"
 				),
-				step_name="filter_volume",
+				required=False
+			)
+
+		if watchlist_params.get("volatility_enabled", True):
+			watchlist_flow.add_step(
+				VolatilityAgent(
+					"VolatilityStep"
+				),
 				required=False
 			)
 
@@ -74,7 +83,6 @@ class WatchListAgent(Agent):
 					"RankStep",
 					metric=watchlist_params.get("metric", "score")
 				),
-				step_name="rank_tickers",
 				required=False
 			)
 
@@ -84,7 +92,6 @@ class WatchListAgent(Agent):
 					"MaxTickersStep",
 					max_tickers=watchlist_params.get("max_count", 50)
 				),
-				step_name="max_tickers",
 				required=False
 			)
 
@@ -101,8 +108,7 @@ class WatchListAgent(Agent):
 			}
 
 		# Get final watchlist from context
-		watchlist = self.context.get("tickers") or []
-		self.context.set("watchlist", watchlist)
+		watchlist = self.context.get("watchlist") or []
 
 		return {
 			"status": "success",
@@ -113,16 +119,14 @@ class WatchListAgent(Agent):
 				"flow_steps": flow_result.get("steps_completed", 0),
 				"parameters": watchlist_params,
 			},
+			"execution_history": flow_result.get("execution_history", []),
 		}
 
-	def _get_watchlist_parameters(self, strategy_name: Optional[str] = None) -> Dict[str, Any]:
-		"""Get watchlist parameters from strategy configuration.
+	def _get_watchlist_parameters(self) -> Dict[str, Any]:
+		"""Get watchlist parameters from context strategy configuration.
 
-		Reads watchlist parameters from strategy config file,
-		with sensible defaults if not specified.
-
-		Args:
-			strategy_name: Name of the strategy to load parameters from
+		Reads watchlist parameters from context.strategy_config which is
+		loaded by WatchlistFlow, with sensible defaults if not specified.
 
 		Returns:
 			Dictionary with watchlist parameters
@@ -130,44 +134,35 @@ class WatchListAgent(Agent):
 		# Default parameters
 		defaults = {
 			"volume_enabled": True,
-			"min_volume": 1000000,
+			"trend_enabled": True,
+			"volatility_enabled": True,
 			"ranking_enabled": True,
 			"metric": "score",
 			"max_enabled": True,
 			"max_count": 50,
 		}
 
-		if not strategy_name:
+		# Get strategy config from context (loaded by WatchlistFlow)
+		strategy_config = self.context.get("strategy_config")
+		if not strategy_config:
+			self.logger.warning("Strategy config not found in context")
 			return defaults
 
-		try:
-			# Load strategy configuration
-			from os import environ
-			project_root = Path(environ.get("CRESUS_PROJECT_ROOT", "."))
-			strategy_manager = StrategyManager(project_root)
-			strategy_result = strategy_manager.load_strategy(strategy_name)
+		watchlist_config = strategy_config.get("watchlist", {})
 
-			if strategy_result.get("status") != "success":
-				return defaults
+		if not watchlist_config.get("enabled", True):
+			# Watchlist is disabled in strategy
+			return {**defaults, "volume_enabled": False, "trend_enabled": False, "ranking_enabled": False, "max_enabled": False}
 
-			strategy_config = strategy_result.get("data", {})
-			watchlist_config = strategy_config.get("watchlist", {})
+		# Extract parameters from strategy config
+		params = watchlist_config.get("parameters", {})
 
-			if not watchlist_config.get("enabled", True):
-				# Watchlist is disabled in strategy
-				return {**defaults, "volume_enabled": False, "ranking_enabled": False, "max_enabled": False}
-
-			# Extract parameters from strategy config
-			params = strategy_config.get("watchlist", {}).get("parameters", {})
-
-			return {
-				"volume_enabled": True,
-				"min_volume": params.get("volume", {}).get("min_volume", defaults["min_volume"]),
-				"ranking_enabled": True,
-				"metric": params.get("ranking", {}).get("metric", defaults["metric"]),
-				"max_enabled": True,
-				"max_count": params.get("tickers", {}).get("max_count", defaults["max_count"]),
-			}
-		except Exception as e:
-			self.logger.warning(f"Failed to load watchlist parameters from strategy: {str(e)}")
-			return defaults
+		return {
+			"volume_enabled": True,
+			"trend_enabled": True,
+			"volatility_enabled": True,
+			"ranking_enabled": True,
+			"metric": params.get("ranking", {}).get("metric", defaults["metric"]),
+			"max_enabled": True,
+			"max_count": params.get("tickers", {}).get("max_count", defaults["max_count"]),
+		}

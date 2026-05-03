@@ -1,10 +1,40 @@
 """Logger for agents."""
 
+import sys
+import inspect
+import os
+from pathlib import Path
+
 try:
 	from loguru import logger as loguru_logger
 	HAS_LOGURU = True
+
+	# Configure loguru
+	loguru_logger.remove()
+	loguru_logger.add(
+		sys.stderr,
+		format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {message}",
+	)
 except ImportError:
 	HAS_LOGURU = False
+
+# Get project root (parent of src directory)
+_project_root = Path(__file__).parent.parent.parent
+
+
+def _get_relative_path(filepath: str) -> str:
+	"""Convert absolute path to relative path from project root.
+
+	Args:
+		filepath: Absolute file path
+
+	Returns:
+		Relative path from project root
+	"""
+	try:
+		return str(Path(filepath).relative_to(_project_root))
+	except ValueError:
+		return filepath
 
 
 class AgentLogger:
@@ -34,7 +64,9 @@ class AgentLogger:
 		"""Log an info level message."""
 		formatted_msg = f"[{self.agent_name}] {message}"
 		if HAS_LOGURU:
-			loguru_logger.info(formatted_msg)
+			frame = inspect.currentframe().f_back
+			rel_path = _get_relative_path(frame.f_code.co_filename)
+			loguru_logger.info(f"{rel_path}:{frame.f_lineno} - {formatted_msg}")
 		else:
 			print(f"INFO: {formatted_msg}")
 
@@ -42,7 +74,9 @@ class AgentLogger:
 		"""Log an error level message."""
 		formatted_msg = f"[{self.agent_name}] {message}"
 		if HAS_LOGURU:
-			loguru_logger.error(formatted_msg)
+			frame = inspect.currentframe().f_back
+			rel_path = _get_relative_path(frame.f_code.co_filename)
+			loguru_logger.error(f"{rel_path}:{frame.f_lineno} - {formatted_msg}")
 		else:
 			print(f"ERROR: {formatted_msg}")
 
@@ -50,7 +84,9 @@ class AgentLogger:
 		"""Log a debug level message."""
 		formatted_msg = f"[{self.agent_name}] {message}"
 		if HAS_LOGURU:
-			loguru_logger.debug(formatted_msg)
+			frame = inspect.currentframe().f_back
+			rel_path = _get_relative_path(frame.f_code.co_filename)
+			loguru_logger.debug(f"{rel_path}:{frame.f_lineno} - {formatted_msg}")
 		else:
 			print(f"DEBUG: {formatted_msg}")
 
@@ -58,6 +94,18 @@ class AgentLogger:
 		"""Log a warning level message."""
 		formatted_msg = f"[{self.agent_name}] {message}"
 		if HAS_LOGURU:
-			loguru_logger.warning(formatted_msg)
+			frame = inspect.currentframe().f_back
+			rel_path = _get_relative_path(frame.f_code.co_filename)
+			loguru_logger.warning(f"{rel_path}:{frame.f_lineno} - {formatted_msg}")
 		else:
 			print(f"WARNING: {formatted_msg}")
+
+	def exception(self, message: str):
+		"""Log an exception level message."""
+		formatted_msg = f"[{self.agent_name}] {message}"
+		if HAS_LOGURU:
+			frame = inspect.currentframe().f_back
+			rel_path = _get_relative_path(frame.f_code.co_filename)
+			loguru_logger.exception(f"{rel_path}:{frame.f_lineno} - {formatted_msg}")
+		else:
+			print(f"EXCEPTION: {formatted_msg}")

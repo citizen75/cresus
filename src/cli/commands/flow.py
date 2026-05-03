@@ -10,6 +10,8 @@ if str(src_path) not in sys.path:
 	sys.path.insert(0, str(src_path))
 
 from flows.watchlist import WatchlistFlow
+from flows.signals import SignalsFlow
+from flows.premarket import PreMarketFlow
 from tools.strategy.strategy import StrategyManager
 from tools.universe.universe import Universe
 
@@ -30,7 +32,7 @@ class FlowManager:
 		"""Run a workflow.
 
 		Args:
-			workflow_name: Name of the workflow to run (e.g., 'watchlist')
+			workflow_name: Name of the workflow to run (e.g., 'watchlist', 'signals')
 			strategy: Strategy name for the workflow
 			input_data: Optional input data for the workflow
 			include_context: Whether to include flow context in result
@@ -38,7 +40,21 @@ class FlowManager:
 		Returns:
 			Workflow result dictionary
 		"""
-		if workflow_name.lower() == "watchlist":
+		if workflow_name.lower() == "signals":
+			# Signals flow - generate trading signals
+			flow = SignalsFlow(strategy)
+			result = flow.process(input_data or {})
+
+			# Include context if requested
+			if include_context:
+				result["_context"] = {
+					key: value for key, value in flow.context.__dict__.items()
+					if not key.startswith("_") and key != "logger"
+				}
+
+			return result
+
+		elif workflow_name.lower() == "watchlist":
 			# Try to get tickers from input_data or strategy config
 			tickers = None
 
@@ -104,11 +120,25 @@ class FlowManager:
 				}
 
 			return result
+
+		elif workflow_name.lower() == "premarket":
+			# Pre-market flow - watchlist generation + signal analysis
+			flow = PreMarketFlow(strategy)
+			result = flow.process(input_data or {})
+
+			# Include context if requested
+			if include_context:
+				result["_context"] = {
+					key: value for key, value in flow.context.__dict__.items()
+					if not key.startswith("_") and key != "logger"
+				}
+
+			return result
 		else:
 			return {
 				"status": "error",
 				"message": f"Unknown workflow: {workflow_name}",
-				"available": ["watchlist"]
+				"available": ["signals", "watchlist", "premarket"]
 			}
 
 	def list_workflows(self) -> Dict[str, Any]:
@@ -121,9 +151,19 @@ class FlowManager:
 			"status": "success",
 			"workflows": [
 				{
+					"name": "signals",
+					"description": "Trading signal generation from strategy indicators",
+					"parameters": ["strategy"]
+				},
+				{
 					"name": "watchlist",
 					"description": "Stock watchlist generation using strategy analysis",
 					"parameters": ["strategy", "tickers"]
+				},
+				{
+					"name": "premarket",
+					"description": "Pre-market analysis: watchlist generation + signal analysis",
+					"parameters": ["strategy"]
 				}
 			]
 		}

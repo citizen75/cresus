@@ -2,6 +2,7 @@
 
 import pytest
 import json
+import yaml
 import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -237,15 +238,15 @@ class TestStrategyManager:
 		result2 = manager.load_strategy("test")
 		assert result2.get("data").get("version") == "2"
 
-	def test_strategy_file_format_is_json(self, manager):
-		"""Test that strategies are stored as JSON."""
-		strategy_data = {"name": "json_test", "source": "test"}
+	def test_strategy_file_format_is_yaml(self, manager):
+		"""Test that strategies are stored as YAML."""
+		strategy_data = {"name": "yaml_test", "source": "test"}
 
-		manager.save_strategy("json_test", strategy_data)
+		manager.save_strategy("yaml_test", strategy_data)
 
-		strategy_file = manager._get_strategy_file("json_test")
+		strategy_file = manager._get_strategy_file("yaml_test")
 		with open(strategy_file, "r") as f:
-			content = json.load(f)
+			content = yaml.safe_load(f)
 
 		assert content == strategy_data
 

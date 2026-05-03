@@ -1,0 +1,223 @@
+"""Watchlist manager for saving and loading trading watchlists.
+
+Manages watchlist persistence with OHLCV data and signal information.
+Watches are stored as CSV files in db/local/watchlist/<strategy_name>.csv
+"""
+
+from pathlib import Path
+from typing import Dict, List, Any, Optional
+import os
+
+import pandas as pd
+from loguru import logger
+
+
+def _get_project_root() -> Path:
+	"""Get project root from CRESUS_PROJECT_ROOT env var or current working directory."""
+	return Path(os.environ.get("CRESUS_PROJECT_ROOT", os.getcwd()))
+
+
+class WatchlistManager:
+	"""Manager for persisting and loading trading watchlists.
+
+	Saves watchlist data with OHLCV (Open, High, Low, Close, Volume) and
+	signal information (score and triggered signals) for each ticker.
+
+	Files are stored as CSV in db/local/watchlist/<strategy_name>.csv
+	"""
+
+	def __init__(self, strategy_name: str):
+		"""Initialize watchlist manager for a strategy.
+
+		Args:
+			strategy_name: Name of the strategy
+		"""
+		self.strategy_name = strategy_name
+		project_root = _get_project_root()
+		self.watchlist_dir = project_root / "db" / "local" / "watchlist"
+		self.watchlist_dir.mkdir(parents=True, exist_ok=True)
+		self.filepath = self.watchlist_dir / f"{strategy_name}.csv"
+
+	def save(
+		self,
+		watchlist: List[str],
+		ticker_scores: Dict[str, Dict[str, Any]],
+		data_history: Dict[str, pd.DataFrame],
+	) -> Dict[str, Any]:
+		"""Save watchlist with OHLCV and signal data to CSV.
+
+		Merges watchlist tickers with their latest OHLCV data and signal scores.
+		Creates a CSV with columns: ticker, date, open, high, low, close, volume,
+		signal_score, signals
+
+		Args:
+			watchlist: List of ticker symbols in watchlist
+			ticker_scores: Dict mapping ticker -> {score, raw_score, triggered_signals, signal_count}
+			data_history: Dict mapping ticker -> DataFrame with OHLCV data
+
+		Returns:
+			Dict with status and details about saved watchlist
+		"""
+		try:
+			rows = []
+
+			for ticker in watchlist:
+				# Get signal info for this ticker
+				score_info = ticker_scores.get(ticker, {})
+				signal_score = score_info.get("score", 0.0)
+				triggered_signals = score_info.get("triggered_signals", [])
+				signals_str = ",".join(triggered_signals) if triggered_signals else ""
+
+				# Get OHLCV data for this ticker
+				if ticker in data_history:
+					ticker_data = data_history[ticker]
+
+					# Handle both DataFrame and empty cases
+					if isinstance(ticker_data, pd.DataFrame) and not ticker_data.empty:
+						# Get latest row
+						latest = ticker_data.iloc[-1]
+
+						# Extract OHLCV columns (handle both cases)
+						date = latest.get("timestamp", latest.name) if hasattr(latest, "get") else latest.get("timestamp", latest.index)
+
+						row = {
+							"ticker": ticker,
+							"date": date,
+							"open": latest.get("open") if hasattr(latest, "get") else latest.get("open"),
+							"high": latest.get("high") if hasattr(latest, "get") else latest.get("high"),
+							"low": latest.get("low") if hasattr(latest, "get") else latest.get("low"),
+							"close": latest.get("close") if hasattr(latest, "get") else latest.get("close"),
+							"volume": latest.get("volume") if hasattr(latest, "get") else latest.get("volume"),
+							"signal_score": signal_score,
+							"signals": signals_str,
+						}
+						rows.append(row)
+					else:
+						# No data for this ticker, still add watchlist entry
+						row = {
+							"ticker": ticker,
+							"date": None,
+							"open": None,
+							"high": None,
+							"low": None,
+							"close": None,
+							"volume": None,
+							"signal_score": signal_score,
+							"signals": signals_str,
+						}
+						rows.append(row)
+				else:
+					# Ticker not in data_history
+					row = {
+						"ticker": ticker,
+						"date": None,
+						"open": None,
+						"high": None,
+						"low": None,
+						"close": None,
+						"volume": None,
+						"signal_score": signal_score,
+						"signals": signals_str,
+					}
+					rows.append(row)
+
+			# Create DataFrame and save to CSV
+			if rows:
+				df = pd.DataFrame(rows)
+				df.to_csv(self.filepath, index=False)
+				logger.info(f"Saved watchlist '{self.strategy_name}' with {len(rows)} tickers to {self.filepath}")
+
+				return {
+					"status": "success",
+					"message": f"Watchlist saved successfully",
+					"file": str(self.filepath),
+					"ticker_count": len(rows),
+					"size": self.filepath.stat().st_size,
+				}
+			else:
+				return {
+					"status": "warning",
+					"message": "No tickers in watchlist to save",
+					"file": str(self.filepath),
+					"ticker_count": 0,
+				}
+
+		except Exception as e:
+			logger.error(f"Error saving watchlist '{self.strategy_name}': {e}")
+			return {
+				"status": "error",
+				"message": f"Failed to save watchlist: {str(e)}",
+				"error_type": type(e).__name__,
+			}
+
+	def load(self) -> Optional[pd.DataFrame]:
+		"""Load watchlist from CSV.
+
+		Returns:
+			DataFrame with watchlist data, or None if file doesn't exist
+		"""
+		try:
+			if self.filepath.exists():
+				df = pd.read_csv(self.filepath)
+				logger.info(f"Loaded watchlist '{self.strategy_name}' with {len(df)} tickers from {self.filepath}")
+				return df
+			else:
+				logger.warning(f"Watchlist file not found: {self.filepath}")
+				return None
+
+		except Exception as e:
+			logger.error(f"Error loading watchlist '{self.strategy_name}': {e}")
+			return None
+
+	def list_tickers(self) -> Optional[List[str]]:
+		"""Get list of tickers from saved watchlist.
+
+		Returns:
+			List of ticker symbols, or None if watchlist doesn't exist
+		"""
+		df = self.load()
+		if df is not None:
+			return df["ticker"].tolist()
+		return None
+
+	def get_top_tickers(self, n: int = 10) -> Optional[List[Dict[str, Any]]]:
+		"""Get top N tickers by signal score.
+
+		Args:
+			n: Number of top tickers to return
+
+		Returns:
+			List of dicts with ticker info, or None if watchlist doesn't exist
+		"""
+		df = self.load()
+		if df is not None:
+			top = df.nlargest(n, "signal_score")
+			return top[["ticker", "close", "signal_score", "signals"]].to_dict("records")
+		return None
+
+	def delete(self) -> Dict[str, Any]:
+		"""Delete saved watchlist file.
+
+		Returns:
+			Dict with status of deletion
+		"""
+		try:
+			if self.filepath.exists():
+				self.filepath.unlink()
+				logger.info(f"Deleted watchlist '{self.strategy_name}' from {self.filepath}")
+				return {
+					"status": "success",
+					"message": f"Watchlist deleted successfully",
+				}
+			else:
+				return {
+					"status": "warning",
+					"message": f"Watchlist file not found: {self.filepath}",
+				}
+
+		except Exception as e:
+			logger.error(f"Error deleting watchlist '{self.strategy_name}': {e}")
+			return {
+				"status": "error",
+				"message": f"Failed to delete watchlist: {str(e)}",
+			}

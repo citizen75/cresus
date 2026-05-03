@@ -2,6 +2,7 @@
 
 from typing import Any, Dict, Optional
 from core.agent import Agent
+from core.context import AgentContext
 
 
 class MaxTickersAgent(Agent):
@@ -34,26 +35,26 @@ class MaxTickersAgent(Agent):
 		if input_data is None:
 			input_data = {}
 
-		# Get tickers from context
-		tickers = self.context.get("tickers")
-		if not tickers:
+		# Get watchlist from context
+		watchlist = self.context.get("watchlist")
+		if not watchlist:
 			return {
 				"status": "error",
 				"input": input_data,
 				"output": {},
-				"message": "No tickers in context"
+				"message": "No watchlist in context"
 			}
 
 		# Limit to max tickers
-		limited_tickers = tickers[:self.max_tickers] if isinstance(tickers, list) else []
-		self.context.set("tickers", limited_tickers)
+		limited_watchlist = watchlist[:self.max_tickers] if isinstance(watchlist, list) else []
+		self.context.set("watchlist", limited_watchlist)
 
 		return {
 			"status": "success",
 			"input": input_data,
 			"output": {
-				"tickers_count": len(limited_tickers),
-				"original_count": len(tickers),
-				"limited": len(tickers) > self.max_tickers
+				"tickers_count": len(limited_watchlist),
+				"original_count": len(watchlist),
+				"limited": len(watchlist) > self.max_tickers
 			}
 		}
