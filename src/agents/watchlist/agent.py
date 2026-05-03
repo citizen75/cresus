@@ -22,14 +22,12 @@ class WatchListAgent(Agent):
 		if input_data is None:
 			input_data = {}
 
+		ret = DataAgent(self.name, self.context).process(input_data)
+		if ret['status'] != 'success':  # Check if DataAgent processing was successful
+			return {'status': 'error', 'message': ret['message'], 'watchlist': []}
+
 		# Base implementation returns empty watchlist
 		watchlist = []
-
-		# Store in context if strategy data exists
-		strategy_result = self.context.get("strategy_result")
-		if strategy_result:
-			output = strategy_result.get("output") if isinstance(strategy_result, dict) else {}
-			watchlist = output.get("tickers", []) if isinstance(output, dict) else []
 
 		self.context.set("watchlist", watchlist)
 

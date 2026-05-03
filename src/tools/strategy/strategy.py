@@ -1,14 +1,16 @@
-"""
-Finance strategy skill - Load and manage strategy configurations.
+"""Strategy manager for reading and writing trading strategies.
 
-Provides functions to:
-- Load strategy by name from YAML files
+Provides a StrategyManager class to:
+- Load strategy by name from JSON files in db/local/strategies
+- Save strategy configurations
 - Extract agent configurations from strategies
 - Get tickers list from strategy source
 - Retrieve momentum scoring parameters from strategy
+- List and validate strategies
 """
 
 import sys
+import json
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 import yaml
@@ -16,41 +18,367 @@ import yaml
 # Add parent directories to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent.parent))
 
-# Strategy configuration base path - try new location first, then legacy location
-def get_strategies_path():
-    """Get the strategies path, checking new location first (config/finance/strategies)."""
-    # Start from this file and find the project root by looking for 'config' directory
-    current = Path(__file__).resolve().parent
 
-    # Walk up the tree until we find the 'config' directory
-    while current != current.parent:
-        config_path = current / "config"
-        if config_path.exists():
-            # Try new location first
-            new_location = config_path / "finance" / "strategies"
-            if new_location.exists():
-                return new_location
+class StrategyManager:
+	"""Manager for reading and writing trading strategy configurations.
 
-            # Fall back to old workspace location for backwards compatibility
-            old_location = config_path / "workspace" / "finance" / "strategies"
-            if old_location.exists():
-                return old_location
+	Handles persistence of strategies in db/local/strategies directory with
+	automatic folder creation.
+	"""
 
-        current = current.parent
+	def __init__(self, project_root: Optional[Path] = None):
+		"""Initialize StrategyManager with optional project root.
 
-    # Fallback: return path relative to where this script expects it
-    # Try new location first, then old workspace location
-    new_fallback = Path(__file__).resolve().parent.parent.parent.parent.parent / "config" / "finance" / "strategies"
-    if new_fallback.exists():
-        return new_fallback
+		Args:
+			project_root: Optional path to project root. If None, searches from current file.
+		"""
+		if project_root:
+			self.project_root = Path(project_root)
+		else:
+			# Find project root by looking for config directory
+			self.project_root = self._find_project_root()
 
-    old_fallback = Path(__file__).resolve().parent.parent.parent.parent.parent / "config" / "workspace" / "finance" / "strategies"
-    if old_fallback.exists():
-        return old_fallback
+		# Strategies are stored in db/local/strategies
+		self.strategies_dir = self.project_root / "db" / "local" / "strategies"
+		self._ensure_strategies_dir()
 
-    return new_fallback  # Return new location as default even if not found yet
+	def _find_project_root(self) -> Path:
+		"""Find project root by walking up from this file."""
+		current = Path(__file__).resolve().parent
 
-STRATEGIES_PATH = get_strategies_path()
+		while current != current.parent:
+			if (current / "config").exists() or (current / "db").exists():
+				return current
+			current = current.parent
+
+		# Fallback to parent of src
+		return Path(__file__).resolve().parent.parent.parent.parent
+
+	def _ensure_strategies_dir(self) -> None:
+		"""Create strategies directory if it doesn't exist."""
+		self.strategies_dir.mkdir(parents=True, exist_ok=True)
+
+	def _get_strategy_file(self, strategy_name: str) -> Path:
+		"""Get the full path for a strategy file.
+
+		Args:
+			strategy_name: Name of the strategy
+
+		Returns:
+			Path to the strategy JSON file
+		"""
+		return self.strategies_dir / f"{strategy_name}.json"
+
+	def save_strategy(self, strategy_name: str, strategy_data: Dict[str, Any]) -> Dict[str, Any]:
+		"""Save a strategy to db/local/strategies.
+
+		Args:
+			strategy_name: Name of the strategy
+			strategy_data: Strategy configuration dictionary
+
+		Returns:
+			Result dictionary with status and details
+		"""
+		try:
+			self._ensure_strategies_dir()
+			strategy_file = self._get_strategy_file(strategy_name)
+
+			# Ensure strategy_data has a name field
+			if "name" not in strategy_data:
+				strategy_data["name"] = strategy_name
+
+			with open(strategy_file, "w") as f:
+				json.dump(strategy_data, f, indent=2)
+
+			return {
+				"status": "success",
+				"message": f"Strategy '{strategy_name}' saved successfully",
+				"file": str(strategy_file),
+				"size": strategy_file.stat().st_size,
+			}
+		except Exception as e:
+			return {
+				"status": "error",
+				"message": f"Failed to save strategy: {str(e)}",
+				"error_type": type(e).__name__,
+			}
+
+	def load_strategy(self, strategy_name: str) -> Dict[str, Any]:
+		"""Load strategy configuration by name.
+
+		Args:
+			strategy_name: Name of the strategy
+
+		Returns:
+			Dict with strategy configuration or error status
+		"""
+		try:
+			strategy_file = self._get_strategy_file(strategy_name)
+
+			if not strategy_file.exists():
+				return {
+					"status": "error",
+					"message": f"Strategy '{strategy_name}' not found at {strategy_file}",
+					"error_type": "FileNotFoundError",
+				}
+
+			with open(strategy_file, "r") as f:
+				strategy_data = json.load(f)
+
+			return {
+				"status": "success",
+				"data": strategy_data,
+				"name": strategy_data.get("name"),
+				"description": strategy_data.get("description"),
+				"source": strategy_data.get("source"),
+				"file": str(strategy_file),
+			}
+		except json.JSONDecodeError as e:
+			return {
+				"status": "error",
+				"message": f"JSON parsing error: {str(e)}",
+				"error_type": "JSONError",
+			}
+		except Exception as e:
+			return {
+				"status": "error",
+				"message": f"Failed to load strategy: {str(e)}",
+				"error_type": type(e).__name__,
+			}
+
+	def delete_strategy(self, strategy_name: str) -> Dict[str, Any]:
+		"""Delete a strategy file.
+
+		Args:
+			strategy_name: Name of the strategy to delete
+
+		Returns:
+			Result dictionary with status
+		"""
+		try:
+			strategy_file = self._get_strategy_file(strategy_name)
+
+			if not strategy_file.exists():
+				return {
+					"status": "error",
+					"message": f"Strategy '{strategy_name}' not found",
+					"error_type": "FileNotFoundError",
+				}
+
+			strategy_file.unlink()
+
+			return {
+				"status": "success",
+				"message": f"Strategy '{strategy_name}' deleted successfully",
+			}
+		except Exception as e:
+			return {
+				"status": "error",
+				"message": f"Failed to delete strategy: {str(e)}",
+				"error_type": type(e).__name__,
+			}
+
+	def list_strategies(self) -> Dict[str, Any]:
+		"""List all available strategies.
+
+		Returns:
+			Dict with list of strategy names and metadata
+		"""
+		try:
+			strategies_info = []
+
+			if not self.strategies_dir.exists():
+				return {
+					"status": "success",
+					"strategies": [],
+					"total_count": 0,
+					"directory": str(self.strategies_dir),
+				}
+
+			for strategy_file in sorted(self.strategies_dir.glob("*.json")):
+				try:
+					with open(strategy_file, "r") as f:
+						strategy_data = json.load(f)
+
+					strategies_info.append({
+						"name": strategy_data.get("name"),
+						"description": strategy_data.get("description", "No description"),
+						"source": strategy_data.get("source"),
+						"file": strategy_file.name,
+						"modified": strategy_file.stat().st_mtime,
+					})
+				except Exception:
+					# Skip files that can't be parsed
+					continue
+
+			return {
+				"status": "success",
+				"strategies": strategies_info,
+				"total_count": len(strategies_info),
+				"directory": str(self.strategies_dir),
+			}
+		except Exception as e:
+			return {
+				"status": "error",
+				"message": f"Failed to list strategies: {str(e)}",
+				"error_type": type(e).__name__,
+			}
+
+	def get_strategy_by_source(self, source_name: str) -> Dict[str, Any]:
+		"""Get all strategies filtered by data source.
+
+		Args:
+			source_name: Source name (e.g., 'cac40')
+
+		Returns:
+			Dict with list of strategies for this source
+		"""
+		try:
+			strategies_info = []
+
+			if not self.strategies_dir.exists():
+				return {
+					"status": "success",
+					"source": source_name,
+					"strategies": [],
+					"total_count": 0,
+				}
+
+			for strategy_file in sorted(self.strategies_dir.glob("*.json")):
+				try:
+					with open(strategy_file, "r") as f:
+						strategy_data = json.load(f)
+
+					if strategy_data.get("source") == source_name:
+						strategies_info.append({
+							"name": strategy_data.get("name"),
+							"description": strategy_data.get("description", "No description"),
+							"source": source_name,
+							"file": strategy_file.name,
+						})
+				except Exception:
+					continue
+
+			return {
+				"status": "success",
+				"source": source_name,
+				"strategies": strategies_info,
+				"total_count": len(strategies_info),
+			}
+		except Exception as e:
+			return {
+				"status": "error",
+				"message": f"Failed to get strategies by source: {str(e)}",
+				"error_type": type(e).__name__,
+			}
+
+	def find_strategy_by_name(self, strategy_name: str) -> Dict[str, Any]:
+		"""Find and load a strategy by its name.
+
+		Args:
+			strategy_name: Strategy name to find
+
+		Returns:
+			Dict with strategy data or error status
+		"""
+		return self.load_strategy(strategy_name)
+
+	def get_agent_config(self, strategy_name: str, agent_name: str) -> Dict[str, Any]:
+		"""Extract specific agent configuration from strategy.
+
+		Args:
+			strategy_name: Strategy name
+			agent_name: Agent name
+
+		Returns:
+			Dict with agent configuration or error status
+		"""
+		try:
+			result = self.load_strategy(strategy_name)
+
+			if result["status"] != "success":
+				return result
+
+			strategy_data = result["data"]
+
+			if "agents" not in strategy_data:
+				return {
+					"status": "error",
+					"message": f"No agents section in strategy '{strategy_name}'",
+					"error_type": "NotFound",
+				}
+
+			agents_config = strategy_data["agents"]
+
+			if agent_name not in agents_config:
+				available = list(agents_config.keys())
+				return {
+					"status": "error",
+					"message": f"Agent '{agent_name}' not found in strategy",
+					"error_type": "NotFound",
+					"available_agents": available,
+				}
+
+			return {
+				"status": "success",
+				"config": agents_config[agent_name],
+				"strategy": strategy_name,
+				"agent": agent_name,
+			}
+		except Exception as e:
+			return {
+				"status": "error",
+				"message": f"Failed to get agent config: {str(e)}",
+				"error_type": type(e).__name__,
+			}
+
+	def validate_strategy_config(self, strategy_name: str) -> Dict[str, Any]:
+		"""Validate strategy configuration completeness.
+
+		Args:
+			strategy_name: Strategy name to validate
+
+		Returns:
+			Dict with validation results
+		"""
+		try:
+			result = self.load_strategy(strategy_name)
+
+			if result["status"] != "success":
+				return {
+					"status": "error",
+					"message": f"Strategy not found: {strategy_name}",
+					"valid": False,
+				}
+
+			strategy_data = result["data"]
+			issues = []
+
+			if not strategy_data.get("name"):
+				issues.append("Missing strategy name")
+
+			if not strategy_data.get("source"):
+				issues.append("Missing source")
+
+			if not strategy_data.get("agents"):
+				issues.append("Missing agents section")
+
+			valid = len(issues) == 0
+
+			return {
+				"status": "success",
+				"strategy": strategy_name,
+				"valid": valid,
+				"issues": issues,
+				"issue_count": len(issues),
+			}
+		except Exception as e:
+			return {
+				"status": "error",
+				"message": f"Validation failed: {str(e)}",
+				"error_type": type(e).__name__,
+				"valid": False,
+			}
 
 
 def load_strategy(strategy_name: str) -> Dict[str, Any]:
