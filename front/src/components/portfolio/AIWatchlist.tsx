@@ -425,7 +425,8 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
                         />
                         <YAxis
                           hide={true}
-                          domain={['dataMin - 5', 'dataMax + 5']}
+                          domain={['dataMin', 'dataMax']}
+                          type="number"
                         />
                         <Tooltip
                           contentStyle={{
