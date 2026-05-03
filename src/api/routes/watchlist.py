@@ -116,9 +116,10 @@ async def get_watchlist_tickers(strategy_name: str):
 
 @router.get("/{strategy_name}/historical/{ticker}")
 async def get_ticker_historical(strategy_name: str, ticker: str, days: int = 365):
-	"""Get historical OHLCV data for a ticker.
+	"""Get historical OHLCV data for a ticker in a watchlist.
 
-	Returns historical price data (1 year by default) for a ticker in a watchlist.
+	Verifies ticker is in the watchlist, then returns historical price data.
+	Uses general /data/history endpoint under the hood.
 	"""
 	try:
 		from tools.data import DataHistory
@@ -133,7 +134,7 @@ async def get_ticker_historical(strategy_name: str, ticker: str, days: int = 365
 		if ticker not in watchlist_tickers:
 			raise HTTPException(404, f"Ticker '{ticker}' not in watchlist '{strategy_name}'")
 
-		# Fetch historical data
+		# Load historical data
 		history = DataHistory(ticker)
 		df = history.load_all()
 
@@ -146,24 +147,23 @@ async def get_ticker_historical(strategy_name: str, ticker: str, days: int = 365
 		# Convert to list of dicts
 		records = []
 		for _, row in df.iterrows():
-			date = row.get('timestamp', row.name)
-			if pd.notna(date):
-				records.append({
-					'date': str(date).split(' ')[0],  # Just the date part
-					'open': float(row['open']) if pd.notna(row.get('open')) else None,
-					'high': float(row['high']) if pd.notna(row.get('high')) else None,
-					'low': float(row['low']) if pd.notna(row.get('low')) else None,
-					'close': float(row['close']) if pd.notna(row.get('close')) else None,
-					'volume': int(row['volume']) if pd.notna(row.get('volume')) else None,
-				})
-
-		if not records:
-			raise HTTPException(404, f"No historical data available for {ticker}")
+			record = {}
+			for col in df.columns:
+				value = row[col]
+				if pd.isna(value):
+					record[col] = None
+				elif col == 'volume':
+					record[col] = int(value)
+				elif col in ['open', 'high', 'low', 'close']:
+					record[col] = float(value)
+				else:
+					record[col] = str(value)
+			records.append(record)
 
 		return {
 			"ticker": ticker,
 			"strategy": strategy_name,
-			"historical_data": records,
+			"data": records,
 			"count": len(records),
 			"days": days,
 		}
