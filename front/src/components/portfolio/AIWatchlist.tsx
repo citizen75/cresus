@@ -1,28 +1,71 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface AIWatchlistProps {
   name: string
 }
 
-const mockWatchlist = [
-  { rank: 1, stock: 'NVIDIA', ticker: 'NVDA', aiScore: 94, match: 'Excellent', updatePotential: '98%', riskScore: 'High', drivers: 'Earnings momentum, AI demand, Data center growth' },
-  { rank: 2, stock: 'TSMC', ticker: 'TSM', aiScore: 92, match: 'Excellent', updatePotential: '82%', riskScore: 'Medium', drivers: 'AI chip supplier, Capacity expansion' },
-  { rank: 3, stock: 'Palantir', ticker: 'PLTR', aiScore: 89, match: 'Excellent', updatePotential: '76%', riskScore: 'Medium', drivers: 'AI platform adoption, Gov contracts' },
-  { rank: 4, stock: 'Microsoft', ticker: 'MSFT', aiScore: 87, match: 'Excellent', updatePotential: '69%', riskScore: 'Medium', drivers: 'Cloud AI integration, Strong cash flow' },
-  { rank: 5, stock: 'Apple', ticker: 'AAPL', aiScore: 84, match: 'Very Good', updatePotential: '71%', riskScore: 'Medium', drivers: 'On-device AI, Services growth' },
-  { rank: 6, stock: 'Amazon', ticker: 'AMZN', aiScore: 82, match: 'Very Good', updatePotential: '64%', riskScore: 'Medium', drivers: 'AWS AI services, E-commerce innovation' },
-  { rank: 7, stock: 'Snowflake', ticker: 'SNOW', aiScore: 79, match: 'Good', updatePotential: '58%', riskScore: 'Medium', drivers: 'Data cloud, AI analytics platform' },
-  { rank: 8, stock: 'Databricks', ticker: 'DBRI', aiScore: 78, match: 'Good', updatePotential: '54%', riskScore: 'Medium', drivers: 'Open source AI, Data platform' },
-]
+interface WatchlistItem {
+  rank: number
+  stock: string
+  ticker: string
+  aiScore: number
+  match: string
+  updatePotential: string
+  riskScore: string
+  drivers: string
+}
 
 export default function AIWatchlist({ name }: AIWatchlistProps) {
+  const [watchlist, setWatchlist] = useState<WatchlistItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [sector, setSector] = useState('All sectors')
   const [country, setCountry] = useState('All countries')
   const [searchTerm, setSearchTerm] = useState('')
   const [sortBy, setSortBy] = useState('AI Score')
   const [currentPage, setCurrentPage] = useState(1)
 
-  const filtered = mockWatchlist.filter(item =>
+  // Load watchlist from API
+  useEffect(() => {
+    const loadWatchlist = async () => {
+      try {
+        setLoading(true)
+        // Use portfolio name as strategy name (e.g., "Momentum cac" -> "momentum_cac")
+        const strategyName = name.toLowerCase().replace(/\s+/g, '_')
+        const response = await fetch(`http://localhost:8000/api/v1/watchlists/${strategyName}`)
+
+        if (!response.ok) {
+          throw new Error('Failed to load watchlist')
+        }
+
+        const data = await response.json()
+
+        // Transform API data to table format
+        const transformedWatchlist: WatchlistItem[] = data.watchlist.map((item: any, index: number) => ({
+          rank: index + 1,
+          stock: item.ticker.replace('.PA', '').toUpperCase(),
+          ticker: item.ticker,
+          aiScore: Math.round((item.signal_score || 0) * 100),
+          match: item.signal_score >= 0.8 ? 'Excellent' : item.signal_score >= 0.6 ? 'Very Good' : 'Good',
+          updatePotential: `${Math.round((item.close || 0) / 100)}%`,
+          riskScore: 'Medium',
+          drivers: (item.signals || '').split(',').filter(Boolean).join(', ') || 'Strategy match'
+        }))
+
+        setWatchlist(transformedWatchlist)
+        setError(null)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load watchlist')
+        setWatchlist([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadWatchlist()
+  }, [name])
+
+  const filtered = watchlist.filter(item =>
     item.stock.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.ticker.toLowerCase().includes(searchTerm.toLowerCase())
   )
@@ -30,6 +73,26 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
   const itemsPerPage = 8
   const totalPages = Math.ceil(filtered.length / itemsPerPage)
   const paginatedItems = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-slate-400">Loading watchlist...</div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-red-400">Error: {error}</div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -39,7 +102,9 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
           <h2 className="text-2xl font-bold text-white">AI Stock Watchlist</h2>
           <p className="text-slate-400 text-sm mt-1">Cresus AI-selected stocks ranked by relevance to your strategy</p>
         </div>
-        <button className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition">
+        <button
+          onClick={() => window.location.reload()}
+          className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition">
           Refresh ranks
         </button>
       </div>
