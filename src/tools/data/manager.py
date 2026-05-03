@@ -9,7 +9,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from tools.data.core import DataHistory, Fundamental
-from portfolio.universe import Universe
+from tools.universe.universe import Universe
 
 
 class DataManager:

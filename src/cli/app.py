@@ -255,7 +255,7 @@ Type 'help' for commands or 'quit' to exit.
 
     def _print_universes(self):
         """Print available universes."""
-        from portfolio.universe import Universe
+        from tools.universe.universe import Universe
 
         universes = Universe.list_universes()
 
