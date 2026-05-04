@@ -256,6 +256,7 @@ class EntryTimingAgent(Agent):
 				"ticker": ticker,
 				"shares": order["shares"],
 				"entry_price": order["entry_price"],
+				"risk_amount": order.get("risk_amount", 0),
 				"execution_method": execution_method,
 				"limit_offset": limit_offset,
 				"scale_count": scale_count,
@@ -410,11 +411,16 @@ class RiskGuardAgent(Agent):
 				max_shares = int(remaining_cash / order.get("entry_price", 1))
 				if max_shares > 0:
 					reduced_order = order.copy()
+					original_shares = order["shares"]
 					reduced_order["shares"] = max_shares
-					reduced_order["original_shares"] = order["shares"]
+					reduced_order["original_shares"] = original_shares
 					reduced_order["reason"] = "Reduced to fit available cash"
+					# Recalculate risk amount based on new shares
+					entry_price = order.get("entry_price", 0)
+					stop_loss = entry_recs.get(order.get("ticker"), {}).get("stop_loss", entry_price)
+					reduced_order["risk_amount"] = abs(max_shares * (entry_price - stop_loss))
 					validated_orders.append(reduced_order)
-					remaining_cash -= max_shares * order.get("entry_price", 0)
+					remaining_cash -= max_shares * entry_price
 
 		self.context.set("validated_orders", validated_orders)
 
