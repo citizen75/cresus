@@ -105,7 +105,7 @@ class DataValidator:
         for col in required_cols:
             if col in df.columns and df[col].isna().any():
                 # Forward fill then backward fill to handle edge cases
-                df[col] = df[col].fillna(method="ffill").fillna(method="bfill")
+                df[col] = df[col].ffill().bfill()
 
         return df
 
