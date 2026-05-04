@@ -19,6 +19,7 @@ from agents.watchlist.save_agent import SaveWatchlistAgent
 from agents.data.agent import DataAgent
 from agents.signals.agent import SignalsAgent
 from agents.entry.agent import EntryAgent
+from agents.entry_order.agent import EntryOrderAgent
 
 
 class PreMarketFlow(Flow):
@@ -59,6 +60,10 @@ class PreMarketFlow(Flow):
 		# Entry analysis step - analyze trade entry points for watchlist tickers
 		entry_agent = EntryAgent("EntryAgent", self.context)
 		self.add_step(entry_agent, step_name="entry", required=False)
+
+		# Entry order step - convert entry signals to executable orders
+		entry_order_agent = EntryOrderAgent("EntryOrderAgent", self.context)
+		self.add_step(entry_order_agent, step_name="entry_order", required=False)
 
 		# Save watchlist step - persist watchlist to disk with OHLCV and signal data
 		save_agent = SaveWatchlistAgent("SaveWatchlistAgent", self.strategy_name)
@@ -120,6 +125,17 @@ class PreMarketFlow(Flow):
 				entry_recommendations = output.get("top_opportunities")
 				if entry_recommendations:
 					result["entry_recommendations"] = entry_recommendations
+
+		# Extract executable orders from entry_order step
+		entry_order_step = self.get_step("entry_order")
+		if entry_order_step:
+			entry_order_result = entry_order_step.get("result")
+			if entry_order_result and entry_order_result.get("status") == "success":
+				output = entry_order_result.get("output", {})
+				orders = output.get("orders")
+				if orders:
+					result["executable_orders"] = orders
+					result["orders_count"] = len(orders)
 
 		# Extract watchlist save result from save_watchlist step
 		save_step = self.get_step("save_watchlist")
