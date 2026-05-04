@@ -3,12 +3,14 @@
 import sys
 import threading
 import signal
+import time
 from pathlib import Path
 from typing import Optional
 from loguru import logger
 import uvicorn
 
 from gateway.cron import CronScheduler
+from gateway.watchdog import FileWatcher
 
 
 class GatewayServer:
@@ -45,12 +47,72 @@ class GatewayServer:
 		self.cron_scheduler: Optional[CronScheduler] = None
 		self.cron_thread: Optional[threading.Thread] = None
 		self.mcp_thread: Optional[threading.Thread] = None
+		self.file_watcher: Optional[FileWatcher] = None
 
 		if enable_cron and cron_config_path is None:
 			cron_config_path = Path("config/cron.yml")
 
 		self.cron_config_path = cron_config_path
 		self.running = False
+
+		# Initialize file watcher to monitor code changes
+		project_root = Path(__file__).parent.parent.parent
+		self.file_watcher = FileWatcher(
+			project_root,
+			on_api_change=self._on_api_change,
+			on_mcp_change=self._on_mcp_change,
+			on_gateway_change=self._on_gateway_change,
+		)
+
+	def _on_api_change(self) -> None:
+		"""Handle API module changes - restart API server."""
+		logger.info("Detected API code changes, restarting API server...")
+		try:
+			if self.api_server:
+				self.api_server.should_exit = True
+				if self.api_thread and self.api_thread.is_alive():
+					self.api_thread.join(timeout=5)
+
+			# Restart API server in new thread
+			self.api_thread = threading.Thread(target=self._start_api, daemon=False)
+			self.api_thread.start()
+			logger.info("API server restarted")
+
+		except Exception as e:
+			logger.error(f"Error restarting API server: {e}", exc_info=True)
+
+	def _on_mcp_change(self) -> None:
+		"""Handle MCP module changes - restart MCP server."""
+		logger.info("Detected MCP code changes, restarting MCP server...")
+		try:
+			if self.mcp_thread and self.mcp_thread.is_alive():
+				self.mcp_thread.join(timeout=5)
+
+			# Restart MCP server in new thread
+			self.mcp_thread = threading.Thread(target=self._start_mcp, daemon=False)
+			self.mcp_thread.start()
+			logger.info("MCP server restarted")
+
+		except Exception as e:
+			logger.error(f"Error restarting MCP server: {e}", exc_info=True)
+
+	def _on_gateway_change(self) -> None:
+		"""Handle gateway module changes - restart cron scheduler."""
+		logger.info("Detected gateway code changes, restarting cron scheduler...")
+		try:
+			if self.cron_scheduler and self.cron_scheduler.is_running():
+				self.cron_scheduler.stop()
+				if self.cron_thread and self.cron_thread.is_alive():
+					self.cron_thread.join(timeout=5)
+
+			# Restart cron scheduler in new thread
+			if self.enable_cron:
+				self.cron_thread = threading.Thread(target=self._start_cron, daemon=False)
+				self.cron_thread.start()
+				logger.info("Cron scheduler restarted")
+
+		except Exception as e:
+			logger.error(f"Error restarting cron scheduler: {e}", exc_info=True)
 
 	def _start_api(self) -> None:
 		"""Start the API server in a separate thread."""
@@ -135,6 +197,11 @@ class GatewayServer:
 			self.mcp_thread.start()
 			logger.info("MCP server thread started")
 
+		# Start file watcher to monitor code changes
+		if self.file_watcher:
+			self.file_watcher.start()
+			logger.info("File watcher started")
+
 		# Wait for all threads to complete
 		if self.api_thread:
 			self.api_thread.join()
@@ -149,6 +216,13 @@ class GatewayServer:
 		"""Stop the gateway server gracefully."""
 		logger.info("Stopping Cresus Gateway")
 		self.running = False
+
+		# Stop file watcher
+		if self.file_watcher:
+			try:
+				self.file_watcher.stop()
+			except Exception as e:
+				logger.error(f"Error stopping file watcher: {e}")
 
 		# Stop cron scheduler
 		if self.cron_scheduler and self.cron_scheduler.is_running():
