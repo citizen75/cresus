@@ -119,7 +119,7 @@ class PositionSizingAgent(Agent):
 	def _fractional_sizing(self, cash: float, current_price: float, entry_price: float, stop_loss: float) -> int:
 		"""Calculate shares using fixed fractional method.
 
-		Risk a fixed percent of portfolio per trade.
+		Risk a fixed percent of portfolio per trade, but limit to 5% of cash per position.
 
 		Args:
 			cash: Available cash
@@ -136,8 +136,14 @@ class PositionSizingAgent(Agent):
 		if price_risk <= 0:
 			return 0
 
+		# Calculate shares based on risk amount
 		shares = risk_amount / price_risk
-		return int(min(shares, cash / current_price))
+
+		# Limit position to 5% of available cash (conservative)
+		max_position_value = cash * 0.05
+		max_shares = int(max_position_value / current_price)
+
+		return int(min(shares, max_shares))
 
 	def _kelly_sizing(self, cash: float, current_price: float, rr_ratio: float, win_rate: float) -> int:
 		"""Calculate shares using Kelly Criterion.
@@ -354,63 +360,79 @@ class RiskGuardAgent(Agent):
 			}
 
 		# Validate each order
-		validated_orders = []
-		rejected_orders = []
 		constraints = self.context.get("risk_constraints") or {}
 
 		max_position_pct = constraints.get("max_position_pct", 0.15)  # Max 15% per position
-		max_leverage = constraints.get("max_leverage", 1.0)  # No leverage
 		max_concurrent = constraints.get("max_concurrent_trades", 10)
-		max_daily_loss = constraints.get("max_daily_loss_pct", 0.05)  # Max 5% daily loss
 
-		# Check cash availability
-		total_order_value = sum(o["shares"] * o["entry_price"] for o in timed_orders)
-
-		if total_order_value > cash:
-			return {
-				"status": "error",
-				"input": input_data,
-				"output": {"orders": timed_orders},
-				"message": f"Insufficient cash: {total_order_value} > {cash}"
-			}
-
-		# Check position concentration
+		# Get portfolio metrics
 		portfolio_value = portfolio_details.get("total_value", 0) + cash
 		num_positions = portfolio_details.get("num_positions", 0)
 
+		# Pre-validate orders by constraints
+		pre_validated = []
 		for order in timed_orders:
 			ticker = order.get("ticker")
 			order_value = order["shares"] * order["entry_price"]
 			position_pct = order_value / portfolio_value if portfolio_value > 0 else 0
 
-			# Validate constraints
-			violations = []
-
+			# Check position concentration
 			if position_pct > max_position_pct:
-				violations.append(f"Position {position_pct:.1%} exceeds max {max_position_pct:.1%}")
+				order["violation"] = f"Position {position_pct:.1%} exceeds max {max_position_pct:.1%}"
+				continue
 
-			if num_positions + len(validated_orders) >= max_concurrent:
-				violations.append(f"Too many concurrent trades: {num_positions + len(validated_orders)} >= {max_concurrent}")
+			# Check concurrent trades limit
+			if num_positions + len(pre_validated) >= max_concurrent:
+				order["violation"] = f"Max concurrent trades ({max_concurrent}) exceeded"
+				continue
 
-			if violations:
-				order["violations"] = violations
-				rejected_orders.append(order)
-			else:
+			pre_validated.append(order)
+
+		# Sort by entry score (highest first) to prioritize best opportunities
+		entry_recs = {rec["ticker"]: rec for rec in (self.context.get("entry_recommendations") or [])}
+		pre_validated.sort(
+			key=lambda o: entry_recs.get(o.get("ticker"), {}).get("composite_score", 0),
+			reverse=True
+		)
+
+		# Accept orders up to available cash
+		validated_orders = []
+		remaining_cash = cash
+
+		for order in pre_validated:
+			order_value = order["shares"] * order["entry_price"]
+
+			if order_value <= remaining_cash:
 				validated_orders.append(order)
+				remaining_cash -= order_value
+			else:
+				# Try to reduce position size to fit remaining cash
+				max_shares = int(remaining_cash / order.get("entry_price", 1))
+				if max_shares > 0:
+					reduced_order = order.copy()
+					reduced_order["shares"] = max_shares
+					reduced_order["original_shares"] = order["shares"]
+					reduced_order["reason"] = "Reduced to fit available cash"
+					validated_orders.append(reduced_order)
+					remaining_cash -= max_shares * order.get("entry_price", 0)
 
 		self.context.set("validated_orders", validated_orders)
+
+		total_order_value = sum(o["shares"] * o["entry_price"] for o in validated_orders)
+		rejected_count = len(timed_orders) - len(validated_orders)
 
 		return {
 			"status": "success",
 			"input": input_data,
 			"output": {
 				"validated": len(validated_orders),
-				"rejected": len(rejected_orders),
+				"rejected": rejected_count,
 				"total_order_value": total_order_value,
 				"portfolio_value": portfolio_value,
 				"utilization_pct": (total_order_value / portfolio_value * 100) if portfolio_value > 0 else 0,
+				"remaining_cash": remaining_cash,
 			},
-			"message": f"Validated {len(validated_orders)} orders, rejected {len(rejected_orders)}"
+			"message": f"Validated {len(validated_orders)} orders, rejected {rejected_count}, ${remaining_cash:,.0f} cash remaining"
 		}
 
 

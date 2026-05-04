@@ -190,12 +190,13 @@ class TestPositionSizingAgent(unittest.TestCase):
 		self.assertIsNotNone(self.context.get("sized_orders"))
 
 	def test_fractional_sizing_calculation(self):
-		"""Test fractional sizing formula."""
+		"""Test fractional sizing formula with position limits."""
 		agent = PositionSizingAgent(risk_percent=2.0)
 
 		# $100k portfolio, 2% risk = $2000 risk amount
 		# Entry at 150, stop at 145 = $5 per share
 		# Shares = $2000 / $5 = 400 shares
+		# But limited to 5% of cash = $5000 / $150 = 33 shares
 		shares = agent._fractional_sizing(
 			cash=100000,
 			current_price=150.0,
@@ -203,7 +204,8 @@ class TestPositionSizingAgent(unittest.TestCase):
 			stop_loss=145.0
 		)
 
-		self.assertEqual(shares, 400)
+		# Position limited to 5% of cash for safety
+		self.assertEqual(shares, 33)
 
 	def test_kelly_sizing_calculation(self):
 		"""Test Kelly Criterion sizing."""
