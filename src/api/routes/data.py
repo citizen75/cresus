@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException
 from typing import Optional
 import pandas as pd
 
-from tools.data import DataHistory
+from tools.data import DataHistory, Fundamental
 
 router = APIRouter(prefix="/data", tags=["data"])
 
@@ -109,3 +109,25 @@ async def get_ticker_latest(ticker: str):
 		raise
 	except Exception as e:
 		raise HTTPException(500, f"Error loading historical data: {str(e)}")
+
+
+@router.get("/fundamental/{ticker}")
+async def get_ticker_fundamental(ticker: str):
+	"""Get fundamental data for a ticker (current price, bid/ask, etc).
+
+	Fetches latest fundamental data from cache or yfinance.
+	Returns quotation data including current price, bid, ask.
+	"""
+	try:
+		fundamental = Fundamental(ticker)
+		data = fundamental.fetch()
+
+		if data.get("status") == "error":
+			raise HTTPException(500, f"Error fetching fundamental data: {data.get('message')}")
+
+		return data
+
+	except HTTPException:
+		raise
+	except Exception as e:
+		raise HTTPException(500, f"Error loading fundamental data: {str(e)}")

@@ -98,11 +98,19 @@ class PreMarketFlow(Flow):
 					result["top_score"] = top_score
 
 		# Save watchlist with OHLCV and signal data
-		if watchlist and ticker_scores:
+		if ticker_scores:
 			data_history = self.context.get("data_history") or {}
 			watchlist_manager = WatchlistManager(self.strategy_name)
-			save_result = watchlist_manager.save(watchlist, ticker_scores, data_history)
-			result["watchlist_saved"] = save_result
+			# Use sorted_tickers from signals if available, otherwise use watchlist
+			tickers_to_save = []
+			if result.get("sorted_tickers"):
+				tickers_to_save = [t["ticker"] for t in result["sorted_tickers"]]
+			elif watchlist:
+				tickers_to_save = watchlist
+
+			if tickers_to_save:
+				save_result = watchlist_manager.save(tickers_to_save, ticker_scores, data_history)
+				result["watchlist_saved"] = save_result
 
 		# Add strategy-specific fields to response
 		result["strategy"] = self.strategy_name

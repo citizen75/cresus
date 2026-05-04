@@ -1,6 +1,49 @@
 import { useState, useEffect } from 'react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 
+// Ticker to company name mapping
+const COMPANY_NAMES: { [key: string]: string } = {
+  'STMPA.PA': 'STMicroelectronics',
+  'TTE.PA': 'TotalEnergies',
+  'PUB.PA': 'Publicis Groupe',
+  'DSY.PA': 'Dassault Systèmes',
+  'SGO.PA': 'Sanofi',
+  'VIE.PA': 'Veolia',
+  'EDEN.PA': 'EdenWorks',
+  'LR.PA': 'Legrand',
+  'AC.PA': 'Accor',
+  'AI.PA': 'Air Liquide',
+  'AIR.PA': 'Airbus',
+  'MT.AS': 'ArcelorMittal',
+  'CS.PA': 'Crédit Suisse',
+  'BNP.PA': 'BNP Paribas',
+  'EN.PA': 'Engie',
+  'CAP.PA': 'Capgemini',
+  'CA.PA': 'Carrefour',
+  'ACA.PA': 'Acacia Research',
+  'BN.PA': 'Bouygues',
+  'ENGI.PA': 'Engie',
+  'EL.PA': 'EssiloLuxottica',
+  'ERF.PA': 'Eramet',
+  'RMS.PA': 'Remy Cointreau',
+  'KER.PA': 'Kering',
+  'OR.PA': 'L\'Oréal',
+  'MC.PA': 'LVMH',
+  'ML.PA': 'Michelin',
+  'ORA.PA': 'Orange',
+  'RI.PA': 'Pernod Ricard',
+  'RNO.PA': 'Renault',
+  'SAF.PA': 'Safran',
+  'SAN.PA': 'Sanofi',
+  'SU.PA': 'Schneider Electric',
+  'GLE.PA': 'Société Générale',
+  'STLAP.PA': 'Stellantis',
+  'TEP.PA': 'TotalEnergies',
+  'HO.PA': 'Thales',
+  'DG.PA': 'Vinci',
+  'VIV.PA': 'Vivendi',
+}
+
 interface AIWatchlistProps {
   name: string
 }
@@ -8,6 +51,7 @@ interface AIWatchlistProps {
 interface WatchlistItem {
   rank: number
   stock: string
+  companyName?: string
   ticker: string
   aiScore: number
   match: string
@@ -16,6 +60,13 @@ interface WatchlistItem {
   drivers: string
   close?: number
   date?: string
+  currentPrice?: number
+  previousClose?: number
+  priceChange?: number
+  targetPrice?: number
+  analystRating?: string
+  analystCount?: number
+  upsidePotential?: number
 }
 
 interface HistoricalData {
@@ -65,6 +116,7 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
         const transformedWatchlist: WatchlistItem[] = data.watchlist.map((item: any, index: number) => ({
           rank: index + 1,
           stock: item.ticker.replace('.PA', '').toUpperCase(),
+          companyName: COMPANY_NAMES[item.ticker],
           ticker: item.ticker,
           aiScore: Math.round((item.signal_score || 0) * 100),
           match: item.signal_score >= 0.8 ? 'Excellent' : item.signal_score >= 0.6 ? 'Very Good' : 'Good',
@@ -92,6 +144,56 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
     loadWatchlist()
   }, [name])
 
+  // Fetch real-time prices and company names for each ticker
+  useEffect(() => {
+    if (watchlist.length === 0) return
+
+    const loadFundamentalData = async () => {
+      const updatedWatchlist = [...watchlist]
+
+      for (let i = 0; i < updatedWatchlist.length; i++) {
+        try {
+          const response = await fetch(
+            `http://localhost:8000/api/v1/data/fundamental/${updatedWatchlist[i].ticker}`
+          )
+          if (response.ok) {
+            const data = await response.json()
+            const currentPrice = data.data?.quotation?.current_price
+            const previousClose = data.data?.quotation?.previous_close
+            const companyName = data.data?.company?.name
+            const analysts = data.data?.analysts
+
+            if (currentPrice) {
+              updatedWatchlist[i].currentPrice = currentPrice
+              updatedWatchlist[i].previousClose = previousClose
+
+              // Calculate price change from previous close
+              if (previousClose) {
+                const change = ((currentPrice - previousClose) / previousClose) * 100
+                updatedWatchlist[i].priceChange = change
+              }
+            }
+            if (companyName) {
+              updatedWatchlist[i].companyName = companyName
+            }
+            if (analysts) {
+              updatedWatchlist[i].targetPrice = analysts.target_price
+              updatedWatchlist[i].analystRating = analysts.recommendation
+              updatedWatchlist[i].analystCount = analysts.analyst_count
+              updatedWatchlist[i].upsidePotential = analysts.upside_potential
+            }
+          }
+        } catch (err) {
+          console.warn(`Failed to load fundamental data for ${updatedWatchlist[i].ticker}:`, err)
+        }
+      }
+
+      setWatchlist(updatedWatchlist)
+    }
+
+    loadFundamentalData()
+  }, [watchlist.length])
+
   // Load 1 year historical data for charts
   const loadHistoricalData = async (tickers: string[]) => {
     try {
@@ -106,9 +208,9 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
 
           if (response.ok) {
             const data = await response.json()
-            if (data.historical_data && data.historical_data.length > 0) {
-              historical[ticker] = data.historical_data.map((item: any) => ({
-                date: item.date,
+            if (data.data && data.data.length > 0) {
+              historical[ticker] = data.data.map((item: any) => ({
+                date: new Date(item.timestamp).toISOString().split('T')[0],
                 close: item.close,
               }))
             }
@@ -271,8 +373,9 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
                   <th className="px-6 py-4 text-left text-slate-400 font-medium">Stock</th>
                   <th className="px-6 py-4 text-left text-slate-400 font-medium">AI Score</th>
                   <th className="px-6 py-4 text-left text-slate-400 font-medium">Match to strategy</th>
-                  <th className="px-6 py-4 text-left text-slate-400 font-medium">Update potential</th>
-                  <th className="px-6 py-4 text-left text-slate-400 font-medium">Risk score</th>
+                  <th className="px-6 py-4 text-left text-slate-400 font-medium">Current Price</th>
+                  <th className="px-6 py-4 text-left text-slate-400 font-medium">Target</th>
+                  <th className="px-6 py-4 text-left text-slate-400 font-medium">Analyst Rating</th>
                   <th className="px-6 py-4 text-left text-slate-400 font-medium">Key drivers</th>
                 </tr>
               </thead>
@@ -286,7 +389,7 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
                           {item.ticker.charAt(0)}
                         </div>
                         <div>
-                          <p className="text-white font-medium">{item.stock}</p>
+                          <p className="text-white font-medium">{item.companyName || item.stock}</p>
                           <p className="text-slate-400 text-xs">{item.ticker}</p>
                         </div>
                       </div>
@@ -312,15 +415,48 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-green-400 font-medium">{item.updatePotential}</span>
+                      <div className="flex flex-col">
+                        <span className="text-white font-medium">
+                          {item.currentPrice ? `€${item.currentPrice.toFixed(2)}` : '—'}
+                        </span>
+                        {item.priceChange !== undefined && (
+                          <span className={`text-xs font-medium ${
+                            item.priceChange >= 0 ? 'text-green-400' : 'text-red-400'
+                          }`}>
+                            {item.priceChange >= 0 ? '+' : ''}{item.priceChange.toFixed(2)}%
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`px-3 py-1 rounded text-xs font-medium ${
-                        item.riskScore === 'High' ? 'bg-red-900/30 text-red-400' :
-                        'bg-yellow-900/30 text-yellow-400'
-                      }`}>
-                        {item.riskScore}
-                      </span>
+                      {item.targetPrice ? (
+                        <div className="flex flex-col">
+                          <span className="text-white font-medium">€{item.targetPrice.toFixed(2)}</span>
+                          {item.upsidePotential && (
+                            <span className={`text-xs font-medium ${
+                              item.upsidePotential > 0 ? 'text-green-400' : 'text-red-400'
+                            }`}>
+                              {item.upsidePotential > 0 ? '+' : ''}{item.upsidePotential.toFixed(2)}%
+                            </span>
+                          )}
+                        </div>
+                      ) : '—'}
+                    </td>
+                    <td className="px-6 py-4">
+                      {item.analystRating ? (
+                        <div className="flex flex-col">
+                          <span className={`px-3 py-1 rounded text-xs font-medium w-fit ${
+                            item.analystRating.includes('Buy') ? 'bg-green-900/30 text-green-400' :
+                            item.analystRating.includes('Sell') ? 'bg-red-900/30 text-red-400' :
+                            'bg-yellow-900/30 text-yellow-400'
+                          }`}>
+                            {item.analystRating}
+                          </span>
+                          {item.analystCount && (
+                            <span className="text-slate-400 text-xs mt-1">{item.analystCount} analysts</span>
+                          )}
+                        </div>
+                      ) : '—'}
                     </td>
                     <td className="px-6 py-4 text-slate-400 text-xs max-w-xs">{item.drivers}</td>
                   </tr>
@@ -375,7 +511,7 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
                 <div className="bg-slate-800/50 border-b border-slate-800 p-4">
                   <div className="flex items-start justify-between mb-3">
                     <div>
-                      <p className="text-white font-bold text-lg">{item.stock}</p>
+                      <p className="text-white font-bold text-lg">{item.companyName || item.stock}</p>
                       <p className="text-slate-400 text-xs">{item.ticker}</p>
                     </div>
                     <div className="text-right">
@@ -448,14 +584,63 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
                   </div>
                   <div className="flex justify-between text-xs pt-2 border-t border-slate-700">
                     <div>
-                      <p className="text-slate-500">Price</p>
-                      <p className="text-white font-medium">${item.close?.toFixed(2)}</p>
+                      <p className="text-slate-500">Current Price</p>
+                      <p className="text-white font-medium">
+                        {item.currentPrice ? `€${item.currentPrice.toFixed(2)}` : '—'}
+                      </p>
                     </div>
                     <div>
-                      <p className="text-slate-500">Potential</p>
-                      <p className="text-green-400 font-medium">{item.updatePotential}</p>
+                      <p className="text-slate-500">Change</p>
+                      <p className={`font-medium ${
+                        item.priceChange !== undefined && item.priceChange >= 0
+                          ? 'text-green-400'
+                          : 'text-red-400'
+                      }`}>
+                        {item.priceChange !== undefined
+                          ? `${item.priceChange >= 0 ? '+' : ''}${item.priceChange.toFixed(2)}%`
+                          : '—'}
+                      </p>
                     </div>
                   </div>
+
+                  {/* Analyst Targets */}
+                  {item.targetPrice && (
+                    <div className="border-t border-slate-700 pt-2">
+                      <p className="text-slate-500 mb-2">Analyst Targets</p>
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-slate-400">Target Price</span>
+                          <span className="text-white font-medium">€{item.targetPrice.toFixed(2)}</span>
+                        </div>
+                        {item.upsidePotential && (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-slate-400">Upside</span>
+                            <span className={`font-medium ${item.upsidePotential > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              {item.upsidePotential.toFixed(2)}%
+                            </span>
+                          </div>
+                        )}
+                        {item.analystRating && (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-slate-400">Rating</span>
+                            <span className={`font-medium px-2 py-0.5 rounded ${
+                              item.analystRating.includes('Buy') ? 'bg-green-900/30 text-green-400' :
+                              item.analystRating.includes('Sell') ? 'bg-red-900/30 text-red-400' :
+                              'bg-yellow-900/30 text-yellow-400'
+                            }`}>
+                              {item.analystRating}
+                            </span>
+                          </div>
+                        )}
+                        {item.analystCount && (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-slate-400">Analysts</span>
+                            <span className="text-white">{item.analystCount}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

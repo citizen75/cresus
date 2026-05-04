@@ -64,6 +64,20 @@ class Fundamental:
 				elif ask:
 					current_price = ask
 
+			# Extract analyst data
+			target_price = info.get("targetMeanPrice") or info.get("targetPrice")
+			recommendation = info.get("recommendationKey")
+			analyst_count = info.get("numberOfAnalystRatings", 0)
+
+			# Map recommendation key to readable format
+			recommendation_map = {
+				"strong_buy": "Strong Buy",
+				"buy": "Buy",
+				"hold": "Hold",
+				"sell": "Sell",
+				"strong_sell": "Strong Sell",
+			}
+
 			data = {
 				"ticker": self.ticker,
 				"status": "success",
@@ -73,6 +87,17 @@ class Fundamental:
 						"previous_close": info.get("previousClose"),
 						"bid": info.get("bid"),
 						"ask": info.get("ask"),
+					},
+					"company": {
+						"name": info.get("longName") or info.get("shortName") or self.ticker,
+						"sector": info.get("sector"),
+						"industry": info.get("industry"),
+					},
+					"analysts": {
+						"target_price": target_price,
+						"recommendation": recommendation_map.get(recommendation, recommendation),
+						"analyst_count": analyst_count,
+						"upside_potential": ((target_price - current_price) / current_price * 100) if target_price and current_price else None,
 					}
 				},
 				"timestamp": datetime.now().isoformat(),
