@@ -21,3 +21,4 @@ from tools.watchlist import WatchlistManager
 
 
 class PostMarketFlow(Flow):
+	pass

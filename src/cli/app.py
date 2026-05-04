@@ -438,6 +438,26 @@ class CresusCLI(cmd2.Cmd):
 				total_risk = sum(o.get("risk_amount", 0) for o in orders)
 				total_value = sum(o.get("shares", 0) * o.get("entry_price", 0) for o in orders)
 				console.print(f"[cyan]Summary:[/cyan] {len(orders)} orders | ${total_value:,.0f} total value | ${total_risk:,.0f} total risk")
+
+				# Display execution results if present (paper trading)
+				if "execution_results" in result.get("output", {}):
+					exec_results = result["output"]["execution_results"]
+					if exec_results:
+						exec_table = Table(title="Execution Results (Paper Trading)", box=box.ROUNDED)
+						exec_table.add_column("Ticker", style="cyan")
+						exec_table.add_column("Status", style="yellow")
+						exec_table.add_column("Filled Qty", style="green", justify="right")
+						exec_table.add_column("Filled Price", style="blue", justify="right")
+						exec_table.add_column("Reason", style="red")
+						for exec_result in exec_results:
+							ticker = exec_result.get("ticker", "?")
+							status = exec_result.get("status", "?").upper()
+							status_style = "green" if status == "FILLED" else "yellow"
+							filled_qty = str(exec_result.get("filled_quantity", "—"))
+							filled_price = f"${exec_result.get('filled_price', 0):.2f}" if exec_result.get('filled_price') else "—"
+							reason = exec_result.get("reason", "")
+							exec_table.add_row(ticker, f"[{status_style}]{status}[/{status_style}]", filled_qty, filled_price, reason or "—")
+						console.print(exec_table)
 			else:
 				console.print("[yellow]No executable orders[/yellow]")
 

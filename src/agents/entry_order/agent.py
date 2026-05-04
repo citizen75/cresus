@@ -9,6 +9,9 @@ from agents.entry_order.sub_agents import (
 	RiskGuardAgent,
 	OrderConstructionAgent,
 )
+from tools.portfolio import PortfolioManager
+from tools.portfolio.broker import PaperBroker
+from tools.portfolio.journal import Journal
 
 
 class EntryOrderAgent(Agent):
@@ -124,16 +127,32 @@ class EntryOrderAgent(Agent):
 		# Get final executable orders from context
 		executable_orders = self.context.get("executable_orders") or []
 
+		# Execute orders through broker if portfolio type is "paper"
+		execution_results = []
+		if executable_orders:
+			pm = PortfolioManager()
+			portfolio_config = self._get_portfolio_config(pm, portfolio_name)
+			portfolio_type = portfolio_config.get("type", "paper") if portfolio_config else "paper"
+
+			if portfolio_type == "paper":
+				execution_results = self._execute_through_paper_broker(
+					executable_orders,
+					portfolio_name,
+					pm
+				)
+
 		return {
 			"status": "success",
 			"input": input_data,
 			"output": {
 				"orders": executable_orders,
 				"count": len(executable_orders),
+				"executed": len([r for r in execution_results if r.get("status") == "filled"]),
 				"recommendations_analyzed": len(entry_recommendations),
 				"execution_methods": self._count_execution_methods(executable_orders),
 				"total_order_value": sum(o["shares"] * o["entry_price"] for o in executable_orders),
 				"total_risk": sum(o.get("risk_amount", 0) for o in executable_orders),
+				"execution_results": execution_results if execution_results else None,
 			},
 			"execution_history": flow_result.get("execution_history", []),
 		}
@@ -159,3 +178,104 @@ class EntryOrderAgent(Agent):
 				counts[method] += 1
 
 		return counts
+
+	def _get_portfolio_config(self, pm: PortfolioManager, portfolio_name: str) -> Optional[Dict[str, Any]]:
+		"""Get portfolio configuration.
+
+		Args:
+			pm: PortfolioManager instance
+			portfolio_name: Portfolio name
+
+		Returns:
+			Portfolio configuration dict
+		"""
+		try:
+			import yaml
+			from pathlib import Path
+			import os
+
+			config_path = pm.config_path
+			if not config_path.exists():
+				return None
+
+			config = yaml.safe_load(config_path.read_text())
+			for portfolio in config.get("portfolios", []):
+				if portfolio.get("name") == portfolio_name:
+					return portfolio
+
+			return None
+		except Exception as e:
+			self.logger.error(f"Error loading portfolio config: {e}")
+			return None
+
+	def _execute_through_paper_broker(
+		self,
+		orders: list,
+		portfolio_name: str,
+		pm: PortfolioManager
+	) -> list:
+		"""Execute orders through PaperBroker and record in journal.
+
+		Args:
+			orders: List of executable orders
+			portfolio_name: Portfolio name
+			pm: PortfolioManager instance
+
+		Returns:
+			List of execution results
+		"""
+		execution_results = []
+		broker = PaperBroker()
+		journal = Journal(portfolio_name)
+
+		try:
+			for order in orders:
+				# Convert order format for broker
+				broker_order = {
+					"ticker": order.get("ticker"),
+					"quantity": order.get("shares"),
+					"action": "BUY",
+					"price": order.get("entry_price"),
+					"stop_loss": order.get("stop_loss"),
+					"target_price": order.get("take_profit"),
+					"strategy_id": order.get("metadata", {}).get("strategy", "unknown"),
+				}
+
+				# Execute through broker
+				result = broker.execute_order(broker_order)
+
+				execution_results.append({
+					"order_id": order.get("id"),
+					"ticker": order.get("ticker"),
+					"shares": order.get("shares"),
+					"entry_price": order.get("entry_price"),
+					"status": result.status,
+					"filled_price": result.filled_price,
+					"filled_quantity": result.filled_quantity,
+					"reason": result.reason,
+				})
+
+				# Record in journal if filled
+				if result.status == "filled":
+					journal.add_transaction(
+						operation="BUY",
+						ticker=order.get("ticker"),
+						quantity=result.filled_quantity,
+						price=result.filled_price,
+						fees=0,  # Paper trading has no fees
+						notes=f"Strategy: {broker_order['strategy_id']} | Entry Score: {order.get('metadata', {}).get('entry_score', 0):.2f}"
+					)
+
+					self.logger.info(
+						f"Executed {result.filled_quantity} {order.get('ticker')} @ ${result.filled_price:.2f}"
+					)
+				else:
+					self.logger.warning(f"Order rejected: {result.reason}")
+
+			# Update portfolio cache after execution
+			pm.update_portfolio_cache(portfolio_name)
+
+		except Exception as e:
+			self.logger.error(f"Error executing orders through PaperBroker: {e}")
+
+		return execution_results
