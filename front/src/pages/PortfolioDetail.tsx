@@ -3,12 +3,14 @@ import { useState } from 'react'
 import PortfolioOverview from '@/components/portfolio/PortfolioOverview'
 import StrategyBuilder from '@/components/portfolio/StrategyBuilder'
 import AIWatchlist from '@/components/portfolio/AIWatchlist'
+import OrdersView from '@/components/portfolio/OrdersView'
 import PortfolioBacktest from '@/components/portfolio/PortfolioBacktest'
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'strategy', label: 'Strategy' },
   { id: 'watchlist', label: 'AI Watchlist' },
+  { id: 'orders', label: 'Orders' },
   { id: 'backtest', label: 'Backtest' },
   { id: 'holdings', label: 'Holdings' },
   { id: 'activity', label: 'Activity' },
@@ -97,6 +99,7 @@ export default function PortfolioDetail() {
         {activeTab === 'overview' && <PortfolioOverview name={name} />}
         {activeTab === 'strategy' && <StrategyBuilder name={name} />}
         {activeTab === 'watchlist' && <AIWatchlist name={name} />}
+        {activeTab === 'orders' && <OrdersView name={name} />}
         {activeTab === 'backtest' && <PortfolioBacktest name={name} />}
         {activeTab === 'activity' && <div className="text-slate-400 py-12 text-center">Activity tab - Coming soon</div>}
       </div>

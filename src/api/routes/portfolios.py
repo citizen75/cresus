@@ -480,3 +480,52 @@ async def get_portfolio_backtest(name: str):
             {"year": 2024, "portfolio": 12.8, "benchmark": 9.7},
         ],
     }
+
+
+@router.get("/{name}/orders")
+async def get_portfolio_orders(name: str):
+    """Get current orders for a portfolio from recent buy transactions."""
+    from tools.portfolio.journal import Journal
+
+    try:
+        journal = Journal(name)
+        df = journal.load_df()
+
+        if df is None or df.empty:
+            return {"orders": [], "count": 0}
+
+        # Get recent BUY orders (transactions)
+        buy_orders = df[df["operation"].str.upper() == "BUY"].copy()
+
+        if buy_orders.empty:
+            return {"orders": [], "count": 0}
+
+        # Convert to order format
+        orders = []
+        for _, row in buy_orders.iterrows():
+            order = {
+                "id": str(row.get("id", ""))[:8],  # Truncate ID
+                "ticker": str(row.get("ticker", "")),
+                "shares": int(row.get("quantity", 0)),
+                "entryPrice": float(row.get("price", 0)),
+                "executionMethod": "market",  # Default to market for executed orders
+                "stopLoss": None,
+                "takeProfit": None,
+                "riskAmount": None,
+                "riskReward": None,
+                "status": "FILLED",  # Executed orders are filled
+                "filledQuantity": int(row.get("quantity", 0)),
+                "filledPrice": float(row.get("price", 0)),
+                "executedAt": str(row.get("created_at", "")),
+                "reason": str(row.get("notes", "")),
+            }
+            orders.append(order)
+
+        # Sort by date descending (most recent first)
+        orders.sort(key=lambda x: x["executedAt"], reverse=True)
+
+        return {"orders": orders, "count": len(orders)}
+
+    except Exception as e:
+        print(f"Error fetching portfolio orders: {e}")
+        return {"orders": [], "count": 0}
