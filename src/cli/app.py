@@ -440,8 +440,8 @@ class CresusCLI(cmd2.Cmd):
 				console.print(f"[cyan]Summary:[/cyan] {len(orders)} orders | ${total_value:,.0f} total value | ${total_risk:,.0f} total risk")
 
 				# Display execution results if present (paper trading)
-				if "execution_results" in result.get("output", {}):
-					exec_results = result["output"]["execution_results"]
+				if "execution_results" in result:
+					exec_results = result["execution_results"]
 					if exec_results:
 						exec_table = Table(title="Execution Results (Paper Trading)", box=box.ROUNDED)
 						exec_table.add_column("Ticker", style="cyan")

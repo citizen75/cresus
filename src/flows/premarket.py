@@ -136,6 +136,9 @@ class PreMarketFlow(Flow):
 				if orders:
 					result["executable_orders"] = orders
 					result["orders_count"] = len(orders)
+				execution_results = output.get("execution_results")
+				if execution_results:
+					result["execution_results"] = execution_results
 
 		# Extract watchlist save result from save_watchlist step
 		save_step = self.get_step("save_watchlist")

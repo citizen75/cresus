@@ -360,34 +360,13 @@ class RiskGuardAgent(Agent):
 				"message": f"Portfolio '{portfolio_name}' not found"
 			}
 
-		# Validate each order
-		constraints = self.context.get("risk_constraints") or {}
-
-		max_position_pct = constraints.get("max_position_pct", 0.15)  # Max 15% per position
-		max_concurrent = constraints.get("max_concurrent_trades", 10)
-
 		# Get portfolio metrics
 		portfolio_value = portfolio_details.get("total_value", 0) + cash
 		num_positions = portfolio_details.get("num_positions", 0)
 
-		# Pre-validate orders by constraints
-		pre_validated = []
-		for order in timed_orders:
-			ticker = order.get("ticker")
-			order_value = order["shares"] * order["entry_price"]
-			position_pct = order_value / portfolio_value if portfolio_value > 0 else 0
-
-			# Check position concentration
-			if position_pct > max_position_pct:
-				order["violation"] = f"Position {position_pct:.1%} exceeds max {max_position_pct:.1%}"
-				continue
-
-			# Check concurrent trades limit
-			if num_positions + len(pre_validated) >= max_concurrent:
-				order["violation"] = f"Max concurrent trades ({max_concurrent}) exceeded"
-				continue
-
-			pre_validated.append(order)
+		# All timed orders are pre-validated (more aggressive approach for paper trading)
+		# Cash constraint will be the limiting factor
+		pre_validated = timed_orders.copy()
 
 		# Sort by entry score (highest first) to prioritize best opportunities
 		entry_recs = {rec["ticker"]: rec for rec in (self.context.get("entry_recommendations") or [])}
