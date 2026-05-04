@@ -114,7 +114,7 @@ class CresusCLI(cmd2.Cmd):
 				console.print("[red]✗[/red] Usage: service start <api|mcp|front|all> [-d]")
 				return
 			if service == "all":
-				for svc in ["api", "mcp", "front"]:
+				for svc in ["gateway", "front"]:
 					result = self.service_manager.start(svc, daemon)
 					svc_status = result.get("status", "error") if isinstance(result, dict) else str(result)
 					is_success = svc_status in ["started", "already_running"]

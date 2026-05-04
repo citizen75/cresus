@@ -80,7 +80,12 @@ export default function CardChart({ data, ticker }: CardChartProps) {
                 border: '1px solid #334155',
                 borderRadius: '0.5rem',
               }}
-              formatter={(value: any) => `€${value.toFixed(2)}`}
+              formatter={(value: any) => {
+                if (typeof value === 'number') {
+                  return `€${value.toFixed(2)}`
+                }
+                return value ? `€${parseFloat(value).toFixed(2)}` : '—'
+              }}
               labelFormatter={(label: any) => label}
             />
             <Line
