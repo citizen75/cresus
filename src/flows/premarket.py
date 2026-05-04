@@ -90,7 +90,9 @@ class PreMarketFlow(Flow):
 		# Set portfolio name from strategy if not already set
 		# This allows EntryOrderAgent to execute orders in the correct portfolio
 		if "portfolio_name" not in flow_input:
-			flow_input["portfolio_name"] = self.strategy_name
+			# Transform strategy name to portfolio name format (e.g., momentum_cac → Momentum cac)
+			portfolio_name = self._strategy_to_portfolio_name(self.strategy_name)
+			flow_input["portfolio_name"] = portfolio_name
 
 		# Ensure portfolio_name is set in context for sub-agents
 		self.context.set("portfolio_name", flow_input["portfolio_name"])
@@ -160,6 +162,24 @@ class PreMarketFlow(Flow):
 		result["strategy"] = self.strategy_name
 
 		return result
+
+	def _strategy_to_portfolio_name(self, strategy_name: str) -> str:
+		"""Convert strategy name to portfolio name format.
+
+		Examples:
+			momentum_cac → Momentum cac
+			default_strategy → Default strategy
+
+		Args:
+			strategy_name: Strategy name to convert
+
+		Returns:
+			Portfolio name with first letter capitalized and spaces instead of underscores
+		"""
+		# Replace underscores with spaces
+		name = strategy_name.replace("_", " ")
+		# Capitalize only the first letter
+		return name[0].upper() + name[1:] if name else name
 
 	def __repr__(self) -> str:
 		"""String representation of the flow."""
