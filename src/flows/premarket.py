@@ -15,9 +15,9 @@ if str(src_path) not in sys.path:
 from core.flow import Flow
 from agents.strategy.agent import StrategyAgent
 from agents.watchlist.agent import WatchListAgent
+from agents.watchlist.save_agent import SaveWatchlistAgent
 from agents.data.agent import DataAgent
 from agents.signals.agent import SignalsAgent
-from tools.watchlist import WatchlistManager
 
 
 class PreMarketFlow(Flow):
@@ -55,12 +55,16 @@ class PreMarketFlow(Flow):
 		signals_agent = SignalsAgent("SignalsAgent", self.context)
 		self.add_step(signals_agent, step_name="signals", required=True)
 
+		# Save watchlist step - persist watchlist to disk with OHLCV and signal data
+		save_agent = SaveWatchlistAgent("SaveWatchlistAgent", self.strategy_name)
+		save_agent.context = self.context
+		self.add_step(save_agent, step_name="save_watchlist", required=False)
+
 	def process(self, input_data: Optional[Dict[str, Any]] = None, save: bool = True) -> Dict[str, Any]:
 		"""Process input data through the pre-market flow.
 
-		Executes strategy, watchlist, data, and signals agents sequentially.
-		Generates a watchlist first, then analyzes signals on watchlist tickers.
-		Optionally saves watchlist with OHLCV and signal data to CSV.
+		Executes strategy, watchlist, data, signals, and save agents sequentially.
+		Generates a watchlist, analyzes signals, and optionally persists to disk.
 
 		Args:
 			input_data: Input dictionary for the flow
@@ -69,8 +73,12 @@ class PreMarketFlow(Flow):
 		Returns:
 			Final flow result with watchlist and signals
 		"""
+		# Prepare input data with save toggle for SaveWatchlistAgent
+		flow_input = input_data or {}
+		flow_input["save_enabled"] = save
+
 		# Execute parent flow logic
-		result = super().process(input_data or {})
+		result = super().process(flow_input)
 
 		# Extract and include watchlist data
 		watchlist = self.context.get("watchlist") or []
@@ -98,22 +106,12 @@ class PreMarketFlow(Flow):
 					result["top_ticker"] = top_ticker
 					result["top_score"] = top_score
 
-		# Save watchlist with OHLCV and signal data using WatchlistManager
-		if ticker_scores:
-			data_history = self.context.get("data_history") or {}
-			strategy_config = self.context.get("strategy_config") or {}
-			sorted_tickers = result.get("sorted_tickers")
-
-			watchlist_manager = WatchlistManager(self.strategy_name)
-			save_result = watchlist_manager.process(
-				watchlist=watchlist,
-				ticker_scores=ticker_scores,
-				data_history=data_history,
-				sorted_tickers=sorted_tickers,
-				strategy_config=strategy_config,
-				save_enabled=save  # Toggle to disable saving if needed
-			)
-			result["watchlist_saved"] = save_result
+		# Extract watchlist save result from save_watchlist step
+		save_step = self.get_step("save_watchlist")
+		if save_step:
+			save_step_result = save_step.get("result")
+			if save_step_result:
+				result["watchlist_saved"] = save_step_result.get("output")
 
 		# Add strategy-specific fields to response
 		result["strategy"] = self.strategy_name
