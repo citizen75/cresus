@@ -472,17 +472,30 @@ class OrderConstructionAgent(Agent):
 			if strategy_name is None:
 				strategy_name = "unknown"
 
+			# Calculate risk/reward ratio
+			entry_price = order.get("entry_price", 0)
+			stop_loss = rec.get("stop_loss")
+			take_profit = rec.get("take_profit")
+
+			risk_reward = None
+			if stop_loss and take_profit and entry_price:
+				risk = abs(entry_price - stop_loss)
+				reward = abs(take_profit - entry_price)
+				if risk > 0:
+					risk_reward = reward / risk
+
 			executable_order = {
 				"id": self._generate_order_id(ticker),
 				"ticker": ticker,
 				"shares": order.get("shares"),
-				"entry_price": order.get("entry_price"),
+				"entry_price": entry_price,
 				"execution_method": order.get("execution_method", "market"),
 				"limit_offset": order.get("limit_offset", 0),
 				"scale_count": order.get("scale_count", 1),
-				"stop_loss": rec.get("stop_loss"),
-				"take_profit": rec.get("take_profit"),
+				"stop_loss": stop_loss,
+				"take_profit": take_profit,
 				"risk_amount": order.get("risk_amount"),
+				"risk_reward": risk_reward,
 				"metadata": {
 					"strategy": strategy_name,
 					"entry_score": rec.get("entry_score", 0),
