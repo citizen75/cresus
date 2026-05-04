@@ -101,10 +101,14 @@ class PreMarketFlow(Flow):
 		if ticker_scores:
 			data_history = self.context.get("data_history") or {}
 			watchlist_manager = WatchlistManager(self.strategy_name)
-			# Use sorted_tickers from signals if available, otherwise use watchlist
+			# Use sorted_tickers from signals if available, limited by max_count
 			tickers_to_save = []
 			if result.get("sorted_tickers"):
-				tickers_to_save = [t["ticker"] for t in result["sorted_tickers"]]
+				# Limit to max_count from strategy config (default 20)
+				strategy_config = self.context.get("strategy_config") or {}
+				max_count = strategy_config.get("watchlist", {}).get("parameters", {}).get("tickers", {}).get("max_count", 20)
+				top_tickers = result["sorted_tickers"][:max_count]
+				tickers_to_save = [t["ticker"] for t in top_tickers]
 			elif watchlist:
 				tickers_to_save = watchlist
 
