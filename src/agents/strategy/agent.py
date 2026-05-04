@@ -83,11 +83,11 @@ class StrategyAgent(Agent):
 		try:
 			with open(universe_file, "r") as f:
 				reader = csv.reader(f)
-				next(reader)  # Skip header (I, Name, Isin, TickerYahoo, ...)
+				next(reader)  # Skip header (Name, Isin, TickerYahoo, Market, Currency)
 				for row in reader:
-					if row and len(row) > 3:
-						# Column 3 is TickerYahoo (e.g., 'AC.PA')
-						tickers.append(row[3].strip())
+					if row and len(row) > 2:
+						# Column 2 is TickerYahoo (e.g., 'AADA.PA')
+						tickers.append(row[2].strip())
 		except Exception as e:
 			self.logger.error(f"Failed to load tickers from {universe_file}: {e}")
 			return []
