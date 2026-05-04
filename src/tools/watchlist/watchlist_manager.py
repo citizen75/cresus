@@ -38,6 +38,64 @@ class WatchlistManager:
 		self.watchlist_dir.mkdir(parents=True, exist_ok=True)
 		self.filepath = self.watchlist_dir / f"{strategy_name}.csv"
 
+	def process(
+		self,
+		watchlist: List[str],
+		ticker_scores: Dict[str, Dict[str, Any]],
+		data_history: Dict[str, pd.DataFrame],
+		sorted_tickers: Optional[List[Dict[str, Any]]] = None,
+		strategy_config: Optional[Dict[str, Any]] = None,
+		save_enabled: bool = True,
+	) -> Dict[str, Any]:
+		"""Process and save watchlist with intelligent ticker selection.
+
+		Handles full watchlist processing including:
+		- Determining which tickers to save (from sorted_tickers or watchlist)
+		- Limiting by max_count from strategy config
+		- Optionally saving to disk based on save_enabled toggle
+
+		Args:
+			watchlist: List of all watchlist tickers
+			ticker_scores: Dict mapping ticker -> {score, raw_score, triggered_signals, signal_count}
+			data_history: Dict mapping ticker -> DataFrame with OHLCV data
+			sorted_tickers: Optional list of pre-sorted tickers from signals (with rank info)
+			strategy_config: Optional strategy config dict (for max_count)
+			save_enabled: Toggle to enable/disable saving to disk (default: True)
+
+		Returns:
+			Dict with status and watchlist save details
+		"""
+		if not save_enabled:
+			return {
+				"status": "success",
+				"message": "Watchlist saving is disabled",
+				"save_enabled": False,
+				"ticker_count": 0,
+			}
+
+		# Determine tickers to save
+		tickers_to_save = []
+		if sorted_tickers:
+			# Limit to max_count from strategy config (default 20)
+			max_count = 20
+			if strategy_config:
+				max_count = strategy_config.get("watchlist", {}).get("parameters", {}).get("tickers", {}).get("max_count", 20)
+			top_tickers = sorted_tickers[:max_count]
+			tickers_to_save = [t["ticker"] if isinstance(t, dict) else t for t in top_tickers]
+		elif watchlist:
+			tickers_to_save = watchlist
+
+		if not tickers_to_save:
+			return {
+				"status": "warning",
+				"message": "No tickers to save",
+				"save_enabled": True,
+				"ticker_count": 0,
+			}
+
+		# Save to disk
+		return self.save(tickers_to_save, ticker_scores, data_history)
+
 	def save(
 		self,
 		watchlist: List[str],
