@@ -22,54 +22,118 @@ class DataManager:
         self.history_dir = self.cache_dir / "history"
         self.fundamentals_dir = self.cache_dir / "fundamentals"
 
-    def fetch_history(self, ticker: str, start_date: Optional[str] = None) -> Dict[str, Any]:
-        """Fetch historical data for a ticker from yfinance."""
+    def fetch_history(self, ticker_or_universe: str, start_date: Optional[str] = None) -> Dict[str, Any]:
+        """Fetch historical data for a ticker or all tickers in a universe.
+
+        Args:
+            ticker_or_universe: Single ticker symbol (e.g., 'AAPL') or universe name (e.g., 'etf_fr')
+            start_date: Optional start date for fetching (YYYY-MM-DD)
+
+        Returns:
+            Dict with status and results
+        """
         try:
-            dh = DataHistory(ticker.upper())
+            # Check if it's a universe first
+            universe = Universe(ticker_or_universe.lower())
+            if universe.exists():
+                return self.fetch_universe(ticker_or_universe, start_date)
+
+            # Treat as single ticker
+            ticker = ticker_or_universe.upper()
+            dh = DataHistory(ticker)
             result = dh.fetch(start_date=start_date, incremental=True)
             if result.get("status") == "success":
                 df = dh.get_all()
                 return {
                     "status": "success",
-                    "ticker": ticker.upper(),
+                    "ticker": ticker,
                     "rows": len(df),
-                    "message": f"Fetched {len(df)} rows for {ticker.upper()}",
+                    "message": f"Fetched {len(df)} rows for {ticker}",
                 }
             else:
                 return {
                     "status": "error",
-                    "ticker": ticker.upper(),
+                    "ticker": ticker,
                     "message": result.get("message", "Unknown error"),
                 }
         except Exception as e:
             return {
                 "status": "error",
-                "ticker": ticker.upper(),
+                "ticker_or_universe": ticker_or_universe.upper(),
                 "message": str(e),
             }
 
-    def fetch_fundamental(self, ticker: str) -> Dict[str, Any]:
-        """Fetch fundamental data for a ticker from yfinance."""
+    def fetch_fundamental(self, ticker_or_universe: str) -> Dict[str, Any]:
+        """Fetch fundamental data for a ticker or all tickers in a universe."""
         try:
-            fd = Fundamental(ticker.upper())
-            result = fd.fetch()
-            if result.get("status") == "success":
-                return {
+            # Check if it's a universe first
+            universe = Universe(ticker_or_universe.lower())
+            if universe.exists():
+                # Fetch for all tickers in universe
+                tickers = universe.get_tickers()
+                if not tickers:
+                    return {
+                        "status": "error",
+                        "message": f"No tickers found in universe '{ticker_or_universe}'",
+                    }
+
+                results = {
                     "status": "success",
-                    "ticker": ticker.upper(),
-                    "message": f"Fetched fundamental data for {ticker.upper()}",
-                    "data": result.get("data"),
+                    "universe": ticker_or_universe.lower(),
+                    "total": len(tickers),
+                    "fetched": 0,
+                    "failed": 0,
+                    "details": [],
                 }
+
+                for ticker in tickers:
+                    try:
+                        fd = Fundamental(ticker.upper())
+                        result = fd.fetch()
+                        if result.get("status") == "success":
+                            results["fetched"] += 1
+                            results["details"].append({
+                                "ticker": ticker,
+                                "status": "success",
+                                "price": result.get("data", {}).get("quotation", {}).get("current_price"),
+                            })
+                        else:
+                            results["failed"] += 1
+                            results["details"].append({
+                                "ticker": ticker,
+                                "status": "error",
+                                "message": result.get("message", "Unknown error"),
+                            })
+                    except Exception as e:
+                        results["failed"] += 1
+                        results["details"].append({
+                            "ticker": ticker,
+                            "status": "error",
+                            "message": str(e),
+                        })
+
+                results["message"] = f"Fetched fundamental data for {results['fetched']}/{results['total']} tickers from {ticker_or_universe}"
+                return results
             else:
-                return {
-                    "status": "error",
-                    "ticker": ticker.upper(),
-                    "message": result.get("message", "Unknown error"),
-                }
+                # Treat as single ticker
+                fd = Fundamental(ticker_or_universe.upper())
+                result = fd.fetch()
+                if result.get("status") == "success":
+                    return {
+                        "status": "success",
+                        "ticker": ticker_or_universe.upper(),
+                        "message": f"Fetched fundamental data for {ticker_or_universe.upper()}",
+                        "data": result.get("data"),
+                    }
+                else:
+                    return {
+                        "status": "error",
+                        "ticker": ticker_or_universe.upper(),
+                        "message": result.get("message", "Unknown error"),
+                    }
         except Exception as e:
             return {
                 "status": "error",
-                "ticker": ticker.upper(),
                 "message": str(e),
             }
 
