@@ -72,6 +72,14 @@ class FilterStaleDataAgent(Agent):
 				except:
 					continue
 
+			# Normalize to UTC and extract date only to avoid timezone issues
+			if hasattr(last_date, 'tz_localize'):
+				last_date = last_date.tz_convert('UTC').normalize()
+			elif hasattr(last_date, 'tz_convert'):
+				last_date = last_date.tz_convert('UTC').normalize()
+			else:
+				last_date = pd.Timestamp(last_date.date())
+
 			if most_recent_date is None or last_date > most_recent_date:
 				most_recent_date = last_date
 
@@ -112,6 +120,14 @@ class FilterStaleDataAgent(Agent):
 				except:
 					removed_count += 1
 					continue
+
+			# Normalize to UTC and extract date only to avoid timezone issues
+			if hasattr(ticker_last_date, 'tz_localize'):
+				ticker_last_date = ticker_last_date.tz_convert('UTC').normalize()
+			elif hasattr(ticker_last_date, 'tz_convert'):
+				ticker_last_date = ticker_last_date.tz_convert('UTC').normalize()
+			else:
+				ticker_last_date = pd.Timestamp(ticker_last_date.date())
 
 			# Keep ticker if its last date matches the most recent date
 			if ticker_last_date == most_recent_date:

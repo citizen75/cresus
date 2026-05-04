@@ -56,11 +56,12 @@ class WatchListAgent(Agent):
 		watchlist_flow = Flow("WatchlistProcessingFlow", context=self.context)
 
 		# Add processing steps with parameters from strategy
-		# First step: filter out tickers with stale data
-		watchlist_flow.add_step(
-			FilterStaleDataAgent("FilterStaleDataStep"),
-			required=False
-		)
+		# First step: filter out tickers with stale data (optional for ETF data)
+		if watchlist_params.get("stale_data_enabled", False):
+			watchlist_flow.add_step(
+				FilterStaleDataAgent("FilterStaleDataStep"),
+				required=False
+			)
 
 		if watchlist_params.get("volume_enabled", True):
 			watchlist_flow.add_step(
@@ -164,12 +165,17 @@ class WatchListAgent(Agent):
 		# Extract parameters from strategy config
 		params = watchlist_config.get("parameters", {})
 
+		# Check which filters are actually defined in the strategy config
+		has_trend = "trend" in params
+		has_volatility = "volatility" in params
+		has_ranking = "ranking" in params
+
 		return {
-			"volume_enabled": True,
-			"trend_enabled": True,
-			"volatility_enabled": True,
-			"ranking_enabled": True,
-			"metric": params.get("ranking", {}).get("metric", defaults["metric"]),
+			"volume_enabled": "volume" in params,
+			"trend_enabled": has_trend,
+			"volatility_enabled": has_volatility,
+			"ranking_enabled": has_ranking,
+			"metric": params.get("ranking", {}).get("metric", defaults["metric"]) if has_ranking else defaults["metric"],
 			"max_enabled": True,
 			"max_count": params.get("tickers", {}).get("max_count", defaults["max_count"]),
 		}
