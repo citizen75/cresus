@@ -257,13 +257,26 @@ class EntryOrderAgent(Agent):
 
 				# Record in journal if filled
 				if result.status == "filled":
+					# Build detailed notes with order information
+					import json
+					order_details = {
+						"strategy": broker_order['strategy_id'],
+						"entry_score": float(order.get('metadata', {}).get('entry_score', 0)),
+						"execution_method": order.get("execution_method", "market"),
+						"stop_loss": order.get("stop_loss"),
+						"take_profit": order.get("take_profit"),
+						"risk_amount": order.get("risk_amount"),
+						"risk_reward": order.get("risk_reward"),
+					}
+					notes = json.dumps(order_details)
+
 					journal.add_transaction(
 						operation="BUY",
 						ticker=order.get("ticker"),
 						quantity=result.filled_quantity,
 						price=result.filled_price,
 						fees=0,  # Paper trading has no fees
-						notes=f"Strategy: {broker_order['strategy_id']} | Entry Score: {order.get('metadata', {}).get('entry_score', 0):.2f}"
+						notes=notes
 					)
 
 					self.logger.info(

@@ -97,21 +97,38 @@ async def get_portfolio_orders(name: str):
         # Convert to order format
         orders = []
         for _, row in buy_orders.iterrows():
+            # Try to parse order details from notes (JSON format)
+            order_details = {}
+            notes_str = str(row.get("notes", ""))
+
+            if notes_str:
+                try:
+                    import json
+                    # Handle double-escaped quotes from CSV
+                    if '""' in notes_str:
+                        notes_str = notes_str.replace('""', '"')
+                    # Try JSON parsing first (new format)
+                    if notes_str.startswith("{"):
+                        order_details = json.loads(notes_str)
+                except Exception:
+                    # If JSON parsing fails, try old format (Strategy: ... | Entry Score: ...)
+                    pass
+
             order = {
                 "id": str(row.get("id", ""))[:8],  # Truncate ID
                 "ticker": str(row.get("ticker", "")),
                 "shares": int(row.get("quantity", 0)),
                 "entryPrice": float(row.get("price", 0)),
-                "executionMethod": "market",  # Default to market for executed orders
-                "stopLoss": None,
-                "takeProfit": None,
-                "riskAmount": None,
-                "riskReward": None,
+                "executionMethod": order_details.get("execution_method", "market"),
+                "stopLoss": order_details.get("stop_loss"),
+                "takeProfit": order_details.get("take_profit"),
+                "riskAmount": order_details.get("risk_amount"),
+                "riskReward": order_details.get("risk_reward"),
                 "status": "FILLED",  # Executed orders are filled
                 "filledQuantity": int(row.get("quantity", 0)),
                 "filledPrice": float(row.get("price", 0)),
                 "executedAt": str(row.get("created_at", "")),
-                "reason": str(row.get("notes", "")),
+                "reason": notes_str if order_details.get("strategy") is None else order_details.get("strategy", ""),
             }
             orders.append(order)
 

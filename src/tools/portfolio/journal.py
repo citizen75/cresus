@@ -33,11 +33,11 @@ class Journal:
         """Load journal as DataFrame."""
         if not self.filepath.exists():
             return pd.DataFrame(columns=self.BASE_COLUMNS)
-        return pd.read_csv(self.filepath, dtype=object)
+        return pd.read_csv(self.filepath, dtype=object, quotechar='"', quoting=1)  # QUOTE_ALL
 
     def save(self, df: pd.DataFrame) -> None:
         """Save DataFrame to CSV."""
-        df.to_csv(self.filepath, index=False)
+        df.to_csv(self.filepath, index=False, quoting=1, quotechar='"')  # QUOTE_ALL
 
     def add_transaction(self, operation: str, ticker: str, quantity: int, price: float,
                        fees: float = 0, notes: str = "", created_at: str = None) -> str:
