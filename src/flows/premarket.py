@@ -87,6 +87,15 @@ class PreMarketFlow(Flow):
 		flow_input = input_data or {}
 		flow_input["save_enabled"] = save
 
+		# Set portfolio name from strategy if not already set
+		# This allows EntryOrderAgent to execute orders in the correct portfolio
+		if "portfolio_name" not in flow_input:
+			flow_input["portfolio_name"] = self.strategy_name
+
+		# Ensure portfolio_name is set in context for sub-agents
+		self.context.set("portfolio_name", flow_input["portfolio_name"])
+		self.context.set("strategy_name", self.strategy_name)
+
 		# Execute parent flow logic
 		result = super().process(flow_input)
 
