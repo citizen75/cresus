@@ -18,6 +18,7 @@ from agents.watchlist.agent import WatchListAgent
 from agents.watchlist.save_agent import SaveWatchlistAgent
 from agents.data.agent import DataAgent
 from agents.signals.agent import SignalsAgent
+from agents.entry.agent import EntryAgent
 
 
 class PreMarketFlow(Flow):
@@ -54,6 +55,10 @@ class PreMarketFlow(Flow):
 		# Signals step - generate trading signals on watchlist tickers
 		signals_agent = SignalsAgent("SignalsAgent", self.context)
 		self.add_step(signals_agent, step_name="signals", required=True)
+
+		# Entry analysis step - analyze trade entry points for watchlist tickers
+		entry_agent = EntryAgent("EntryAgent", self.context)
+		self.add_step(entry_agent, step_name="entry", required=False)
 
 		# Save watchlist step - persist watchlist to disk with OHLCV and signal data
 		save_agent = SaveWatchlistAgent("SaveWatchlistAgent", self.strategy_name)
@@ -105,6 +110,16 @@ class PreMarketFlow(Flow):
 				if top_ticker:
 					result["top_ticker"] = top_ticker
 					result["top_score"] = top_score
+
+		# Extract entry recommendations from entry step
+		entry_step = self.get_step("entry")
+		if entry_step:
+			entry_step_result = entry_step.get("result")
+			if entry_step_result and entry_step_result.get("status") == "success":
+				output = entry_step_result.get("output", {})
+				entry_recommendations = output.get("top_opportunities")
+				if entry_recommendations:
+					result["entry_recommendations"] = entry_recommendations
 
 		# Extract watchlist save result from save_watchlist step
 		save_step = self.get_step("save_watchlist")
