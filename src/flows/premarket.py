@@ -55,15 +55,16 @@ class PreMarketFlow(Flow):
 		signals_agent = SignalsAgent("SignalsAgent", self.context)
 		self.add_step(signals_agent, step_name="signals", required=True)
 
-	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+	def process(self, input_data: Optional[Dict[str, Any]] = None, save: bool = True) -> Dict[str, Any]:
 		"""Process input data through the pre-market flow.
 
 		Executes strategy, watchlist, data, and signals agents sequentially.
 		Generates a watchlist first, then analyzes signals on watchlist tickers.
-		Saves watchlist with OHLCV and signal data to CSV.
+		Optionally saves watchlist with OHLCV and signal data to CSV.
 
 		Args:
 			input_data: Input dictionary for the flow
+			save: Toggle to enable/disable watchlist saving (default: True)
 
 		Returns:
 			Final flow result with watchlist and signals
@@ -110,7 +111,7 @@ class PreMarketFlow(Flow):
 				data_history=data_history,
 				sorted_tickers=sorted_tickers,
 				strategy_config=strategy_config,
-				save_enabled=True  # Toggle to disable saving if needed
+				save_enabled=save  # Toggle to disable saving if needed
 			)
 			result["watchlist_saved"] = save_result
 
