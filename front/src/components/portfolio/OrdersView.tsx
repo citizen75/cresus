@@ -54,7 +54,7 @@ export default function OrdersView({ name }: OrdersViewProps) {
     const loadOrders = async () => {
       try {
         setLoading(true)
-        const response = await fetch(`/api/portfolios/${encodeURIComponent(name)}/orders`)
+        const response = await fetch(`/api/v1/portfolios/${encodeURIComponent(name)}/orders`)
         if (!response.ok) {
           setOrders([])
           setLoading(false)
@@ -85,7 +85,7 @@ export default function OrdersView({ name }: OrdersViewProps) {
       for (const ticker of tickers) {
         try {
           const response = await fetch(
-            `/api/data/history?ticker=${ticker}&days=${
+            `/api/v1/data/history?ticker=${ticker}&days=${
               period === '1D' ? 1 : period === '1W' ? 7 : period === '1M' ? 30 : period === '3M' ? 90 : period === '6M' ? 180 : 365
             }`
           )
