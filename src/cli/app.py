@@ -406,6 +406,41 @@ class CresusCLI(cmd2.Cmd):
 			else:
 				console.print("[yellow]No tickers in watchlist[/yellow]")
 
+		# Display executable orders if present
+		if "executable_orders" in result:
+			orders = result["executable_orders"]
+			if orders:
+				table = Table(title=f"Executable Orders ({len(orders)})", box=box.ROUNDED)
+				table.add_column("ID", style="dim", width=12)
+				table.add_column("Ticker", style="cyan")
+				table.add_column("Shares", style="yellow", justify="right")
+				table.add_column("Entry Price", style="green", justify="right")
+				table.add_column("Execution", style="magenta")
+				table.add_column("Stop Loss", style="red", justify="right")
+				table.add_column("Take Profit", style="blue", justify="right")
+				table.add_column("Risk/Reward", style="bright_white", justify="right")
+				for order in orders:
+					order_id = order.get("id", "?")[:8]
+					ticker = order.get("ticker", "?")
+					shares = str(order.get("shares", "?"))
+					entry_price = f"${order.get('entry_price', 0):.2f}"
+					execution = order.get("execution_method", "market").upper()
+					stop_loss = f"${order.get('stop_loss', 0):.2f}" if order.get('stop_loss') else "—"
+					take_profit = f"${order.get('take_profit', 0):.2f}" if order.get('take_profit') else "—"
+					rr_ratio = f"{order.get('metadata', {}).get('rr_ratio', 0):.2f}x" if order.get('metadata', {}).get('rr_ratio') else "—"
+					table.add_row(
+						order_id, ticker, shares, entry_price, execution,
+						stop_loss, take_profit, rr_ratio
+					)
+				console.print(table)
+
+				# Show summary stats
+				total_risk = sum(o.get("risk_amount", 0) for o in orders)
+				total_value = sum(o.get("shares", 0) * o.get("entry_price", 0) for o in orders)
+				console.print(f"[cyan]Summary:[/cyan] {len(orders)} orders | ${total_value:,.0f} total value | ${total_risk:,.0f} total risk")
+			else:
+				console.print("[yellow]No executable orders[/yellow]")
+
 		# Display execution history
 		if "execution_history" in result:
 			history = result["execution_history"]
