@@ -1,11 +1,11 @@
 """Strategy agent for executing trading strategies."""
 
-import csv
 import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 from core.agent import Agent
 from tools.strategy.strategy import StrategyManager
+from tools.universe.universe import Universe
 
 
 class StrategyAgent(Agent):
@@ -66,30 +66,24 @@ class StrategyAgent(Agent):
 	def _load_tickers_from_source(self, source: str) -> list:
 		"""Load tickers from universe CSV file.
 
+		Uses TickerYahoo if available, otherwise falls back to ISIN.
+
 		Args:
-			source: Source name (e.g., 'cac40')
+			source: Source name (e.g., 'cac40', 'etf_pea_full')
 
 		Returns:
-			List of ticker symbols
+			List of ticker symbols or ISINs
 		"""
-		project_root = Path(os.environ.get("CRESUS_PROJECT_ROOT", "."))
-		universe_file = project_root / "db" / "global" / "list" / f"{source}.csv"
-
-		if not universe_file.exists():
-			self.logger.warning(f"Universe file not found: {universe_file}")
-			return []
-
-		tickers = []
 		try:
-			with open(universe_file, "r") as f:
-				reader = csv.reader(f)
-				next(reader)  # Skip header (Name, Isin, TickerYahoo, Market, Currency)
-				for row in reader:
-					if row and len(row) > 2:
-						# Column 2 is TickerYahoo (e.g., 'AADA.PA')
-						tickers.append(row[2].strip())
-		except Exception as e:
-			self.logger.error(f"Failed to load tickers from {universe_file}: {e}")
-			return []
+			universe = Universe(source)
+			if not universe.exists():
+				self.logger.warning(f"Universe '{source}' not found")
+				return []
 
-		return tickers
+			tickers = universe.get_tickers()
+			self.logger.debug(f"Loaded {len(tickers)} tickers from universe '{source}'")
+			return tickers
+
+		except Exception as e:
+			self.logger.error(f"Failed to load tickers from universe '{source}': {e}")
+			return []

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import CardChart from '@/components/CardChart'
+import Spinner from '@/components/Spinner'
 
 // Ticker to company name mapping
 const COMPANY_NAMES: { [key: string]: string } = {
@@ -70,7 +71,7 @@ interface WatchlistItem {
 }
 
 interface HistoricalData {
-  [ticker: string]: Array<{ date: string; close: number }>
+  [ticker: string]: Array<{ date: string; close: number; ema_20?: number; ema_50?: number }>
 }
 
 export default function AIWatchlist({ name }: AIWatchlistProps) {
@@ -84,6 +85,14 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [sortBy, setSortBy] = useState('AI Score')
   const [currentPage, setCurrentPage] = useState(1)
+  const [period, setPeriod] = useState('1Y')
+
+  // Reload historical data when period changes
+  useEffect(() => {
+    if (watchlist.length > 0) {
+      loadHistoricalData(watchlist.map(w => w.ticker), period)
+    }
+  }, [period])
 
   // Load watchlist from API
   useEffect(() => {
@@ -194,8 +203,8 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
     loadFundamentalData()
   }, [watchlist.length])
 
-  // Load 1 year historical data for charts
-  const loadHistoricalData = async (tickers: string[]) => {
+  // Load historical data for charts
+  const loadHistoricalData = async (tickers: string[], selectedPeriod: string = '1Y') => {
     try {
       const strategyName = name.toLowerCase().replace(/\s+/g, '_')
       const historical: HistoricalData = {}
@@ -203,15 +212,17 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
       for (const ticker of tickers) {
         try {
           const response = await fetch(
-            `http://localhost:8000/api/v1/watchlists/${strategyName}/historical/${ticker}?days=365`
+            `http://localhost:8000/api/v1/watchlists/${strategyName}/historical/${ticker}?period=${selectedPeriod}`
           )
 
           if (response.ok) {
             const data = await response.json()
             if (data.data && data.data.length > 0) {
               historical[ticker] = data.data.map((item: any) => ({
-                date: new Date(item.timestamp).toISOString().split('T')[0],
+                date: item.date || new Date(item.timestamp).toISOString().split('T')[0],
                 close: item.close,
+                ema_20: item.ema_20,
+                ema_50: item.ema_50,
               }))
             }
           }
@@ -285,27 +296,48 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
       </div>
 
       {/* View Toggle */}
-      <div className="flex items-center gap-2 bg-slate-800/30 border border-slate-700 rounded-lg p-1 w-fit">
-        <button
-          onClick={() => setViewMode('table')}
-          className={`px-4 py-2 rounded transition font-medium text-sm ${
-            viewMode === 'table'
-              ? 'bg-purple-600 text-white'
-              : 'text-slate-400 hover:text-slate-300'
-          }`}
-        >
-          📊 Table
-        </button>
-        <button
-          onClick={() => setViewMode('cards')}
-          className={`px-4 py-2 rounded transition font-medium text-sm ${
-            viewMode === 'cards'
-              ? 'bg-purple-600 text-white'
-              : 'text-slate-400 hover:text-slate-300'
-          }`}
-        >
-          📈 Charts
-        </button>
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 bg-slate-800/30 border border-slate-700 rounded-lg p-1 w-fit">
+          <button
+            onClick={() => setViewMode('table')}
+            className={`px-4 py-2 rounded transition font-medium text-sm ${
+              viewMode === 'table'
+                ? 'bg-purple-600 text-white'
+                : 'text-slate-400 hover:text-slate-300'
+            }`}
+          >
+            📊 Table
+          </button>
+          <button
+            onClick={() => setViewMode('cards')}
+            className={`px-4 py-2 rounded transition font-medium text-sm ${
+              viewMode === 'cards'
+                ? 'bg-purple-600 text-white'
+                : 'text-slate-400 hover:text-slate-300'
+            }`}
+          >
+            📈 Charts
+          </button>
+        </div>
+
+        {/* Period Selection (only in charts view) */}
+        {viewMode === 'cards' && (
+          <div className="flex items-center gap-2 bg-slate-800/30 border border-slate-700 rounded-lg p-1">
+            {['1W', '1M', '3M', '6M', 'YTD', '1Y', 'All'].map((p) => (
+              <button
+                key={p}
+                onClick={() => setPeriod(p)}
+                className={`px-3 py-2 rounded transition font-medium text-xs ${
+                  period === p
+                    ? 'bg-purple-600 text-white'
+                    : 'text-slate-400 hover:text-slate-300'
+                }`}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Filters */}
@@ -534,47 +566,16 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
                 </div>
 
                 {/* Chart */}
-                <div className="p-4 h-48 bg-slate-800/20">
-                  {historicalData[item.ticker] && historicalData[item.ticker].length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart
-                        data={historicalData[item.ticker]}
-                        margin={{ top: 5, right: 10, left: -20, bottom: 0 }}
-                      >
-                        <XAxis
-                          dataKey="date"
-                          hide={true}
-                        />
-                        <YAxis
-                          hide={true}
-                          domain={['dataMin', 'dataMax']}
-                          type="number"
-                        />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: '#1e293b',
-                            border: '1px solid #334155',
-                            borderRadius: '0.5rem',
-                          }}
-                          formatter={(value: any) => `$${value.toFixed(2)}`}
-                          labelFormatter={(label: any) => label}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="close"
-                          stroke="#a78bfa"
-                          dot={false}
-                          strokeWidth={2.5}
-                          isAnimationActive={false}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-slate-500 text-sm">
-                      Loading chart...
-                    </div>
-                  )}
-                </div>
+                {historicalData[item.ticker] && historicalData[item.ticker].length > 0 ? (
+                  <CardChart
+                    data={historicalData[item.ticker]}
+                    ticker={item.ticker}
+                  />
+                ) : (
+                  <div className="p-4 h-48 bg-slate-800/20 flex items-center justify-center">
+                    <Spinner />
+                  </div>
+                )}
 
                 {/* Card Footer */}
                 <div className="border-t border-slate-800 p-4 space-y-2">

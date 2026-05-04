@@ -4,7 +4,7 @@ from typing import Any, Dict, Optional
 from core.agent import Agent
 from core.flow import Flow
 from agents.data.agent import DataAgent
-from agents.watchlist.sub_agents import MaxTickersAgent, FilterVolumeAgent, RankTickersAgent, TrendAgent, VolatilityAgent
+from agents.watchlist.sub_agents import MaxTickersAgent, FilterVolumeAgent, RankTickersAgent, TrendAgent, VolatilityAgent, FilterStaleDataAgent
 
 
 class WatchListAgent(Agent):
@@ -18,11 +18,12 @@ class WatchListAgent(Agent):
 		"""Process watchlist through a series of filtering and ranking steps.
 
 		Creates a Flow with sub-agents that:
-		1. Validate tickers from context
+		1. Filter out tickers with stale trading data
 		2. Filter by trading volume (from strategy config)
-		3. Rank by metric (from strategy config)
-		4. Limit to maximum count (from strategy config)
-		5. Build final watchlist
+		3. Filter by trend
+		4. Filter by volatility
+		5. Rank by metric (from strategy config)
+		6. Limit to maximum count (from strategy config)
 
 		Args:
 			input_data: Input data (optional, uses context for tickers)
@@ -55,6 +56,12 @@ class WatchListAgent(Agent):
 		watchlist_flow = Flow("WatchlistProcessingFlow", context=self.context)
 
 		# Add processing steps with parameters from strategy
+		# First step: filter out tickers with stale data
+		watchlist_flow.add_step(
+			FilterStaleDataAgent("FilterStaleDataStep"),
+			required=False
+		)
+
 		if watchlist_params.get("volume_enabled", True):
 			watchlist_flow.add_step(
 				FilterVolumeAgent("FilterVolumeStep"),

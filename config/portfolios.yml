@@ -1,15 +1,5 @@
 portfolios:
 - currency: EUR
-  description: Main portfolio
-  gsheet:
-    enabled: false
-    sheet_id: ''
-    sheet_name: Positions
-    sheet_range: A1:J500
-  initial_capital: 100000
-  name: main
-  type: paper
-- currency: EUR
   description: Momentum for cac40
   initial_capital: 10000.0
   name: Momentum cac
@@ -25,7 +15,12 @@ portfolios:
   name: PEA Gilles
   type: paper
 - currency: EUR
-  description: Portfolio to test cache
-  initial_capital: 50000.0
-  name: Cache Test Portfolio
+  description: ''
+  initial_capital: 10000.0
+  name: Momentum ETF_FR
+  type: paper
+- currency: EUR
+  description: ''
+  initial_capital: 10000.0
+  name: Momentum ETF PEA Full
   type: paper

@@ -1,4 +1,4 @@
-﻿ETF;Code ISIN;TER;AUM;Perf. 5 ans;Catégorie;ETF recommandé;Frais;Encours
+﻿ETF;ISIN;TER;AUM;Perf. 5 ans;Catégorie;ETF recommandé;Frais;Encours
 AMUNDI MSCI WORLD SWAP;LU1681043599;0.0038;;0.8284999999999999;;;;
 iSHARES MSCI WORLD SWAP PEA;IE0002XZSHO1;0.002;;;;;;
 AMUNDI PEA MONDE (MSCI WORLD);FR001400U5Q4;0.002;631.0;;;;;
@@ -257,17 +257,3 @@ BNP Paribas Easy Quality Europe;LU1481201611;0.0031;6.0;0.5501;;;;
 BNP Paribas Easy Value Europe;LU1481201702;0.0031;5.0;0.6356;;;;
 Amundi PEA Emergent (MSCI Emerging) ESG Transition S – Acc;FR001400ZGO4;0.003;5.0;;;;;
 Goldman Sachs Emerging Markets Hard Currency Bond Active USD (Acc);IE000M3UHD88;0.0045000000000000005;0.0;;;;;
-;;;;;Zone Euro large;Amundi Prime Eurozone;0.0005;82.0
-;;;;;Europe développée;Amundi Prime Europe;0.0005;213.0
-;;;;;Allemagne;Vanguard Germany All Caps;0.0007000000000000001;274.0
-;;;;;Euro Stoxx 50;HSBC / Amundi Core / iShares (DE);;
-;;;;;MSCI EMU;SPDR MSCI EMU;0.0008;342.0
-;;;;;Europe hors UK;Vanguard FTSE Dev Europe ex UK;0.001;
-;;;;;S&P 500;Amundi PEA S&P 500;0.0012;912.0
-;;;;;S&P 500 (gros encours);BNP Paribas Easy S&P 500;0.0014000000000000002;
-;;;;;Émergents globaux;HSBC MSCI Emerging Markets;0.0015;
-;;;;;Europe large;Amundi PEA MSCI Europe;0.0015;273.0
-;;;;;Monde;iShares MSCI World Swap PEA / Amundi PEA Monde;0.002;
-;;;;;France (CAC 40);Xtrackers CAC 40;0.002;118.0
-;;;;;Japon;Amundi PEA Japon TOPIX;0.002;91.0
-;;;;;Monde (historique);Amundi MSCI World Swap;0.0038;

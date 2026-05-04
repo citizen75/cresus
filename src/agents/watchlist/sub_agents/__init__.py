@@ -5,5 +5,6 @@ from .filter_volume_agent import FilterVolumeAgent
 from .rank_tickers_agent import RankTickersAgent
 from .trend_agent import TrendAgent
 from .volatility_agent import VolatilityAgent
+from .filter_stale_data_agent import FilterStaleDataAgent
 
-__all__ = ["MaxTickersAgent", "FilterVolumeAgent", "RankTickersAgent", "TrendAgent", "VolatilityAgent"]
+__all__ = ["MaxTickersAgent", "FilterVolumeAgent", "RankTickersAgent", "TrendAgent", "VolatilityAgent", "FilterStaleDataAgent"]

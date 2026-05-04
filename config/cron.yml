@@ -1,0 +1,33 @@
+# Cron job configuration for Cresus Gateway
+# Each job can call an agent or flow with parameters
+
+jobs:
+  # Example: Run premarket flow daily at 8:00 AM on weekdays
+  - name: premarket_daily
+    description: "Run premarket analysis for momentum strategy"
+    enabled: false  # Set to true to enable
+    schedule: "0 8 * * 1-5"  # 8:00 AM, Monday-Friday (cron format)
+    type: flow  # 'flow' or 'agent'
+    target: premarket  # Flow or agent name
+    params:
+      strategy: momentum_cac
+
+  # Example: Run strategy agent hourly
+  - name: strategy_hourly
+    description: "Run strategy agent every hour"
+    enabled: false
+    schedule: "0 * * * *"  # Every hour
+    type: agent
+    target: strategy
+    params:
+      strategy: momentum_etf_fr
+
+  # Example: Run data fetch every 6 hours
+  - name: data_sync
+    description: "Sync market data every 6 hours"
+    enabled: false
+    schedule: "0 */6 * * *"  # Every 6 hours
+    type: flow
+    target: data_fetch
+    params:
+      universe: cac40

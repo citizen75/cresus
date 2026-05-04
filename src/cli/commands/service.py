@@ -11,8 +11,7 @@ class ServiceManager:
     """Manage API, MCP, and frontend services."""
 
     SERVICES = {
-        "api": {"script": "bin/api", "port": 8000, "name": "API Server"},
-        "mcp": {"script": "bin/mcp", "port": None, "name": "MCP Server"},
+        "gateway": {"script": "bin/gateway", "port": 8000, "name": "Gateway (API + MCP + Cron)"},
         "front": {"script": "bin/front", "port": 5173, "name": "Frontend"},
     }
 

@@ -26,27 +26,49 @@ class Universe:
     def get_tickers(self) -> List[str]:
         """Get list of ticker symbols from universe.
 
+        Uses TickerYahoo column if available, otherwise falls back to ISIN.
+
         Returns:
-            List of ticker symbols (TickerYahoo column)
+            List of ticker symbols or ISINs
         """
         if not self.exists():
             raise FileNotFoundError(f"Universe '{self.universe_name}' not found")
 
         try:
-            df = pd.read_csv(self.filepath)
-            if "TickerYahoo" not in df.columns:
-                raise ValueError(f"Universe file missing 'TickerYahoo' column")
+            df = self.load_df()
 
-            tickers = df["TickerYahoo"].dropna().str.strip().tolist()
-            return [t for t in tickers if t]  # Filter empty strings
+            # Try TickerYahoo first (preferred)
+            if "TickerYahoo" in df.columns:
+                tickers = df["TickerYahoo"].dropna().str.strip().tolist()
+                return [t for t in tickers if t]  # Filter empty strings
+
+            # Fallback to ISIN if TickerYahoo not available
+            if "ISIN" in df.columns:
+                isins = df["ISIN"].dropna().str.strip().tolist()
+                return [i for i in isins if i]  # Filter empty strings
+
+            # If neither column exists, raise error
+            raise ValueError(f"Universe file missing both 'TickerYahoo' and 'ISIN' columns")
+
+        except pd.errors.ParserError as e:
+            raise ValueError(f"Error parsing universe file '{self.universe_name}': {e}")
         except Exception as e:
             raise ValueError(f"Error reading universe '{self.universe_name}': {e}")
 
     def load_df(self) -> pd.DataFrame:
-        """Load universe as DataFrame."""
+        """Load universe as DataFrame.
+
+        Automatically detects separator (comma or semicolon).
+        """
         if not self.exists():
             raise FileNotFoundError(f"Universe '{self.universe_name}' not found")
-        return pd.read_csv(self.filepath)
+
+        # Try to detect separator
+        with open(self.filepath, 'r', encoding='utf-8-sig') as f:
+            first_line = f.readline()
+
+        separator = ',' if ',' in first_line else ';'
+        return pd.read_csv(self.filepath, sep=separator, encoding='utf-8-sig')
 
     @staticmethod
     def list_universes() -> List[str]:

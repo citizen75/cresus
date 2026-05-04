@@ -3,6 +3,10 @@ servers:
     host: "0.0.0.0"
     port: 8000
     log_file: "logs/api.log"
+  gateway:
+    cron_enabled: false  # Set to true to enable cron scheduler
+    cron_config: "config/cron.yml"
+    mcp_enabled: true    # Set to false to disable MCP server
   mcp:
     log_file: "logs/mcp.log"
   front:

@@ -3,6 +3,7 @@
 from fastapi import APIRouter, HTTPException
 from typing import Optional, List, Dict, Any
 import pandas as pd
+from datetime import datetime, timedelta
 
 from tools.watchlist import WatchlistManager
 from tools.strategy import StrategyManager
@@ -115,11 +116,17 @@ async def get_watchlist_tickers(strategy_name: str):
 
 
 @router.get("/{strategy_name}/historical/{ticker}")
-async def get_ticker_historical(strategy_name: str, ticker: str, days: int = 365):
-	"""Get historical OHLCV data for a ticker in a watchlist.
+async def get_ticker_historical(
+	strategy_name: str,
+	ticker: str,
+	period: str = "1Y",
+	days: Optional[int] = None
+):
+	"""Get historical OHLCV data with EMA indicators for a ticker in a watchlist.
 
 	Verifies ticker is in the watchlist, then returns historical price data.
-	Uses general /data/history endpoint under the hood.
+	Period mapping: 1W=7, 1M=30, 3M=90, YTD=year-to-date, 1Y=365, All=all available
+	Includes EMA_20 and EMA_50 calculations.
 	"""
 	try:
 		from tools.data import DataHistory
@@ -141,12 +148,35 @@ async def get_ticker_historical(strategy_name: str, ticker: str, days: int = 365
 		if df.empty:
 			raise HTTPException(404, f"No historical data for {ticker}")
 
+		# Map period to days if not explicitly provided
+		if days is None:
+			period_map = {
+				"1W": 7,
+				"1M": 30,
+				"3M": 90,
+				"6M": 180,
+				"YTD": _get_ytd_days(),
+				"1Y": 365,
+				"All": None
+			}
+			days = period_map.get(period, 365)
+
 		# Filter to last N days
-		df = df.tail(days)
+		if days is not None:
+			df = df.tail(days)
+
+		# Normalize column names to lowercase for consistency
+		df.columns = df.columns.str.lower()
+
+		# Calculate EMA_20 and EMA_50
+		if 'close' in df.columns:
+			close = pd.to_numeric(df['close'], errors='coerce')
+			df['ema_20'] = close.ewm(span=20, adjust=False).mean()
+			df['ema_50'] = close.ewm(span=50, adjust=False).mean()
 
 		# Convert to list of dicts
 		records = []
-		for _, row in df.iterrows():
+		for idx, row in df.iterrows():
 			record = {}
 			for col in df.columns:
 				value = row[col]
@@ -154,21 +184,37 @@ async def get_ticker_historical(strategy_name: str, ticker: str, days: int = 365
 					record[col] = None
 				elif col == 'volume':
 					record[col] = int(value)
-				elif col in ['open', 'high', 'low', 'close']:
+				elif col in ['open', 'high', 'low', 'close', 'ema_20', 'ema_50']:
 					record[col] = float(value)
 				else:
 					record[col] = str(value)
+
+			# Add date field formatted as YYYY-MM-DD from timestamp
+			if 'timestamp' in record and record['timestamp']:
+				try:
+					ts = pd.Timestamp(record['timestamp'])
+					record['date'] = ts.strftime('%Y-%m-%d')
+				except:
+					record['date'] = record['timestamp']
+
 			records.append(record)
 
 		return {
 			"ticker": ticker,
 			"strategy": strategy_name,
+			"period": period,
 			"data": records,
 			"count": len(records),
-			"days": days,
 		}
 
 	except HTTPException:
 		raise
 	except Exception as e:
 		raise HTTPException(500, f"Error loading historical data: {str(e)}")
+
+
+def _get_ytd_days() -> int:
+	"""Calculate days from start of year to today."""
+	today = datetime.now().date()
+	year_start = datetime(today.year, 1, 1).date()
+	return (today - year_start).days

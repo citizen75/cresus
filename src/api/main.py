@@ -12,32 +12,26 @@ os.environ.setdefault("CRESUS_PROJECT_ROOT", str(project_root))
 os.chdir(project_root)
 
 import uvicorn
-import yaml
 from loguru import logger
+from utils.env import get_api_host, get_api_port
 
 
 def main():
-    """Start API server."""
-    config_path = Path("config/cresus.yml")
-    config = {}
-    if config_path.exists():
-        config = yaml.safe_load(config_path.read_text()) or {}
+	"""Start API server."""
+	host = get_api_host()
+	port = get_api_port()
 
-    api_cfg = config.get("servers", {}).get("api", {})
-    host = api_cfg.get("host", "0.0.0.0")
-    port = api_cfg.get("port", 8000)
+	logger.info(f"Starting Cresus API on {host}:{port}")
 
-    logger.info(f"Starting Cresus API on {host}:{port}")
-
-    uvicorn.run(
-        "api.app:create_app",
-        factory=True,
-        host=host,
-        port=port,
-        reload=False,
-        log_level="info",
-    )
+	uvicorn.run(
+		"api.app:create_app",
+		factory=True,
+		host=host,
+		port=port,
+		reload=False,
+		log_level="info",
+	)
 
 
 if __name__ == "__main__":
-    main()
+	main()

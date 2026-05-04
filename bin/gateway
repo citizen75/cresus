@@ -1,0 +1,15 @@
+#!/usr/bin/env python3
+"""Entry point for Cresus Gateway server (API + MCP + Cron)."""
+import os
+import sys
+
+# Set project root
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
+os.chdir(project_root)
+os.environ.setdefault("CRESUS_PROJECT_ROOT", project_root)
+
+from src.gateway.main import main
+
+if __name__ == "__main__":
+    main()
