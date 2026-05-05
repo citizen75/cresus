@@ -198,7 +198,7 @@ class CresusCLI(cmd2.Cmd):
 		console.print(panel)
 
 	def do_data(self, args):
-		"""Manage historical and fundamental data: fetch|list|clear|stats [options]"""
+		"""Manage historical and fundamental data: fetch|list|clear|stats|show [options]"""
 		args_str = str(args).strip() if args else ""
 
 		if not args_str:
@@ -209,6 +209,7 @@ class CresusCLI(cmd2.Cmd):
 			table.add_row("data fetch fundamental <ticker>", "Fetch fundamental data")
 			table.add_row("data fetch universe <name> [start_date]", "Fetch all tickers in universe")
 			table.add_row("data fetch all <universe> [start_date]", "Fetch history + fundamental for universe")
+			table.add_row("data show <ticker>", "Show ticker info (history dates, last OHLCV, fundamentals)")
 			table.add_row("data list [history|fundamentals|all]", "List cached data")
 			table.add_row("data clear [type] [ticker]", "Clear cache (types: history, fundamentals, all)")
 			table.add_row("data stats", "Show cache statistics")
@@ -242,6 +243,14 @@ class CresusCLI(cmd2.Cmd):
 			else:
 				console.print(f"[red]✗[/red] Unknown data type: {data_type}")
 
+		elif cmd == "show":
+			if len(parts) < 2:
+				console.print("[red]✗[/red] Usage: data show <ticker>")
+				return
+			ticker = parts[1]
+			result = self.data_manager.show_ticker_info(ticker)
+			self._print_ticker_info(result)
+
 		elif cmd == "list":
 			data_type = parts[1] if len(parts) > 1 else "all"
 			result = self.data_manager.list_cached(data_type)
@@ -262,7 +271,7 @@ class CresusCLI(cmd2.Cmd):
 
 		else:
 			console.print(f"[red]✗[/red] Unknown command: {cmd}")
-			console.print("Try: data fetch|list|clear|stats|universes")
+			console.print("Try: data fetch|show|list|clear|stats|universes")
 
 	def do_flow(self, args):
 		"""Execute workflows: run <workflow_name> [strategy] [tickers...] [--context] [--debug]"""
@@ -799,6 +808,91 @@ class CresusCLI(cmd2.Cmd):
 
 		console.print(stats_table)
 		console.print(f"\n[bold]Total Size:[/bold] {result.get('total_size_mb', 0):.2f} MB")
+
+	def _print_ticker_info(self, result):
+		"""Print ticker information."""
+		if result.get("status") == "error":
+			panel = Panel(
+				f"[red]✗[/red] {result.get('message')}",
+				style="red",
+				box=box.ROUNDED
+			)
+			console.print(panel)
+			return
+
+		ticker = result.get("ticker")
+		console.print(f"\n[bold cyan]Ticker: {ticker}[/bold cyan]\n")
+
+		# History information
+		history = result.get("history", {})
+		if "message" not in history:
+			console.print("[bold]History[/bold]")
+			hist_table = Table(box=box.ROUNDED, show_header=False)
+			hist_table.add_row("Start Date", f"[yellow]{history.get('start_date')}[/yellow]")
+			hist_table.add_row("End Date", f"[yellow]{history.get('end_date')}[/yellow]")
+			hist_table.add_row("Total Rows", f"[yellow]{history.get('total_rows')}[/yellow]")
+			console.print(hist_table)
+		else:
+			console.print(f"[dim]{history.get('message')}[/dim]")
+
+		# Last OHLCV
+		ohlcv = result.get("last_ohlcv", {})
+		if "message" not in ohlcv:
+			console.print("\n[bold]Last OHLCV[/bold]")
+			ohlcv_table = Table(box=box.ROUNDED, show_header=False)
+			ohlcv_table.add_row("Date", f"[cyan]{ohlcv.get('date')}[/cyan]")
+			ohlcv_table.add_row("Open", f"[yellow]{ohlcv.get('open')}[/yellow]")
+			ohlcv_table.add_row("High", f"[yellow]{ohlcv.get('high')}[/yellow]")
+			ohlcv_table.add_row("Low", f"[yellow]{ohlcv.get('low')}[/yellow]")
+			ohlcv_table.add_row("Close", f"[green]{ohlcv.get('close')}[/green]")
+			ohlcv_table.add_row("Volume", f"[magenta]{ohlcv.get('volume'):,}[/magenta]")
+			console.print(ohlcv_table)
+		else:
+			console.print(f"[dim]{ohlcv.get('message')}[/dim]")
+
+		# Fundamental data
+		fundamental = result.get("fundamental", {})
+		if "message" not in fundamental:
+			console.print("\n[bold]Fundamental[/bold]")
+			
+			# Company info
+			company = fundamental.get("company", {})
+			if company:
+				console.print("[bold cyan]Company[/bold cyan]")
+				company_table = Table(box=box.ROUNDED, show_header=False)
+				company_table.add_row("Name", f"[yellow]{company.get('name', 'N/A')}[/yellow]")
+				company_table.add_row("Sector", f"[yellow]{company.get('sector', 'N/A')}[/yellow]")
+				company_table.add_row("Industry", f"[yellow]{company.get('industry', 'N/A')}[/yellow]")
+				console.print(company_table)
+			
+			# Quotation info
+			quotation = fundamental.get("quotation", {})
+			if quotation:
+				console.print("\n[bold cyan]Quotation[/bold cyan]")
+				quote_table = Table(box=box.ROUNDED, show_header=False)
+				quote_table.add_row("Current Price", f"[green]{quotation.get('current_price', 'N/A')}[/green]")
+				quote_table.add_row("Previous Close", f"[yellow]{quotation.get('previous_close', 'N/A')}[/yellow]")
+				quote_table.add_row("Bid", f"[cyan]{quotation.get('bid', 'N/A')}[/cyan]")
+				quote_table.add_row("Ask", f"[cyan]{quotation.get('ask', 'N/A')}[/cyan]")
+				console.print(quote_table)
+			
+			# Analyst info
+			analysts = fundamental.get("analysts", {})
+			if analysts:
+				console.print("\n[bold cyan]Analyst Ratings[/bold cyan]")
+				analyst_table = Table(box=box.ROUNDED, show_header=False)
+				analyst_table.add_row("Recommendation", f"[magenta]{analysts.get('recommendation', 'N/A')}[/magenta]")
+				analyst_table.add_row("Analyst Count", f"[yellow]{analysts.get('analyst_count', 'N/A')}[/yellow]")
+				analyst_table.add_row("Target Price", f"[yellow]{analysts.get('target_price', 'N/A')}[/yellow]")
+				upside = analysts.get('upside_potential')
+				if upside is not None:
+					color = "green" if upside > 0 else "red"
+					analyst_table.add_row("Upside Potential", f"[{color}]{upside:.2f}%[/{color}]")
+				console.print(analyst_table)
+		else:
+			console.print(f"[dim]{fundamental.get('message')}[/dim]")
+
+		console.print()
 
 	def _print_universe_result(self, result):
 		"""Print universe fetch result."""

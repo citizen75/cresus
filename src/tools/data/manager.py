@@ -319,6 +319,64 @@ class DataManager:
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
+    def show_ticker_info(self, ticker: str) -> Dict[str, Any]:
+        """Show ticker information: history dates, last OHLCV, and fundamentals."""
+        try:
+            ticker = ticker.upper()
+            info = {
+                "status": "success",
+                "ticker": ticker,
+            }
+            
+            # Get history info
+            dh = DataHistory(ticker)
+            df = dh.get_all()
+            
+            if not df.empty:
+                # Get date range
+                info["history"] = {
+                    "start_date": str(df["timestamp"].min().date()),
+                    "end_date": str(df["timestamp"].max().date()),
+                    "total_rows": len(df),
+                }
+                
+                # Get last OHLCV
+                last_row = df.iloc[-1]
+                info["last_ohlcv"] = {
+                    "date": str(last_row["timestamp"].date()),
+                    "open": round(float(last_row["open"]), 2),
+                    "high": round(float(last_row["high"]), 2),
+                    "low": round(float(last_row["low"]), 2),
+                    "close": round(float(last_row["close"]), 2),
+                    "volume": int(last_row["volume"]),
+                }
+            else:
+                info["history"] = {"message": "No cached history"}
+                info["last_ohlcv"] = {"message": "No cached history"}
+            
+            # Get fundamental data
+            fund = Fundamental(ticker)
+            fundamental_data = fund.load()
+            
+            if fundamental_data:
+                data_section = fundamental_data.get("data", {})
+                info["fundamental"] = {
+                    "company": data_section.get("company", {}),
+                    "quotation": data_section.get("quotation", {}),
+                    "analysts": data_section.get("analysts", {}),
+                }
+            else:
+                info["fundamental"] = {"message": "No cached fundamental data"}
+            
+            return info
+            
+        except Exception as e:
+            return {
+                "status": "error",
+                "ticker": ticker.upper(),
+                "message": str(e),
+            }
+
     def cache_stats(self) -> Dict[str, Any]:
         """Show cache statistics."""
         try:
