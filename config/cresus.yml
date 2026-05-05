@@ -1,17 +1,17 @@
 servers:
   api:
-    host: "0.0.0.0"
-    port: 8000
+    host: "${API_HOST:0.0.0.0}"     # Set via API_HOST env var
+    port: "${API_PORT:8000}"         # Set via API_PORT env var
     log_file: "logs/api.log"
   gateway:
-    cron_enabled: false  # Set to true to enable cron scheduler
+    cron_enabled: false              # Set to true to enable cron scheduler
     cron_config: "config/cron.yml"
-    mcp_enabled: true    # Set to false to disable MCP server
+    mcp_enabled: true                # Set to false to disable MCP server
   mcp:
     log_file: "logs/mcp.log"
   front:
-    port: 5173
-    api_url: "http://localhost:8000"
+    port: "${FRONT_PORT:5173}"       # Set via FRONT_PORT env var
+    api_url: "${VITE_API_URL:http://localhost:8000}"  # Set via VITE_API_URL env var
     log_file: "logs/front.log"
 
 db:
