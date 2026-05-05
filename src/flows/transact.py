@@ -84,7 +84,7 @@ class TransactFlow(Flow):
 
 		# Step 2: Filter pre-loaded data to just the trading date
 		# BacktestAgent loads all historical data upfront, so data_history is already in context
-		all_data = self.context.get("data_history", {})
+		all_data = self.context.get("data_history") or {}
 		if not all_data:
 			return {
 				"status": "error",

@@ -53,7 +53,7 @@ class PositionSizingAgent(Agent):
 			}
 
 		# Get portfolio metrics
-		pm = PortfolioManager()
+		pm = PortfolioManager(context=self.context.__dict__)
 		portfolio_details = pm.get_portfolio_details(portfolio_name)
 		cash = pm.get_portfolio_cash(portfolio_name)
 
