@@ -38,6 +38,7 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
   const [strategy, setStrategy] = useState<Strategy | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [editingWatchlist, setEditingWatchlist] = useState(false)
 
   useEffect(() => {
     const fetchStrategy = async () => {
@@ -181,34 +182,79 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
 
         {/* Watchlist Config */}
         <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
-          <h3 className="text-white font-bold mb-4">Watchlist</h3>
-          {strategy.watchlist?.enabled ? (
-            <div className="space-y-3 text-xs">
-              {strategy.watchlist.parameters?.tickers && (
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-white font-bold">Watchlist</h3>
+            <button
+              onClick={() => setEditingWatchlist(!editingWatchlist)}
+              className="text-purple-400 hover:text-purple-300 text-sm font-medium"
+            >
+              {editingWatchlist ? 'Done' : 'Edit'}
+            </button>
+          </div>
+
+          {editingWatchlist ? (
+            // Edit Form
+            <div className="space-y-3">
+              <div>
+                <label className="text-slate-400 text-xs uppercase block mb-1">Volume Min</label>
+                <input
+                  type="number"
+                  defaultValue={strategy.watchlist?.parameters?.volume?.min_volume || 500000}
+                  className="w-full bg-slate-800 border border-slate-700 text-white px-2 py-1 rounded text-xs"
+                />
+              </div>
+              <div>
+                <label className="text-slate-400 text-xs uppercase block mb-1">Ranking</label>
+                <input
+                  type="text"
+                  defaultValue={strategy.watchlist?.parameters?.ranking?.metric || 'score'}
+                  className="w-full bg-slate-800 border border-slate-700 text-white px-2 py-1 rounded text-xs"
+                />
+              </div>
+              <div>
+                <label className="text-slate-400 text-xs uppercase block mb-1">Trend</label>
+                <textarea
+                  defaultValue={strategy.watchlist?.parameters?.trend?.formula || ''}
+                  className="w-full bg-slate-800 border border-slate-700 text-white px-2 py-1 rounded text-xs font-mono h-12"
+                />
+              </div>
+              <div>
+                <label className="text-slate-400 text-xs uppercase block mb-1">Volatility</label>
+                <textarea
+                  defaultValue={strategy.watchlist?.parameters?.volatility?.formula || ''}
+                  className="w-full bg-slate-800 border border-slate-700 text-white px-2 py-1 rounded text-xs font-mono h-12"
+                />
+              </div>
+            </div>
+          ) : (
+            // Display View
+            <div className="space-y-2 text-xs">
+              {strategy.watchlist?.parameters?.volume && (
                 <div className="bg-slate-800/50 rounded p-2">
-                  <p className="text-slate-400 uppercase mb-1">Max Tickers</p>
-                  <p className="text-white font-medium">{strategy.watchlist.parameters.tickers.max_count}</p>
-                </div>
-              )}
-              {strategy.watchlist.parameters?.volume && (
-                <div className="bg-slate-800/50 rounded p-2">
-                  <p className="text-slate-400 uppercase mb-1">Min Volume</p>
+                  <p className="text-slate-400 uppercase mb-1">Volume Min</p>
                   <p className="text-white font-medium">{strategy.watchlist.parameters.volume.min_volume?.toLocaleString()}</p>
                 </div>
               )}
-              {strategy.watchlist.parameters?.ranking && (
+              {strategy.watchlist?.parameters?.ranking && (
                 <div className="bg-slate-800/50 rounded p-2">
                   <p className="text-slate-400 uppercase mb-1">Ranking</p>
                   <p className="text-white font-medium">{strategy.watchlist.parameters.ranking.metric}</p>
                 </div>
               )}
+              {strategy.watchlist?.parameters?.trend && (
+                <div className="bg-slate-800/50 rounded p-2">
+                  <p className="text-slate-400 uppercase mb-1 text-xs">Trend</p>
+                  <p className="text-slate-300 text-xs font-mono break-all line-clamp-2">{strategy.watchlist.parameters.trend.formula}</p>
+                </div>
+              )}
+              {strategy.watchlist?.parameters?.volatility && (
+                <div className="bg-slate-800/50 rounded p-2">
+                  <p className="text-slate-400 uppercase mb-1 text-xs">Volatility</p>
+                  <p className="text-slate-300 text-xs font-mono break-all line-clamp-2">{strategy.watchlist.parameters.volatility.formula}</p>
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="text-slate-400 text-sm">Not configured</div>
           )}
-          <button className="w-full mt-4 px-4 py-2 text-purple-400 hover:text-purple-300 text-sm font-medium transition">
-            Edit watchlist
-          </button>
         </div>
       </div>
 
