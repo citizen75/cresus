@@ -163,6 +163,9 @@ class BacktestAgent(Agent):
 		self.logger.info(f"Found {len(trading_days)} trading days")
 		backtest["total_trading_days"] = len(trading_days)
 
+		# Pre-slice data by date for efficient access (avoid filtering on each iteration)
+		day_data_cache = self._create_day_data_cache(data_history)
+
 		# Main backtest loop: pre_market → [increment] → market → post_market
 		portfolio_name = self.context.get("portfolio_name") or "default"
 		for i, current_date in enumerate(trading_days[:-1]):
@@ -170,6 +173,8 @@ class BacktestAgent(Agent):
 
 			# Pre-market phase: signals based on data up to current_date
 			self.context.set("current_date", current_date)
+			# Slice data_history to current_date so watchlist changes daily
+			self._set_data_history_for_date(data_history, current_date)
 			if self.pre_market_flow:
 				self.pre_market_flow.context = self.context
 				self.pre_market_flow.process({
@@ -181,7 +186,11 @@ class BacktestAgent(Agent):
 			# Increment to next trading day
 			self.context.set("current_date", next_date)
 
-			# Market phase: execute on next_date prices
+			# Pass next_date OHLCV data to market flow (no reloading)
+			next_day_data = day_data_cache.get(next_date, {})
+			self.context.set("next_day_data", next_day_data)
+
+			# Market phase: execute on next_date prices with pre-loaded data
 			if self.market_flow:
 				self.market_flow.context = self.context
 				self.market_flow.process({
@@ -209,3 +218,81 @@ class BacktestAgent(Agent):
 			"input": input_data,
 			"output": backtest,
 		}
+
+	def _create_day_data_cache(self, data_history: Dict) -> Dict[date, Dict[str, Any]]:
+		"""Create a cache of OHLCV data organized by trading date for fast lookup.
+
+		Transforms data_history from {ticker: DataFrame} to {date: {ticker: row}}.
+		This avoids filtering data on every loop iteration.
+
+		Args:
+			data_history: Dict mapping {ticker: DataFrame with timestamp column}
+
+		Returns:
+			Dict mapping {date: {ticker: latest_row_for_date}}
+		"""
+		day_cache = {}
+
+		for ticker, df in data_history.items():
+			if df.empty:
+				continue
+
+			# Get timestamp column (handle both column and index)
+			if "timestamp" in df.columns:
+				timestamps = df["timestamp"]
+			else:
+				timestamps = df.index
+
+			# Group by date
+			if hasattr(timestamps, 'dt'):
+				# pandas datetime index/series
+				dates = timestamps.dt.date
+			else:
+				# convert to date if needed
+				dates = [ts.date() if hasattr(ts, 'date') else ts for ts in timestamps]
+
+			# For each date, store the latest row for this ticker
+			for idx, trading_date in enumerate(dates):
+				if trading_date not in day_cache:
+					day_cache[trading_date] = {}
+
+				# Store the row for this ticker on this date
+				day_cache[trading_date][ticker] = df.iloc[idx]
+
+		return day_cache
+
+	def _set_data_history_for_date(self, data_history: Dict, current_date: date) -> None:
+		"""Slice data_history to include only data up to current_date.
+
+		This ensures watchlist calculations use only data available on the current
+		trading day, making the watchlist change day-to-day as new data appears.
+
+		Args:
+			data_history: Dict mapping {ticker: DataFrame}
+			current_date: Current trading date
+		"""
+		import pandas as pd
+
+		if not data_history:
+			return
+
+		# Slice each ticker's data to current_date and earlier
+		sliced_history = {}
+		for ticker, df in data_history.items():
+			if df.empty:
+				sliced_history[ticker] = df
+				continue
+
+			# Get timestamp column
+			if "timestamp" in df.columns:
+				timestamps = pd.to_datetime(df["timestamp"])
+			else:
+				timestamps = pd.to_datetime(df.index)
+
+			# Extract dates and filter to current_date and earlier
+			dates = timestamps.dt.date
+			mask = dates <= current_date
+			sliced_history[ticker] = df[mask].copy()
+
+		self.context.set("data_history", sliced_history)
+		self.logger.debug(f"Sliced data_history to {current_date} for PreMarketFlow")

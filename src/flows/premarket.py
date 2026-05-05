@@ -47,6 +47,7 @@ class PreMarketFlow(Flow):
 		self.add_step(strategy_agent, step_name="strategy", required=True)
 
 		# Data step - fetch data and calculate indicators for all tickers
+		# Skip if already in context (backtest mode - data loaded by BacktestAgent)
 		data_agent = DataAgent(f"DataAgent[{self.strategy_name}]", self.context)
 		self.add_step(data_agent, step_name="data", required=True)
 

@@ -13,7 +13,7 @@ class Journal:
 
     BASE_COLUMNS = [
         "id", "created_at", "operation", "ticker", "quantity",
-        "price", "amount", "fees", "status", "status_at", "notes"
+        "price", "amount", "fees", "stop_loss", "take_profit", "status", "status_at", "notes"
     ]
 
     def __init__(self, name: str = "default", context: Optional[Dict[str, Any]] = None):
@@ -65,7 +65,8 @@ class Journal:
         df.to_csv(self.filepath, index=False, quoting=1, quotechar='"')  # QUOTE_ALL
 
     def add_transaction(self, operation: str, ticker: str, quantity: int, price: float,
-                       fees: float = 0, notes: str = "", created_at: str = None) -> str:
+                       fees: float = 0, notes: str = "", created_at: str = None,
+                       stop_loss: float = None, take_profit: float = None) -> str:
         """Add a new transaction to journal.
 
         Operations: BUY, SELL, CASH (deposit/withdrawal)
@@ -108,6 +109,8 @@ class Journal:
             "price": price_val,
             "amount": round(amount, 2),
             "fees": float(fees),
+            "stop_loss": float(stop_loss) if stop_loss else None,
+            "take_profit": float(take_profit) if take_profit else None,
             "status": "completed",
             "status_at": now,
             "notes": notes
@@ -176,11 +179,23 @@ class Journal:
         result = []
         for ticker, data in open_positions.items():
             avg_entry_price = data["total_cost"] / data["quantity"] if data["quantity"] > 0 else 0
+
+            # Get stop_loss and take_profit from the most recent BUY transaction
+            buy_transactions = [tx for tx in data["transactions"] if tx.get("operation") == "BUY"]
+            stop_loss = None
+            take_profit = None
+            if buy_transactions:
+                most_recent_buy = buy_transactions[-1]
+                stop_loss = most_recent_buy.get("stop_loss")
+                take_profit = most_recent_buy.get("take_profit")
+
             result.append({
                 "ticker": ticker,
                 "quantity": int(data["quantity"]),
                 "avg_entry_price": round(avg_entry_price, 2),
                 "entry_fees": round(data["fees"], 2),
+                "stop_loss": float(stop_loss) if stop_loss else None,
+                "take_profit": float(take_profit) if take_profit else None,
             })
 
         return pd.DataFrame(result)

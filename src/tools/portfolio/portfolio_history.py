@@ -17,15 +17,16 @@ from tools.data import DataHistory
 class PortfolioHistory:
     """Calculate daily portfolio value history."""
 
-    def __init__(self, portfolio_name: str, initial_capital: Optional[float] = None):
+    def __init__(self, portfolio_name: str, initial_capital: Optional[float] = None, context: Optional[Dict[str, Any]] = None):
         """Initialize portfolio history calculator.
 
         Args:
             portfolio_name: Name of the portfolio
             initial_capital: Starting cash amount. If None, loads from config.
+            context: Optional context dict (for backtest sandboxing)
         """
         self.portfolio_name = portfolio_name
-        self.journal = Journal(portfolio_name)
+        self.journal = Journal(portfolio_name, context=context)
         self.initial_capital = initial_capital
 
     def calculate(self, recalculate: bool = False) -> Dict[str, Any]:
@@ -64,7 +65,6 @@ class PortfolioHistory:
         # Get date range
         first_tx_date = df_valid["created_at"].min()
         last_tx_date = df_valid["created_at"].max()
-        today = pd.Timestamp.now().normalize()
 
         if pd.isna(first_tx_date) or pd.isna(last_tx_date):
             logger.warning("Invalid dates in journal")
@@ -73,7 +73,7 @@ class PortfolioHistory:
         first_tx_date = pd.Timestamp(first_tx_date).normalize()
         last_tx_date = pd.Timestamp(last_tx_date).normalize()
 
-        logger.info(f"Date range: {first_tx_date} to {today}")
+        logger.info(f"Date range: {first_tx_date} to {last_tx_date}")
 
         # Collect unique tickers (excluding CASH)
         tickers = set()
@@ -112,7 +112,7 @@ class PortfolioHistory:
         daily_history = []
         current_date = first_tx_date
 
-        while current_date <= today:
+        while current_date <= last_tx_date:
             # Replay all transactions up to this date (inclusive)
             rows_up_to = df_valid[df_valid["created_at"] <= current_date]
 

@@ -4,6 +4,8 @@ from typing import Any, Dict, Optional
 from core.agent import Agent
 from tools.portfolio import PortfolioManager
 from tools.data import Fundamental
+from tools.strategy.strategy import StrategyManager
+from tools.strategy.config_evaluator import ConfigEvaluator
 
 
 class PositionSizingAgent(Agent):
@@ -28,8 +30,8 @@ class PositionSizingAgent(Agent):
 	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
 		"""Calculate position sizes for entry recommendations.
 
-		Reads entry_recommendations from context and calculates shares
-		based on portfolio cash and risk tolerance.
+		Uses strategy config position_size formula if available, otherwise
+		falls back to portfolio-based sizing methods.
 
 		Args:
 			input_data: Input data (optional)
@@ -51,6 +53,24 @@ class PositionSizingAgent(Agent):
 				"output": {},
 				"message": "No entry recommendations to size"
 			}
+
+		# Try to load strategy config for position sizing formula
+		strategy_name = self.context.get("strategy_name") if self.context else None
+		position_size_formula = None
+
+		if strategy_name:
+			try:
+				strategy_manager = StrategyManager()
+				strategy_result = strategy_manager.load_strategy(strategy_name)
+				if strategy_result.get("status") == "success":
+					strategy_data = strategy_result.get("data", {})
+					entry_config = strategy_data.get("entry", {}).get("parameters", {})
+					if "position_size" in entry_config:
+						position_size_formula = entry_config["position_size"].get("formula")
+						if position_size_formula:
+							self.logger.info(f"Using position_size formula from strategy: {position_size_formula}")
+			except Exception as e:
+				self.logger.debug(f"Could not load strategy config: {e}")
 
 		# Get portfolio metrics
 		pm = PortfolioManager(context=self.context.__dict__)
@@ -79,18 +99,30 @@ class PositionSizingAgent(Agent):
 			fundamental = Fundamental(ticker)
 			current_price = fundamental.get_current_price() or entry_price
 
-			# Calculate position size based on method
-			if self.sizing_method == "fractional":
-				shares = self._fractional_sizing(cash, current_price, entry_price, stop_loss)
-			elif self.sizing_method == "kelly":
-				rr_ratio = rec.get("rr_ratio", 1.0)
-				win_rate = self.context.get("win_rate", 0.5)
-				shares = self._kelly_sizing(cash, current_price, rr_ratio, win_rate)
-			elif self.sizing_method == "volatility":
-				volatility = rec.get("volatility", 0.02)
-				shares = self._volatility_sizing(cash, current_price, volatility)
-			else:
-				shares = self._fractional_sizing(cash, current_price, entry_price, stop_loss)
+			# Try to calculate position size from strategy config formula first
+			shares = None
+			if position_size_formula:
+				data_context = {"close": current_price}
+				shares = ConfigEvaluator.evaluate_position_size(
+					position_size_formula, data_context, max_shares=None
+				)
+				if shares and shares > 0:
+					self.logger.debug(f"{ticker}: Using formula-based shares={shares}")
+
+			# Fall back to portfolio-based sizing if formula didn't work
+			if not shares or shares <= 0:
+				# Calculate position size based on method
+				if self.sizing_method == "fractional":
+					shares = self._fractional_sizing(cash, current_price, entry_price, stop_loss)
+				elif self.sizing_method == "kelly":
+					rr_ratio = rec.get("rr_ratio", 1.0)
+					win_rate = self.context.get("win_rate", 0.5)
+					shares = self._kelly_sizing(cash, current_price, rr_ratio, win_rate)
+				elif self.sizing_method == "volatility":
+					volatility = rec.get("volatility", 0.02)
+					shares = self._volatility_sizing(cash, current_price, volatility)
+				else:
+					shares = self._fractional_sizing(cash, current_price, entry_price, stop_loss)
 
 			if shares > 0:
 				sized_orders.append({
@@ -99,7 +131,7 @@ class PositionSizingAgent(Agent):
 					"entry_price": entry_price,
 					"order_value": int(shares) * current_price,
 					"risk_amount": abs(int(shares) * (entry_price - stop_loss)),
-					"sizing_method": self.sizing_method,
+					"sizing_method": "strategy_config" if position_size_formula else self.sizing_method,
 				})
 
 		# Store sized orders in context

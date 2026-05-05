@@ -1,0 +1,218 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║           BACKTEST WORKFLOW & METRICS - QUICK REFERENCE CARD                  ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. BACKTEST.FLOW.PROCESS() RETURN STRUCTURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+FILE: src/flows/backtest.py (lines 38-123)
+
+RETURN: Dict[str, Any]
+  ├─ status: "success" | "error"
+  ├─ output:
+  │   ├─ backtest_id: "20250110_154523_a1b2c3d4"
+  │   ├─ backtest_dir: "/db/local/backtests/..."
+  │   ├─ portfolio: "Momentum cac"
+  │   ├─ strategy_name: "momentum_cac"
+  │   ├─ start_date: "2024-01-01"
+  │   ├─ end_date: "2024-12-31"
+  │   ├─ total_trading_days: 252
+  │   ├─ days_processed: 251
+  │   ├─ daily_results: [{"date": "2024-01-02"}, ...]
+  │   ├─ metrics: {}  # Empty
+  │   └─ final_portfolio:
+  │       ├─ name: "Momentum cac"
+  │       ├─ num_positions: 5
+  │       ├─ num_trades: 47
+  │       ├─ buy_trades: 28
+  │       ├─ sell_trades: 19
+  │       ├─ total_fees: 125.50
+  │       ├─ total_gain_pct: 0.0
+  │       └─ positions: [{ticker, qty, entry_price, current_price, ...}]
+  └─ message: "Backtest ... completed for ..."
+
+KEY POINTS:
+  • backtest_id uniquely identifies this run
+  • backtest_dir is isolated (doesn't affect live portfolios)
+  • daily_results contains one entry per execution day
+  • final_portfolio is portfolio state at end of backtest
+  • metrics dict is currently empty (needs population)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. PORTFOLIO METRICS STORAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+FILES: 
+  • src/tools/portfolio/manager.py (core)
+  • src/tools/portfolio/journal.py (SQLite storage)
+  • src/tools/portfolio/cache.py (performance cache)
+
+4-LAYER STORAGE ARCHITECTURE:
+
+Layer 1: JOURNAL (SQLite)
+  Location: db/local/portfolios/[portfolio_name].db
+  Stores: Individual BUY/SELL/CASH transactions
+
+Layer 2: PORTFOLIO MANAGER (On-demand calculations)
+  Methods:
+    • get_portfolio_summary(name) → details + performance
+    • get_portfolio_details(name) → positions & values
+    • get_portfolio_performance(name) → trades & fees
+    • get_portfolio_allocation(name) → position weights
+    • get_portfolio_history(name) → daily value replay
+    • update_portfolio_cache(name) → refresh cache
+
+Layer 3: CACHE (JSON files)
+  Stores pre-computed metrics for fast lookups
+  Updated after each transaction
+
+Layer 4: BACKTEST SANDBOXING
+  When backtest_dir in context:
+    ✓ Uses isolated journal files
+    ✓ Separate portfolio directory
+    ✓ No interference with live portfolio
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. AVAILABLE METRICS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+FILE: src/tools/portfolio/metrics.py (method: get_daily_metrics)
+
+IMPLEMENTED (Calculated from transactions):
+  ✓ num_trades: int
+  ✓ buy_trades: int
+  ✓ sell_trades: int
+  ✓ total_fees: float
+  ✓ total_gain_pct: float
+  ✓ position_value: float (per position)
+  ✓ position_gain: float (per position)
+  ✓ position_gain_pct: float (per position)
+
+STUB METRICS (Return hardcoded, not real calculations):
+  ⚠️ sharpe_ratio: 1.5
+  ⚠️ sortino_ratio: 2.0
+  ⚠️ calmar_ratio: 1.0
+  ⚠️ max_drawdown_pct: 5.0
+  ⚠️ profit_factor: 1.5
+  ⚠️ expectancy_pct: 0.5
+  ⚠️ sqn: 1.5
+  ⚠️ kelly_criterion_pct: 5.0
+
+PER-POSITION METRICS:
+  ├─ ticker: str
+  ├─ quantity: int
+  ├─ avg_entry_price: float
+  ├─ current_price: float
+  ├─ position_value: float
+  ├─ position_gain: float
+  ├─ position_gain_pct: float
+  └─ weight: float (% of total)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4. CLI CURRENT DISPLAY - _print_flow_result()
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+FILE: src/cli/app.py (lines 362-520)
+
+WHAT IT CURRENTLY SHOWS:
+  ✓ Status panel (✓ success or ✗ error)
+  ✓ Metadata (flow, strategy, duration, steps)
+  ✓ Signals/Watchlist/Orders/Execution history
+  ✓ Context (if --context flag used)
+
+WHAT IT'S MISSING FOR BACKTEST:
+  ❌ backtest_id
+  ❌ Portfolio summary table
+  ❌ Performance metrics table
+  ❌ Positions table with P&L
+  ❌ Daily results summary
+  ❌ Risk metrics display
+
+EXAMPLE CURRENT OUTPUT:
+┌────────────────────────────────────────┐
+│ ✓ Workflow executed successfully       │
+└────────────────────────────────────────┘
+Flow: backtest
+Strategy: momentum_cac
+Duration: 5234ms
+
+(No backtest-specific content rendered)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+BACKTEST AGENT EXECUTION FLOW (src/agents/backtest/agent.py)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+FOR EACH TRADING DAY (from start_date to end_date-1):
+
+  [DAY i]
+  ├─ PRE-MARKET PHASE
+  │   ├─ current_date = Day i
+  │   ├─ Use data ≤ Day i
+  │   ├─ Generate signals
+  │   └─ Create pending orders
+  │
+  ├─ INCREMENT
+  │   └─ current_date = Day i+1
+  │
+  ├─ MARKET PHASE
+  │   ├─ Use Day i+1 prices
+  │   ├─ Execute pending orders
+  │   └─ Fill matches
+  │
+  ├─ POST-MARKET PHASE
+  │   ├─ Expire unmatched orders
+  │   ├─ Update portfolio metrics
+  │   └─ Record results
+  │
+  └─ Append {"date": "Day i+1"} to daily_results
+
+KEY METHODS:
+  • _get_trading_days() → Extract dates from data
+  • _create_day_data_cache() → Cache OHLCV by date
+  • _set_data_history_for_date() → Slice data for current date
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+IMPLEMENTATION STATUS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+FULLY IMPLEMENTED ✓
+  ✓ Backtest flow orchestration
+  ✓ Portfolio transaction storage
+  ✓ Position tracking
+  ✓ Trade counting
+  ✓ Fee calculation
+  ✓ 3-phase daily loop
+  ✓ Sandboxed backtest environment
+  ✓ Position-level P&L
+
+PARTIALLY IMPLEMENTED ⚠️
+  ⚠️ Metrics (stubs only)
+  ⚠️ CLI display (generic, not backtest-specific)
+
+NOT IMPLEMENTED ❌
+  ❌ Real metric calculations
+  ❌ Equity curve / portfolio history
+  ❌ Backtest-specific CLI formatting
+  ❌ Export functionality
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+QUICK LOOKUP TABLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+QUESTION                          ANSWER / LOCATION
+────────────────────────────────────────────────────────────
+Where is BacktestFlow?           src/flows/backtest.py
+What does process() return?      Dict with status, output, message
+Where are metrics stored?        PortfolioManager + Journal (SQLite)
+Which metrics are working?       Trades, fees, position P&L
+Which metrics are stubs?         Sharpe, Sortino, Calmar, Max DD, etc.
+How to view backtest results?    CLI _print_flow_result() (generic display)
+How is data isolated?            backtest_dir in context = separate journals
+When does final_portfolio calc?  At end of BacktestFlow.process()
+Can backtest affect live data?   No (sandboxed directory)
+How many days does it process?   days_processed = total_trading_days - 1
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📖 FOR DETAILED INFORMATION: See BACKTEST_METRICS_GUIDE.md

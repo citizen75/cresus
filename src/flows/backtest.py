@@ -16,7 +16,10 @@ from core.flow import Flow
 from agents.backtest.agent import BacktestAgent
 from flows.premarket import PreMarketFlow
 from flows.transact import TransactFlow
+from flows.postmarket import PostMarketFlow
 from tools.portfolio import PortfolioManager
+from tools.portfolio.metrics import PortfolioMetrics
+from tools.strategy.strategy import StrategyManager
 
 
 class BacktestFlow(Flow):
@@ -25,6 +28,7 @@ class BacktestFlow(Flow):
 	Orchestrates BacktestAgent with pluggable flows:
 	1. PreMarketFlow - Generate pending orders based on strategy signals
 	2. TransactFlow - Execute pending orders on the date
+	3. PostMarketFlow - Expire pending orders and cleanup at end of day
 
 	Collects metrics and results across all days with sandboxed data.
 	"""
@@ -86,6 +90,11 @@ class BacktestFlow(Flow):
 		transact_flow = TransactFlow(context=self.context)
 		backtest_agent.set_market_flow(transact_flow)
 
+		# Set post-market flow (cleanup: expire pending orders, update metrics)
+		postmarket_flow = PostMarketFlow(strategy_name)
+		postmarket_flow.context = self.context
+		backtest_agent.set_postmarket_flow(postmarket_flow)
+
 		# Run backtest through agent
 		agent_result = backtest_agent.process({
 			"strategy_name": strategy_name,
@@ -108,6 +117,27 @@ class BacktestFlow(Flow):
 		final_portfolio = pm.get_portfolio_summary(portfolio_name)
 		if final_portfolio:
 			backtest_output["final_portfolio"] = final_portfolio
+
+		# Load strategy configuration to get initial capital
+		strategy_manager = StrategyManager()
+		strategy_config = strategy_manager.load_strategy(strategy_name)
+		initial_capital = 100.0  # default
+		if strategy_config.get("status") == "success":
+			strategy_data = strategy_config.get("data", {})
+			initial_capital = strategy_data.get("backtest", {}).get("initial_capital", 100.0)
+		
+		self.logger.info(f"Using initial capital: ${initial_capital:.2f}")
+
+		# Calculate comprehensive backtest metrics
+		metrics_calculator = PortfolioMetrics(context=self.context)
+		metrics = metrics_calculator.calculate_backtest_metrics(
+			name=portfolio_name,
+			start_date=flow_input.get("start_date"),
+			end_date=flow_input.get("end_date"),
+			start_value=initial_capital
+		)
+		# Merge metrics into output
+		backtest_output.update(metrics)
 
 		return {
 			"status": "success",

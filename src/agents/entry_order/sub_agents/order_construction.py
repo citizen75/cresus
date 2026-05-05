@@ -4,6 +4,8 @@ from typing import Any, Dict, Optional
 from datetime import datetime
 import hashlib
 from core.agent import Agent
+from tools.strategy.strategy import StrategyManager
+from tools.strategy.config_evaluator import ConfigEvaluator
 
 
 class OrderConstructionAgent(Agent):
@@ -23,6 +25,9 @@ class OrderConstructionAgent(Agent):
 
 	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
 		"""Construct final orders from validated timing decisions.
+
+		Reads strategy config for trailing_stop and holding_period,
+		adds them to orders for use by post-market and exit logic.
 
 		Args:
 			input_data: Input data (optional)
@@ -44,6 +49,23 @@ class OrderConstructionAgent(Agent):
 				"message": "No validated orders to construct"
 			}
 
+		# Try to load strategy config for exit parameters
+		strategy_name = self.context.get("strategy_name")
+		exit_config = {}
+		
+		if strategy_name:
+			try:
+				strategy_manager = StrategyManager()
+				strategy_result = strategy_manager.load_strategy(strategy_name)
+				if strategy_result.get("status") == "success":
+					strategy_data = strategy_result.get("data", {})
+					exit_config = strategy_data.get("exit", {}).get("parameters", {})
+			except Exception as e:
+				self.logger.debug(f"Could not load strategy config: {e}")
+
+		if strategy_name is None:
+			strategy_name = "unknown"
+
 		# Build recommendation lookup
 		rec_lookup = {rec["ticker"]: rec for rec in entry_recommendations}
 
@@ -52,10 +74,6 @@ class OrderConstructionAgent(Agent):
 		for order in validated_orders:
 			ticker = order.get("ticker")
 			rec = rec_lookup.get(ticker, {})
-
-			strategy_name = self.context.get("strategy_name")
-			if strategy_name is None:
-				strategy_name = "unknown"
 
 			# Calculate risk/reward ratio
 			entry_price = order.get("entry_price", 0)
@@ -69,6 +87,32 @@ class OrderConstructionAgent(Agent):
 				if risk > 0:
 					risk_reward = reward / risk
 
+			# Extract trailing_stop and holding_period from config
+			trailing_stop = None
+			holding_period = None
+
+			if "trailing_stop" in exit_config:
+				ts_formula = exit_config["trailing_stop"].get("formula")
+				if ts_formula:
+					# Evaluate trailing_stop formula (e.g., "data['close'] - data['atr_14']")
+					data_context = {
+						"close": entry_price,
+						"atr_14": rec.get("risk_amount", 0),  # Use risk_amount as proxy for ATR
+					}
+					trailing_stop = ConfigEvaluator.evaluate_formula(ts_formula, data_context)
+
+			if "holding_period" in exit_config:
+				hp_formula = exit_config["holding_period"].get("formula")
+				if hp_formula:
+					# Try to evaluate holding_period (usually a constant integer)
+					try:
+						holding_period = int(float(hp_formula))
+					except (ValueError, TypeError):
+						data_context = {"close": entry_price}
+						result = ConfigEvaluator.evaluate_formula(hp_formula, data_context)
+						if result:
+							holding_period = int(result)
+
 			executable_order = {
 				"id": self._generate_order_id(ticker),
 				"ticker": ticker,
@@ -79,6 +123,8 @@ class OrderConstructionAgent(Agent):
 				"scale_count": order.get("scale_count", 1),
 				"stop_loss": stop_loss,
 				"take_profit": take_profit,
+				"trailing_stop": trailing_stop,
+				"holding_period": holding_period,
 				"risk_amount": order.get("risk_amount"),
 				"risk_reward": risk_reward,
 				"metadata": {

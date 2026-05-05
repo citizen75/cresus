@@ -23,6 +23,23 @@ class DataAgent(Agent):
 		if input_data is None:
 			input_data = {}
 
+		# Check if data_history already exists in context (backtest mode)
+		# If so, skip loading and just return success
+		existing_data_history = self.context.get("data_history")
+		if existing_data_history:
+			self.logger.debug("data_history already in context (backtest mode), skipping DataAgent load")
+			return {
+				"status": "success",
+				"input": input_data,
+				"output": {
+					"tickers": list(existing_data_history.keys()),
+					"count": len(existing_data_history),
+					"data_fetched": len(existing_data_history),
+					"indicators": [],
+					"indicators_count": 0,
+				},
+			}
+
 		# Check for tickers in input or context
 		tickers = input_data.get("tickers") or self.context.get("tickers")
 
@@ -46,6 +63,7 @@ class DataAgent(Agent):
 				indicators = strategy_config.get("indicators", [])
 
 		# Load cached price history for all tickers
+		# Note: Load all data - filtering by current_date happens in analysis agents
 		data_history = {}
 		indicators_calculated = {}
 		for ticker in tickers:

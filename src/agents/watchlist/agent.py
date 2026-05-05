@@ -34,7 +34,11 @@ class WatchListAgent(Agent):
 		if input_data is None:
 			input_data = {}
 
-		# Step 1: Get tickers using DataAgent
+		# Clear watchlist at start of processing to avoid stale data from previous days
+		self.context.set("watchlist", [])
+		self.logger.debug("Cleared watchlist at start of process")
+
+		# Step 1: Get tickers using DataAgent (skip if data already loaded in backtest)
 		data_result = DataAgent(self.name, self.context).process(input_data)
 		if data_result['status'] != 'success':
 			return {
@@ -44,12 +48,22 @@ class WatchListAgent(Agent):
 				'message': data_result['message']
 			}
 
+		# Ensure data_history is in context
+		if not self.context.get("data_history"):
+			return {
+				'status': 'error',
+				'input': input_data,
+				'output': {'watchlist': [], 'count': 0},
+				'message': "No data_history in context"
+			}
+
 		# Step 2: Get watchlist parameters from context strategy config
 		watchlist_params = self._get_watchlist_parameters()
 
 		# Step 3: Initialize watchlist from tickers
 		tickers = self.context.get("tickers") or []
 		self.context.set("watchlist", tickers)
+		self.logger.debug(f"Initialized watchlist with {len(tickers)} tickers from universe")
 
 		# Step 4: Create a watchlist processing flow with sub-agents
 		# The flow uses the same context as this agent

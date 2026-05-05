@@ -3,6 +3,8 @@
 from typing import Any, Dict, Optional
 import pandas as pd
 from core.agent import Agent
+from tools.strategy.strategy import StrategyManager
+from tools.strategy.config_evaluator import ConfigEvaluator
 
 
 class EntryRRAgent(Agent):
@@ -85,8 +87,8 @@ class EntryRRAgent(Agent):
 	def _calculate_rr(self, df: pd.DataFrame) -> Optional[Dict[str, float]]:
 		"""Calculate risk/reward metrics for a ticker.
 
-		Identifies support level (for stop-loss) and resistance level
-		(for take-profit) to calculate the RR ratio.
+		Uses strategy configuration formulas if available, otherwise
+		falls back to support/resistance level detection.
 
 		Args:
 			df: DataFrame with OHLCV data
@@ -101,46 +103,94 @@ class EntryRRAgent(Agent):
 			if current_price <= 0:
 				return None
 
-			# Identify support (lowest low in recent period)
-			lookback = min(20, len(df))
-			recent_data = df.iloc[-lookback:]
+			# Try to load strategy config for exit formulas
+			strategy_name = self.context.get("strategy_name") if self.context else None
+			exit_config = {}
+			
+			if strategy_name:
+				try:
+					strategy_manager = StrategyManager()
+					strategy_result = strategy_manager.load_strategy(strategy_name)
+					if strategy_result.get("status") == "success":
+						strategy_data = strategy_result.get("data", {})
+						exit_config = strategy_data.get("exit", {}).get("parameters", {})
+				except Exception as e:
+					self.logger.debug(f"Could not load strategy config: {e}")
 
-			low_col = "low" if "low" in df.columns else "close"
-			high_col = "high" if "high" in df.columns else "close"
+			# Prepare data context for formula evaluation
+			data_context = {
+				"close": current_price,
+				"atr_14": float(latest.get("atr_14", 0)),
+				"high": float(latest.get("high", 0)),
+				"low": float(latest.get("low", 0)),
+			}
 
-			support = float(recent_data[low_col].min())
-			resistance = float(recent_data[high_col].max())
+			# Try to evaluate stop_loss formula from config
+			stop_loss = None
+			if "stop_loss" in exit_config:
+				sl_formula = exit_config["stop_loss"].get("formula")
+				if sl_formula:
+					stop_loss = ConfigEvaluator.evaluate_formula(sl_formula, data_context)
 
-			# If current price is at support/resistance, use ATR for calculation
-			if support >= current_price * 0.98:  # Too close to support
-				if "atr_14" in df.columns:
-					atr = float(latest.get("atr_14", 0))
+			# Try to evaluate take_profit formula from config
+			take_profit = None
+			if "take_profit" in exit_config:
+				tp_formula = exit_config["take_profit"].get("formula")
+				if tp_formula:
+					take_profit = ConfigEvaluator.evaluate_formula(tp_formula, data_context)
+
+			# If config formulas didn't work, use fallback support/resistance method
+			if stop_loss is None or take_profit is None:
+				# Identify support (lowest low in recent period) and resistance (highest high)
+				lookback = min(20, len(df))
+				recent_data = df.iloc[-lookback:]
+
+				low_col = "low" if "low" in df.columns else "close"
+				high_col = "high" if "high" in df.columns else "close"
+
+				recent_low = float(recent_data[low_col].min())
+				recent_high = float(recent_data[high_col].max())
+
+				# Ensure support < current_price < resistance
+				support = min(recent_low, recent_high)
+				resistance = max(recent_low, recent_high)
+
+				# If support >= current_price, use ATR-based fallback
+				if support >= current_price:
+					atr = data_context.get("atr_14", 0)
 					support = current_price - (atr * 2)
-				else:
-					support = current_price * 0.97  # 3% below current
-
-			if resistance <= current_price * 1.02:  # Too close to resistance
-				if "atr_14" in df.columns:
-					atr = float(latest.get("atr_14", 0))
 					resistance = current_price + (atr * 3)
-				else:
-					resistance = current_price * 1.05  # 5% above current
+				elif resistance <= current_price:
+					atr = data_context.get("atr_14", 0)
+					resistance = current_price + (atr * 3)
+
+				# Safety checks
+				if support >= current_price:
+					support = current_price * 0.97
+				if resistance <= current_price:
+					resistance = current_price * 1.05
+
+				# Use fallback values if config formulas didn't evaluate
+				if stop_loss is None:
+					stop_loss = support
+				if take_profit is None:
+					take_profit = resistance
 
 			# Calculate risk and reward
-			risk = current_price - support
-			reward = resistance - current_price
+			risk = current_price - stop_loss
+			reward = take_profit - current_price
 
-			if risk <= 0:
+			if risk <= 0 or reward <= 0:
 				return None
 
 			rr_ratio = reward / risk
 
 			return {
 				"entry_price": round(current_price, 4),
-				"support_level": round(support, 4),
-				"resistance_level": round(resistance, 4),
-				"stop_loss": round(support, 4),
-				"take_profit": round(resistance, 4),
+				"support_level": round(stop_loss, 4),
+				"resistance_level": round(take_profit, 4),
+				"stop_loss": round(stop_loss, 4),
+				"take_profit": round(take_profit, 4),
 				"risk_amount": round(risk, 4),
 				"reward_amount": round(reward, 4),
 				"rr_ratio": round(rr_ratio, 2),

@@ -9,11 +9,12 @@ try:
 	from loguru import logger as loguru_logger
 	HAS_LOGURU = True
 
-	# Configure loguru
+	# Configure loguru (default to INFO level)
 	loguru_logger.remove()
 	loguru_logger.add(
 		sys.stderr,
 		format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {message}",
+		level="INFO"
 	)
 except ImportError:
 	HAS_LOGURU = False
@@ -35,6 +36,28 @@ def _get_relative_path(filepath: str) -> str:
 		return str(Path(filepath).relative_to(_project_root))
 	except ValueError:
 		return filepath
+
+
+def enable_debug_mode():
+	"""Enable debug logging level for loguru."""
+	if HAS_LOGURU:
+		loguru_logger.remove()
+		loguru_logger.add(
+			sys.stderr,
+			format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {message}",
+			level="DEBUG"
+		)
+
+
+def disable_debug_mode():
+	"""Disable debug logging level for loguru."""
+	if HAS_LOGURU:
+		loguru_logger.remove()
+		loguru_logger.add(
+			sys.stderr,
+			format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {message}",
+			level="INFO"
+		)
 
 
 class AgentLogger:

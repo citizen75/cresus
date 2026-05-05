@@ -8,15 +8,16 @@ from tools.portfolio import PortfolioManager
 from tools.portfolio.orders import Orders
 from tools.portfolio.journal import Journal
 from tools.portfolio.broker import PaperBroker
+from .sub_agents import StopLossAgent, TargetAgent, TimeLimitAgent, LimitOrderAgent
 
 
 class TransactAgent(Agent):
 	"""Agent for executing orders and managing exits on a specific trading date.
 
-	Consolidates buy and exit execution:
+	Consolidates buy and exit execution using pluggable subagents:
 	1. Execute pending BUY orders at market prices
-	2. Check open positions against stop_loss
-	3. Auto-exit positions that hit stop_loss
+	2. Check open positions against stop_loss via StopLossAgent
+	3. Execute limit orders via LimitOrderAgent
 	4. Record all transactions (BUY and EXIT) in journal
 	5. Update portfolio cache
 	"""
@@ -29,6 +30,10 @@ class TransactAgent(Agent):
 			context: AgentContext for shared state
 		"""
 		super().__init__(name, context)
+		self.stop_loss_agent = StopLossAgent("StopLossAgent")
+		self.target_agent = TargetAgent("TargetAgent")
+		self.time_limit_agent = TimeLimitAgent("TimeLimitAgent")
+		self.limit_agent = LimitOrderAgent("LimitOrderAgent")
 
 	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
 		"""Execute pending BUY orders and manage exits (stop_loss) for a specific date.
@@ -57,34 +62,40 @@ class TransactAgent(Agent):
 				"message": "date not set in context"
 			}
 
-		# Verify day data is available in context
-		data_history = self.context.get("data_history")
-		if not data_history:
-			return {
-				"status": "error",
-				"input": input_data,
-				"message": "Day data not loaded - ensure TransactFlow loads data before executing orders"
-			}
+		# Get pre-sliced day data (already filtered to specific date by BacktestAgent)
+		day_data = self.context.get("day_data") or {}
+		if not day_data:
+			self.logger.warning(f"No day data available for {trading_date}")
 
 		journal = Journal(portfolio_name, context=self.context.__dict__)
 		orders_mgr = Orders(portfolio_name, context=self.context.__dict__)
 
-		# Execute pending BUY orders
+		# Execute pending BUY orders at market prices
 		buy_results = self._execute_buy_orders(
 			orders_mgr,
 			journal,
 			portfolio_name,
 			trading_date,
-			data_history
+			day_data
 		)
 
-		# Check open positions and execute exits (stop_loss)
-		exit_results = self._execute_stop_loss_exits(
-			journal,
-			portfolio_name,
-			trading_date,
-			data_history
-		)
+		# Execute exit orders via subagents in sequence
+		exit_results = []
+
+		# 1. Stop loss exits
+		self.stop_loss_agent.context = self.context
+		stop_loss_result = self.stop_loss_agent.process({"day_data": day_data})
+		exit_results.extend(stop_loss_result.get("output", {}).get("exits", []))
+
+		# 2. Take profit exits
+		self.target_agent.context = self.context
+		target_result = self.target_agent.process({"day_data": day_data})
+		exit_results.extend(target_result.get("output", {}).get("exits", []))
+
+		# 3. Time limit exits
+		self.time_limit_agent.context = self.context
+		time_limit_result = self.time_limit_agent.process({"day_data": day_data})
+		exit_results.extend(time_limit_result.get("output", {}).get("exits", []))
 
 		buy_count = len([r for r in buy_results if r.get("status") == "filled"])
 		exit_count = len([r for r in exit_results if r.get("status") == "filled"])
@@ -115,7 +126,7 @@ class TransactAgent(Agent):
 		journal: Journal,
 		portfolio_name: str,
 		trading_date: date_type,
-		data_history: Dict[str, Any]
+		day_data: Dict[str, Any]
 	) -> List[Dict[str, Any]]:
 		"""Execute pending BUY orders using market data.
 
@@ -124,7 +135,7 @@ class TransactAgent(Agent):
 			journal: Journal for recording transactions
 			portfolio_name: Portfolio name
 			trading_date: Date of execution
-			data_history: Market data for the date
+			day_data: Pre-sliced market data {ticker: row} for the specific date
 
 		Returns:
 			List of buy execution results
@@ -145,13 +156,25 @@ class TransactAgent(Agent):
 				stop_loss = float(order_row.get("stop_loss", 0)) if order_row.get("stop_loss") else None
 				take_profit = float(order_row.get("take_profit", 0)) if order_row.get("take_profit") else None
 
-				# Get market price for the date
-				market_price = self._get_market_price(ticker, data_history)
+				# Get market price for the date (day_data is {ticker: row}, pre-sliced)
+				market_price = self._get_market_price(ticker, day_data)
 				if market_price is None:
 					market_price = entry_price
 
 				# Execute at better of entry_price or market price
 				execution_price = min(market_price, entry_price)
+
+				# Validate and adjust stop_loss/take_profit based on execution price
+				# If order was created on a previous day, these values might be stale
+				if stop_loss and stop_loss >= execution_price:
+					# Stop loss is above execution price - recalculate based on risk ratio
+					if take_profit and execution_price > 0:
+						risk_ratio = (take_profit - entry_price) / (entry_price - stop_loss) if (entry_price - stop_loss) != 0 else 1.0
+						# Recalculate stop_loss to maintain proper risk management
+						stop_loss = execution_price * 0.97  # 3% below execution price as safe default
+				if take_profit and take_profit <= execution_price:
+					# Take profit is below or at execution price - recalculate
+					take_profit = execution_price * 1.05  # 5% above execution price as safe default
 
 				# Convert order for broker
 				broker_order = {
@@ -184,13 +207,15 @@ class TransactAgent(Agent):
 				if result.status == "filled":
 					orders_mgr.update_order_status(order_id, "executed")
 
-					# Record BUY transaction in journal
+					# Record BUY transaction in journal with stop loss and take profit
 					journal.add_transaction(
 						operation="BUY",
 						ticker=ticker,
 						quantity=result.filled_quantity,
 						price=result.filled_price,
 						fees=0,
+						stop_loss=stop_loss,
+						take_profit=take_profit,
 						notes=f"Order {order_id[:8]} executed",
 						created_at=f"{trading_date.isoformat()}T14:00:00.000000"
 					)
@@ -208,133 +233,21 @@ class TransactAgent(Agent):
 
 		return execution_results
 
-	def _execute_stop_loss_exits(
-		self,
-		journal: Journal,
-		portfolio_name: str,
-		trading_date: date_type,
-		data_history: Dict[str, Any]
-	) -> List[Dict[str, Any]]:
-		"""Check open positions and execute exits if stop_loss hit.
-
-		Args:
-			journal: Journal for reading positions and recording exits
-			portfolio_name: Portfolio name
-			trading_date: Date of execution
-			data_history: Market data for the date
-
-		Returns:
-			List of exit execution results
-		"""
-		execution_results = []
-		broker = PaperBroker()
-
-		try:
-			# Get all open positions
-			open_positions = journal.get_open_positions()
-			if open_positions.empty:
-				return execution_results
-
-			for _, position in open_positions.iterrows():
-				ticker = str(position.get("ticker", ""))
-				quantity = int(position.get("quantity", 0))
-				stop_loss = float(position.get("stop_loss", 0)) if position.get("stop_loss") else None
-
-				if not stop_loss or quantity <= 0:
-					continue
-
-				# Get market data for today
-				day_low = self._get_day_low(ticker, data_history)
-				if day_low is None:
-					continue
-
-				# Check if stop_loss was hit
-				if day_low <= stop_loss:
-					# Execute EXIT at stop_loss price
-					exit_price = stop_loss
-
-					broker_order = {
-						"ticker": ticker,
-						"quantity": quantity,
-						"action": "SELL",
-						"price": exit_price,
-						"strategy_id": "transact_stop_loss",
-					}
-
-					result = broker.execute_order(broker_order)
-
-					execution_result = {
-						"ticker": ticker,
-						"quantity": quantity,
-						"stop_loss": stop_loss,
-						"day_low": day_low,
-						"status": result.status,
-						"exit_price": result.filled_price,
-						"exit_quantity": result.filled_quantity,
-						"reason": "stop_loss_hit",
-					}
-					execution_results.append(execution_result)
-
-					# Record EXIT transaction in journal
-					if result.status == "filled":
-						journal.add_transaction(
-							operation="SELL",
-							ticker=ticker,
-							quantity=result.filled_quantity,
-							price=result.filled_price,
-							fees=0,
-							notes=f"Stop loss exit @ {stop_loss}",
-							created_at=f"{trading_date.isoformat()}T14:00:00.000000"
-						)
-
-						self.logger.info(
-							f"EXIT {result.filled_quantity} {ticker} @ {result.filled_price:.2f} "
-							f"(stop_loss hit at {stop_loss})"
-						)
-
-		except Exception as e:
-			self.logger.error(f"Error executing stop loss exits: {e}")
-
-		return execution_results
-
-	def _get_market_price(self, ticker: str, data_history: Dict[str, Any]) -> Optional[float]:
+	def _get_market_price(self, ticker: str, day_data: Dict[str, Any]) -> Optional[float]:
 		"""Get closing price for ticker from day data.
 
 		Args:
 			ticker: Ticker symbol
-			data_history: Market data dict
+			day_data: Pre-sliced market data {ticker: row}
 
 		Returns:
 			Closing price or None
 		"""
-		if ticker not in data_history:
+		if ticker not in day_data:
 			return None
 
-		df = data_history[ticker]
-		if df.empty:
+		row = day_data[ticker]
+		try:
+			return float(row.get("close")) if "close" in row else None
+		except (ValueError, AttributeError):
 			return None
-
-		# Get closing price from latest row
-		latest = df.iloc[-1]
-		return float(latest.get("close")) if "close" in latest else None
-
-	def _get_day_low(self, ticker: str, data_history: Dict[str, Any]) -> Optional[float]:
-		"""Get daily low price for ticker from day data.
-
-		Args:
-			ticker: Ticker symbol
-			data_history: Market data dict
-
-		Returns:
-			Daily low price or None
-		"""
-		if ticker not in data_history:
-			return None
-
-		df = data_history[ticker]
-		if df.empty:
-			return None
-
-		# Get low price from latest row
-		latest = df.iloc[-1]
-		return float(latest.get("low")) if "low" in latest else None

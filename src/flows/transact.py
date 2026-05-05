@@ -82,33 +82,17 @@ class TransactFlow(Flow):
 				}
 			}
 
-		# Step 2: Filter pre-loaded data to just the trading date
-		# BacktestAgent loads all historical data upfront, so data_history is already in context
-		all_data = self.context.get("data_history") or {}
-		if not all_data:
-			return {
-				"status": "error",
-				"message": "No market data available in context - ensure BacktestAgent loads data first",
-			}
+		# Step 2: Get pre-sliced day data from BacktestAgent (already organized by date)
+		# BacktestAgent creates day_data_cache to avoid filtering on each iteration
+		next_day_data = self.context.get("next_day_data") or {}
 
-		# Filter to data for the specific trading date
-		filtered_data = {}
-		for ticker, df in all_data.items():
-			if not df.empty:
-				# Handle both timestamp column and index
-				if "timestamp" in df.columns:
-					mask = df["timestamp"].dt.date == trading_date
-					day_data = df[mask]
-				else:
-					# If timestamp is index, filter by index
-					mask = df.index.date == trading_date
-					day_data = df[mask]
+		# If day data not available (not in backtest), construct minimal day_data
+		# This allows TransactFlow to work both in backtest and live scenarios
+		if not next_day_data:
+			self.logger.warning(f"No pre-loaded day data for {trading_date} - TransactAgent will use available data")
 
-				if not day_data.empty:
-					filtered_data[ticker] = day_data.iloc[-1:]  # Get latest row for the day
-
-		# Store filtered day data in context for TransactAgent
-		self.context.set("data_history", filtered_data)
+		# Store day data in context for TransactAgent
+		self.context.set("day_data", next_day_data)
 
 		# Step 3: Execute pending orders with day data
 		transact_agent = TransactAgent("TransactAgent", self.context)

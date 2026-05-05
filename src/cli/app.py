@@ -265,7 +265,7 @@ class CresusCLI(cmd2.Cmd):
 			console.print("Try: data fetch|list|clear|stats|universes")
 
 	def do_flow(self, args):
-		"""Execute workflows: run <workflow_name> [strategy] [tickers...] [--context]"""
+		"""Execute workflows: run <workflow_name> [strategy] [tickers...] [--context] [--debug]"""
 		args_str = str(args).strip() if args else ""
 
 		if not args_str:
@@ -275,9 +275,10 @@ class CresusCLI(cmd2.Cmd):
 			table.add_row("flow list", "List available workflows")
 			table.add_row("flow run premarket <strategy>", "Generate pending orders")
 			table.add_row("flow run transact <portfolio> [date]", "Execute pending orders (default: today)")
-			table.add_row("flow run backtest <strategy> [start] [end]", "Backtest strategy over date range")
+			table.add_row("flow run backtest <strategy> [start_date] [end_date]", "Backtest strategy over date range (YYYY-MM-DD format)")
 			table.add_row("flow run <workflow> [strategy] [tickers...]", "Run a workflow")
 			table.add_row("flow run <workflow> [strategy] [--context]", "Run workflow and display context")
+			table.add_row("flow run <workflow> [strategy] [--debug]", "Run workflow with debug logging enabled")
 			console.print(table)
 			return
 
@@ -290,24 +291,36 @@ class CresusCLI(cmd2.Cmd):
 
 		elif cmd == "run":
 			if len(parts) < 2:
-				console.print("[red]✗[/red] Usage: flow run <workflow_name> [strategy] [tickers...] [--context]")
+				console.print("[red]✗[/red] Usage: flow run <workflow_name> [strategy] [tickers...] [--context] [--debug]")
 				return
 
 			workflow_name = parts[1]
 			include_context = "--context" in parts
+			debug = "--debug" in parts
 
 			# Remove workflow name and flags from parts
 			remaining = [p for p in parts[2:] if not p.startswith("--")]
 
-			# First remaining item is strategy, rest are tickers
+			# First remaining item is strategy, rest depends on workflow type
 			strategy = remaining[0] if remaining else "default_strategy"
-			tickers = remaining[1:] if len(remaining) > 1 else None
-
 			input_data = None
-			if tickers:
-				input_data = {"tickers": tickers}
 
-			result = self.flow_manager.run_workflow(workflow_name, strategy, input_data, include_context)
+			# Special handling for backtest workflow (dates instead of tickers)
+			if workflow_name.lower() == "backtest":
+				input_data = {}
+				if len(remaining) > 1:
+					# Second argument is start_date
+					input_data["start_date"] = remaining[1]
+				if len(remaining) > 2:
+					# Third argument is end_date
+					input_data["end_date"] = remaining[2]
+			else:
+				# For other workflows, treat remaining items as tickers
+				tickers = remaining[1:] if len(remaining) > 1 else None
+				if tickers:
+					input_data = {"tickers": tickers}
+
+			result = self.flow_manager.run_workflow(workflow_name, strategy, input_data, include_context, debug)
 			self._print_flow_result(result)
 
 		else:
@@ -346,6 +359,187 @@ class CresusCLI(cmd2.Cmd):
 
 		console.print(table)
 
+	def _print_backtest_metrics(self, output):
+		"""Print comprehensive backtest portfolio metrics."""
+		console.print()
+		
+		# Backtest metadata
+		metadata_table = Table(title="Backtest Period", box=box.ROUNDED)
+		metadata_table.add_column("Property", style="cyan")
+		metadata_table.add_column("Value", style="yellow")
+		
+		metadata_table.add_row("Start Date", output.get("start_date", "?"))
+		metadata_table.add_row("End Date", output.get("end_date", "?"))
+		metadata_table.add_row("Period", f"{output.get('period_days', 0)} days")
+		metadata_table.add_row("Backtest ID", output.get("backtest_id", "?"))
+		
+		console.print(metadata_table)
+
+		# Performance summary
+		console.print()
+		perf_table = Table(title="Performance Summary", box=box.ROUNDED)
+		perf_table.add_column("Metric", style="cyan")
+		perf_table.add_column("Value", style="green", justify="right")
+		
+		start_val = output.get("start_value", 100)
+		end_val = output.get("end_value", 100)
+		perf_table.add_row("Start Value", f"${start_val:,.2f}")
+		perf_table.add_row("End Value", f"${end_val:,.2f}")
+		
+		total_return = output.get("total_return_pct", 0)
+		return_color = "green" if total_return >= 0 else "red"
+		perf_table.add_row("Total Return", f"[{return_color}]{total_return:+.2f}%[/{return_color}]")
+		
+		bench_return = output.get("benchmark_return_pct", 0)
+		bench_color = "green" if bench_return >= 0 else "red"
+		perf_table.add_row("Benchmark Return", f"[{bench_color}]{bench_return:+.2f}%[/{bench_color}]")
+		
+		exposure = output.get("max_gross_exposure_pct", 0)
+		perf_table.add_row("Max Gross Exposure", f"{exposure:.2f}%")
+		
+		fees = output.get("total_fees_paid", 0)
+		perf_table.add_row("Total Fees Paid", f"${fees:,.2f}")
+		
+		console.print(perf_table)
+
+		# Risk metrics
+		console.print()
+		risk_table = Table(title="Risk Metrics", box=box.ROUNDED)
+		risk_table.add_column("Metric", style="cyan")
+		risk_table.add_column("Value", style="yellow", justify="right")
+		
+		max_dd = output.get("max_drawdown_pct", 0)
+		dd_color = "red" if max_dd < 0 else "yellow"
+		risk_table.add_row("Max Drawdown", f"[{dd_color}]{max_dd:.2f}%[/{dd_color}]")
+		
+		dd_duration = output.get("max_drawdown_duration_days", 0)
+		risk_table.add_row("Max Drawdown Duration", f"{dd_duration} days")
+		
+		console.print(risk_table)
+
+		# Trade statistics
+		console.print()
+		trades_table = Table(title="Trade Statistics", box=box.ROUNDED)
+		trades_table.add_column("Metric", style="cyan")
+		trades_table.add_column("Value", style="magenta", justify="right")
+		
+		total_trades = output.get("total_trades", 0)
+		closed_trades = output.get("closed_trades", 0)
+		open_trades = output.get("open_trades", 0)
+		
+		trades_table.add_row("Total Trades", str(total_trades))
+		trades_table.add_row("Closed Trades", str(closed_trades))
+		trades_table.add_row("Open Trades", str(open_trades))
+		
+		open_pnl = output.get("open_trade_pnl", 0)
+		open_color = "green" if open_pnl >= 0 else "red"
+		trades_table.add_row("Open Trade PnL", f"[{open_color}]${open_pnl:+,.2f}[/{open_color}]")
+		
+		win_rate = output.get("win_rate_pct", 0)
+		trades_table.add_row("Win Rate", f"{win_rate:.2f}%")
+		
+		best_trade = output.get("best_trade_pct", 0)
+		best_color = "green" if best_trade >= 0 else "red"
+		trades_table.add_row("Best Trade", f"[{best_color}]{best_trade:+.2f}%[/{best_color}]")
+		
+		worst_trade = output.get("worst_trade_pct", 0)
+		worst_color = "green" if worst_trade >= 0 else "red"
+		trades_table.add_row("Worst Trade", f"[{worst_color}]{worst_trade:+.2f}%[/{worst_color}]")
+		
+		avg_winning = output.get("avg_winning_trade_pct", 0)
+		trades_table.add_row("Avg Winning Trade", f"{avg_winning:+.2f}%")
+		
+		avg_losing = output.get("avg_losing_trade_pct", 0)
+		trades_table.add_row("Avg Losing Trade", f"{avg_losing:+.2f}%")
+		
+		console.print(trades_table)
+
+		# Trade duration and metrics
+		console.print()
+		duration_table = Table(title="Trade Duration & Ratios", box=box.ROUNDED)
+		duration_table.add_column("Metric", style="cyan")
+		duration_table.add_column("Value", style="bright_white", justify="right")
+		
+		avg_win_duration = output.get("avg_winning_trade_duration_days", 0)
+		duration_table.add_row("Avg Winning Trade Duration", f"{avg_win_duration:.1f} days")
+		
+		avg_loss_duration = output.get("avg_losing_trade_duration_days", 0)
+		duration_table.add_row("Avg Losing Trade Duration", f"{avg_loss_duration:.1f} days")
+		
+		profit_factor = output.get("profit_factor", 0)
+		duration_table.add_row("Profit Factor", f"{profit_factor:.2f}")
+		
+		expectancy = output.get("expectancy_pct", 0)
+		expectancy_color = "green" if expectancy >= 0 else "red"
+		duration_table.add_row("Expectancy", f"[{expectancy_color}]{expectancy:+.2f}%[/{expectancy_color}]")
+		
+		console.print(duration_table)
+
+		# Risk-adjusted returns
+		console.print()
+		ratios_table = Table(title="Risk-Adjusted Returns", box=box.ROUNDED)
+		ratios_table.add_column("Ratio", style="cyan")
+		ratios_table.add_column("Value", style="bright_cyan", justify="right")
+		
+		sharpe = output.get("sharpe_ratio", 0)
+		sharpe_color = "green" if sharpe >= 1 else "yellow" if sharpe >= 0 else "red"
+		ratios_table.add_row("Sharpe Ratio", f"[{sharpe_color}]{sharpe:.4f}[/{sharpe_color}]")
+		
+		sortino = output.get("sortino_ratio", 0)
+		sortino_color = "green" if sortino >= 1 else "yellow" if sortino >= 0 else "red"
+		ratios_table.add_row("Sortino Ratio", f"[{sortino_color}]{sortino:.4f}[/{sortino_color}]")
+		
+		calmar = output.get("calmar_ratio", 0)
+		calmar_color = "green" if calmar >= 0.5 else "yellow" if calmar >= 0 else "red"
+		ratios_table.add_row("Calmar Ratio", f"[{calmar_color}]{calmar:.4f}[/{calmar_color}]")
+		
+		omega = output.get("omega_ratio", 0)
+		omega_color = "green" if omega >= 1.5 else "yellow" if omega >= 1 else "red"
+		ratios_table.add_row("Omega Ratio", f"[{omega_color}]{omega:.4f}[/{omega_color}]")
+		
+		console.print(ratios_table)
+
+		# Positions breakdown (if available)
+		final_portfolio = output.get("final_portfolio", {})
+		positions = final_portfolio.get("positions", [])
+		if positions:
+			console.print()
+			positions_table = Table(title=f"Final Positions ({len(positions)})", box=box.ROUNDED)
+			positions_table.add_column("Ticker", style="cyan")
+			positions_table.add_column("Shares", style="yellow", justify="right")
+			positions_table.add_column("Entry Price", style="blue", justify="right")
+			positions_table.add_column("Current Price", style="blue", justify="right")
+			positions_table.add_column("Position Value", style="magenta", justify="right")
+			positions_table.add_column("Gain/Loss", style="bright_white", justify="right")
+			positions_table.add_column("Gain %", style="bright_white", justify="right")
+			
+			for pos in positions:
+				ticker = pos.get("ticker", "?")
+				# Fix: PortfolioManager returns 'quantity', not 'shares'
+				shares = pos.get("quantity", pos.get("shares", 0))
+				shares_str = f"{shares:,.0f}"
+				
+				# Fix: PortfolioManager returns 'avg_entry_price', not 'entry_price'
+				entry_price_val = pos.get("avg_entry_price", pos.get("entry_price", 0))
+				entry_price = f"${entry_price_val:.2f}"
+				
+				# Fix: Use 'current_price' from position data
+				current_price_val = pos.get("current_price", 0)
+				current_price = f"${current_price_val:.2f}"
+				
+				position_value = f"${pos.get('position_value', 0):,.2f}"
+				
+				gain = pos.get("position_gain", 0)
+				gain_str = f"${gain:+,.2f}"
+				gain_pct = pos.get("position_gain_pct", 0)
+				
+				gain_color = "green" if gain >= 0 else "red"
+				gain_pct_str = f"[{gain_color}]{gain_pct:+.2f}%[/{gain_color}]"
+				
+				positions_table.add_row(ticker, shares_str, entry_price, current_price, position_value, gain_str, gain_pct_str)
+			
+			console.print(positions_table)
+
 	def _print_flow_result(self, result):
 		"""Print workflow execution result."""
 		status = result.get("status", "unknown")
@@ -380,7 +574,11 @@ class CresusCLI(cmd2.Cmd):
 		if "duration_ms" in result:
 			console.print(f"[cyan]Duration:[/cyan] {result['duration_ms']:.0f}ms")
 
-		# Display sorted tickers with scores (for signals workflow)
+		# Display backtest portfolio metrics
+		if "output" in result and isinstance(result.get("output"), dict):
+			output = result["output"]
+			if output.get("backtest_id"):
+				self._print_backtest_metrics(output)
 		if "sorted_tickers" in result:
 			sorted_tickers = result.get("sorted_tickers", [])
 			if sorted_tickers:
