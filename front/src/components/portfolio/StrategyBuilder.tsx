@@ -41,6 +41,7 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
   const [editingWatchlist, setEditingWatchlist] = useState(false)
   const [editingEntry, setEditingEntry] = useState(false)
   const [editingExit, setEditingExit] = useState(false)
+  const [editingSignals, setEditingSignals] = useState(false)
 
   useEffect(() => {
     const fetchStrategy = async () => {
@@ -341,15 +342,54 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
       {/* Signals Configuration */}
       {strategy.signals?.enabled && (
         <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
-          <h3 className="text-white font-bold text-lg mb-6">Signal Weights</h3>
-          <div className="grid grid-cols-4 gap-4">
-            {Object.entries(strategy.signals.weights).map(([key, value]) => (
-              <div key={key} className="bg-slate-800/50 rounded p-4">
-                <p className="text-slate-400 text-xs uppercase mb-2 capitalize">{key.replace(/_/g, ' ')}</p>
-                <p className="text-white font-bold text-2xl">{(value * 100).toFixed(0)}%</p>
-              </div>
-            ))}
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-white font-bold text-lg">Signal Weights</h3>
+            <button
+              onClick={() => setEditingSignals(!editingSignals)}
+              className="text-purple-400 hover:text-purple-300 text-sm font-medium"
+            >
+              {editingSignals ? 'Done' : 'Edit'}
+            </button>
           </div>
+
+          {editingSignals ? (
+            // Edit Form
+            <div className="space-y-4">
+              {Object.entries(strategy.signals.weights).map(([key, value]) => (
+                <div key={key}>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-slate-400 text-xs uppercase capitalize">{key.replace(/_/g, ' ')}</label>
+                    <span className="text-white font-medium text-sm">{(value * 100).toFixed(1)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="1"
+                    defaultValue={(value * 100).toString()}
+                    className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+              ))}
+              <div className="mt-4 p-3 bg-slate-800/50 rounded">
+                <p className="text-slate-400 text-xs">
+                  Total: <span className="text-slate-200 font-medium">
+                    {(Object.values(strategy.signals.weights).reduce((a, b) => a + b, 0) * 100).toFixed(1)}%
+                  </span>
+                </p>
+              </div>
+            </div>
+          ) : (
+            // Display View
+            <div className="grid grid-cols-4 gap-4">
+              {Object.entries(strategy.signals.weights).map(([key, value]) => (
+                <div key={key} className="bg-slate-800/50 rounded p-4">
+                  <p className="text-slate-400 text-xs uppercase mb-2 capitalize">{key.replace(/_/g, ' ')}</p>
+                  <p className="text-white font-bold text-2xl">{(value * 100).toFixed(0)}%</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
