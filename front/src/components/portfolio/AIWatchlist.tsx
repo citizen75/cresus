@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import CardChart from '@/components/CardChart'
 import Spinner from '@/components/Spinner'
+import { getApiBaseUrl } from '@/services/api'
 
 // Ticker to company name mapping
 const COMPANY_NAMES: { [key: string]: string } = {
@@ -100,7 +101,8 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
       try {
         setLoading(true)
         const strategyName = name.toLowerCase().replace(/\s+/g, '_')
-        const apiUrl = `http://localhost:8000/api/v1/watchlists/${strategyName}`
+        const baseUrl = getApiBaseUrl()
+        const apiUrl = `${baseUrl}/api/v1/watchlists/${strategyName}`
 
         const response = await fetch(apiUrl, {
           headers: {
@@ -159,11 +161,12 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
 
     const loadFundamentalData = async () => {
       const updatedWatchlist = [...watchlist]
+      const baseUrl = getApiBaseUrl()
 
       for (let i = 0; i < updatedWatchlist.length; i++) {
         try {
           const response = await fetch(
-            `http://localhost:8000/api/v1/data/fundamental/${updatedWatchlist[i].ticker}`
+            `${baseUrl}/api/v1/data/fundamental/${updatedWatchlist[i].ticker}`
           )
           if (response.ok) {
             const data = await response.json()
@@ -207,12 +210,13 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
   const loadHistoricalData = async (tickers: string[], selectedPeriod: string = '1Y') => {
     try {
       const strategyName = name.toLowerCase().replace(/\s+/g, '_')
+      const baseUrl = getApiBaseUrl()
       const historical: HistoricalData = {}
 
       for (const ticker of tickers) {
         try {
           const response = await fetch(
-            `http://localhost:8000/api/v1/watchlists/${strategyName}/historical/${ticker}?period=${selectedPeriod}`
+            `${baseUrl}/api/v1/watchlists/${strategyName}/historical/${ticker}?period=${selectedPeriod}`
           )
 
           if (response.ok) {

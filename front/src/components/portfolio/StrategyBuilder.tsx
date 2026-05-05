@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { getApiBaseUrl } from '@/services/api'
 
 interface StrategyBuilderProps {
   name: string
@@ -53,7 +54,8 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
   useEffect(() => {
     const fetchStrategy = async () => {
       try {
-        const response = await fetch(`http://localhost:8000/api/v1/strategies/${name}`)
+        const baseUrl = getApiBaseUrl()
+        const response = await fetch(`${baseUrl}/api/v1/strategies/${name}`)
         if (!response.ok) {
           throw new Error(`Failed to fetch strategy: ${response.statusText}`)
         }
@@ -75,7 +77,8 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
     setIsSaving(true)
     
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/strategies/${name}`, {
+      const baseUrl = getApiBaseUrl()
+      const response = await fetch(`${baseUrl}/api/v1/strategies/${name}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

@@ -1,9 +1,21 @@
 import axios, { AxiosInstance } from 'axios'
 
+export function getApiBaseUrl(): string {
+  // Priority: env var > current window origin
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL
+  }
+  // Use current domain (frontend host)
+  if (typeof window !== 'undefined') {
+    return window.location.origin
+  }
+  return 'http://localhost:8000'
+}
+
 class CresusAPI {
   private client: AxiosInstance
 
-  constructor(baseURL: string = import.meta.env.VITE_API_URL || 'http://localhost:8000') {
+  constructor(baseURL: string = getApiBaseUrl()) {
     this.client = axios.create({
       baseURL: `${baseURL}/api/v1`,
       timeout: 30000,
