@@ -42,6 +42,13 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
   const [editingEntry, setEditingEntry] = useState(false)
   const [editingExit, setEditingExit] = useState(false)
   const [editingSignals, setEditingSignals] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  
+  // Form state
+  const [entryForm, setEntryForm] = useState<any>(null)
+  const [exitForm, setExitForm] = useState<any>(null)
+  const [watchlistForm, setWatchlistForm] = useState<any>(null)
+  const [signalsForm, setSignalsForm] = useState<any>(null)
 
   useEffect(() => {
     const fetchStrategy = async () => {
@@ -61,6 +68,72 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
 
     fetchStrategy()
   }, [name])
+
+  const saveStrategy = async (updates: any) => {
+    if (!strategy) return
+    
+    setIsSaving(true)
+    
+    try {
+      const response = await fetch(`http://localhost:8000/api/v1/strategies/${name}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updates),
+      })
+      
+      if (!response.ok) {
+        throw new Error(`Failed to update strategy: ${response.statusText}`)
+      }
+      
+      const data = await response.json()
+      setStrategy(data.strategy)
+      return true
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      console.error('Save error:', message)
+      return false
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleSaveEntry = async () => {
+    if (!entryForm) return
+    const success = await saveStrategy({ entry: entryForm })
+    if (success) {
+      setEditingEntry(false)
+      setEntryForm(null)
+    }
+  }
+
+  const handleSaveExit = async () => {
+    if (!exitForm) return
+    const success = await saveStrategy({ exit: exitForm })
+    if (success) {
+      setEditingExit(false)
+      setExitForm(null)
+    }
+  }
+
+  const handleSaveWatchlist = async () => {
+    if (!watchlistForm) return
+    const success = await saveStrategy({ watchlist: watchlistForm })
+    if (success) {
+      setEditingWatchlist(false)
+      setWatchlistForm(null)
+    }
+  }
+
+  const handleSaveSignals = async () => {
+    if (!signalsForm) return
+    const success = await saveStrategy({ signals: signalsForm })
+    if (success) {
+      setEditingSignals(false)
+      setSignalsForm(null)
+    }
+  }
 
   if (loading) {
     return <div className="text-slate-400 py-12 text-center">Loading strategy...</div>
@@ -118,10 +191,21 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-white font-bold">Entry</h3>
             <button
-              onClick={() => setEditingEntry(!editingEntry)}
-              className="text-purple-400 hover:text-purple-300 text-sm font-medium"
+              onClick={() => {
+                if (editingEntry) {
+                  handleSaveEntry()
+                } else {
+                  setEntryForm({
+                    enabled: strategy.entry?.enabled || false,
+                    parameters: JSON.parse(JSON.stringify(strategy.entry?.parameters || {}))
+                  })
+                  setEditingEntry(true)
+                }
+              }}
+              disabled={isSaving}
+              className="text-purple-400 hover:text-purple-300 text-sm font-medium disabled:opacity-50"
             >
-              {editingEntry ? 'Done' : 'Edit'}
+              {editingEntry ? (isSaving ? 'Saving...' : 'Done') : 'Edit'}
             </button>
           </div>
 
@@ -132,6 +216,18 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
                 <label className="text-slate-400 text-xs uppercase block mb-1">Position Size Formula</label>
                 <textarea
                   defaultValue={strategy.entry?.parameters?.position_size?.formula || ''}
+                  onChange={(e) => {
+                    setEntryForm({
+                      ...entryForm,
+                      parameters: {
+                        ...entryForm?.parameters,
+                        position_size: {
+                          formula: e.target.value,
+                          description: entryForm?.parameters?.position_size?.description || ''
+                        }
+                      }
+                    })
+                  }}
                   className="w-full bg-slate-800 border border-slate-700 text-white px-2 py-1 rounded text-xs font-mono h-16"
                 />
               </div>
@@ -161,10 +257,21 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-white font-bold">Exit</h3>
             <button
-              onClick={() => setEditingExit(!editingExit)}
-              className="text-purple-400 hover:text-purple-300 text-sm font-medium"
+              onClick={() => {
+                if (editingExit) {
+                  handleSaveExit()
+                } else {
+                  setExitForm({
+                    enabled: strategy.exit?.enabled || false,
+                    parameters: JSON.parse(JSON.stringify(strategy.exit?.parameters || {}))
+                  })
+                  setEditingExit(true)
+                }
+              }}
+              disabled={isSaving}
+              className="text-purple-400 hover:text-purple-300 text-sm font-medium disabled:opacity-50"
             >
-              {editingExit ? 'Done' : 'Edit'}
+              {editingExit ? (isSaving ? 'Saving...' : 'Done') : 'Edit'}
             </button>
           </div>
 
@@ -175,6 +282,18 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
                 <label className="text-slate-400 text-xs uppercase block mb-1">Stop Loss</label>
                 <textarea
                   defaultValue={strategy.exit?.parameters?.stop_loss?.formula || ''}
+                  onChange={(e) => {
+                    setExitForm({
+                      ...exitForm,
+                      parameters: {
+                        ...exitForm?.parameters,
+                        stop_loss: {
+                          formula: e.target.value,
+                          description: exitForm?.parameters?.stop_loss?.description || ''
+                        }
+                      }
+                    })
+                  }}
                   className="w-full bg-slate-800 border border-slate-700 text-white px-2 py-1 rounded text-xs font-mono h-12"
                 />
               </div>
@@ -182,6 +301,18 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
                 <label className="text-slate-400 text-xs uppercase block mb-1">Take Profit</label>
                 <textarea
                   defaultValue={strategy.exit?.parameters?.take_profit?.formula || ''}
+                  onChange={(e) => {
+                    setExitForm({
+                      ...exitForm,
+                      parameters: {
+                        ...exitForm?.parameters,
+                        take_profit: {
+                          formula: e.target.value,
+                          description: exitForm?.parameters?.take_profit?.description || ''
+                        }
+                      }
+                    })
+                  }}
                   className="w-full bg-slate-800 border border-slate-700 text-white px-2 py-1 rounded text-xs font-mono h-12"
                 />
               </div>
@@ -189,6 +320,18 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
                 <label className="text-slate-400 text-xs uppercase block mb-1">Trailing Stop</label>
                 <textarea
                   defaultValue={strategy.exit?.parameters?.trailing_stop?.formula || ''}
+                  onChange={(e) => {
+                    setExitForm({
+                      ...exitForm,
+                      parameters: {
+                        ...exitForm?.parameters,
+                        trailing_stop: {
+                          formula: e.target.value,
+                          description: exitForm?.parameters?.trailing_stop?.description || ''
+                        }
+                      }
+                    })
+                  }}
                   className="w-full bg-slate-800 border border-slate-700 text-white px-2 py-1 rounded text-xs font-mono h-12"
                 />
               </div>
@@ -197,6 +340,18 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
                 <input
                   type="number"
                   defaultValue={strategy.exit?.parameters?.holding_period?.formula || 15}
+                  onChange={(e) => {
+                    setExitForm({
+                      ...exitForm,
+                      parameters: {
+                        ...exitForm?.parameters,
+                        holding_period: {
+                          formula: e.target.value,
+                          description: exitForm?.parameters?.holding_period?.description || ''
+                        }
+                      }
+                    })
+                  }}
                   className="w-full bg-slate-800 border border-slate-700 text-white px-2 py-1 rounded text-xs"
                 />
               </div>
@@ -266,10 +421,21 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-white font-bold">Watchlist</h3>
             <button
-              onClick={() => setEditingWatchlist(!editingWatchlist)}
-              className="text-purple-400 hover:text-purple-300 text-sm font-medium"
+              onClick={() => {
+                if (editingWatchlist) {
+                  handleSaveWatchlist()
+                } else {
+                  setWatchlistForm({
+                    enabled: strategy.watchlist?.enabled || false,
+                    parameters: JSON.parse(JSON.stringify(strategy.watchlist?.parameters || {}))
+                  })
+                  setEditingWatchlist(true)
+                }
+              }}
+              disabled={isSaving}
+              className="text-purple-400 hover:text-purple-300 text-sm font-medium disabled:opacity-50"
             >
-              {editingWatchlist ? 'Done' : 'Edit'}
+              {editingWatchlist ? (isSaving ? 'Saving...' : 'Done') : 'Edit'}
             </button>
           </div>
 
@@ -281,6 +447,18 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
                 <input
                   type="number"
                   defaultValue={strategy.watchlist?.parameters?.volume?.min_volume || 500000}
+                  onChange={(e) => {
+                    setWatchlistForm({
+                      ...watchlistForm,
+                      parameters: {
+                        ...watchlistForm?.parameters,
+                        volume: {
+                          ...watchlistForm?.parameters?.volume,
+                          min_volume: parseInt(e.target.value)
+                        }
+                      }
+                    })
+                  }}
                   className="w-full bg-slate-800 border border-slate-700 text-white px-2 py-1 rounded text-xs"
                 />
               </div>
@@ -289,6 +467,18 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
                 <input
                   type="text"
                   defaultValue={strategy.watchlist?.parameters?.ranking?.metric || 'score'}
+                  onChange={(e) => {
+                    setWatchlistForm({
+                      ...watchlistForm,
+                      parameters: {
+                        ...watchlistForm?.parameters,
+                        ranking: {
+                          ...watchlistForm?.parameters?.ranking,
+                          metric: e.target.value
+                        }
+                      }
+                    })
+                  }}
                   className="w-full bg-slate-800 border border-slate-700 text-white px-2 py-1 rounded text-xs"
                 />
               </div>
@@ -296,6 +486,18 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
                 <label className="text-slate-400 text-xs uppercase block mb-1">Trend</label>
                 <textarea
                   defaultValue={strategy.watchlist?.parameters?.trend?.formula || ''}
+                  onChange={(e) => {
+                    setWatchlistForm({
+                      ...watchlistForm,
+                      parameters: {
+                        ...watchlistForm?.parameters,
+                        trend: {
+                          formula: e.target.value,
+                          description: watchlistForm?.parameters?.trend?.description || ''
+                        }
+                      }
+                    })
+                  }}
                   className="w-full bg-slate-800 border border-slate-700 text-white px-2 py-1 rounded text-xs font-mono h-12"
                 />
               </div>
@@ -303,6 +505,18 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
                 <label className="text-slate-400 text-xs uppercase block mb-1">Volatility</label>
                 <textarea
                   defaultValue={strategy.watchlist?.parameters?.volatility?.formula || ''}
+                  onChange={(e) => {
+                    setWatchlistForm({
+                      ...watchlistForm,
+                      parameters: {
+                        ...watchlistForm?.parameters,
+                        volatility: {
+                          formula: e.target.value,
+                          description: watchlistForm?.parameters?.volatility?.description || ''
+                        }
+                      }
+                    })
+                  }}
                   className="w-full bg-slate-800 border border-slate-700 text-white px-2 py-1 rounded text-xs font-mono h-12"
                 />
               </div>
@@ -345,10 +559,22 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-white font-bold text-lg">Signal Weights</h3>
             <button
-              onClick={() => setEditingSignals(!editingSignals)}
-              className="text-purple-400 hover:text-purple-300 text-sm font-medium"
+              onClick={() => {
+                if (editingSignals) {
+                  handleSaveSignals()
+                } else {
+                  setSignalsForm({
+                    enabled: strategy.signals?.enabled || false,
+                    weights: JSON.parse(JSON.stringify(strategy.signals?.weights || {})),
+                    parameters: JSON.parse(JSON.stringify(strategy.signals?.parameters || {}))
+                  })
+                  setEditingSignals(true)
+                }
+              }}
+              disabled={isSaving}
+              className="text-purple-400 hover:text-purple-300 text-sm font-medium disabled:opacity-50"
             >
-              {editingSignals ? 'Done' : 'Edit'}
+              {editingSignals ? (isSaving ? 'Saving...' : 'Done') : 'Edit'}
             </button>
           </div>
 
@@ -359,7 +585,9 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
                 <div key={key}>
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-slate-400 text-xs uppercase capitalize">{key.replace(/_/g, ' ')}</label>
-                    <span className="text-white font-medium text-sm">{(value * 100).toFixed(1)}%</span>
+                    <span className="text-white font-medium text-sm">
+                      {signalsForm?.weights?.[key] ? (signalsForm.weights[key] * 100).toFixed(1) : (value * 100).toFixed(1)}%
+                    </span>
                   </div>
                   <input
                     type="range"
@@ -367,6 +595,15 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
                     max="100"
                     step="1"
                     defaultValue={(value * 100).toString()}
+                    onChange={(e) => {
+                      setSignalsForm({
+                        ...signalsForm,
+                        weights: {
+                          ...signalsForm?.weights,
+                          [key]: parseInt(e.target.value) / 100
+                        }
+                      })
+                    }}
                     className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer"
                   />
                 </div>
@@ -374,7 +611,7 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
               <div className="mt-4 p-3 bg-slate-800/50 rounded">
                 <p className="text-slate-400 text-xs">
                   Total: <span className="text-slate-200 font-medium">
-                    {(Object.values(strategy.signals.weights).reduce((a, b) => a + b, 0) * 100).toFixed(1)}%
+                    {(Object.values((signalsForm?.weights || strategy.signals.weights) as Record<string, number>).reduce((a: number, b: number) => a + b, 0) * 100).toFixed(1)}%
                   </span>
                 </p>
               </div>
