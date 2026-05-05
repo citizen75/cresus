@@ -33,7 +33,7 @@ export default function OrdersView({ name }: OrdersViewProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
-  const [statusFilter, setStatusFilter] = useState('All')
+  const [statusFilter, setStatusFilter] = useState('Pending')
   const [searchTerm, setSearchTerm] = useState('')
   const [sortBy, setSortBy] = useState('Risk/Reward')
   const [currentPage, setCurrentPage] = useState(1)
