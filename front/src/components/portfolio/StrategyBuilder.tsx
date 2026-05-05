@@ -39,6 +39,8 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [editingWatchlist, setEditingWatchlist] = useState(false)
+  const [editingEntry, setEditingEntry] = useState(false)
+  const [editingExit, setEditingExit] = useState(false)
 
   useEffect(() => {
     const fetchStrategy = async () => {
@@ -112,56 +114,134 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
 
         {/* Entry Conditions */}
         <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
-          <h3 className="text-white font-bold mb-4">Entry</h3>
-          {strategy.entry?.enabled ? (
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-white font-bold">Entry</h3>
+            <button
+              onClick={() => setEditingEntry(!editingEntry)}
+              className="text-purple-400 hover:text-purple-300 text-sm font-medium"
+            >
+              {editingEntry ? 'Done' : 'Edit'}
+            </button>
+          </div>
+
+          {editingEntry ? (
+            // Edit Form
             <div className="space-y-3">
-              <div className="flex items-center gap-2 p-2 bg-green-900/20 rounded border border-green-800/50">
-                <span className="w-2 h-2 bg-green-400 rounded-full"></span>
-                <span className="text-green-400 text-xs font-medium">Enabled</span>
+              <div>
+                <label className="text-slate-400 text-xs uppercase block mb-1">Position Size Formula</label>
+                <textarea
+                  defaultValue={strategy.entry?.parameters?.position_size?.formula || ''}
+                  className="w-full bg-slate-800 border border-slate-700 text-white px-2 py-1 rounded text-xs font-mono h-16"
+                />
               </div>
-              {strategy.entry.parameters?.position_size && (
-                <div className="text-slate-300 text-xs bg-slate-800/30 p-2 rounded font-mono break-all">
-                  {strategy.entry.parameters.position_size.formula}
-                </div>
-              )}
             </div>
           ) : (
-            <div className="text-slate-400 text-sm">Not configured</div>
+            // Display View
+            strategy.entry?.enabled ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 p-2 bg-green-900/20 rounded border border-green-800/50">
+                  <span className="w-2 h-2 bg-green-400 rounded-full"></span>
+                  <span className="text-green-400 text-xs font-medium">Enabled</span>
+                </div>
+                {strategy.entry.parameters?.position_size && (
+                  <div className="text-slate-300 text-xs bg-slate-800/30 p-2 rounded font-mono break-all">
+                    {strategy.entry.parameters.position_size.formula}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-slate-400 text-sm">Not configured</div>
+            )
           )}
-          <button className="w-full mt-4 px-4 py-2 text-purple-400 hover:text-purple-300 text-sm font-medium transition">
-            Edit entry
-          </button>
         </div>
 
         {/* Exit Conditions */}
         <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
-          <h3 className="text-white font-bold mb-4">Exit</h3>
-          {strategy.exit?.enabled ? (
-            <div className="space-y-2 text-xs">
-              <div className="flex items-center gap-2 p-2 bg-red-900/20 rounded border border-red-800/50">
-                <span className="w-2 h-2 bg-red-400 rounded-full"></span>
-                <span className="text-red-400 font-medium">Stop Loss</span>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-white font-bold">Exit</h3>
+            <button
+              onClick={() => setEditingExit(!editingExit)}
+              className="text-purple-400 hover:text-purple-300 text-sm font-medium"
+            >
+              {editingExit ? 'Done' : 'Edit'}
+            </button>
+          </div>
+
+          {editingExit ? (
+            // Edit Form
+            <div className="space-y-3">
+              <div>
+                <label className="text-slate-400 text-xs uppercase block mb-1">Stop Loss</label>
+                <textarea
+                  defaultValue={strategy.exit?.parameters?.stop_loss?.formula || ''}
+                  className="w-full bg-slate-800 border border-slate-700 text-white px-2 py-1 rounded text-xs font-mono h-12"
+                />
               </div>
-              {strategy.exit.parameters?.stop_loss && (
-                <div className="text-slate-300 bg-slate-800/30 p-2 rounded font-mono break-all">
-                  {strategy.exit.parameters.stop_loss.formula}
-                </div>
-              )}
-              {strategy.exit.parameters?.take_profit && (
-                <div>
-                  <span className="text-slate-400">Take Profit:</span>
-                  <div className="text-slate-300 bg-slate-800/30 p-2 rounded font-mono break-all">
-                    {strategy.exit.parameters.take_profit.formula}
-                  </div>
-                </div>
-              )}
+              <div>
+                <label className="text-slate-400 text-xs uppercase block mb-1">Take Profit</label>
+                <textarea
+                  defaultValue={strategy.exit?.parameters?.take_profit?.formula || ''}
+                  className="w-full bg-slate-800 border border-slate-700 text-white px-2 py-1 rounded text-xs font-mono h-12"
+                />
+              </div>
+              <div>
+                <label className="text-slate-400 text-xs uppercase block mb-1">Trailing Stop</label>
+                <textarea
+                  defaultValue={strategy.exit?.parameters?.trailing_stop?.formula || ''}
+                  className="w-full bg-slate-800 border border-slate-700 text-white px-2 py-1 rounded text-xs font-mono h-12"
+                />
+              </div>
+              <div>
+                <label className="text-slate-400 text-xs uppercase block mb-1">Holding Period</label>
+                <input
+                  type="number"
+                  defaultValue={strategy.exit?.parameters?.holding_period?.formula || 15}
+                  className="w-full bg-slate-800 border border-slate-700 text-white px-2 py-1 rounded text-xs"
+                />
+              </div>
             </div>
           ) : (
-            <div className="text-slate-400 text-sm">Not configured</div>
+            // Display View
+            strategy.exit?.enabled ? (
+              <div className="space-y-2 text-xs">
+                <div className="flex items-center gap-2 p-2 bg-red-900/20 rounded border border-red-800/50">
+                  <span className="w-2 h-2 bg-red-400 rounded-full"></span>
+                  <span className="text-red-400 font-medium">Stop Loss</span>
+                </div>
+                {strategy.exit.parameters?.stop_loss && (
+                  <div className="text-slate-300 bg-slate-800/30 p-2 rounded font-mono break-all">
+                    {strategy.exit.parameters.stop_loss.formula}
+                  </div>
+                )}
+                {strategy.exit.parameters?.take_profit && (
+                  <div>
+                    <span className="text-slate-400">Take Profit:</span>
+                    <div className="text-slate-300 bg-slate-800/30 p-2 rounded font-mono break-all">
+                      {strategy.exit.parameters.take_profit.formula}
+                    </div>
+                  </div>
+                )}
+                {strategy.exit.parameters?.trailing_stop && (
+                  <div>
+                    <span className="text-slate-400">Trailing Stop:</span>
+                    <div className="text-slate-300 bg-slate-800/30 p-2 rounded font-mono break-all">
+                      {strategy.exit.parameters.trailing_stop.formula}
+                    </div>
+                  </div>
+                )}
+                {strategy.exit.parameters?.holding_period && (
+                  <div>
+                    <span className="text-slate-400">Holding Period:</span>
+                    <div className="text-slate-300 bg-slate-800/30 p-2 rounded">
+                      {strategy.exit.parameters.holding_period.formula} days
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-slate-400 text-sm">Not configured</div>
+            )
           )}
-          <button className="w-full mt-4 px-4 py-2 text-purple-400 hover:text-purple-300 text-sm font-medium transition">
-            Edit exit
-          </button>
         </div>
 
         {/* Indicators */}
