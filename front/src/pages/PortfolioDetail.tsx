@@ -1,5 +1,5 @@
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import PortfolioOverview from '@/components/portfolio/PortfolioOverview'
 import StrategyBuilder from '@/components/portfolio/StrategyBuilder'
 import AIWatchlist from '@/components/portfolio/AIWatchlist'
@@ -22,19 +22,18 @@ export default function PortfolioDetail() {
   const navigate = useNavigate()
   const [localTab, setLocalTab] = useState('overview')
   
-  // Detect active tab from URL
-  const getActiveTabFromUrl = () => {
+  // Detect active tab - prioritize URL-based tabs, fallback to local state
+  const getActiveTab = () => {
+    // Check URL for routed tabs
     if (location.pathname.includes('/orders')) return 'orders'
     if (location.pathname.includes('/holdings')) return 'holdings'
     if (location.pathname.includes('/transactions')) return 'activity'
-    return 'overview'
+    
+    // Otherwise use local state (strategy, watchlist, backtest)
+    return localTab
   }
   
-  const activeTab = location.pathname.includes('/holdings') || 
-                    location.pathname.includes('/orders') || 
-                    location.pathname.includes('/transactions')
-    ? getActiveTabFromUrl()
-    : localTab
+  const activeTab = getActiveTab()
   
   const handleTabChange = (tabId: string) => {
     // Update URL based on tab
