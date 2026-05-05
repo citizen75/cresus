@@ -179,40 +179,36 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
           </button>
         </div>
 
-        {/* Backtest Config */}
+        {/* Watchlist Config */}
         <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
-          <h3 className="text-white font-bold mb-4">Backtest</h3>
-          <div className="space-y-3">
-            {strategy.backtest?.initial_capital && (
-              <div>
-                <p className="text-slate-400 text-xs uppercase mb-1">Initial Capital</p>
-                <p className="text-white font-medium text-sm">€{strategy.backtest.initial_capital.toLocaleString()}</p>
-              </div>
-            )}
-            <div>
-              <p className="text-slate-400 text-xs uppercase mb-1">Status</p>
-              <p className="text-white font-medium text-sm">Configured</p>
+          <h3 className="text-white font-bold mb-4">Watchlist</h3>
+          {strategy.watchlist?.enabled ? (
+            <div className="space-y-3 text-xs">
+              {strategy.watchlist.parameters?.tickers && (
+                <div className="bg-slate-800/50 rounded p-2">
+                  <p className="text-slate-400 uppercase mb-1">Max Tickers</p>
+                  <p className="text-white font-medium">{strategy.watchlist.parameters.tickers.max_count}</p>
+                </div>
+              )}
+              {strategy.watchlist.parameters?.volume && (
+                <div className="bg-slate-800/50 rounded p-2">
+                  <p className="text-slate-400 uppercase mb-1">Min Volume</p>
+                  <p className="text-white font-medium">{strategy.watchlist.parameters.volume.min_volume?.toLocaleString()}</p>
+                </div>
+              )}
+              {strategy.watchlist.parameters?.ranking && (
+                <div className="bg-slate-800/50 rounded p-2">
+                  <p className="text-slate-400 uppercase mb-1">Ranking</p>
+                  <p className="text-white font-medium">{strategy.watchlist.parameters.ranking.metric}</p>
+                </div>
+              )}
             </div>
-          </div>
+          ) : (
+            <div className="text-slate-400 text-sm">Not configured</div>
+          )}
           <button className="w-full mt-4 px-4 py-2 text-purple-400 hover:text-purple-300 text-sm font-medium transition">
-            Edit backtest
+            Edit watchlist
           </button>
-        </div>
-      </div>
-
-      {/* Conditions Details */}
-      <div className="grid grid-cols-2 gap-6">
-        <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
-          <h3 className="text-white font-bold mb-4">Buy Conditions</h3>
-          <div className="text-slate-300 text-sm bg-slate-800/50 p-4 rounded font-mono break-all">
-            {strategy.buy_conditions}
-          </div>
-        </div>
-        <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
-          <h3 className="text-white font-bold mb-4">Sell Conditions</h3>
-          <div className="text-slate-300 text-sm bg-slate-800/50 p-4 rounded font-mono break-all">
-            {strategy.sell_conditions}
-          </div>
         </div>
       </div>
 
