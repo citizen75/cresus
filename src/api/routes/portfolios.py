@@ -6,6 +6,9 @@ from functools import lru_cache
 from typing import Dict, Any, Optional
 from datetime import datetime
 import pandas as pd
+import json
+import os
+from pathlib import Path
 
 from tools.portfolio.manager import PortfolioManager
 from tools.portfolio.metrics import PortfolioMetrics
@@ -32,11 +35,49 @@ def _get_metrics() -> PortfolioMetrics:
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
 
 
+def _get_portfolios_json_path() -> Path:
+    """Get path to portfolios.json file."""
+    project_root = Path(os.environ.get("CRESUS_PROJECT_ROOT", "."))
+    return project_root / "db" / "local" / "portfolios.json"
+
+
+def _load_portfolios_from_json() -> Dict[str, Any]:
+    """Load portfolios from db/local/portfolios.json."""
+    json_path = _get_portfolios_json_path()
+    
+    if not json_path.exists():
+        return {}
+    
+    try:
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+        return data
+    except Exception as e:
+        print(f"Error loading portfolios.json: {e}")
+        return {}
+
+
 @router.get("")
 async def list_portfolios():
-    """List all portfolios."""
-    pm = _get_portfolio_manager()
-    return {"portfolios": pm.list_portfolios()}
+    """List all portfolios from db/local/portfolios.json."""
+    data = _load_portfolios_from_json()
+    portfolios_dict = data.get("portfolios", {})
+    
+    # Convert dict to list format for API
+    portfolios_list = []
+    for name, portfolio_data in portfolios_dict.items():
+        portfolios_list.append({
+            "name": name,
+            "type": portfolio_data.get("type", "paper"),
+            "currency": portfolio_data.get("currency", "EUR"),
+            "description": portfolio_data.get("description", ""),
+            "initial_capital": portfolio_data.get("initial_capital", 0),
+            "cash": portfolio_data.get("metrics", {}).get("cash", 0),
+            "positions_count": portfolio_data.get("positions", {}).get("count", 0),
+            "updated_at": portfolio_data.get("updated_at", ""),
+        })
+    
+    return {"portfolios": portfolios_list}
 
 
 @router.get("/cache/all")
