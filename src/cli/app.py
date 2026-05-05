@@ -314,6 +314,9 @@ class CresusCLI(cmd2.Cmd):
 				if len(remaining) > 2:
 					# Third argument is end_date
 					input_data["end_date"] = remaining[2]
+			elif workflow_name.lower() in ["premarket", "transact"]:
+				# These workflows don't take tickers; strategy is sufficient
+				input_data = None
 			else:
 				# For other workflows, treat remaining items as tickers
 				tickers = remaining[1:] if len(remaining) > 1 else None
