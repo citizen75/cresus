@@ -29,13 +29,14 @@ class PreMarketFlow(Flow):
 	on the watchlist tickers for pre-market decision making.
 	"""
 
-	def __init__(self, strategy: str):
+	def __init__(self, strategy: str, context: Optional[Any] = None):
 		"""Initialize pre-market flow with strategy.
 
 		Args:
 			strategy: Strategy name to use for watchlist and signals
+			context: Optional AgentContext for shared state
 		"""
-		super().__init__(f"PreMarketFlow[{strategy}]")
+		super().__init__(f"PreMarketFlow[{strategy}]", context=context)
 		self.strategy_name = strategy
 		self._setup_default_steps()
 
@@ -66,8 +67,7 @@ class PreMarketFlow(Flow):
 		self.add_step(entry_order_agent, step_name="entry_order", required=False)
 
 		# Save watchlist step - persist watchlist to disk with OHLCV and signal data
-		save_agent = SaveWatchlistAgent("SaveWatchlistAgent", self.strategy_name)
-		save_agent.context = self.context
+		save_agent = SaveWatchlistAgent("SaveWatchlistAgent", self.strategy_name, context=self.context)
 		self.add_step(save_agent, step_name="save_watchlist", required=False)
 
 	def process(self, input_data: Optional[Dict[str, Any]] = None, save: bool = True) -> Dict[str, Any]:
