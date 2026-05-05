@@ -17,6 +17,7 @@ from agents.backtest.agent import BacktestAgent
 from flows.premarket import PreMarketFlow
 from flows.transact import TransactFlow
 from flows.postmarket import PostMarketFlow
+from agents.research.agent import ResearchAgent
 from tools.portfolio import PortfolioManager
 from tools.portfolio.metrics import PortfolioMetrics
 from tools.strategy.strategy import StrategyManager
@@ -138,6 +139,21 @@ class BacktestFlow(Flow):
 		)
 		# Merge metrics into output
 		backtest_output.update(metrics)
+
+		# Run research agent to identify issues
+		research_agent = ResearchAgent()
+		research_agent.context = self.context
+		research_result = research_agent.process()
+		research_output = research_result.get("output", {})
+		
+		# Add research findings to output
+		backtest_output["research"] = {
+			"journal_analysis": research_output.get("journal_analysis", {}),
+			"order_analysis": research_output.get("order_analysis", {}),
+			"identified_issues": research_output.get("identified_issues", []),
+			"severity_level": research_output.get("severity_level", "none"),
+			"issue_count": research_output.get("total_issues", 0),
+		}
 
 		return {
 			"status": "success",
