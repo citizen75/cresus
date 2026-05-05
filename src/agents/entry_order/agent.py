@@ -12,6 +12,7 @@ from agents.entry_order.sub_agents import (
 from tools.portfolio import PortfolioManager
 from tools.portfolio.broker import PaperBroker
 from tools.portfolio.journal import Journal
+from tools.portfolio.orders import Orders
 
 
 class EntryOrderAgent(Agent):
@@ -32,6 +33,7 @@ class EntryOrderAgent(Agent):
 		context: Optional[Any] = None,
 		sizing_method: str = "fractional",
 		risk_percent: float = 2.0,
+		execute: bool = False,
 	):
 		"""Initialize entry order agent.
 
@@ -40,10 +42,12 @@ class EntryOrderAgent(Agent):
 			context: AgentContext for shared state
 			sizing_method: Position sizing method ("fractional", "kelly", "volatility")
 			risk_percent: Risk percentage per trade (default 2%)
+			execute: Whether to execute orders immediately (default False - pending only)
 		"""
 		super().__init__(name, context)
 		self.sizing_method = sizing_method
 		self.risk_percent = risk_percent
+		self.execute = execute
 
 	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
 		"""Process entry recommendations into executable orders.
@@ -127,10 +131,10 @@ class EntryOrderAgent(Agent):
 		# Get final executable orders from context
 		executable_orders = self.context.get("executable_orders") or []
 
-		# Execute orders through broker if portfolio type is "paper"
+		# Execute orders through broker if execute=True and portfolio type is "paper"
 		execution_results = []
-		if executable_orders:
-			pm = PortfolioManager()
+		if executable_orders and self.execute:
+			pm = PortfolioManager(context=self.context.__dict__)
 			portfolio_config = self._get_portfolio_config(pm, portfolio_name)
 			portfolio_type = portfolio_config.get("type", "paper") if portfolio_config else "paper"
 
@@ -140,6 +144,35 @@ class EntryOrderAgent(Agent):
 					portfolio_name,
 					pm
 				)
+		elif executable_orders and not self.execute:
+			# Just save orders as pending without execution
+			orders_mgr = Orders(portfolio_name, context=self.context.__dict__)
+			for order in executable_orders:
+				# Use trading date from context if available (backtesting), otherwise current time
+				created_at = None
+				context_date = self.context.get("date")
+				if context_date:
+					from datetime import datetime
+					if isinstance(context_date, str):
+						created_at = f"{context_date}T09:00:00.000000"  # 9 AM pre-market
+					else:
+						created_at = f"{context_date.isoformat()}T09:00:00.000000"
+
+				metadata = order.get("metadata", {})
+				orders_mgr.add_order(
+					ticker=order.get("ticker"),
+					quantity=order.get("shares"),
+					entry_price=order.get("entry_price"),
+					stop_loss=order.get("stop_loss"),
+					take_profit=order.get("take_profit"),
+					execution_method=order.get("execution_method", "market"),
+					scale_count=order.get("scale_count", 1),
+					risk_amount=order.get("risk_amount"),
+					risk_reward=order.get("risk_reward"),
+					metadata=metadata,
+					created_at=created_at
+				)
+			self.logger.info(f"Created {len(executable_orders)} pending orders (not executed)")
 
 		return {
 			"status": "success",
@@ -214,7 +247,11 @@ class EntryOrderAgent(Agent):
 		portfolio_name: str,
 		pm: PortfolioManager
 	) -> list:
-		"""Execute orders through PaperBroker and record in journal.
+		"""Execute orders through PaperBroker.
+
+		Saves orders to Orders file first (pending status),
+		then updates to executed after broker execution,
+		and records filled trades in Journal transaction history.
 
 		Args:
 			orders: List of executable orders
@@ -226,10 +263,26 @@ class EntryOrderAgent(Agent):
 		"""
 		execution_results = []
 		broker = PaperBroker()
-		journal = Journal(portfolio_name)
+		orders_mgr = Orders(portfolio_name, context=self.context.__dict__)
+		journal = Journal(portfolio_name, context=self.context.__dict__)
 
 		try:
 			for order in orders:
+				# Save order to Orders file (pending status)
+				metadata = order.get("metadata", {})
+				order_id = orders_mgr.add_order(
+					ticker=order.get("ticker"),
+					quantity=order.get("shares"),
+					entry_price=order.get("entry_price"),
+					stop_loss=order.get("stop_loss"),
+					take_profit=order.get("take_profit"),
+					execution_method=order.get("execution_method", "market"),
+					scale_count=order.get("scale_count", 1),
+					risk_amount=order.get("risk_amount"),
+					risk_reward=order.get("risk_reward"),
+					metadata=metadata
+				)
+
 				# Convert order format for broker
 				broker_order = {
 					"ticker": order.get("ticker"),
@@ -238,14 +291,14 @@ class EntryOrderAgent(Agent):
 					"price": order.get("entry_price"),
 					"stop_loss": order.get("stop_loss"),
 					"target_price": order.get("take_profit"),
-					"strategy_id": order.get("metadata", {}).get("strategy", "unknown"),
+					"strategy_id": metadata.get("strategy", "unknown"),
 				}
 
 				# Execute through broker
 				result = broker.execute_order(broker_order)
 
 				execution_results.append({
-					"order_id": order.get("id"),
+					"order_id": order_id,
 					"ticker": order.get("ticker"),
 					"shares": order.get("shares"),
 					"entry_price": order.get("entry_price"),
@@ -255,20 +308,21 @@ class EntryOrderAgent(Agent):
 					"reason": result.reason,
 				})
 
-				# Record in journal if filled
+				# Update order status based on execution
 				if result.status == "filled":
-					# Build detailed notes with order information
-					import json
-					order_details = {
-						"strategy": broker_order['strategy_id'],
-						"entry_score": float(order.get('metadata', {}).get('entry_score', 0)),
-						"execution_method": order.get("execution_method", "market"),
-						"stop_loss": order.get("stop_loss"),
-						"take_profit": order.get("take_profit"),
-						"risk_amount": order.get("risk_amount"),
-						"risk_reward": order.get("risk_reward"),
-					}
-					notes = json.dumps(order_details)
+					# Update order status to executed
+					orders_mgr.update_order_status(order_id, "executed")
+
+					# Record transaction in journal (what actually happened)
+					# Use trading date from context if available (backtesting), otherwise current time
+					created_at = None
+					context_date = self.context.get("date")
+					if context_date:
+						from datetime import datetime
+						if isinstance(context_date, str):
+							created_at = f"{context_date}T14:00:00.000000"  # Use 2 PM as market close
+						else:
+							created_at = f"{context_date.isoformat()}T14:00:00.000000"
 
 					journal.add_transaction(
 						operation="BUY",
@@ -276,13 +330,16 @@ class EntryOrderAgent(Agent):
 						quantity=result.filled_quantity,
 						price=result.filled_price,
 						fees=0,  # Paper trading has no fees
-						notes=notes
+						notes=f"Order {order_id}: {metadata.get('strategy', 'unknown')}",
+						created_at=created_at
 					)
 
 					self.logger.info(
 						f"Executed {result.filled_quantity} {order.get('ticker')} @ ${result.filled_price:.2f}"
 					)
 				else:
+					# Update order status to rejected
+					orders_mgr.update_order_status(order_id, "rejected")
 					self.logger.warning(f"Order rejected: {result.reason}")
 
 			# Update portfolio cache after execution

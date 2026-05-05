@@ -12,6 +12,8 @@ if str(src_path) not in sys.path:
 from flows.watchlist import WatchlistFlow
 from flows.signals import SignalsFlow
 from flows.premarket import PreMarketFlow
+from flows.transact import TransactFlow
+from flows.backtest import BacktestFlow
 from tools.strategy.strategy import StrategyManager
 from tools.universe.universe import Universe
 
@@ -134,11 +136,60 @@ class FlowManager:
 				}
 
 			return result
+
+		elif workflow_name.lower() == "transact":
+			# Transaction flow - execute pending orders on a date
+			# Default to today if no date provided
+			from datetime import date
+
+			flow_input = input_data or {}
+			if "date" not in flow_input or not flow_input["date"]:
+				flow_input["date"] = date.today().isoformat()
+
+			# Use strategy as portfolio name if provided
+			if strategy and strategy != "default":
+				flow_input["portfolio_name"] = strategy
+
+			flow = TransactFlow()
+			result = flow.process(flow_input)
+
+			# Include context if requested
+			if include_context:
+				result["_context"] = {
+					key: value for key, value in flow.context.__dict__.items()
+					if not key.startswith("_") and key != "logger"
+				}
+
+			return result
+
+		elif workflow_name.lower() == "backtest":
+			# Backtest flow - simulate strategy over a date range
+			flow_input = input_data or {}
+			flow_input["strategy"] = strategy if strategy and strategy != "default" else flow_input.get("strategy")
+
+			if not flow_input.get("strategy"):
+				return {
+					"status": "error",
+					"message": "strategy parameter required for backtest"
+				}
+
+			flow = BacktestFlow()
+			result = flow.process(flow_input)
+
+			# Include context if requested
+			if include_context:
+				result["_context"] = {
+					key: value for key, value in flow.context.__dict__.items()
+					if not key.startswith("_") and key != "logger"
+				}
+
+			return result
+
 		else:
 			return {
 				"status": "error",
 				"message": f"Unknown workflow: {workflow_name}",
-				"available": ["signals", "watchlist", "premarket"]
+				"available": ["signals", "watchlist", "premarket", "transact", "backtest"]
 			}
 
 	def list_workflows(self) -> Dict[str, Any]:
@@ -164,6 +215,16 @@ class FlowManager:
 					"name": "premarket",
 					"description": "Pre-market analysis: watchlist generation + signal analysis",
 					"parameters": ["strategy"]
+				},
+				{
+					"name": "transact",
+					"description": "Execute pending orders on a specific trading date",
+					"parameters": ["date", "portfolio_name"]
+				},
+				{
+					"name": "backtest",
+					"description": "Backtest strategy over a date range (pre-market → transact daily)",
+					"parameters": ["strategy", "start_date", "end_date"]
 				}
 			]
 		}

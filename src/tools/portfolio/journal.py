@@ -16,12 +16,37 @@ class Journal:
         "price", "amount", "fees", "status", "status_at", "notes"
     ]
 
-    def __init__(self, name: str = "default"):
+    def __init__(self, name: str = "default", context: Optional[Dict[str, Any]] = None):
         project_root = Path(os.environ.get("CRESUS_PROJECT_ROOT", os.getcwd()))
-        self.filepath = project_root / "db" / "local" / "portfolios" / f"{name}_journal.csv"
+        # Normalize portfolio name to lowercase snake_case
+        normalized_name = self._normalize_name(name)
+
+        # Check if running in backtest context
+        backtest_dir = None
+        if context:
+            backtest_dir = context.get("backtest_dir")
+
+        if backtest_dir:
+            # Use sandboxed backtest directory
+            self.filepath = Path(backtest_dir) / "portfolios" / f"{normalized_name}_journal.csv"
+        else:
+            # Use normal directory
+            self.filepath = project_root / "db" / "local" / "portfolios" / f"{normalized_name}_journal.csv"
+
         self.filepath.parent.mkdir(parents=True, exist_ok=True)
-        self.name = name
+        self.name = normalized_name
         self._ensure_base_structure()
+
+    @staticmethod
+    def _normalize_name(name: str) -> str:
+        """Normalize portfolio name to lowercase snake_case.
+
+        Examples:
+            "Momentum cac" → "momentum_cac"
+            "PEA Gilles" → "pea_gilles"
+            "momentum_cac" → "momentum_cac"
+        """
+        return name.lower().replace(" ", "_")
 
     def _ensure_base_structure(self) -> None:
         """Ensure journal file exists with correct columns."""
@@ -49,6 +74,11 @@ class Journal:
         Returns the transaction ID.
         """
         df = self.load_df()
+
+        # Ensure DataFrame has the correct columns even if empty
+        for col in self.BASE_COLUMNS:
+            if col not in df.columns:
+                df[col] = None
 
         transaction_id = str(uuid.uuid4())[:8]
         now = datetime.now().isoformat()
@@ -83,7 +113,12 @@ class Journal:
             "notes": notes
         }
 
-        df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+        import warnings
+        new_df = pd.DataFrame([new_row])
+        # Suppress FutureWarning about DataFrame concatenation with empty/NA entries
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=FutureWarning)
+            df = pd.concat([df, new_df], ignore_index=True)
         self.save(df)
         return transaction_id
 

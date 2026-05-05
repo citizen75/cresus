@@ -22,14 +22,27 @@ class PortfolioManager:
         config_path: Optional[Path] = None,
         orders_dir: Optional[Path] = None,
         in_memory: bool = False,
+        context: Optional[Dict[str, Any]] = None,
     ):
         project_root = Path(os.environ.get("CRESUS_PROJECT_ROOT", os.getcwd()))
-        self.portfolios_dir = Path(portfolios_dir or project_root / "db/local/portfolios")
+        self.context = context or {}
+
+        # Check if running in backtest context
+        backtest_dir = self.context.get("backtest_dir")
+
+        if backtest_dir:
+            # Use sandboxed backtest directory
+            self.portfolios_dir = Path(portfolios_dir or Path(backtest_dir) / "portfolios")
+            self.orders_dir = Path(orders_dir or Path(backtest_dir) / "orders")
+        else:
+            # Use normal directory
+            self.portfolios_dir = Path(portfolios_dir or project_root / "db/local/portfolios")
+            self.orders_dir = Path(orders_dir or project_root / "db/local/orders")
+
         self.config_path = Path(config_path or project_root / "config/portfolios.yml")
-        self.orders_dir = Path(orders_dir or project_root / "db/local/orders")
         self.portfolios_dir.mkdir(parents=True, exist_ok=True)
         self.orders_dir.mkdir(parents=True, exist_ok=True)
-        self.cache = PortfolioCache()
+        self.cache = PortfolioCache(context=self.context)
 
     def list_portfolios(self) -> List[Dict[str, Any]]:
         """List all portfolios with metrics."""
@@ -38,7 +51,7 @@ class PortfolioManager:
             config = yaml.safe_load(self.config_path.read_text())
             for p in config.get("portfolios", []):
                 name = p.get("name")
-                journal = Journal(name)
+                journal = Journal(name, context=self.context)
                 df = journal.load_df()
                 open_pos = journal.get_open_positions()
                 completed = df[df["status"] == "completed"]
@@ -73,7 +86,7 @@ class PortfolioManager:
                             return {"status": "error", "message": f"Portfolio '{name}' already exists"}
 
             # Create journal file
-            journal = Journal(name)
+            journal = Journal(name, context=self.context)
             if not journal.filepath.exists():
                 journal._ensure_base_structure()
 
@@ -129,7 +142,7 @@ class PortfolioManager:
                     yaml.dump(config, f)
 
             # Delete journal file
-            journal = Journal(name)
+            journal = Journal(name, context=self.context)
             if journal.filepath.exists():
                 journal.filepath.unlink()
 
@@ -146,7 +159,7 @@ class PortfolioManager:
 
     def get_portfolio_details(self, name: str) -> Optional[Dict[str, Any]]:
         """Get portfolio with positions."""
-        journal = Journal(name)
+        journal = Journal(name, context=self.context)
         df = journal.load_df()
 
         positions = []
@@ -179,7 +192,7 @@ class PortfolioManager:
 
     def get_portfolio_positions(self, name: str) -> Optional[Dict[str, Any]]:
         """Get open positions."""
-        journal = Journal(name)
+        journal = Journal(name, context=self.context)
         open_pos = journal.get_open_positions()
         positions = []
         for _, row in open_pos.iterrows():
@@ -197,7 +210,7 @@ class PortfolioManager:
 
     def get_portfolio_performance(self, name: str) -> Optional[Dict[str, Any]]:
         """Get performance metrics."""
-        journal = Journal(name)
+        journal = Journal(name, context=self.context)
         df = journal.load_df()
 
         if df.empty:
@@ -235,7 +248,7 @@ class PortfolioManager:
                     break
 
         # Calculate cash from transactions
-        journal = Journal(name)
+        journal = Journal(name, context=self.context)
         df = journal.load_df()
 
         if df.empty:
@@ -358,7 +371,7 @@ class PortfolioManager:
 
         CASH operations: ticker should be "CASH", quantity is the amount (positive=deposit, negative=withdrawal)
         """
-        journal = Journal(portfolio_name)
+        journal = Journal(portfolio_name, context=self.context)
         operation_upper = operation.upper()
 
         if operation_upper not in ("BUY", "SELL", "CASH"):

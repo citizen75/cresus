@@ -78,62 +78,37 @@ async def delete_portfolio(name: str):
 
 @router.get("/{name}/orders")
 async def get_portfolio_orders(name: str):
-    """Get current orders for a portfolio from recent buy transactions."""
-    from tools.portfolio.journal import Journal
+    """Get orders for a portfolio (pending, executed, rejected)."""
+    from tools.portfolio.orders import Orders
 
     try:
-        journal = Journal(name)
-        df = journal.load_df()
+        orders_mgr = Orders(name)
+        all_orders = orders_mgr.to_orders()
 
-        if df is None or df.empty:
+        if not all_orders:
             return {"orders": [], "count": 0}
 
-        # Get recent BUY orders (transactions)
-        buy_orders = df[df["operation"].str.upper() == "BUY"].copy()
-
-        if buy_orders.empty:
-            return {"orders": [], "count": 0}
-
-        # Convert to order format
+        # Convert to API format
         orders = []
-        for _, row in buy_orders.iterrows():
-            # Try to parse order details from notes (JSON format)
-            order_details = {}
-            notes_str = str(row.get("notes", ""))
-
-            if notes_str:
-                try:
-                    import json
-                    # Handle double-escaped quotes from CSV
-                    if '""' in notes_str:
-                        notes_str = notes_str.replace('""', '"')
-                    # Try JSON parsing first (new format)
-                    if notes_str.startswith("{"):
-                        order_details = json.loads(notes_str)
-                except Exception:
-                    # If JSON parsing fails, try old format (Strategy: ... | Entry Score: ...)
-                    pass
-
-            order = {
-                "id": str(row.get("id", ""))[:8],  # Truncate ID
-                "ticker": str(row.get("ticker", "")),
-                "shares": int(row.get("quantity", 0)),
-                "entryPrice": float(row.get("price", 0)),
-                "executionMethod": order_details.get("execution_method", "market"),
-                "stopLoss": order_details.get("stop_loss"),
-                "takeProfit": order_details.get("take_profit"),
-                "riskAmount": order_details.get("risk_amount"),
-                "riskReward": order_details.get("risk_reward"),
-                "status": "FILLED",  # Executed orders are filled
-                "filledQuantity": int(row.get("quantity", 0)),
-                "filledPrice": float(row.get("price", 0)),
-                "executedAt": str(row.get("created_at", "")),
-                "reason": notes_str if order_details.get("strategy") is None else order_details.get("strategy", ""),
+        for order in all_orders:
+            api_order = {
+                "id": order["id"][:8],  # Truncate ID
+                "ticker": order["ticker"],
+                "shares": order["quantity"],
+                "entryPrice": order["entry_price"],
+                "executionMethod": order["execution_method"],
+                "stopLoss": order["stop_loss"],
+                "takeProfit": order["take_profit"],
+                "riskAmount": order["risk_amount"],
+                "riskReward": order["risk_reward"],
+                "status": order["status"].upper(),
+                "createdAt": order["created_at"],
+                "metadata": order["metadata"],
             }
-            orders.append(order)
+            orders.append(api_order)
 
         # Sort by date descending (most recent first)
-        orders.sort(key=lambda x: x["executedAt"], reverse=True)
+        orders.sort(key=lambda x: x["createdAt"], reverse=True)
 
         return {"orders": orders, "count": len(orders)}
 

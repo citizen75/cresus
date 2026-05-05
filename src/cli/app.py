@@ -208,6 +208,7 @@ class CresusCLI(cmd2.Cmd):
 			table.add_row("data fetch history <ticker> [start_date]", "Fetch historical data")
 			table.add_row("data fetch fundamental <ticker>", "Fetch fundamental data")
 			table.add_row("data fetch universe <name> [start_date]", "Fetch all tickers in universe")
+			table.add_row("data fetch all <universe> [start_date]", "Fetch history + fundamental for universe")
 			table.add_row("data list [history|fundamentals|all]", "List cached data")
 			table.add_row("data clear [type] [ticker]", "Clear cache (types: history, fundamentals, all)")
 			table.add_row("data stats", "Show cache statistics")
@@ -220,7 +221,7 @@ class CresusCLI(cmd2.Cmd):
 
 		if cmd == "fetch":
 			if len(parts) < 3:
-				console.print("[red]✗[/red] Usage: data fetch <history|fundamental|universe> <ticker|name> [start_date]")
+				console.print("[red]✗[/red] Usage: data fetch <history|fundamental|universe|all> <ticker|name|universe> [start_date]")
 				return
 			data_type = parts[1]
 			target = parts[2]
@@ -234,6 +235,9 @@ class CresusCLI(cmd2.Cmd):
 				self._print_result(result)
 			elif data_type == "universe":
 				result = self.data_manager.fetch_universe(target, start_date)
+				self._print_universe_result(result)
+			elif data_type == "all":
+				result = self.data_manager.fetch_all(target, start_date)
 				self._print_universe_result(result)
 			else:
 				console.print(f"[red]✗[/red] Unknown data type: {data_type}")
@@ -269,8 +273,10 @@ class CresusCLI(cmd2.Cmd):
 			table.add_column("Command", style="cyan")
 			table.add_column("Description")
 			table.add_row("flow list", "List available workflows")
+			table.add_row("flow run premarket <strategy>", "Generate pending orders")
+			table.add_row("flow run transact <portfolio> [date]", "Execute pending orders (default: today)")
+			table.add_row("flow run backtest <strategy> [start] [end]", "Backtest strategy over date range")
 			table.add_row("flow run <workflow> [strategy] [tickers...]", "Run a workflow")
-			table.add_row("flow run watchlist [strategy]", "Run watchlist workflow with default tickers")
 			table.add_row("flow run <workflow> [strategy] [--context]", "Run workflow and display context")
 			console.print(table)
 			return

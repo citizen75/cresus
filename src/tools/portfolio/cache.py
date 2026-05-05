@@ -11,9 +11,21 @@ from loguru import logger
 class PortfolioCache:
     """Manage cached portfolio metrics."""
 
-    def __init__(self, cache_path: Optional[Path] = None):
+    def __init__(self, cache_path: Optional[Path] = None, context: Optional[Dict[str, Any]] = None):
         project_root = Path(os.environ.get("CRESUS_PROJECT_ROOT", os.getcwd()))
-        self.cache_path = Path(cache_path or project_root / "db/local/portfolios.json")
+
+        # Check if running in backtest context
+        backtest_dir = None
+        if context:
+            backtest_dir = context.get("backtest_dir")
+
+        if backtest_dir:
+            # Use sandboxed backtest directory
+            self.cache_path = Path(backtest_dir) / "portfolios.json"
+        else:
+            # Use normal directory
+            self.cache_path = Path(cache_path or project_root / "db/local/portfolios.json")
+
         self.cache_path.parent.mkdir(parents=True, exist_ok=True)
 
     def _load_cache(self) -> Dict[str, Any]:

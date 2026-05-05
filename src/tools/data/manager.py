@@ -184,6 +184,64 @@ class DataManager:
                 "message": str(e),
             }
 
+    def fetch_all(self, universe_name: str, start_date: str = None) -> Dict[str, Any]:
+        """Fetch both historical and fundamental data for all tickers in a universe."""
+        try:
+            universe = Universe(universe_name)
+            if not universe.exists():
+                return {
+                    "status": "error",
+                    "message": f"Universe '{universe_name}' not found",
+                    "available": Universe.list_universes(),
+                }
+
+            tickers = universe.get_tickers()
+            if not tickers:
+                return {
+                    "status": "error",
+                    "message": f"No tickers found in universe '{universe_name}'",
+                }
+
+            results = {
+                "status": "success",
+                "universe": universe_name,
+                "total": len(tickers),
+                "history_fetched": 0,
+                "history_failed": 0,
+                "fundamental_fetched": 0,
+                "fundamental_failed": 0,
+                "details": [],
+            }
+
+            for ticker in tickers:
+                # Fetch history
+                history_result = self.fetch_history(ticker, start_date)
+                if history_result.get("status") == "success":
+                    results["history_fetched"] += 1
+                else:
+                    results["history_failed"] += 1
+
+                # Fetch fundamental
+                fundamental_result = self.fetch_fundamental(ticker)
+                if fundamental_result.get("status") == "success":
+                    results["fundamental_fetched"] += 1
+                else:
+                    results["fundamental_failed"] += 1
+
+                results["details"].append({
+                    "ticker": ticker,
+                    "history": history_result.get("status"),
+                    "fundamental": fundamental_result.get("status"),
+                })
+
+            results["message"] = f"Fetched history for {results['history_fetched']}/{results['total']} tickers and fundamental for {results['fundamental_fetched']}/{results['total']} tickers from {universe_name}"
+            return results
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": str(e),
+            }
+
     def list_cached(self, data_type: str = "all") -> Dict[str, Any]:
         """List cached data files."""
         try:

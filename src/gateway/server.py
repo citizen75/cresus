@@ -147,7 +147,7 @@ class GatewayServer:
 
 				# Block until shutdown
 				while self.running and self.cron_scheduler.is_running():
-					threading.Event().wait(1)
+					time.sleep(1)
 
 		except Exception as e:
 			logger.error(f"Cron scheduler failed: {e}", exc_info=True)

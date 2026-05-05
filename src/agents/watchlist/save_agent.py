@@ -12,14 +12,15 @@ class SaveWatchlistAgent(Agent):
 	and persists to CSV via WatchlistManager with optional toggle.
 	"""
 
-	def __init__(self, name: str = "SaveWatchlistAgent", strategy_name: str = ""):
+	def __init__(self, name: str = "SaveWatchlistAgent", strategy_name: str = "", context: Optional[Any] = None):
 		"""Initialize save watchlist agent.
 
 		Args:
 			name: Agent name
 			strategy_name: Strategy name for WatchlistManager
+			context: Optional AgentContext for shared state
 		"""
-		super().__init__(name)
+		super().__init__(name, context)
 		self.strategy_name = strategy_name
 
 	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -60,8 +61,11 @@ class SaveWatchlistAgent(Agent):
 				"message": "No ticker scores to save"
 			}
 
+		# Get backtest_dir from context if available (for sandboxed backtesting)
+		backtest_dir = self.context.get("backtest_dir") if self.context else None
+
 		# Use WatchlistManager to handle saving
-		watchlist_manager = WatchlistManager(self.strategy_name)
+		watchlist_manager = WatchlistManager(self.strategy_name, backtest_dir=backtest_dir)
 		save_result = watchlist_manager.process(
 			watchlist=watchlist,
 			ticker_scores=ticker_scores,

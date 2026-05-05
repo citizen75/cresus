@@ -164,6 +164,7 @@ class BacktestAgent(Agent):
 		backtest["total_trading_days"] = len(trading_days)
 
 		# Main backtest loop: pre_market → [increment] → market → post_market
+		portfolio_name = self.context.get("portfolio_name") or "default"
 		for i, current_date in enumerate(trading_days[:-1]):
 			next_date = trading_days[i + 1]
 
@@ -174,6 +175,7 @@ class BacktestAgent(Agent):
 				self.pre_market_flow.process({
 					"date": current_date.isoformat(),
 					"strategy_name": strategy_name,
+					"portfolio_name": portfolio_name,
 				})
 
 			# Increment to next trading day
@@ -185,6 +187,7 @@ class BacktestAgent(Agent):
 				self.market_flow.process({
 					"date": next_date.isoformat(),
 					"strategy_name": strategy_name,
+					"portfolio_name": portfolio_name,
 				})
 
 			# Post-market phase: update after close
@@ -193,6 +196,7 @@ class BacktestAgent(Agent):
 				self.post_market_flow.process({
 					"date": next_date.isoformat(),
 					"strategy_name": strategy_name,
+					"portfolio_name": portfolio_name,
 				})
 
 			backtest["daily_results"].append({"date": next_date.isoformat()})

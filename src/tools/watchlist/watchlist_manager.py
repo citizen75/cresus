@@ -26,15 +26,23 @@ class WatchlistManager:
 	Files are stored as CSV in db/local/watchlist/<strategy_name>.csv
 	"""
 
-	def __init__(self, strategy_name: str):
+	def __init__(self, strategy_name: str, backtest_dir: Optional[str] = None):
 		"""Initialize watchlist manager for a strategy.
 
 		Args:
 			strategy_name: Name of the strategy
+			backtest_dir: Optional backtest directory for sandboxed backtesting
 		"""
 		self.strategy_name = strategy_name
 		project_root = _get_project_root()
-		self.watchlist_dir = project_root / "db" / "local" / "watchlist"
+
+		if backtest_dir:
+			# Use sandboxed backtest directory
+			self.watchlist_dir = Path(backtest_dir) / "watchlist"
+		else:
+			# Use normal directory
+			self.watchlist_dir = project_root / "db" / "local" / "watchlist"
+
 		self.watchlist_dir.mkdir(parents=True, exist_ok=True)
 		self.filepath = self.watchlist_dir / f"{strategy_name}.csv"
 
