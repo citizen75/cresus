@@ -16,6 +16,7 @@ export default function App() {
           <Route path="/" element={<Layout><Dashboard /></Layout>} />
           <Route path="/portfolios" element={<Layout><Portfolios /></Layout>} />
           <Route path="/portfolios/:name" element={<Layout><PortfolioDetail /></Layout>} />
+          <Route path="/portfolios/:name/orders" element={<Layout><PortfolioDetail /></Layout>} />
           <Route path="/portfolios/:name/holdings" element={<Layout><HoldingsPage /></Layout>} />
           <Route path="/portfolios/:name/holdings/transactions" element={<Layout><TransactionsPage /></Layout>} />
           <Route path="/portfolios/:name/transactions" element={<Layout><TransactionsPage /></Layout>} />

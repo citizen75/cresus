@@ -1,5 +1,5 @@
-import { useParams, Link } from 'react-router-dom'
-import { useState } from 'react'
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import PortfolioOverview from '@/components/portfolio/PortfolioOverview'
 import StrategyBuilder from '@/components/portfolio/StrategyBuilder'
 import AIWatchlist from '@/components/portfolio/AIWatchlist'
@@ -18,7 +18,39 @@ const TABS = [
 
 export default function PortfolioDetail() {
   const { name = 'main' } = useParams()
-  const [activeTab, setActiveTab] = useState('overview')
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [localTab, setLocalTab] = useState('overview')
+  
+  // Detect active tab from URL
+  const getActiveTabFromUrl = () => {
+    if (location.pathname.includes('/orders')) return 'orders'
+    if (location.pathname.includes('/holdings')) return 'holdings'
+    if (location.pathname.includes('/transactions')) return 'activity'
+    return 'overview'
+  }
+  
+  const activeTab = location.pathname.includes('/holdings') || 
+                    location.pathname.includes('/orders') || 
+                    location.pathname.includes('/transactions')
+    ? getActiveTabFromUrl()
+    : localTab
+  
+  const handleTabChange = (tabId: string) => {
+    // Update URL based on tab
+    if (tabId === 'overview') {
+      navigate(`/portfolios/${encodeURIComponent(name)}`)
+    } else if (tabId === 'holdings') {
+      navigate(`/portfolios/${encodeURIComponent(name)}/holdings`)
+    } else if (tabId === 'orders') {
+      navigate(`/portfolios/${encodeURIComponent(name)}/orders`)
+    } else if (tabId === 'activity') {
+      navigate(`/portfolios/${encodeURIComponent(name)}/transactions`)
+    } else {
+      // For other tabs (strategy, watchlist, backtest), keep them as local state
+      setLocalTab(tabId)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -65,22 +97,28 @@ export default function PortfolioDetail() {
       <div className="border-b border-slate-800">
         <div className="flex gap-8 overflow-x-auto">
           {TABS.map((tab) => {
-            if (tab.id === 'holdings') {
+            // Tabs with routing
+            if (['overview', 'orders', 'holdings', 'activity'].includes(tab.id)) {
               return (
-                <Link
+                <button
                   key={tab.id}
-                  to={`/portfolios/${encodeURIComponent(name)}/holdings`}
-                  className="px-1 py-4 font-medium text-sm transition border-b-2 whitespace-nowrap border-transparent text-slate-400 hover:text-slate-300"
+                  onClick={() => handleTabChange(tab.id)}
+                  className={`px-1 py-4 font-medium text-sm transition border-b-2 whitespace-nowrap ${
+                    activeTab === tab.id
+                      ? 'border-purple-600 text-white'
+                      : 'border-transparent text-slate-400 hover:text-slate-300'
+                  }`}
                 >
                   {tab.label}
-                </Link>
+                </button>
               )
             }
-
+            
+            // Tabs without routing (local state only)
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => setLocalTab(tab.id)}
                 className={`px-1 py-4 font-medium text-sm transition border-b-2 whitespace-nowrap ${
                   activeTab === tab.id
                     ? 'border-purple-600 text-white'

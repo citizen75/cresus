@@ -127,8 +127,10 @@ export default function OrdersView({ name }: OrdersViewProps) {
   const paginatedItems = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
 
   const getStatusColor = (status: string) => {
-    if (status.toLowerCase() === 'filled') return 'bg-green-900/30 text-green-400'
-    if (status.toLowerCase() === 'pending') return 'bg-yellow-900/30 text-yellow-400'
+    const lowerStatus = status.toLowerCase()
+    if (lowerStatus === 'executed' || lowerStatus === 'filled') return 'bg-green-900/30 text-green-400'
+    if (lowerStatus === 'pending') return 'bg-yellow-900/30 text-yellow-400'
+    if (lowerStatus === 'rejected') return 'bg-red-900/30 text-red-400'
     return 'bg-slate-800/30 text-slate-400'
   }
 
@@ -164,9 +166,10 @@ export default function OrdersView({ name }: OrdersViewProps) {
             className="px-4 py-2 bg-slate-900 border border-slate-800 rounded-lg text-white focus:border-purple-600 outline-none transition"
           >
             <option>All</option>
-            <option>Filled</option>
+            <option>Executed</option>
             <option>Pending</option>
             <option>Rejected</option>
+            <option>Filled</option>
           </select>
 
           <select
