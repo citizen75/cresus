@@ -1,14 +1,18 @@
 import axios, { AxiosInstance } from 'axios'
 
 export function getApiBaseUrl(): string {
-  // Priority: env var > current window origin
+  // Priority: env var > construct from hostname with API port
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL
   }
-  // Use current domain (frontend host)
+  
+  // Use same hostname as frontend, but API port (8000)
   if (typeof window !== 'undefined') {
-    return window.location.origin
+    const hostname = window.location.hostname
+    // For localhost, use port 8000; for other hosts (192.168.x.x, etc), use port 8000
+    return `http://${hostname}:8000`
   }
+  
   return 'http://localhost:8000'
 }
 
