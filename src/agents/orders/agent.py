@@ -95,7 +95,12 @@ class OrdersAgent(Agent):
 			pending_orders = df[pending_mask]
 
 			if pending_orders.empty:
-				self.logger.debug("No pending orders to check for expiration")
+				total_orders = len(df)
+				status_summary = df["status"].value_counts().to_dict()
+				self.logger.info(
+					f"No pending orders to expire. Total orders: {total_orders}, "
+					f"Status breakdown: {status_summary}"
+				)
 				return expired_results
 
 			# Parse created_at timestamps and check age

@@ -1,5 +1,4 @@
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom'
-import { useState } from 'react'
 import PortfolioOverview from '@/components/portfolio/PortfolioOverview'
 import StrategyBuilder from '@/components/portfolio/StrategyBuilder'
 import AIWatchlist from '@/components/portfolio/AIWatchlist'
@@ -20,34 +19,39 @@ export default function PortfolioDetail() {
   const { name = 'main' } = useParams()
   const location = useLocation()
   const navigate = useNavigate()
-  const [localTab, setLocalTab] = useState('overview')
   
-  // Detect active tab - prioritize URL-based tabs, fallback to local state
+  // Detect active tab from URL path
   const getActiveTab = () => {
     // Check URL for routed tabs
+    if (location.pathname.includes('/strategy')) return 'strategy'
+    if (location.pathname.includes('/watchlist')) return 'watchlist'
+    if (location.pathname.includes('/backtest')) return 'backtest'
     if (location.pathname.includes('/orders')) return 'orders'
     if (location.pathname.includes('/holdings')) return 'holdings'
     if (location.pathname.includes('/transactions')) return 'activity'
     
-    // Otherwise use local state (strategy, watchlist, backtest)
-    return localTab
+    // Default to overview if no tab path segment found
+    return 'overview'
   }
   
   const activeTab = getActiveTab()
   
   const handleTabChange = (tabId: string) => {
-    // Update URL based on tab
+    // Route all tabs through URL
     if (tabId === 'overview') {
       navigate(`/portfolios/${encodeURIComponent(name)}`)
-    } else if (tabId === 'holdings') {
-      navigate(`/portfolios/${encodeURIComponent(name)}/holdings`)
+    } else if (tabId === 'strategy') {
+      navigate(`/portfolios/${encodeURIComponent(name)}/strategy`)
+    } else if (tabId === 'watchlist') {
+      navigate(`/portfolios/${encodeURIComponent(name)}/watchlist`)
+    } else if (tabId === 'backtest') {
+      navigate(`/portfolios/${encodeURIComponent(name)}/backtest`)
     } else if (tabId === 'orders') {
       navigate(`/portfolios/${encodeURIComponent(name)}/orders`)
+    } else if (tabId === 'holdings') {
+      navigate(`/portfolios/${encodeURIComponent(name)}/holdings`)
     } else if (tabId === 'activity') {
       navigate(`/portfolios/${encodeURIComponent(name)}/transactions`)
-    } else {
-      // For other tabs (strategy, watchlist, backtest), keep them as local state
-      setLocalTab(tabId)
     }
   }
 
@@ -95,39 +99,19 @@ export default function PortfolioDetail() {
       {/* Tab Navigation */}
       <div className="border-b border-slate-800">
         <div className="flex gap-8 overflow-x-auto">
-          {TABS.map((tab) => {
-            // Tabs with routing
-            if (['overview', 'orders', 'holdings', 'activity'].includes(tab.id)) {
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => handleTabChange(tab.id)}
-                  className={`px-1 py-4 font-medium text-sm transition border-b-2 whitespace-nowrap ${
-                    activeTab === tab.id
-                      ? 'border-purple-600 text-white'
-                      : 'border-transparent text-slate-400 hover:text-slate-300'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              )
-            }
-            
-            // Tabs without routing (local state only)
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setLocalTab(tab.id)}
-                className={`px-1 py-4 font-medium text-sm transition border-b-2 whitespace-nowrap ${
-                  activeTab === tab.id
-                    ? 'border-purple-600 text-white'
-                    : 'border-transparent text-slate-400 hover:text-slate-300'
-                }`}
-              >
-                {tab.label}
-              </button>
-            )
-          })}
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => handleTabChange(tab.id)}
+              className={`px-1 py-4 font-medium text-sm transition border-b-2 whitespace-nowrap ${
+                activeTab === tab.id
+                  ? 'border-purple-600 text-white'
+                  : 'border-transparent text-slate-400 hover:text-slate-300'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 
