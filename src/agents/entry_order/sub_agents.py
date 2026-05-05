@@ -347,7 +347,7 @@ class RiskGuardAgent(Agent):
 
 		# Get portfolio state
 		portfolio_name = self.context.get("portfolio_name") or "default"
-		pm = PortfolioManager()
+		pm = PortfolioManager(context=self.context.__dict__)
 		portfolio_details = pm.get_portfolio_details(portfolio_name)
 		cash = pm.get_portfolio_cash(portfolio_name)
 		allocation = pm.get_portfolio_allocation(portfolio_name)
@@ -536,10 +536,20 @@ class OrderConstructionAgent(Agent):
 		return hashlib.md5(id_str.encode()).hexdigest()[:12]
 
 	def _get_timestamp(self) -> str:
-		"""Get current ISO timestamp.
+		"""Get ISO timestamp - uses context date if set (for backtesting), otherwise current time.
 
 		Returns:
 			ISO timestamp string
 		"""
 		from datetime import datetime
+
+		# Use context date if available (backtesting scenario)
+		context_date = self.context.get("date")
+		if context_date:
+			if isinstance(context_date, str):
+				return f"{context_date}T09:00:00.000000"  # Use 9 AM as trading day start
+			else:
+				return f"{context_date.isoformat()}T09:00:00.000000"
+
+		# Fall back to current time
 		return datetime.utcnow().isoformat()
