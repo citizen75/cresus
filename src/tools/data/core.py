@@ -226,7 +226,7 @@ class DataHistory:
 
 			logger.info(f"  Fetching {self.ticker} from {fetch_start} to {fetch_end}")
 			ticker_obj = yf.Ticker(self.ticker)
-			df_new = ticker_obj.history(start=fetch_start, end=fetch_end)
+			df_new = ticker_obj.history(start=fetch_start, interval="1d")
 
 			if df_new is None or df_new.empty:
 				logger.warning(f"No data for {self.ticker}")
