@@ -21,6 +21,10 @@ class Journal:
         # Normalize portfolio name to lowercase snake_case
         normalized_name = self._normalize_name(name)
 
+        # Store context for caching
+        self.context = context
+        self.cache_key = f"_journal_cache_{normalized_name}"
+
         # Check if running in backtest context
         backtest_dir = None
         if context:
@@ -55,14 +59,30 @@ class Journal:
             df.to_csv(self.filepath, index=False)
 
     def load_df(self) -> pd.DataFrame:
-        """Load journal as DataFrame."""
+        """Load journal as DataFrame, using context cache if available."""
+        # Check context cache first
+        if self.context and self.cache_key in self.context:
+            return self.context[self.cache_key].copy()
+        
+        # Load from file
         if not self.filepath.exists():
-            return pd.DataFrame(columns=self.BASE_COLUMNS)
-        return pd.read_csv(self.filepath, dtype=object, quotechar='"', quoting=1)  # QUOTE_ALL
+            df = pd.DataFrame(columns=self.BASE_COLUMNS)
+        else:
+            df = pd.read_csv(self.filepath, dtype=object, quotechar='"', quoting=1)  # QUOTE_ALL
+        
+        # Cache in context if available
+        if self.context is not None:
+            self.context[self.cache_key] = df.copy()
+        
+        return df
 
     def save(self, df: pd.DataFrame) -> None:
-        """Save DataFrame to CSV."""
+        """Save DataFrame to CSV and update context cache."""
         df.to_csv(self.filepath, index=False, quoting=1, quotechar='"')  # QUOTE_ALL
+        
+        # Update context cache
+        if self.context is not None:
+            self.context[self.cache_key] = df.copy()
 
     def add_transaction(self, operation: str, ticker: str, quantity: int, price: float,
                        fees: float = 0, notes: str = "", created_at: str = None,

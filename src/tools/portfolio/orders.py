@@ -23,6 +23,10 @@ class Orders:
         # Normalize portfolio name to lowercase snake_case
         normalized_name = self._normalize_name(name)
 
+        # Store context for caching
+        self.context = context
+        self.cache_key = f"_orders_cache_{normalized_name}"
+
         # Check if running in backtest context
         backtest_dir = None
         if context:
@@ -57,14 +61,30 @@ class Orders:
             df.to_csv(self.filepath, index=False, quoting=1, quotechar='"')
 
     def load_df(self) -> pd.DataFrame:
-        """Load orders as DataFrame."""
+        """Load orders as DataFrame, using context cache if available."""
+        # Check context cache first
+        if self.context and self.cache_key in self.context:
+            return self.context[self.cache_key].copy()
+        
+        # Load from file
         if not self.filepath.exists():
-            return pd.DataFrame(columns=self.BASE_COLUMNS)
-        return pd.read_csv(self.filepath, dtype=object, quotechar='"', quoting=1)
+            df = pd.DataFrame(columns=self.BASE_COLUMNS)
+        else:
+            df = pd.read_csv(self.filepath, dtype=object, quotechar='"', quoting=1)
+        
+        # Cache in context if available
+        if self.context is not None:
+            self.context[self.cache_key] = df.copy()
+        
+        return df
 
     def save(self, df: pd.DataFrame) -> None:
-        """Save DataFrame to CSV."""
+        """Save DataFrame to CSV and update context cache."""
         df.to_csv(self.filepath, index=False, quoting=1, quotechar='"')
+        
+        # Update context cache
+        if self.context is not None:
+            self.context[self.cache_key] = df.copy()
 
     def add_order(self, ticker: str, quantity: int, entry_price: float,
                   stop_loss: Optional[float] = None, take_profit: Optional[float] = None,
