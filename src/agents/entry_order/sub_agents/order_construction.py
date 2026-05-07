@@ -105,12 +105,17 @@ class OrderConstructionAgent(Agent):
 				if hp_formula:
 					# Try to evaluate holding_period (usually a constant integer)
 					try:
-						holding_period = int(float(hp_formula))
+						import math
+						hp_result = float(hp_formula)
+						if not math.isnan(hp_result) and not math.isinf(hp_result):
+							holding_period = int(hp_result)
 					except (ValueError, TypeError):
 						data_context = {"close": entry_price}
 						result = ConfigEvaluator.evaluate_formula(hp_formula, data_context)
 						if result:
-							holding_period = int(result)
+							import math
+							if not math.isnan(result) and not math.isinf(result):
+								holding_period = int(result)
 
 			# Determine execution method and limit price
 			execution_method = order.get("execution_method", "market")

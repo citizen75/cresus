@@ -200,7 +200,11 @@ class PositionSizingAgent(Agent):
 		max_position_value = cash * 0.05
 		max_shares = int(max_position_value / current_price)
 
-		return int(min(shares, max_shares))
+		# Final check before returning
+		result = min(shares, max_shares)
+		if math.isnan(result) or math.isinf(result):
+			return 0
+		return int(result)
 
 	def _kelly_sizing(self, cash: float, current_price: float, rr_ratio: float, win_rate: float) -> int:
 		"""Calculate shares using Kelly Criterion.
@@ -238,7 +242,10 @@ class PositionSizingAgent(Agent):
 		kelly_fraction = min(kelly_fraction, 0.25)
 
 		shares = (cash * kelly_fraction) / current_price
-		return int(shares)
+		result = shares
+		if math.isnan(result) or math.isinf(result):
+			return 0
+		return int(result)
 
 	def _volatility_sizing(self, cash: float, current_price: float, volatility: float) -> int:
 		"""Calculate shares using volatility-adjusted sizing.
@@ -269,4 +276,7 @@ class PositionSizingAgent(Agent):
 		adjusted_risk = max(adjusted_risk, 0.005)  # Min 0.5%
 
 		shares = (cash * adjusted_risk) / current_price
-		return int(shares)
+		result = shares
+		if math.isnan(result) or math.isinf(result):
+			return 0
+		return int(result)
