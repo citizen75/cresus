@@ -60,6 +60,28 @@ def disable_debug_mode():
 		)
 
 
+def enable_quiet_mode():
+	"""Enable quiet mode - only show ERROR level and above."""
+	if HAS_LOGURU:
+		loguru_logger.remove()
+		loguru_logger.add(
+			sys.stderr,
+			format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {message}",
+			level="ERROR"
+		)
+
+
+def disable_quiet_mode():
+	"""Disable quiet mode - show INFO level and above."""
+	if HAS_LOGURU:
+		loguru_logger.remove()
+		loguru_logger.add(
+			sys.stderr,
+			format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {message}",
+			level="INFO"
+		)
+
+
 class AgentLogger:
 	"""Logger for agents to log messages."""
 
