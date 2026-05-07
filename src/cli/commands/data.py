@@ -133,16 +133,19 @@ class DataCommands:
 
 		table = Table(title=f"Data Fetch Results: {result.get('universe')}", box=box.ROUNDED)
 		table.add_column("Ticker", style="cyan")
-		table.add_column("Status", style="green")
-		table.add_column("Details")
+		table.add_column("History", style="green")
+		table.add_column("Fundamental", style="green")
 
 		for detail in result.get("details", []):
 			ticker = detail.get("ticker", "")
-			status = detail.get("status", "")
-			rows = detail.get("rows", 0)
-			status_colored = "[green]✓[/green]" if status == "success" else "[red]✗[/red]"
-			details_text = f"{rows} rows" if rows > 0 else detail.get("message", "")
-			table.add_row(ticker, status_colored, details_text)
+			history_status = detail.get("history", "")
+			fundamental_status = detail.get("fundamental", "")
+
+			# Check if both are success
+			history_colored = "[green]✓[/green]" if history_status == "success" else "[red]✗[/red]"
+			fundamental_colored = "[green]✓[/green]" if fundamental_status == "success" else "[red]✗[/red]"
+
+			table.add_row(ticker, history_colored, fundamental_colored)
 
 		console.print(table)
 		console.print(f"\n{result.get('message')}")
