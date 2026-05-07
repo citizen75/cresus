@@ -41,7 +41,12 @@ class PreMarketFlow(Flow):
 		self._setup_default_steps()
 
 	def _setup_default_steps(self) -> None:
-		"""Set up default steps for pre-market flow."""
+		"""Set up default steps for pre-market flow.
+		
+		Flow order depends on mode:
+		- Backtest: Strategy → Data → Watchlist (filter small) → Signals (on filtered)
+		- Live: Strategy → Data → Signals (on all) → Watchlist (filter with signal scores)
+		"""
 		# Strategy step - load tickers and strategy config
 		strategy_agent = StrategyAgent(f"StrategyAgent[{self.strategy_name}]", self.context)
 		self.add_step(strategy_agent, step_name="strategy", required=True)
@@ -51,15 +56,26 @@ class PreMarketFlow(Flow):
 		data_agent = DataAgent(f"DataAgent[{self.strategy_name}]", self.context)
 		self.add_step(data_agent, step_name="data", required=True)
 
-		# Signals step - generate trading signals on all tickers first
-		# This provides ticker_scores that drive downstream filtering
-		signals_agent = SignalsAgent("SignalsAgent", self.context)
-		self.add_step(signals_agent, step_name="signals", required=True)
-
-		# Watchlist step - filter tickers based on strategy criteria and signal scores
-		# Runs after signals to use signal-based filtering
-		watchlist_agent = WatchListAgent("WatchListAgent", self.context)
-		self.add_step(watchlist_agent, step_name="watchlist", required=True)
+		# In backtest mode, filter watchlist BEFORE signals to reduce computation
+		# This significantly speeds up backtests (filters 258 → ~20 before signal analysis)
+		is_backtest = self.context.get("backtest_id") is not None
+		
+		if is_backtest:
+			# Backtest: filter first for speed
+			watchlist_agent = WatchListAgent("WatchListAgent", self.context)
+			self.add_step(watchlist_agent, step_name="watchlist", required=True)
+			
+			# Signals step - generate trading signals on filtered watchlist only
+			signals_agent = SignalsAgent("SignalsAgent", self.context)
+			self.add_step(signals_agent, step_name="signals", required=True)
+		else:
+			# Live: signals on all tickers first, then filter with signal scores
+			signals_agent = SignalsAgent("SignalsAgent", self.context)
+			self.add_step(signals_agent, step_name="signals", required=True)
+			
+			# Watchlist step - filter tickers based on strategy criteria and signal scores
+			watchlist_agent = WatchListAgent("WatchListAgent", self.context)
+			self.add_step(watchlist_agent, step_name="watchlist", required=True)
 
 		# Entry analysis step - analyze trade entry points for watchlist tickers
 		entry_agent = EntryAgent("EntryAgent", self.context)
