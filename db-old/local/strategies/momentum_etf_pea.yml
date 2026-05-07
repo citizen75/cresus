@@ -1,5 +1,5 @@
-name: momentum_cac40_etf
-universe: cac40_etf
+name: momentum_etf_pea
+universe: etf_pea_full
 description: Momentum strategy for CAC40 ETFs - trend-following momentum with volatility confirmation
 engine: TaModel
 indicators:

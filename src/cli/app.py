@@ -322,14 +322,23 @@ class CresusCLI(cmd2.Cmd):
 			self.flow_manager._print_workflows_result(result)
 		elif cmd == "run":
 			if len(parts) < 2:
-				console.print("[red]✗[/red] Usage: flow run <workflow_name> [strategy] [tickers...] [--context] [--debug] [-v] [--backtest]")
+				console.print("[red]✗[/red] Usage: flow run <workflow_name> [strategy] [tickers...] [--context] [--debug] [-v|-vv|-vvv] [--backtest]")
 				return
 
 			workflow_name = parts[1]
 			include_context = "--context" in parts
 			debug = "--debug" in parts
-			verbose = "-v" in parts
 			use_backtest = "--backtest" in parts
+
+			# Count verbosity level (-v, -vv, -vvv)
+			verbosity_level = 0
+			for part in parts:
+				if part == "-v":
+					verbosity_level = max(verbosity_level, 1)
+				elif part == "-vv":
+					verbosity_level = max(verbosity_level, 2)
+				elif part == "-vvv":
+					verbosity_level = max(verbosity_level, 3)
 
 			# Remove workflow name and flags from parts
 			remaining = [p for p in parts[2:] if not p.startswith("-")]
@@ -368,19 +377,26 @@ class CresusCLI(cmd2.Cmd):
 				if tickers:
 					input_data = {"tickers": tickers}
 
-			# Enable verbose mode if requested
-			if verbose:
-				from core.logger import enable_verbose_mode
-				enable_verbose_mode()
+			# Set log level based on verbosity
+			original_debug = debug
+			if verbosity_level > 0:
+				from core.logger import set_log_level
+				if verbosity_level == 1:
+					set_log_level("WARNING")
+				elif verbosity_level == 2:
+					set_log_level("INFO")
+				elif verbosity_level >= 3:
+					set_log_level("DEBUG")
+					original_debug = True  # Enable debug mode for -vvv
 
 			try:
-				result = self.flow_manager.run_workflow(workflow_name, strategy, input_data, include_context, debug, use_backtest)
+				result = self.flow_manager.run_workflow(workflow_name, strategy, input_data, include_context, original_debug, use_backtest)
 				self.flow_manager._print_flow_result(result, workflow_name)
 			finally:
-				# Restore quiet mode if verbose mode was enabled
-				if verbose:
-					from core.logger import disable_verbose_mode
-					disable_verbose_mode()
+				# Restore default log level
+				if verbosity_level > 0:
+					from core.logger import set_log_level
+					set_log_level("ERROR")
 
 			# Display backtest results if backtest completed successfully
 			if workflow_name.lower() == "backtest" and result.get("status") == "success":

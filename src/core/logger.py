@@ -60,26 +60,29 @@ def disable_debug_mode():
 		)
 
 
-def enable_verbose_mode():
-	"""Enable verbose mode - show INFO level and above."""
+def set_log_level(level: str):
+	"""Set log level for loguru.
+
+	Args:
+		level: Log level as string ("ERROR", "WARNING", "INFO", "DEBUG")
+	"""
 	if HAS_LOGURU:
 		loguru_logger.remove()
 		loguru_logger.add(
 			sys.stderr,
 			format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {message}",
-			level="INFO"
+			level=level.upper()
 		)
+
+
+def enable_verbose_mode():
+	"""Enable verbose mode - show INFO level and above."""
+	set_log_level("INFO")
 
 
 def disable_verbose_mode():
 	"""Disable verbose mode - only show ERROR level and above."""
-	if HAS_LOGURU:
-		loguru_logger.remove()
-		loguru_logger.add(
-			sys.stderr,
-			format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {message}",
-			level="ERROR"
-		)
+	set_log_level("ERROR")
 
 
 class AgentLogger:
