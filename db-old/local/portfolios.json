@@ -1,0 +1,21 @@
+{
+  "portfolios": {
+
+    "momentum_cac": {
+      "name": "momentum_cac",
+      "type": "paper",
+      "currency": "EUR",
+      "description": "",
+      "initial_capital": 10000.0,
+      "positions": {
+        "count": 0,
+        "data": []
+      },
+      "metrics": {
+        "cash": 10000 
+      },
+      "updated_at": "2026-05-05T11:58:23.841201"
+    }
+  },
+  "updated_at": "2026-05-05T12:21:57.629536"
+}

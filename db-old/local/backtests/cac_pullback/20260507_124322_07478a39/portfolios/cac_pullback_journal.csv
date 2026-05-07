@@ -1,0 +1,4 @@
+"id","created_at","operation","ticker","quantity","price","amount","fees","stop_loss","take_profit","trailing_stop_distance","highest_price","status","status_at","notes"
+"34098271","2026-01-05T14:00:00.000000","BUY","MT.AS","18","39.354282000000005","708.38","0.0","37.7642","42.9319","","39.354282000000005","completed","2026-05-07T12:43:26.128290","Limit order c9c25356 executed @ 39.35"
+"3eab0511","2026-01-07T14:00:00.000000","BUY","BNP.PA","10","79.76429999999999","797.64","0.0","76.5415","87.0156","","79.76429999999999","completed","2026-05-07T12:43:26.876278","Limit order 1a4cbc77 executed @ 79.76"
+"8e5b42bc","2026-01-09T14:00:00.000000","SELL","BNP.PA","10","87.0156","870.16","0.0","","","","87.0156","completed","2026-05-07T12:43:27.777974","Take profit exit @ 87.02"

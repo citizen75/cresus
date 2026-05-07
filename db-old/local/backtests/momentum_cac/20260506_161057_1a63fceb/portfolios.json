@@ -1,0 +1,54 @@
+{
+  "portfolios": {
+    "Momentum Cac": {
+      "name": "Momentum Cac",
+      "type": "paper",
+      "currency": "EUR",
+      "description": "",
+      "initial_capital": 100000.0,
+      "positions": {
+        "count": 3,
+        "data": [
+          {
+            "ticker": "VIE.PA",
+            "quantity": 27,
+            "avg_entry_price": 34.11,
+            "current_price": 36.27,
+            "position_value": 979.29,
+            "position_gain": 58.32,
+            "position_gain_pct": 6.33
+          },
+          {
+            "ticker": "SGO.PA",
+            "quantity": 48,
+            "avg_entry_price": 78.71,
+            "current_price": 80.1,
+            "position_value": 3844.8,
+            "position_gain": 66.72,
+            "position_gain_pct": 1.77
+          },
+          {
+            "ticker": "TEP.PA",
+            "quantity": 16,
+            "avg_entry_price": 62.94,
+            "current_price": 61.92,
+            "position_value": 990.72,
+            "position_gain": -16.32,
+            "position_gain_pct": -1.62
+          }
+        ]
+      },
+      "metrics": {
+        "total_positions_value": 5814.81,
+        "cash": 92273.68,
+        "total_portfolio_value": 98088.49,
+        "num_trades": 229,
+        "buy_trades": 140,
+        "sell_trades": 89,
+        "total_fees": 0.0
+      },
+      "updated_at": "2026-05-06T16:12:23.139495"
+    }
+  },
+  "updated_at": "2026-05-06T16:12:23.139498"
+}

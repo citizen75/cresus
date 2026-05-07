@@ -1,0 +1,99 @@
+{
+  "portfolios": {
+    "Cac Pullback": {
+      "name": "Cac Pullback",
+      "type": "paper",
+      "currency": "EUR",
+      "description": "",
+      "initial_capital": 100000.0,
+      "positions": {
+        "count": 8,
+        "data": [
+          {
+            "ticker": "CA.PA",
+            "quantity": 58,
+            "avg_entry_price": 16.73,
+            "current_price": 17.14,
+            "position_value": 994.12,
+            "position_gain": 23.78,
+            "position_gain_pct": 2.45
+          },
+          {
+            "ticker": "EDEN.PA",
+            "quantity": 138,
+            "avg_entry_price": 24.99,
+            "current_price": 21.55,
+            "position_value": 2973.9,
+            "position_gain": -474.72,
+            "position_gain_pct": -13.77
+          },
+          {
+            "ticker": "ORA.PA",
+            "quantity": 110,
+            "avg_entry_price": 17.17,
+            "current_price": 18.145,
+            "position_value": 1995.95,
+            "position_gain": 107.25,
+            "position_gain_pct": 5.68
+          },
+          {
+            "ticker": "BN.PA",
+            "quantity": 135,
+            "avg_entry_price": 67.53,
+            "current_price": 64.86,
+            "position_value": 8756.1,
+            "position_gain": -360.45,
+            "position_gain_pct": -3.95
+          },
+          {
+            "ticker": "CS.PA",
+            "quantity": 92,
+            "avg_entry_price": 41.9,
+            "current_price": 41.93,
+            "position_value": 3857.56,
+            "position_gain": 2.76,
+            "position_gain_pct": 0.07
+          },
+          {
+            "ticker": "OR.PA",
+            "quantity": 20,
+            "avg_entry_price": 440.56,
+            "current_price": 374.35,
+            "position_value": 7487.0,
+            "position_gain": -1324.2,
+            "position_gain_pct": -15.03
+          },
+          {
+            "ticker": "AC.PA",
+            "quantity": 22,
+            "avg_entry_price": 60.7,
+            "current_price": 44.37,
+            "position_value": 976.14,
+            "position_gain": -359.26,
+            "position_gain_pct": -26.9
+          },
+          {
+            "ticker": "CAP.PA",
+            "quantity": 30,
+            "avg_entry_price": 136.08,
+            "current_price": 104.8,
+            "position_value": 3144.0,
+            "position_gain": -938.4,
+            "position_gain_pct": -22.99
+          }
+        ]
+      },
+      "metrics": {
+        "total_positions_value": 30184.77,
+        "cash": 59755.81,
+        "total_portfolio_value": 89940.58,
+        "num_trades": 925,
+        "buy_trades": 618,
+        "sell_trades": 307,
+        "total_fees": 0.0
+      },
+      "updated_at": "2026-05-06T17:55:44.652469"
+    }
+  },
+  "updated_at": "2026-05-06T17:55:44.652475"
+}

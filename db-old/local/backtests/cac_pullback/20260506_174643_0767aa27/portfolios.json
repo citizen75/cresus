@@ -1,0 +1,162 @@
+{
+  "portfolios": {
+    "Cac Pullback": {
+      "name": "Cac Pullback",
+      "type": "paper",
+      "currency": "EUR",
+      "description": "",
+      "initial_capital": 100000.0,
+      "positions": {
+        "count": 15,
+        "data": [
+          {
+            "ticker": "MT.AS",
+            "quantity": 72,
+            "avg_entry_price": 58.73,
+            "current_price": 53.34,
+            "position_value": 3840.48,
+            "position_gain": -388.08,
+            "position_gain_pct": -9.18
+          },
+          {
+            "ticker": "ORA.PA",
+            "quantity": 110,
+            "avg_entry_price": 17.17,
+            "current_price": 18.145,
+            "position_value": 1995.95,
+            "position_gain": 107.25,
+            "position_gain_pct": 5.68
+          },
+          {
+            "ticker": "EL.PA",
+            "quantity": 30,
+            "avg_entry_price": 204.78,
+            "current_price": 176.5,
+            "position_value": 5295.0,
+            "position_gain": -848.4,
+            "position_gain_pct": -13.81
+          },
+          {
+            "ticker": "EDEN.PA",
+            "quantity": 138,
+            "avg_entry_price": 25.08,
+            "current_price": 21.55,
+            "position_value": 2973.9,
+            "position_gain": -487.14,
+            "position_gain_pct": -14.07
+          },
+          {
+            "ticker": "AI.PA",
+            "quantity": 30,
+            "avg_entry_price": 167.27,
+            "current_price": 181.28,
+            "position_value": 5438.4,
+            "position_gain": 420.3,
+            "position_gain_pct": 8.38
+          },
+          {
+            "ticker": "BN.PA",
+            "quantity": 135,
+            "avg_entry_price": 67.54,
+            "current_price": 64.86,
+            "position_value": 8756.1,
+            "position_gain": -361.8,
+            "position_gain_pct": -3.97
+          },
+          {
+            "ticker": "CS.PA",
+            "quantity": 92,
+            "avg_entry_price": 41.93,
+            "current_price": 41.93,
+            "position_value": 3857.56,
+            "position_gain": 0.0,
+            "position_gain_pct": 0.0
+          },
+          {
+            "ticker": "LR.PA",
+            "quantity": 70,
+            "avg_entry_price": 153.04,
+            "current_price": 160.5,
+            "position_value": 11235.0,
+            "position_gain": 522.2,
+            "position_gain_pct": 4.87
+          },
+          {
+            "ticker": "DSY.PA",
+            "quantity": 200,
+            "avg_entry_price": 22.64,
+            "current_price": 19.835,
+            "position_value": 3967.0,
+            "position_gain": -561.0,
+            "position_gain_pct": -12.39
+          },
+          {
+            "ticker": "MC.PA",
+            "quantity": 50,
+            "avg_entry_price": 515.59,
+            "current_price": 474.4,
+            "position_value": 23720.0,
+            "position_gain": -2059.5,
+            "position_gain_pct": -7.99
+          },
+          {
+            "ticker": "OR.PA",
+            "quantity": 10,
+            "avg_entry_price": 526.15,
+            "current_price": 374.35,
+            "position_value": 3743.5,
+            "position_gain": -1518.0,
+            "position_gain_pct": -28.85
+          },
+          {
+            "ticker": "AC.PA",
+            "quantity": 44,
+            "avg_entry_price": 51.15,
+            "current_price": 44.37,
+            "position_value": 1952.28,
+            "position_gain": -298.32,
+            "position_gain_pct": -13.26
+          },
+          {
+            "ticker": "ENGI.PA",
+            "quantity": 210,
+            "avg_entry_price": 24.81,
+            "current_price": 27.88,
+            "position_value": 5854.8,
+            "position_gain": 644.7,
+            "position_gain_pct": 12.37
+          },
+          {
+            "ticker": "ERF.PA",
+            "quantity": 48,
+            "avg_entry_price": 65.8,
+            "current_price": 60.38,
+            "position_value": 2898.24,
+            "position_gain": -260.16,
+            "position_gain_pct": -8.24
+          },
+          {
+            "ticker": "ML.PA",
+            "quantity": 150,
+            "avg_entry_price": 32.21,
+            "current_price": 32.32,
+            "position_value": 4848.0,
+            "position_gain": 16.5,
+            "position_gain_pct": 0.34
+          }
+        ]
+      },
+      "metrics": {
+        "total_positions_value": 90376.21,
+        "cash": 1077.47,
+        "total_portfolio_value": 91453.68,
+        "num_trades": 902,
+        "buy_trades": 611,
+        "sell_trades": 291,
+        "total_fees": 0.0
+      },
+      "updated_at": "2026-05-06T17:48:44.648784"
+    }
+  },
+  "updated_at": "2026-05-06T17:48:44.648791"
+}

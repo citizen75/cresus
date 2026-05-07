@@ -1,0 +1,54 @@
+{
+  "portfolios": {
+    "Cac Pullback": {
+      "name": "Cac Pullback",
+      "type": "paper",
+      "currency": "EUR",
+      "description": "",
+      "initial_capital": 100000.0,
+      "positions": {
+        "count": 3,
+        "data": [
+          {
+            "ticker": "ACA.PA",
+            "quantity": 57,
+            "avg_entry_price": NaN,
+            "current_price": 17.25,
+            "position_value": 983.25,
+            "position_gain": NaN,
+            "position_gain_pct": 0
+          },
+          {
+            "ticker": "STLAP.PA",
+            "quantity": 462,
+            "avg_entry_price": 9.49,
+            "current_price": 6.476,
+            "position_value": 2991.91,
+            "position_gain": -1392.47,
+            "position_gain_pct": -31.76
+          },
+          {
+            "ticker": "GLE.PA",
+            "quantity": 154,
+            "avg_entry_price": 59.73,
+            "current_price": 70.0,
+            "position_value": 10780.0,
+            "position_gain": 1581.58,
+            "position_gain_pct": 17.19
+          }
+        ]
+      },
+      "metrics": {
+        "total_positions_value": 14755.16,
+        "cash": NaN,
+        "total_portfolio_value": NaN,
+        "num_trades": 1239,
+        "buy_trades": 765,
+        "sell_trades": 474,
+        "total_fees": 0.0
+      },
+      "updated_at": "2026-05-06T18:00:28.489062"
+    }
+  },
+  "updated_at": "2026-05-06T18:00:28.489069"
+}

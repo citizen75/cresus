@@ -1,0 +1,26 @@
+universe: cac40
+model_path: db/local/models/cac40_regime.pkl
+features:
+- breadth_above_sma20
+- breadth_above_sma50
+- breadth_above_sma200
+- breadth_change_5d
+- adv_decline_ratio
+- cross_correlation
+- dispersion
+- avg_atr_norm
+- vol_regime_score
+- momentum_factor_return
+- meanrev_factor_return
+- lowvol_factor_return
+- quality_factor_return
+training:
+  lookback_days: 1000
+  n_regimes: 6
+  test_split: 0.2
+lgbm_params:
+  n_estimators: 200
+  max_depth: 6
+  learning_rate: 0.05
+  num_leaves: 31
+  min_child_samples: 20

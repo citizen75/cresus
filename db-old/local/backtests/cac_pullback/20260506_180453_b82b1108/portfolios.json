@@ -1,0 +1,54 @@
+{
+  "portfolios": {
+    "Cac Pullback": {
+      "name": "Cac Pullback",
+      "type": "paper",
+      "currency": "EUR",
+      "description": "",
+      "initial_capital": 100000.0,
+      "positions": {
+        "count": 3,
+        "data": [
+          {
+            "ticker": "EL.PA",
+            "quantity": 10,
+            "avg_entry_price": 269.57,
+            "current_price": 176.7,
+            "position_value": 1767.0,
+            "position_gain": -928.7,
+            "position_gain_pct": -34.45
+          },
+          {
+            "ticker": "ENGI.PA",
+            "quantity": 108,
+            "avg_entry_price": 24.99,
+            "current_price": 27.57,
+            "position_value": 2977.56,
+            "position_gain": 278.64,
+            "position_gain_pct": 10.32
+          },
+          {
+            "ticker": "CAP.PA",
+            "quantity": 10,
+            "avg_entry_price": 117.81,
+            "current_price": 104.95,
+            "position_value": 1049.5,
+            "position_gain": -128.6,
+            "position_gain_pct": -10.92
+          }
+        ]
+      },
+      "metrics": {
+        "total_positions_value": 5794.06,
+        "cash": 92490.09,
+        "total_portfolio_value": 98284.15,
+        "num_trades": 210,
+        "buy_trades": 124,
+        "sell_trades": 86,
+        "total_fees": 0.0
+      },
+      "updated_at": "2026-05-06T18:05:14.606015"
+    }
+  },
+  "updated_at": "2026-05-06T18:05:14.606020"
+}

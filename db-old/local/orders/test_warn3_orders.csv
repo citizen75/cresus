@@ -1,0 +1,2 @@
+"id","created_at","ticker","quantity","entry_price","stop_loss","take_profit","execution_method","scale_count","risk_amount","risk_reward","status","metadata"
+"e28309f8","2026-05-05T11:59:39.522676","AAPL","10","150.0","","","market","1","","","pending","{""test"": ""data""}"

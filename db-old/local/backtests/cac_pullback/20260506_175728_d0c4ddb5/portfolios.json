@@ -1,0 +1,81 @@
+{
+  "portfolios": {
+    "Cac Pullback": {
+      "name": "Cac Pullback",
+      "type": "paper",
+      "currency": "EUR",
+      "description": "",
+      "initial_capital": 100000.0,
+      "positions": {
+        "count": 6,
+        "data": [
+          {
+            "ticker": "CA.PA",
+            "quantity": 580,
+            "avg_entry_price": NaN,
+            "current_price": 17.14,
+            "position_value": 9941.2,
+            "position_gain": NaN,
+            "position_gain_pct": 0
+          },
+          {
+            "ticker": "ACA.PA",
+            "quantity": 570,
+            "avg_entry_price": NaN,
+            "current_price": 17.355,
+            "position_value": 9892.35,
+            "position_gain": NaN,
+            "position_gain_pct": 0
+          },
+          {
+            "ticker": "CS.PA",
+            "quantity": 230,
+            "avg_entry_price": NaN,
+            "current_price": 41.93,
+            "position_value": 9643.9,
+            "position_gain": NaN,
+            "position_gain_pct": 0
+          },
+          {
+            "ticker": "STMPA.PA",
+            "quantity": 120,
+            "avg_entry_price": NaN,
+            "current_price": 48.53,
+            "position_value": 5823.6,
+            "position_gain": NaN,
+            "position_gain_pct": 0
+          },
+          {
+            "ticker": "STLAP.PA",
+            "quantity": 924,
+            "avg_entry_price": 8.89,
+            "current_price": 6.457,
+            "position_value": 5966.27,
+            "position_gain": -2248.09,
+            "position_gain_pct": -27.37
+          },
+          {
+            "ticker": "GLE.PA",
+            "quantity": 140,
+            "avg_entry_price": 69.79,
+            "current_price": 70.08,
+            "position_value": 9811.2,
+            "position_gain": 40.6,
+            "position_gain_pct": 0.42
+          }
+        ]
+      },
+      "metrics": {
+        "total_positions_value": 51078.52,
+        "cash": NaN,
+        "total_portfolio_value": NaN,
+        "num_trades": 112,
+        "buy_trades": 90,
+        "sell_trades": 22,
+        "total_fees": 0.0
+      },
+      "updated_at": "2026-05-06T17:57:37.213152"
+    }
+  },
+  "updated_at": "2026-05-06T17:57:37.213154"
+}

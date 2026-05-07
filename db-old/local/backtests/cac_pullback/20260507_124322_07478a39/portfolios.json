@@ -1,0 +1,36 @@
+{
+  "portfolios": {
+    "Cac Pullback": {
+      "name": "Cac Pullback",
+      "type": "paper",
+      "currency": "EUR",
+      "description": "",
+      "initial_capital": 100000.0,
+      "positions": {
+        "count": 1,
+        "data": [
+          {
+            "ticker": "MT.AS",
+            "quantity": 18,
+            "avg_entry_price": 39.35,
+            "current_price": 54.04,
+            "position_value": 972.72,
+            "position_gain": 264.42,
+            "position_gain_pct": 37.33
+          }
+        ]
+      },
+      "metrics": {
+        "total_positions_value": 972.72,
+        "cash": 99364.14,
+        "total_portfolio_value": 100336.86,
+        "num_trades": 3,
+        "buy_trades": 2,
+        "sell_trades": 1,
+        "total_fees": 0.0
+      },
+      "updated_at": "2026-05-07T12:43:28.169302"
+    }
+  },
+  "updated_at": "2026-05-07T12:43:28.169305"
+}

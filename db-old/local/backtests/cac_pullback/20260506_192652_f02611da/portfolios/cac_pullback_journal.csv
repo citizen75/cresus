@@ -1,0 +1,4 @@
+"id","created_at","operation","ticker","quantity","price","amount","fees","stop_loss","take_profit","trailing_stop_distance","highest_price","status","status_at","notes"
+"4af3fe73","2026-01-05 14:00:00","BUY","CS.PA","119","","","0.0","40.1816","42.4868","","","completed","2026-05-06T19:26:56.211639","Limit order 80ac033a executed @ nan"
+"192aefb0","2026-01-05 14:00:00","BUY","MT.AS","93","39.352848052978516","3659.81","0.0","39.59475567114526","41.9805","1.1144000000000034","40.70915567114526","completed","2026-05-06T19:26:56.218415","Order 9c69f377 executed"
+"fbd3a7be","2026-01-05T14:00:00.000000","SELL","MT.AS","93","39.59475567114526","3682.31","0.0","","","","39.59475567114526","completed","2026-05-06T19:26:56.220286","Stop loss exit @ 39.59"

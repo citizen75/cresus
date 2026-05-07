@@ -1,0 +1,36 @@
+{
+  "portfolios": {
+    "Cac Momentum": {
+      "name": "Cac Momentum",
+      "type": "paper",
+      "currency": "EUR",
+      "description": "",
+      "initial_capital": 100000.0,
+      "positions": {
+        "count": 1,
+        "data": [
+          {
+            "ticker": "MT.AS",
+            "quantity": 18,
+            "avg_entry_price": 42.76,
+            "current_price": 53.56,
+            "position_value": 964.08,
+            "position_gain": 194.4,
+            "position_gain_pct": 25.26
+          }
+        ]
+      },
+      "metrics": {
+        "total_positions_value": 964.08,
+        "cash": 98784.06,
+        "total_portfolio_value": 99748.14,
+        "num_trades": 170,
+        "buy_trades": 94,
+        "sell_trades": 76,
+        "total_fees": 0.0
+      },
+      "updated_at": "2026-05-06T19:03:37.213633"
+    }
+  },
+  "updated_at": "2026-05-06T19:03:37.213636"
+}

@@ -1,0 +1,54 @@
+name: momentum_nasdaq
+universe: nasdaq_100
+description: Momentum strategy on Nasdaq100 stocks - trend following with momentum confirmation
+engine: TaModel
+indicators:
+- atr_14
+- rsi_9
+- ema_10
+- ema_20
+- adx_20
+- macd_12_26
+buy_conditions: data['close'] > data['ema_10'] and data['ema_10'] > data['ema_20'] and data['macd_12_26'] > 0 and data['adx_20'] > 20
+sell_conditions: data['close'] < data['ema_10'] or data['macd_12_26'] < 0
+
+watchlist:
+  enabled: true
+  parameters:
+    tickers:
+      max_count: 20
+      description: Maximum number of tickers to include in the watchlist based on
+        liquidity and volatility filters
+    volume:
+      min_volume: 500000
+      description: Minimum daily trading volume for inclusion in watchlist
+    ranking:
+      metric: score
+      description: Metric used to rank and sort tickers in the watchlist
+    trend:
+      formula: data['close'] > data['ema_10'] and data['ema_10'] > data['ema_20'] and data['adx_20'] > 20
+      description: 'Trend detection: price > EMA10 > EMA20 AND ADX > 20 indicates strong trend'
+    volatility:
+      formula: data['atr_14'] > data['close'] * 0.01
+      description: 'Volatility filter: ATR > 1% of price ensures meaningful trading range'
+
+signals:
+  enabled: true
+  weights:
+    momentum: 0.45
+    trend: 0.40
+    volume_anomaly: 0.15
+    mean_reversion: 0.00
+  parameters:
+    momentum:
+      formula: data['macd_12_26'] > 0 and (data['rsi_9'] < 30 or data['rsi_9'] > 70)
+      description: 'Momentum signal: MACD positive (uptrend) with RSI confirmation (oversold/overbought)'
+    trend:
+      formula: data['close'] > data['ema_10'] and data['ema_10'] > data['ema_20'] and data['adx_20'] > 20
+      description: 'Trend signal: Price > EMA10 > EMA20 with strong ADX confirms uptrend'
+    mean_reversion:
+      formula: 'False'
+      description: 'Mean reversion disabled - momentum strategy is trend-following not counter-trend'
+    volume_anomaly:
+      formula: data['volume'] > 1000000
+      description: 'Volume anomaly signal: Volume > 1M shares indicates good participation'

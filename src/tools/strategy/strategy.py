@@ -34,12 +34,16 @@ class StrategyManager:
 		"""
 		if project_root:
 			self.project_root = Path(project_root)
+			# For explicit project_root (e.g., tests), use db/local/strategies for backward compatibility
+			self.strategies_dir = self.project_root / "db" / "local" / "strategies"
 		else:
 			# Find project root by looking for config directory
 			self.project_root = self._find_project_root()
+			# For normal operation, use ~/.cresus/db/strategies
+			from utils.env import get_db_root
+			db_root = get_db_root()
+			self.strategies_dir = db_root / "strategies"
 
-		# Strategies are stored in db/local/strategies
-		self.strategies_dir = self.project_root / "db" / "local" / "strategies"
 		self._ensure_strategies_dir()
 
 	def _find_project_root(self) -> Path:

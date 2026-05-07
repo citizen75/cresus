@@ -1,7 +1,5 @@
 """Strategy agent for executing trading strategies."""
 
-import os
-from pathlib import Path
 from typing import Any, Dict, Optional
 from core.agent import Agent
 from tools.strategy.strategy import StrategyManager
@@ -33,8 +31,8 @@ class StrategyAgent(Agent):
 			try:
 				strategy_name = self.name.split("[")[1].rstrip("]") if "[" in self.name else None
 				if strategy_name:
-					project_root = Path(os.environ.get("CRESUS_PROJECT_ROOT", "."))
-					strategy_manager = StrategyManager(project_root)
+					# Use StrategyManager without project_root to use centralized ~/.cresus/db/strategies
+					strategy_manager = StrategyManager()
 					strategy_result = strategy_manager.load_strategy(strategy_name)
 					if strategy_result.get("status") == "success":
 						strategy_config = strategy_result.get("data", {})

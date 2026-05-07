@@ -1,0 +1,72 @@
+{
+  "portfolios": {
+    "Cac Pullback": {
+      "name": "Cac Pullback",
+      "type": "paper",
+      "currency": "EUR",
+      "description": "",
+      "initial_capital": 100000.0,
+      "positions": {
+        "count": 5,
+        "data": [
+          {
+            "ticker": "ENGI.PA",
+            "quantity": 36,
+            "avg_entry_price": 15.1,
+            "current_price": 27.57,
+            "position_value": 992.52,
+            "position_gain": 448.92,
+            "position_gain_pct": 82.58
+          },
+          {
+            "ticker": "AC.PA",
+            "quantity": 44,
+            "avg_entry_price": 48.72,
+            "current_price": 44.6,
+            "position_value": 1962.4,
+            "position_gain": -181.28,
+            "position_gain_pct": -8.46
+          },
+          {
+            "ticker": "CAP.PA",
+            "quantity": 10,
+            "avg_entry_price": 152.49,
+            "current_price": 104.95,
+            "position_value": 1049.5,
+            "position_gain": -475.4,
+            "position_gain_pct": -31.18
+          },
+          {
+            "ticker": "MT.AS",
+            "quantity": 18,
+            "avg_entry_price": 36.7,
+            "current_price": 53.56,
+            "position_value": 964.08,
+            "position_gain": 303.48,
+            "position_gain_pct": 45.94
+          },
+          {
+            "ticker": "BN.PA",
+            "quantity": 30,
+            "avg_entry_price": 71.02,
+            "current_price": 64.92,
+            "position_value": 1947.6,
+            "position_gain": -183.0,
+            "position_gain_pct": -8.59
+          }
+        ]
+      },
+      "metrics": {
+        "total_positions_value": 6916.1,
+        "cash": 93862.24,
+        "total_portfolio_value": 100778.34,
+        "num_trades": 139,
+        "buy_trades": 84,
+        "sell_trades": 55,
+        "total_fees": 0.0
+      },
+      "updated_at": "2026-05-06T19:43:01.590450"
+    }
+  },
+  "updated_at": "2026-05-06T19:43:01.590453"
+}

@@ -1,0 +1,36 @@
+{
+  "portfolios": {
+    "Cac Pullback": {
+      "name": "Cac Pullback",
+      "type": "paper",
+      "currency": "EUR",
+      "description": "",
+      "initial_capital": 100000.0,
+      "positions": {
+        "count": 1,
+        "data": [
+          {
+            "ticker": "CS.PA",
+            "quantity": 46,
+            "avg_entry_price": 40.95,
+            "current_price": 41.8,
+            "position_value": 1922.8,
+            "position_gain": 39.1,
+            "position_gain_pct": 2.08
+          }
+        ]
+      },
+      "metrics": {
+        "total_positions_value": 1922.8,
+        "cash": 97437.7,
+        "total_portfolio_value": 99360.5,
+        "num_trades": 73,
+        "buy_trades": 41,
+        "sell_trades": 32,
+        "total_fees": 0.0
+      },
+      "updated_at": "2026-05-06T18:21:33.098697"
+    }
+  },
+  "updated_at": "2026-05-06T18:21:33.098703"
+}

@@ -1,0 +1,26 @@
+{
+  "portfolios": {
+    "Cac Momentum": {
+      "name": "Cac Momentum",
+      "type": "paper",
+      "currency": "EUR",
+      "description": "",
+      "initial_capital": 100000.0,
+      "positions": {
+        "count": 0,
+        "data": []
+      },
+      "metrics": {
+        "total_positions_value": 0,
+        "cash": 99344.07,
+        "total_portfolio_value": 99344.07,
+        "num_trades": 71,
+        "buy_trades": 39,
+        "sell_trades": 32,
+        "total_fees": 0.0
+      },
+      "updated_at": "2026-05-06T18:27:57.774411"
+    }
+  },
+  "updated_at": "2026-05-06T18:27:57.774414"
+}

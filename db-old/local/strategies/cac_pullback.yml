@@ -1,0 +1,86 @@
+name: pullback_cac
+universe: cac40
+description: Pullback continuation strategy on CAC40 stocks - buying controlled retracements to EMA20 in strong uptrends with momentum confirmation and ATR-based risk management
+engine: TaModel
+
+indicators:
+- atr_14
+- rsi_9
+- ema_20
+- ema_50
+- adx_20
+
+watchlist:
+  enabled: true
+  parameters:
+    tickers:
+      max_count: 15
+      description: Focus on top 15 strongest trending stocks based on trend strength
+    volume:
+      min_volume: 500000
+      description: Minimum daily trading volume for liquidity
+    ranking:
+      metric: score
+      description: Ranking based on ADX strength and distance from EMA20 (clean pullbacks in strong trends)
+
+signals:
+  enabled: true
+  weights:
+    momentum: 0.5
+    trend: 0.5
+    mean_reversion: 0.0
+    volume_anomaly: 0.0
+  parameters:
+    momentum:
+      formula: data['rsi_9'] > 50 and data['rsi_9'] < 70
+      description: Momentum confirmation after pullback (RSI recovery above 50 without overextension)
+    trend:
+      formula: data['ema_20'] > data['ema_50'] and data['adx_20'] > 25
+      description: Strong trend confirmation with directional strength
+    mean_reversion:
+      formula: 'False'
+      description: Disabled - continuation strategy only
+    volume_anomaly:
+      formula: data['volume'] > 500000
+      description: Basic liquidity filter
+
+entry:
+  enabled: true
+  parameters:
+    position_size:
+      formula: max(10, min(100, int(1000 / data['close'])))
+      description: Position sizing based on 1000 capital allocation per trade
+    max_daily_orders:
+      formula: 2
+      description: Limit trades to highest quality setups
+    pullback_confirmation:
+      formula: data['rsi_9'] < 45
+      description: 'Entry trigger: RSI below 45 indicates pullback/oversold condition'
+    limit_price:
+      formula: data['close'] * 0.99
+      description: Enter at 1% discount to current price
+    regime_filter:
+      formula: "True"
+      description: Regime filter applied at watchlist stage; skip at entry stage
+
+exit:
+  enabled: true
+  parameters:
+    stop_loss:
+      formula: data['close'] * 0.95
+      description: Stop loss at 5% below current price (no indicator dependency)
+    take_profit:
+      formula: data['close'] * 1.08
+      description: Take profit at 8% above current price
+    trailing_stop:
+      formula: data['close'] * 0.97
+      description: Trailing stop at 3% below current price
+    holding_period:
+      formula: 8
+      description: Maximum holding period (8 days)
+    time_stop:
+      formula: 1
+      description: Cancel unfilled orders after 1 day
+
+backtest:
+  initial_capital: 10000
