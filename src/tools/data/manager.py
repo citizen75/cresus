@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from tools.data.core import DataHistory, Fundamental
 from tools.universe.universe import Universe
+from utils.env import get_db_root
 
 
 class DataManager:
@@ -18,7 +19,7 @@ class DataManager:
     def __init__(self, project_root: Path):
         self.project_root = project_root
         os.environ["CRESUS_PROJECT_ROOT"] = str(project_root)
-        self.cache_dir = project_root / "db" / "local" / "cache"
+        self.cache_dir = get_db_root() / "cache"
         self.history_dir = self.cache_dir / "history"
         self.fundamentals_dir = self.cache_dir / "fundamentals"
 
