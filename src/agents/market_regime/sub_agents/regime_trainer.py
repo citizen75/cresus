@@ -171,7 +171,9 @@ class RegimeTrainerAgent(Agent):
 		}
 
 		model = lgb.LGBMClassifier(**params)
-		model.fit(X_train, y_train)
+		# Convert to DataFrame with feature names to match prediction
+		X_train_df = pd.DataFrame(X_train, columns=feature_names)
+		model.fit(X_train_df, y_train)
 
 		return model
 
@@ -179,8 +181,10 @@ class RegimeTrainerAgent(Agent):
 		self, model: lgb.LGBMClassifier, X_test: np.ndarray, y_test: np.ndarray, feature_names: list
 	) -> dict:
 		"""Compute classification metrics."""
-		y_pred = model.predict(X_test)
-		y_proba = model.predict_proba(X_test)
+		# Convert to DataFrame with feature names to match training
+		X_test_df = pd.DataFrame(X_test, columns=feature_names)
+		y_pred = model.predict(X_test_df)
+		y_proba = model.predict_proba(X_test_df)
 
 		accuracy = float(accuracy_score(y_test, y_pred))
 		f1_macro = float(f1_score(y_test, y_pred, average="macro", zero_division=0))

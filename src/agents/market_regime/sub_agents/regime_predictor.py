@@ -159,8 +159,10 @@ class RegimePredictorAgent(Agent):
 		self, model, feature_row: np.ndarray, feature_names: list, regime_names: dict
 	) -> dict:
 		"""Run model prediction."""
-		y_pred = model.predict(feature_row)[0]
-		y_proba = model.predict_proba(feature_row)[0]
+		# Convert to DataFrame with feature names to match training
+		feature_df = pd.DataFrame(feature_row, columns=feature_names)
+		y_pred = model.predict(feature_df)[0]
+		y_proba = model.predict_proba(feature_df)[0]
 
 		regime_id = int(y_pred)
 		regime_name = regime_names.get(regime_id, f"Regime_{regime_id}")
