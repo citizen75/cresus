@@ -119,25 +119,31 @@ class CresusCLI(cmd2.Cmd):
 		self._init_cresus_directory()
 
 	def _init_cresus_directory(self):
-		"""Create ~/.cresus directory structure and copy config files."""
+		"""Create ~/.cresus directory structure and copy config files from init/ template."""
 		cresus_home = Path.home() / ".cresus"
+		init_template = self.project_root / "init"
+
 		console.print(f"[bold cyan]Initializing Cresus configuration[/bold cyan]")
 		console.print(f"Location: {cresus_home}\n")
 
-		# Define directory structure
-		dirs_to_create = [
-			cresus_home,
-			cresus_home / "db" / "cache" / "history",
-			cresus_home / "db" / "cache" / "fundamentals",
-			cresus_home / "db" / "models",
-			cresus_home / "db" / "regimes",
-			cresus_home / "db" / "backtests",
-			cresus_home / "db" / "portfolios",
-			cresus_home / "db" / "strategies",
-			cresus_home / "db" / "orders",
-			cresus_home / "config",
-			cresus_home / "config" / "strategies",
-		]
+		if not init_template.exists():
+			console.print(f"[red]✗ Init template not found: {init_template}[/red]")
+			return
+
+		# Define directory structure from init template
+		dirs_to_create = [cresus_home]
+
+		# Recursively collect all directories from init/db
+		for item in (init_template / "db").rglob("*"):
+			if item.is_dir():
+				rel_path = item.relative_to(init_template / "db")
+				dirs_to_create.append(cresus_home / "db" / rel_path)
+
+		# Add config directories
+		dirs_to_create.append(cresus_home / "config")
+		config_strategies = init_template / "config" / "strategies"
+		if config_strategies.exists():
+			dirs_to_create.append(cresus_home / "config" / "strategies")
 
 		# Create directories
 		created_dirs = []
@@ -151,13 +157,12 @@ class CresusCLI(cmd2.Cmd):
 		else:
 			console.print("[yellow]⚠ All directories already exist[/yellow]")
 
-		# Copy config files from project
+		# Copy config files from init/config
 		config_files = ["cresus.yml", "cron.yml", "mcp.yml"]
-		project_config = self.project_root / "config"
-
 		copied_files = []
+
 		for config_file in config_files:
-			src = project_config / config_file
+			src = init_template / "config" / config_file
 			dst = cresus_home / "config" / config_file
 
 			if src.exists() and not dst.exists():
@@ -180,7 +185,7 @@ class CresusCLI(cmd2.Cmd):
 		# Create .env file if it doesn't exist
 		env_file = cresus_home / ".env"
 		if not env_file.exists():
-			env_template = self.project_root / ".env.example"
+			env_template = init_template / ".env"
 			if env_template.exists():
 				try:
 					with open(env_template, 'r') as f:
@@ -191,25 +196,7 @@ class CresusCLI(cmd2.Cmd):
 				except Exception as e:
 					console.print(f"[red]✗ Error creating .env: {e}[/red]")
 			else:
-				# Create default .env
-				default_env = """# Cresus Environment Configuration
-# See .env.example in project root for all available options
-
-API_HOST=0.0.0.0
-API_PORT=8000
-MCP_HOST=localhost
-MCP_PORT=3000
-FRONT_HOST=localhost
-FRONT_PORT=5173
-GATEWAY_CRON_ENABLED=true
-GATEWAY_MCP_ENABLED=true
-"""
-				try:
-					with open(env_file, 'w') as f:
-						f.write(default_env)
-					console.print("[green]✓ Created default .env[/green]")
-				except Exception as e:
-					console.print(f"[red]✗ Error creating .env: {e}[/red]")
+				console.print("[yellow]⚠ .env template not found[/yellow]")
 		else:
 			console.print("[yellow]⚠ .env already exists (not overwritten)[/yellow]")
 
