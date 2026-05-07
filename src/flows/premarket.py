@@ -51,13 +51,15 @@ class PreMarketFlow(Flow):
 		data_agent = DataAgent(f"DataAgent[{self.strategy_name}]", self.context)
 		self.add_step(data_agent, step_name="data", required=True)
 
-		# Watchlist step - filter tickers based on strategy criteria (uses data from previous step)
-		watchlist_agent = WatchListAgent("WatchListAgent", self.context)
-		self.add_step(watchlist_agent, step_name="watchlist", required=True)
-
-		# Signals step - generate trading signals on watchlist tickers
+		# Signals step - generate trading signals on all tickers first
+		# This provides ticker_scores that drive downstream filtering
 		signals_agent = SignalsAgent("SignalsAgent", self.context)
 		self.add_step(signals_agent, step_name="signals", required=True)
+
+		# Watchlist step - filter tickers based on strategy criteria and signal scores
+		# Runs after signals to use signal-based filtering
+		watchlist_agent = WatchListAgent("WatchListAgent", self.context)
+		self.add_step(watchlist_agent, step_name="watchlist", required=True)
 
 		# Entry analysis step - analyze trade entry points for watchlist tickers
 		entry_agent = EntryAgent("EntryAgent", self.context)
