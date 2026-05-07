@@ -88,66 +88,75 @@ class PositionSizingAgent(Agent):
 		# Calculate position sizes
 		sized_orders = []
 		for rec in entry_recommendations:
-			ticker = rec.get("ticker")
-			entry_price = rec.get("entry_price")
-			stop_loss = rec.get("stop_loss")
-
-			if not ticker or entry_price is None or stop_loss is None:
-				continue
-
-			# Skip if entry_price or stop_loss are invalid
 			try:
-				entry_price = float(entry_price)
-				stop_loss = float(stop_loss)
-			except (ValueError, TypeError):
-				self.logger.debug(f"{ticker}: Invalid entry_price or stop_loss, skipping")
-				continue
+				ticker = rec.get("ticker")
+				entry_price = rec.get("entry_price")
+				stop_loss = rec.get("stop_loss")
 
-			# Get current price
-			fundamental = Fundamental(ticker)
-			current_price = fundamental.get_current_price() or entry_price
-
-			# Try to calculate position size from strategy config formula first
-			shares = None
-			if position_size_formula:
-				data_context = {"close": current_price}
-				shares = ConfigEvaluator.evaluate_position_size(
-					position_size_formula, data_context, max_shares=None
-				)
-				if shares and shares > 0:
-					self.logger.debug(f"{ticker}: Using formula-based shares={shares}")
-
-			# Fall back to portfolio-based sizing if formula didn't work
-			if not shares or shares <= 0:
-				# Calculate position size based on method
-				if self.sizing_method == "fractional":
-					shares = self._fractional_sizing(cash, current_price, entry_price, stop_loss)
-				elif self.sizing_method == "kelly":
-					rr_ratio = rec.get("rr_ratio", 1.0)
-					win_rate = self.context.get("win_rate", 0.5)
-					shares = self._kelly_sizing(cash, current_price, rr_ratio, win_rate)
-				elif self.sizing_method == "volatility":
-					volatility = rec.get("volatility", 0.02)
-					shares = self._volatility_sizing(cash, current_price, volatility)
-				else:
-					shares = self._fractional_sizing(cash, current_price, entry_price, stop_loss)
-
-			# Validate shares is a valid number
-			import math
-			if shares is not None and not math.isnan(shares) and not math.isinf(shares) and shares > 0:
-				try:
-					shares_int = int(shares)
-					sized_orders.append({
-						"ticker": ticker,
-						"shares": shares_int,
-						"entry_price": entry_price,
-						"order_value": shares_int * current_price,
-						"risk_amount": abs(shares_int * (entry_price - stop_loss)),
-						"sizing_method": "strategy_config" if position_size_formula else self.sizing_method,
-					})
-				except (ValueError, TypeError) as e:
-					self.logger.debug(f"{ticker}: Failed to convert shares to int: {e}, skipping")
+				if not ticker or entry_price is None or stop_loss is None:
 					continue
+
+				# Skip if entry_price or stop_loss are invalid
+				try:
+					entry_price = float(entry_price)
+					stop_loss = float(stop_loss)
+				except (ValueError, TypeError):
+					self.logger.debug(f"{ticker}: Invalid entry_price or stop_loss, skipping")
+					continue
+
+				# Get current price
+				fundamental = Fundamental(ticker)
+				current_price = fundamental.get_current_price() or entry_price
+
+				# Validate current_price is not NaN/Inf
+				import math
+				if math.isnan(current_price) or math.isinf(current_price) or current_price <= 0:
+					self.logger.debug(f"{ticker}: Invalid current_price ({current_price}), skipping")
+					continue
+
+				# Try to calculate position size from strategy config formula first
+				shares = None
+				if position_size_formula:
+					data_context = {"close": current_price}
+					shares = ConfigEvaluator.evaluate_position_size(
+						position_size_formula, data_context, max_shares=None
+					)
+					if shares and shares > 0:
+						self.logger.debug(f"{ticker}: Using formula-based shares={shares}")
+
+				# Fall back to portfolio-based sizing if formula didn't work
+				if not shares or shares <= 0:
+					# Calculate position size based on method
+					if self.sizing_method == "fractional":
+						shares = self._fractional_sizing(cash, current_price, entry_price, stop_loss)
+					elif self.sizing_method == "kelly":
+						rr_ratio = rec.get("rr_ratio", 1.0)
+						win_rate = self.context.get("win_rate", 0.5)
+						shares = self._kelly_sizing(cash, current_price, rr_ratio, win_rate)
+					elif self.sizing_method == "volatility":
+						volatility = rec.get("volatility", 0.02)
+						shares = self._volatility_sizing(cash, current_price, volatility)
+					else:
+						shares = self._fractional_sizing(cash, current_price, entry_price, stop_loss)
+
+				# Validate shares is a valid number
+				if shares is not None and not math.isnan(shares) and not math.isinf(shares) and shares > 0:
+					try:
+						shares_int = int(shares)
+						sized_orders.append({
+							"ticker": ticker,
+							"shares": shares_int,
+							"entry_price": entry_price,
+							"order_value": shares_int * current_price,
+							"risk_amount": abs(shares_int * (entry_price - stop_loss)),
+							"sizing_method": "strategy_config" if position_size_formula else self.sizing_method,
+						})
+					except (ValueError, TypeError, OverflowError) as e:
+						self.logger.debug(f"{ticker}: Failed to convert shares to int: {e}, skipping")
+						continue
+			except Exception as e:
+				self.logger.debug(f"Error processing recommendation for {rec.get('ticker', 'unknown')}: {e}, skipping")
+				continue
 
 		# Store sized orders in context
 		self.context.set("sized_orders", sized_orders)
