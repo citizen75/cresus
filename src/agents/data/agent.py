@@ -73,7 +73,7 @@ class DataAgent(Agent):
 				ticker_data = dh.get_all()
 
 				if ticker_data.empty:
-					self.logger.error(f"No cached data available for {ticker}")
+					self.logger.warning(f"No cached data available for {ticker}")
 					continue
 
 				# Calculate indicators if specified
@@ -90,7 +90,7 @@ class DataAgent(Agent):
 						dh.filepath.parent.mkdir(parents=True, exist_ok=True)
 						ticker_data.to_parquet(dh.filepath, index=False)
 					except Exception as e:
-						self.logger.error(f"Failed to calculate indicators for {ticker}: {e}")
+						self.logger.warning(f"Failed to calculate indicators for {ticker}: {e}")
 
 				data_history[ticker] = ticker_data
 			except Exception as e:
