@@ -1,9 +1,9 @@
 """
 Volume Indicators
 
-OBV, MFI, CMF, Volume Ratio
+OBV, MFI, CMF, Volume Ratio, VWAP
 """
 
-from . import obv, mfi, cmf, volume_ratio
+from . import obv, mfi, cmf, volume_ratio, vwap
 
-__all__ = ["obv", "mfi", "cmf", "volume_ratio"]
+__all__ = ["obv", "mfi", "cmf", "volume_ratio", "vwap"]

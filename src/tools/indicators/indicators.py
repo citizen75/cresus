@@ -139,15 +139,47 @@ def calculate(
     # Map results back to formula strings
     results = {}
     for formula, (indicator_name, params) in formula_map.items():
+        # Extract component if present (for multi-return indicators)
+        component = params.pop('__component__', None)
+
         param_key = tuple(sorted(params.items()))
         indicator_key = (indicator_name, param_key)
 
         calc_result = calc_results[indicator_key]
 
-        # If indicator returns multiple Series (Dict), pick the main one or the formula name
+        # If indicator returns multiple Series (Dict), pick the right one
         if isinstance(calc_result, dict):
-            # For multi-return indicators, try to match formula exactly
-            if formula in calc_result:
+            # If component specified, use it to select from dict
+            if component:
+                # Try to find matching key: component, indicator_component, indicator_params_component
+                possible_keys = [
+                    component,
+                    f"{indicator_name}_{component}",
+                    f"bb_{component}",  # For Bollinger Bands
+                    f"macd_{component}",  # For MACD
+                ]
+                found = False
+                for key in possible_keys:
+                    if key in calc_result:
+                        results[formula] = calc_result[key]
+                        found = True
+                        break
+
+                if not found:
+                    # Fallback: try to match any key containing the component
+                    for key in calc_result.keys():
+                        if component in key:
+                            results[formula] = calc_result[key]
+                            found = True
+                            break
+
+                if not found:
+                    raise IndicatorNotFoundError(
+                        f"Component '{component}' not found in {indicator_name} result. "
+                        f"Available: {list(calc_result.keys())}"
+                    )
+            # No component specified - try formula or indicator name match
+            elif formula in calc_result:
                 results[formula] = calc_result[formula]
             elif indicator_name in calc_result:
                 results[formula] = calc_result[indicator_name]
@@ -241,11 +273,12 @@ def _register_all_indicators():
 
     try:
         # Volume indicators
-        from .volume import obv, mfi, cmf, volume_ratio
+        from .volume import obv, mfi, cmf, volume_ratio, vwap
         register_indicator("obv", obv.calculate)
         register_indicator("mfi", mfi.calculate)
         register_indicator("cmf", cmf.calculate)
         register_indicator("vratio", volume_ratio.calculate)
+        register_indicator("vwap", vwap.calculate)
     except ImportError:
         pass
 

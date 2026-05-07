@@ -63,7 +63,8 @@ class BacktestFlow(Flow):
 
 		# Create backtest ID for sandboxing (timestamp + short UUID)
 		backtest_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{str(uuid.uuid4())[:8]}"
-		backtest_dir = Path(os.environ.get("CRESUS_PROJECT_ROOT", ".")) / "db" / "local" / "backtests" / backtest_id
+		# Organize backtests by strategy: db/local/backtests/<strategy_name>/<timestamp>
+		backtest_dir = Path(os.environ.get("CRESUS_PROJECT_ROOT", ".")) / "db" / "local" / "backtests" / strategy_name / backtest_id
 		backtest_dir.mkdir(parents=True, exist_ok=True)
 
 		# Set in context for sandboxing
@@ -137,8 +138,8 @@ class BacktestFlow(Flow):
 			end_date=flow_input.get("end_date"),
 			start_value=initial_capital
 		)
-		# Merge metrics into output
-		backtest_output.update(metrics)
+		# Add metrics under portfolio_metrics key
+		backtest_output["portfolio_metrics"] = metrics
 
 		# Run research agent to identify issues
 		research_agent = ResearchAgent()

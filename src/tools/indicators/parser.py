@@ -22,13 +22,20 @@ class FormulaParser:
     # Regex pattern for DSL formula: indicator_param1_param2_...
     PATTERN = r'^([a-z_]+?)(?:_(.+))?$'
 
+    # Known component suffixes for multi-return indicators
+    COMPONENT_SUFFIXES = {
+        'upper', 'lower', 'middle',  # Bollinger Bands
+        'line', 'signal', 'histogram',  # MACD
+        'plus', 'minus',  # DMI
+    }
+
     @staticmethod
     def parse(formula: str) -> Tuple[str, Dict[str, Any]]:
         """
         Parse DSL formula into indicator name and parameters.
 
         Args:
-            formula: DSL formula string (e.g., "rsi_14", "bb_20_2", "obv")
+            formula: DSL formula string (e.g., "rsi_14", "bb_20_2", "obv", "bb_20_2_lower", "bollinger_bands_20_2_lower")
 
         Returns:
             Tuple of (indicator_name, parameters_dict)
@@ -47,17 +54,93 @@ class FormulaParser:
         if not match:
             raise InvalidFormulaError(f"Invalid formula syntax: {formula}")
 
-        indicator_name = match.group(1)
+        indicator_name_guess = match.group(1)
         param_str = match.group(2)
 
-        # Validate indicator exists
-        if indicator_name not in INDICATOR_PARAMS:
-            raise InvalidFormulaError(f"Unknown indicator: {indicator_name}")
+        # Check for component suffix (e.g., _lower, _upper, _signal)
+        component = FormulaParser._extract_component(param_str)
+        if component:
+            # Remove component from param_str
+            param_str = param_str[:-len(component)-1]  # -1 for underscore
 
-        # Parse parameters
-        params = FormulaParser._parse_params(indicator_name, param_str)
+        # Find the actual indicator name by trying progressively
+        # For multi-word indicators like "bollinger_bands", we need to check
+        # against the defined indicators in INDICATOR_PARAMS
+        indicator_name, remaining_param_str = FormulaParser._find_indicator_name(indicator_name_guess, param_str)
+
+        if not indicator_name:
+            raise InvalidFormulaError(f"Unknown indicator: {indicator_name_guess}")
+
+        # Parse parameters (use remaining_param_str to skip the consumed indicator name parts)
+        params = FormulaParser._parse_params(indicator_name, remaining_param_str)
+
+        # Store component suffix in params if present
+        if component:
+            params['__component__'] = component
 
         return indicator_name, params
+
+    @staticmethod
+    def _find_indicator_name(indicator_guess: str, param_str: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Find the actual indicator name by checking against defined indicators.
+
+        Handles multi-word indicators like "bollinger_bands" by trying to match
+        the longest possible indicator name in the guess.
+
+        Args:
+            indicator_guess: Initial indicator name guess (e.g., "bollinger")
+            param_str: Parameter string (e.g., "bands_20_2" or "20_2")
+
+        Returns:
+            Tuple of (matched_indicator_name, remaining_param_str), or (None, None) if not found
+        """
+        # First, try the guess directly
+        if indicator_guess in INDICATOR_PARAMS:
+            return indicator_guess, param_str
+
+        # If guess not found and param_str exists, try progressively longer indicators
+        # by moving parts from param_str to indicator_name
+        if param_str:
+            parts = param_str.split('_')
+            # Try combining indicator_guess with param parts to find multi-word indicator
+            # Go in reverse order to find longest match first
+            for i in range(len(parts) - 1, -1, -1):
+                # Try: indicator_guess_part1, indicator_guess_part1_part2, etc.
+                potential_name = indicator_guess + '_' + '_'.join(parts[:i+1])
+                if potential_name in INDICATOR_PARAMS:
+                    # Return the matched name and remaining params
+                    remaining_params = '_'.join(parts[i+1:]) if i+1 < len(parts) else None
+                    return potential_name, remaining_params
+
+        return None, None
+
+    @staticmethod
+    def _extract_component(param_str: Optional[str]) -> Optional[str]:
+        """
+        Extract component suffix from parameter string.
+
+        Checks if param_str ends with a known component suffix (e.g., _lower, _upper, _signal).
+
+        Args:
+            param_str: Parameter string (e.g., "20_2_lower")
+
+        Returns:
+            Component name if found (e.g., "lower"), otherwise None
+        """
+        if not param_str:
+            return None
+
+        # Get the last part after the final underscore
+        parts = param_str.split('_')
+        if not parts:
+            return None
+
+        last_part = parts[-1]
+        if last_part in FormulaParser.COMPONENT_SUFFIXES:
+            return last_part
+
+        return None
 
     @staticmethod
     def _parse_params(

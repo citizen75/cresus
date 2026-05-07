@@ -54,12 +54,15 @@ class WatchlistManager:
 		sorted_tickers: Optional[List[Dict[str, Any]]] = None,
 		strategy_config: Optional[Dict[str, Any]] = None,
 		save_enabled: bool = True,
+		orders: Optional[Dict[str, Any]] = None,
+		indicators: Optional[Dict[str, Dict[str, Any]]] = None,
 	) -> Dict[str, Any]:
 		"""Process and save watchlist with intelligent ticker selection.
 
 		Handles full watchlist processing including:
 		- Determining which tickers to save (from sorted_tickers or watchlist)
 		- Limiting by max_count from strategy config
+		- Adding technical indicators and order information
 		- Optionally saving to disk based on save_enabled toggle
 
 		Args:
@@ -69,6 +72,8 @@ class WatchlistManager:
 			sorted_tickers: Optional list of pre-sorted tickers from signals (with rank info)
 			strategy_config: Optional strategy config dict (for max_count)
 			save_enabled: Toggle to enable/disable saving to disk (default: True)
+			orders: Optional dict of order data by ticker
+			indicators: Optional dict of technical indicators by ticker
 
 		Returns:
 			Dict with status and watchlist save details
@@ -102,24 +107,27 @@ class WatchlistManager:
 			}
 
 		# Save to disk
-		return self.save(tickers_to_save, ticker_scores, data_history)
+		return self.save(tickers_to_save, ticker_scores, data_history, orders=orders, indicators=indicators)
 
 	def save(
 		self,
 		watchlist: List[str],
 		ticker_scores: Dict[str, Dict[str, Any]],
 		data_history: Dict[str, pd.DataFrame],
+		orders: Optional[Dict[str, Any]] = None,
+		indicators: Optional[Dict[str, Dict[str, Any]]] = None,
 	) -> Dict[str, Any]:
-		"""Save watchlist with OHLCV and signal data to CSV.
+		"""Save watchlist with OHLCV, signal data, indicators, and order info.
 
-		Merges watchlist tickers with their latest OHLCV data and signal scores.
-		Creates a CSV with columns: ticker, date, open, high, low, close, volume,
-		signal_score, signals
+		Merges watchlist tickers with their latest OHLCV data, signal scores,
+		technical indicators, and pending order information.
 
 		Args:
 			watchlist: List of ticker symbols in watchlist
 			ticker_scores: Dict mapping ticker -> {score, raw_score, triggered_signals, signal_count}
 			data_history: Dict mapping ticker -> DataFrame with OHLCV data
+			orders: Optional dict mapping ticker -> order info
+			indicators: Optional dict mapping ticker -> technical indicators
 
 		Returns:
 			Dict with status and details about saved watchlist
@@ -186,6 +194,31 @@ class WatchlistManager:
 						"signals": signals_str,
 					}
 					rows.append(row)
+
+			# Add indicators if provided
+			if indicators:
+				for i, row in enumerate(rows):
+					ticker = row["ticker"]
+					if ticker in indicators:
+						ticker_indicators = indicators[ticker]
+						# Add all indicators with their parameter-based names
+						for indicator_name, indicator_value in ticker_indicators.items():
+							row[indicator_name] = indicator_value
+					rows[i] = row
+
+			# Add order info if provided
+			if orders:
+				for i, row in enumerate(rows):
+					ticker = row["ticker"]
+					if ticker in orders:
+						order_info = orders[ticker]
+						row["order_qty"] = order_info.get("quantity")
+						row["order_entry"] = order_info.get("entry_price")
+						row["order_stop"] = order_info.get("stop_loss")
+						row["order_target"] = order_info.get("take_profit")
+						row["order_method"] = order_info.get("execution_method")
+						row["order_status"] = order_info.get("status")
+					rows[i] = row
 
 			# Create DataFrame and save to CSV
 			if rows:

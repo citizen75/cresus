@@ -22,12 +22,32 @@ jobs:
     params:
       strategy: momentum_etf_fr
 
-  # Example: Run data fetch every 6 hours
-  - name: data_sync
-    description: "Sync market data every 6 hours"
-    enabled: false
-    schedule: "0 */6 * * *"  # Every 6 hours
+  # Heartbeat every 5 minutes
+  - name: heartbeat
+    description: "Gateway heartbeat - logs INFO message every 5 minutes"
+    enabled: true
+    schedule: "*/5 * * * *"  # Every 5 minutes
+    type: flow
+    target: heartbeat
+    params: {}
+
+  # Data sync every 30 minutes during market hours
+  - name: data_sync_cac40
+    description: "Sync CAC40 market data every 30 minutes (9:00-18:30, weekdays)"
+    enabled: true
+    schedule: "*/30 9-18 * * 1-5"  # Every 30 minutes, hours 9-18, Monday-Friday
     type: flow
     target: data_fetch
     params:
       universe: cac40
+
+
+    # Data sync every 30 minutes during market hours
+  - name: data_sync_index
+    description: "Sync index market data every 30 minutes (9:00-18:30, weekdays)"
+    enabled: true
+    schedule: "*/30 * * * 1-5"  # Every 30 minutes, hours 9-18, Monday-Friday
+    type: flow
+    target: data_fetch
+    params:
+      universe: index

@@ -1,4 +1,4 @@
-"""Portfolio cache manager - stores latest metrics in db/local/portfolios.json"""
+"""Portfolio cache manager - stores latest metrics in ~/.cresus/db/portfolios.json"""
 
 import json
 from pathlib import Path
@@ -7,13 +7,13 @@ from datetime import datetime
 import os
 from loguru import logger
 
+from utils.env import get_db_root
+
 
 class PortfolioCache:
     """Manage cached portfolio metrics."""
 
     def __init__(self, cache_path: Optional[Path] = None, context: Optional[Dict[str, Any]] = None):
-        project_root = Path(os.environ.get("CRESUS_PROJECT_ROOT", os.getcwd()))
-
         # Check if running in backtest context
         backtest_dir = None
         if context:
@@ -24,7 +24,7 @@ class PortfolioCache:
             self.cache_path = Path(backtest_dir) / "portfolios.json"
         else:
             # Use normal directory
-            self.cache_path = Path(cache_path or project_root / "db/local/portfolios.json")
+            self.cache_path = Path(cache_path or get_db_root() / "portfolios.json")
 
         self.cache_path.parent.mkdir(parents=True, exist_ok=True)
 

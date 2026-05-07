@@ -12,6 +12,7 @@ from pathlib import Path
 
 from tools.portfolio.manager import PortfolioManager
 from tools.portfolio.metrics import PortfolioMetrics
+from utils.env import get_db_root
 
 
 class CreatePortfolioRequest(BaseModel):
@@ -37,8 +38,7 @@ router = APIRouter(prefix="/portfolios", tags=["portfolios"])
 
 def _get_portfolios_json_path() -> Path:
     """Get path to portfolios.json file."""
-    project_root = Path(os.environ.get("CRESUS_PROJECT_ROOT", "."))
-    return project_root / "db" / "local" / "portfolios.json"
+    return get_db_root() / "portfolios.json"
 
 
 def _load_portfolios_from_json() -> Dict[str, Any]:

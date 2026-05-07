@@ -27,13 +27,15 @@ class ConfigEvaluator:
 			return None
 
 		try:
-			# Create safe namespace with data dict
+			# Create safe namespace with data dict and built-in functions
 			namespace = {
 				"data": data,
 				"abs": abs,
 				"round": round,
 				"max": max,
 				"min": min,
+				"int": int,
+				"float": float,
 			}
 
 			# Evaluate the formula
@@ -46,7 +48,7 @@ class ConfigEvaluator:
 			return None
 
 		except Exception as e:
-			logger.warning(f"Failed to evaluate formula '{formula}': {e}")
+			logger.error(f"Failed to evaluate formula '{formula}': {e}")
 			return None
 
 	@staticmethod

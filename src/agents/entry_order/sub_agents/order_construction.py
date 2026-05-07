@@ -49,10 +49,11 @@ class OrderConstructionAgent(Agent):
 				"message": "No validated orders to construct"
 			}
 
-		# Try to load strategy config for exit parameters
+		# Try to load strategy config for entry and exit parameters
 		strategy_name = self.context.get("strategy_name")
 		exit_config = {}
-		
+		entry_config = {}
+
 		if strategy_name:
 			try:
 				strategy_manager = StrategyManager()
@@ -60,6 +61,7 @@ class OrderConstructionAgent(Agent):
 				if strategy_result.get("status") == "success":
 					strategy_data = strategy_result.get("data", {})
 					exit_config = strategy_data.get("exit", {}).get("parameters", {})
+					entry_config = strategy_data.get("entry", {}).get("parameters", {})
 			except Exception as e:
 				self.logger.debug(f"Could not load strategy config: {e}")
 
@@ -87,19 +89,16 @@ class OrderConstructionAgent(Agent):
 				if risk > 0:
 					risk_reward = reward / risk
 
-			# Extract trailing_stop and holding_period from config
-			trailing_stop = None
+			# Extract trailing stop distance and holding period from config
+			trailing_stop_distance = None
 			holding_period = None
 
-			if "trailing_stop" in exit_config:
-				ts_formula = exit_config["trailing_stop"].get("formula")
-				if ts_formula:
-					# Evaluate trailing_stop formula (e.g., "data['close'] - data['atr_14']")
-					data_context = {
-						"close": entry_price,
-						"atr_14": rec.get("risk_amount", 0),  # Use risk_amount as proxy for ATR
-					}
-					trailing_stop = ConfigEvaluator.evaluate_formula(ts_formula, data_context)
+			# Calculate trailing_stop_distance based on the stop_loss
+			# If trailing_stop is configured, the distance is (entry_price - initial_stop_loss)
+			if "trailing_stop" in exit_config and stop_loss is not None and entry_price is not None:
+				# The initial trailing distance is the distance from entry to the initial stop loss
+				# This distance will be maintained as the price rises (hence "trailing")
+				trailing_stop_distance = entry_price - stop_loss
 
 			if "holding_period" in exit_config:
 				hp_formula = exit_config["holding_period"].get("formula")
@@ -113,17 +112,35 @@ class OrderConstructionAgent(Agent):
 						if result:
 							holding_period = int(result)
 
+			# Determine execution method and limit price
+			execution_method = order.get("execution_method", "market")
+			limit_price = None
+
+			# Check if entry config specifies limit orders
+			if "limit_price" in entry_config:
+				# Allow strategy to use limit orders
+				lp_formula = entry_config["limit_price"].get("formula")
+				if lp_formula:
+					data_context = {
+						"close": entry_price,
+						"atr_14": rec.get("risk_amount", 0),
+					}
+					limit_price = ConfigEvaluator.evaluate_formula(lp_formula, data_context)
+					if limit_price:
+						execution_method = "limit"
+
 			executable_order = {
 				"id": self._generate_order_id(ticker),
 				"ticker": ticker,
 				"shares": order.get("shares"),
 				"entry_price": entry_price,
-				"execution_method": order.get("execution_method", "market"),
+				"limit_price": limit_price,
+				"execution_method": execution_method,
 				"limit_offset": order.get("limit_offset", 0),
 				"scale_count": order.get("scale_count", 1),
 				"stop_loss": stop_loss,
 				"take_profit": take_profit,
-				"trailing_stop": trailing_stop,
+				"trailing_stop_distance": trailing_stop_distance,
 				"holding_period": holding_period,
 				"risk_amount": order.get("risk_amount"),
 				"risk_reward": risk_reward,

@@ -131,6 +131,34 @@ class EntryOrderAgent(Agent):
 		# Get final executable orders from context
 		executable_orders = self.context.get("executable_orders") or []
 
+		# Apply max_daily_orders constraint if specified in strategy config
+		strategy_config = self.context.get("strategy_config") or {}
+		entry_config = strategy_config.get("entry", {})
+		max_daily_orders_param = entry_config.get("parameters", {}).get("max_daily_orders")
+
+		if max_daily_orders_param and executable_orders:
+			try:
+				# Extract numeric value from formula or use directly
+				if isinstance(max_daily_orders_param, dict):
+					max_daily = int(max_daily_orders_param.get("formula", 999))
+				else:
+					max_daily = int(max_daily_orders_param)
+
+				if len(executable_orders) > max_daily:
+					# Keep top N orders by score, discard the rest
+					orders_with_scores = [
+						(order, order.get("metadata", {}).get("entry_score", 0))
+						for order in executable_orders
+					]
+					orders_with_scores.sort(key=lambda x: x[1], reverse=True)
+					executable_orders = [order for order, score in orders_with_scores[:max_daily]]
+					self.logger.info(
+						f"Applied max_daily_orders limit: {max_daily}. "
+						f"Reduced from {len(entry_recommendations)} recommendations to {len(executable_orders)} orders"
+					)
+			except (ValueError, TypeError) as e:
+				self.logger.warning(f"Could not parse max_daily_orders constraint: {e}")
+
 		# Execute orders through broker if execute=True and portfolio type is "paper"
 		execution_results = []
 		if executable_orders and self.execute:
@@ -165,6 +193,8 @@ class EntryOrderAgent(Agent):
 					entry_price=order.get("entry_price"),
 					stop_loss=order.get("stop_loss"),
 					take_profit=order.get("take_profit"),
+					limit_price=order.get("limit_price"),
+					trailing_stop_distance=order.get("trailing_stop_distance"),
 					execution_method=order.get("execution_method", "market"),
 					scale_count=order.get("scale_count", 1),
 					risk_amount=order.get("risk_amount"),

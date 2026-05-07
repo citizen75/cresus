@@ -16,15 +16,15 @@ def main():
     """Start CLI."""
     from cli.app import CresusCLI
 
-    app = CresusCLI()
-
-    # If arguments provided, execute command and exit
+    # If arguments provided, use command mode (suppress banner)
     if len(sys.argv) > 1:
+        app = CresusCLI(interactive=False)
         command = " ".join(sys.argv[1:])
         app.onecmd(command)
         return 0
 
     # Otherwise, enter interactive shell
+    app = CresusCLI(interactive=True)
     return app.cmdloop()
 
 

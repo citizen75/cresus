@@ -33,6 +33,7 @@ INDICATOR_PARAMS = {
     "cmf": {"params": ["period"], "defaults": {"period": 20}},
     "vratio": {"params": ["period"], "defaults": {"period": 20}},
     "pvt": {"params": [], "defaults": {}},  # Price-Volume Trend
+    "vwap": {"params": ["anchor"], "defaults": {"anchor": None}},  # Volume Weighted Average Price
 
     # Support/Resistance
     "support": {"params": ["period"], "defaults": {"period": 14}},
@@ -45,7 +46,7 @@ INDICATOR_PARAMS = {
 }
 
 # Indicator return types
-RETURN_SINGLE = {"rsi", "macd_line", "macd_signal", "macd_histogram", "adx", "obv", "mfi", "cmf"}
+RETURN_SINGLE = {"rsi", "macd_line", "macd_signal", "macd_histogram", "adx", "obv", "mfi", "cmf", "vwap"}
 RETURN_DICT = {"macd", "bb", "bollinger_bands", "dmi", "pivot"}  # Return multiple series
 
 # Default periods if not specified

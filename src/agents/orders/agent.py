@@ -4,6 +4,7 @@ from typing import Any, Dict, Optional, List
 from datetime import datetime, timedelta
 from core.agent import Agent
 from tools.portfolio.orders import Orders
+from tools.strategy.strategy import StrategyManager
 
 
 class OrdersAgent(Agent):
@@ -23,11 +24,12 @@ class OrdersAgent(Agent):
 		super().__init__(name, context)
 
 	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-		"""Expire pending orders that were not executed today.
+		"""Expire pending orders that exceeded their holding period.
 
 		Args:
 			input_data: Input data with:
 				- portfolio_name: Portfolio name (optional, uses context if not provided)
+				- holding_period: Holding period in days (optional, default 1 day)
 
 		Returns:
 			Response with expiration results
@@ -38,6 +40,26 @@ class OrdersAgent(Agent):
 		portfolio_name = input_data.get("portfolio_name") or self.context.get("portfolio_name") or "default"
 		trading_date = self.context.get("date")
 
+		# Get time_stop from strategy config (how long to wait for orders to fill before expiring)
+		# Default 1 day - this is order expiration, separate from position holding_period
+		time_stop = input_data.get("time_stop", 1)
+		strategy_name = self.context.get("strategy_name")
+		if strategy_name:
+			try:
+				strategy_manager = StrategyManager()
+				strategy_result = strategy_manager.load_strategy(strategy_name)
+				if strategy_result.get("status") == "success":
+					strategy_data = strategy_result.get("data", {})
+					exit_config = strategy_data.get("exit", {}).get("parameters", {})
+					ts_formula = exit_config.get("time_stop", {}).get("formula")
+					if ts_formula:
+						try:
+							time_stop = int(float(ts_formula))
+						except (ValueError, TypeError):
+							pass
+			except Exception as e:
+				self.logger.debug(f"Could not load strategy config for time_stop: {e}")
+
 		if not trading_date:
 			return {
 				"status": "error",
@@ -46,7 +68,7 @@ class OrdersAgent(Agent):
 			}
 
 		orders_mgr = Orders(portfolio_name, context=self.context.__dict__)
-		expired_results = self._expire_old_orders(orders_mgr, trading_date)
+		expired_results = self._expire_old_orders(orders_mgr, trading_date, time_stop)
 
 		return {
 			"status": "success",
@@ -54,25 +76,27 @@ class OrdersAgent(Agent):
 				"expired_count": len(expired_results),
 				"expired_orders": expired_results,
 			},
-			"message": f"Expired {len(expired_results)} pending order(s) with 1-day lifetime exceeded",
+			"message": f"Expired {len(expired_results)} pending order(s) with {time_stop}-day time_stop exceeded",
 		}
 
 	def _expire_old_orders(
 		self,
 		orders_mgr: Orders,
-		trading_date: Any
+		trading_date: Any,
+		time_stop: int = 1
 	) -> List[Dict[str, Any]]:
-		"""Expire pending orders that have exceeded 1-day lifetime.
+		"""Expire pending orders that have exceeded time_stop duration.
 
 		Rules:
-		- Pending orders created today are kept (may execute tomorrow if premarket runs again)
-		- Pending orders from yesterday or earlier are expired (1-day lifetime exceeded)
+		- Pending orders created today are kept (may execute today if limit met, or expire tomorrow)
+		- Pending orders older than time_stop days are expired
 		- Already executed orders are left unchanged
 		- Already cancelled/expired orders are left unchanged
 
 		Args:
 			orders_mgr: Orders manager
 			trading_date: Current trading date
+			time_stop: Number of days before unfilled order expires (default: 1)
 
 		Returns:
 			List of expired order results
@@ -97,7 +121,7 @@ class OrdersAgent(Agent):
 			if pending_orders.empty:
 				total_orders = len(df)
 				status_summary = df["status"].value_counts().to_dict()
-				self.logger.info(
+				self.logger.warning(
 					f"No pending orders to expire. Total orders: {total_orders}, "
 					f"Status breakdown: {status_summary}"
 				)
@@ -115,7 +139,7 @@ class OrdersAgent(Agent):
 					created_datetime = datetime.fromisoformat(created_at_str)
 					created_date = created_datetime.date()
 				except (ValueError, AttributeError):
-					self.logger.warning(f"Could not parse created_at for order {order_id}: {created_at_str}")
+					self.logger.error(f"Could not parse created_at for order {order_id}: {created_at_str}")
 					continue
 
 				# Calculate age in days
@@ -123,12 +147,12 @@ class OrdersAgent(Agent):
 
 				self.logger.debug(
 					f"Order {order_id} ({ticker} x {quantity}): created {created_date}, "
-					f"age {age_days} days"
+					f"age {age_days} days, time_stop {time_stop} days"
 				)
 
-				# Expire if order is older than 1 day (age >= 1)
-				# Same-day orders (age == 0) are kept because premarket may run again
-				if age_days >= 1:
+				# Expire if order age >= time_stop
+				# Same-day orders (age == 0) are kept for same-day execution
+				if age_days >= time_stop:
 					orders_mgr.update_order_status(order_id, "expired")
 
 					expired_results.append({
@@ -137,13 +161,14 @@ class OrdersAgent(Agent):
 						"quantity": quantity,
 						"created_date": created_date.isoformat(),
 						"age_days": age_days,
+						"time_stop": time_stop,
 						"status": "expired",
-						"reason": "1-day lifetime exceeded",
+						"reason": f"{time_stop}-day time_stop exceeded",
 					})
 
 					self.logger.info(
 						f"EXPIRED {ticker} x {quantity} order {order_id} "
-						f"(created {age_days} days ago)"
+						f"(age {age_days} days >= {time_stop}-day time_stop)"
 					)
 
 		except Exception as e:

@@ -187,17 +187,12 @@ class EntryAgent(Agent):
 			Composite score (0-100)
 		"""
 		score = 0
-		count = 0
 
 		# Entry score weight: 40%
-		if entry_score > 0:
-			score += entry_score * 0.4
-			count += 1
+		score += entry_score * 0.4
 
 		# Timing score weight: 35%
-		if timing_score > 0:
-			score += timing_score * 0.35
-			count += 1
+		score += timing_score * 0.35
 
 		# RR score weight: 25% (based on ratio quality)
 		if rr_data and rr_data.get("rr_ratio", 0) > 0:
@@ -206,9 +201,11 @@ class EntryAgent(Agent):
 			# RR 1.0 = 50, RR 2.0 = 75, RR 3.0 = 90
 			rr_score = min(100, 50 + (rr - 1) * 25)
 			score += rr_score * 0.25
-			count += 1
+		else:
+			# If no RR data, default to 50 (neutral) for the RR component
+			score += 50 * 0.25
 
-		return score / count if count > 0 else 0
+		return min(100, max(0, score))
 
 	def _get_recommendation_level(self, score: float) -> str:
 		"""Get recommendation level based on composite score.

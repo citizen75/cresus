@@ -13,8 +13,8 @@ class Orders:
     """Order management - tracks pending and executable orders separately from executed transactions."""
 
     BASE_COLUMNS = [
-        "id", "created_at", "ticker", "quantity", "entry_price",
-        "stop_loss", "take_profit", "execution_method", "scale_count",
+        "id", "created_at", "ticker", "quantity", "entry_price", "limit_price",
+        "stop_loss", "take_profit", "trailing_stop_distance", "execution_method", "scale_count",
         "risk_amount", "risk_reward", "status", "metadata"
     ]
 
@@ -68,6 +68,8 @@ class Orders:
 
     def add_order(self, ticker: str, quantity: int, entry_price: float,
                   stop_loss: Optional[float] = None, take_profit: Optional[float] = None,
+                  limit_price: Optional[float] = None,
+                  trailing_stop_distance: Optional[float] = None,
                   execution_method: str = "market", scale_count: int = 1,
                   risk_amount: Optional[float] = None, risk_reward: Optional[float] = None,
                   metadata: Optional[Dict[str, Any]] = None,
@@ -78,9 +80,11 @@ class Orders:
         Args:
             ticker: Stock ticker symbol
             quantity: Number of shares
-            entry_price: Entry price
+            entry_price: Entry price (for reference/analysis)
             stop_loss: Stop loss price (optional)
             take_profit: Take profit price (optional)
+            limit_price: Limit price for limit orders (optional, default: entry_price for market)
+            trailing_stop_distance: Distance below highest price for trailing stop (optional)
             execution_method: Execution method (market, limit, scale_in)
             scale_count: Number of scale-in levels
             risk_amount: Risk amount in currency
@@ -115,8 +119,10 @@ class Orders:
             "ticker": ticker.upper(),
             "quantity": int(quantity),
             "entry_price": float(entry_price),
+            "limit_price": float(limit_price) if limit_price is not None else None,
             "stop_loss": float(stop_loss) if stop_loss is not None else None,
             "take_profit": float(take_profit) if take_profit is not None else None,
+            "trailing_stop_distance": float(trailing_stop_distance) if trailing_stop_distance is not None else None,
             "execution_method": execution_method,
             "scale_count": int(scale_count),
             "risk_amount": float(risk_amount) if risk_amount is not None else None,

@@ -5,6 +5,8 @@ from core.agent import Agent
 from .sub_agents.journal_analyzer import JournalAnalyzerAgent
 from .sub_agents.order_analyzer import OrderAnalyzerAgent
 from .sub_agents.issue_identifier import IssueIdentifierAgent
+from .sub_agents.stats_analyzer import PortfolioStatsAnalyzerAgent
+from .sub_agents.orders_analysis import OrdersAnalysisAgent
 
 
 class ResearchAgent(Agent):
@@ -31,6 +33,8 @@ class ResearchAgent(Agent):
 		- Trade journal (entry/exit prices, durations, P&L)
 		- Order execution (matched orders, fills, discrepancies)
 		- Issues (zero metrics, position sizing problems, etc.)
+		- Portfolio statistics and performance recommendations
+		- Orders analysis with execution quality and effectiveness
 
 		Args:
 			input_data: Input data (optional)
@@ -63,7 +67,7 @@ class ResearchAgent(Agent):
 		journal_result = journal_agent.process(input_data)
 		analysis_results["journal"] = journal_result.get("output", {})
 
-		# 2. Analyze orders
+		# 2. Analyze orders (basic statistics)
 		order_agent = OrderAnalyzerAgent()
 		order_agent.context = self.context
 		order_result = order_agent.process(input_data)
@@ -78,9 +82,29 @@ class ResearchAgent(Agent):
 		})
 		analysis_results["issues"] = issue_result.get("output", {})
 
+		# 4. Analyze portfolio statistics and provide recommendations
+		stats_agent = PortfolioStatsAnalyzerAgent()
+		stats_agent.context = self.context
+		stats_result = stats_agent.process({
+			"strategy_name": self.context.get("strategy_name") if self.context else None,
+			"portfolio_metrics": self.context.get("portfolio_metrics") if self.context else {},
+		})
+		analysis_results["stats"] = stats_result.get("output", {})
+
+		# 5. Analyze orders quality and provide execution recommendations
+		orders_agent = OrdersAnalysisAgent()
+		orders_agent.context = self.context
+		orders_result = orders_agent.process({
+			"strategy_name": self.context.get("strategy_name") if self.context else None,
+		})
+		analysis_results["orders_analysis"] = orders_result.get("output", {})
+
 		# Compile summary
 		issues = analysis_results["issues"].get("identified_issues", [])
 		severity = analysis_results["issues"].get("severity_level", "none")
+		stats_recommendations = analysis_results["stats"].get("recommendations", [])
+		orders_recommendations = analysis_results["orders_analysis"].get("recommendations", [])
+		all_recommendations = stats_recommendations + orders_recommendations
 
 		return {
 			"status": "success",
@@ -93,6 +117,10 @@ class ResearchAgent(Agent):
 				"identified_issues": issues,
 				"severity_level": severity,
 				"total_issues": len(issues),
+				"metrics_analysis": analysis_results["stats"].get("metrics_analysis", {}),
+				"orders_analysis": analysis_results["orders_analysis"].get("orders_analysis", {}),
+				"recommendations": all_recommendations,
+				"total_recommendations": len(all_recommendations),
 			},
-			"message": f"Analyzed backtest {backtest_dir}: {len(issues)} issues found (severity: {severity})"
+			"message": f"Analyzed backtest {backtest_dir}: {len(issues)} issues found (severity: {severity}) - {len(all_recommendations)} recommendations"
 		}

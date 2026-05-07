@@ -24,13 +24,15 @@ class SaveWatchlistAgent(Agent):
 		self.strategy_name = strategy_name
 
 	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-		"""Save watchlist with OHLCV and signal data.
+		"""Save watchlist with OHLCV, signal data, indicators, and order info.
 
 		Reads from context:
 		- watchlist: List of tickers
 		- ticker_scores: Dict of scores and signals
 		- data_history: Dict of DataFrames with OHLCV
 		- strategy_config: Strategy configuration
+		- entry_recommendations: Entry opportunities with order details
+		- entry_scores: Entry scores for analysis
 
 		Args:
 			input_data: Input data with optional save_enabled toggle
@@ -64,6 +66,12 @@ class SaveWatchlistAgent(Agent):
 		# Get backtest_dir from context if available (for sandboxed backtesting)
 		backtest_dir = self.context.get("backtest_dir") if self.context else None
 
+		# Collect orders from entry recommendations
+		orders = self._extract_orders_from_recommendations()
+
+		# Collect indicators from entry analysis
+		indicators = self._extract_indicators_from_context()
+
 		# Use WatchlistManager to handle saving
 		watchlist_manager = WatchlistManager(self.strategy_name, backtest_dir=backtest_dir)
 		save_result = watchlist_manager.process(
@@ -72,7 +80,9 @@ class SaveWatchlistAgent(Agent):
 			data_history=data_history,
 			sorted_tickers=sorted_tickers,
 			strategy_config=strategy_config,
-			save_enabled=save_enabled
+			save_enabled=save_enabled,
+			orders=orders,
+			indicators=indicators,
 		)
 
 		return {
@@ -80,3 +90,111 @@ class SaveWatchlistAgent(Agent):
 			"input": input_data,
 			"output": save_result,
 		}
+
+	def _extract_orders_from_recommendations(self) -> Dict[str, Any]:
+		"""Extract order information from entry recommendations.
+
+		Returns:
+			Dict mapping ticker -> order info (qty, price, stops, etc.)
+		"""
+		orders = {}
+		entry_recommendations = self.context.get("entry_recommendations") or []
+
+		for rec in entry_recommendations:
+			ticker = rec.get("ticker")
+			if ticker:
+				orders[ticker] = {
+					"quantity": rec.get("quantity"),
+					"entry_price": rec.get("entry_price"),
+					"stop_loss": rec.get("stop_loss"),
+					"take_profit": rec.get("take_profit"),
+					"execution_method": rec.get("execution_method", "market"),
+					"status": "pending",
+					"risk_reward": rec.get("risk_reward"),
+					"entry_score": rec.get("entry_score"),
+				}
+
+		return orders
+
+	def _extract_indicators_from_context(self) -> Dict[str, Dict[str, Any]]:
+		"""Extract technical indicators from context with parameter-based names.
+
+		Extracts indicators from both data_history and analysis results.
+
+		Returns:
+			Dict mapping ticker -> indicators (rsi_14, atr_14, macd_12_26, etc.)
+		"""
+		indicators = {}
+
+		# Get data history which contains calculated indicators
+		data_history = self.context.get("data_history") or {}
+
+		# Get entry scores which contain entry strength
+		entry_scores = self.context.get("entry_scores") or {}
+
+		# Get RR metrics which contain technical analysis
+		rr_metrics = self.context.get("rr_metrics") or {}
+
+		# Get timing scores
+		timing_scores = self.context.get("timing_scores") or {}
+
+		# Get strategy config for indicator specifications
+		strategy_config = self.context.get("strategy_config") or {}
+		strategy_indicators = strategy_config.get("indicators", [])
+
+		# Compile indicators for each ticker
+		watchlist = self.context.get("watchlist") or []
+		for ticker in watchlist:
+			ticker_indicators = {}
+
+			# Extract indicators from data_history if available
+			if ticker in data_history:
+				ticker_data = data_history[ticker]
+				if not ticker_data.empty:
+					# Get latest row
+					latest = ticker_data.iloc[-1]
+
+					# Add strategy-configured indicators with their parameter names
+					for indicator_name in strategy_indicators:
+						if indicator_name in latest.index:
+							try:
+								value = float(latest[indicator_name])
+								ticker_indicators[indicator_name] = round(value, 4)
+							except (ValueError, TypeError):
+								pass
+
+					# Add common technical indicators if present
+					common_indicators = {
+						'rsi_14': 'rsi_14',
+						'rsi_9': 'rsi_9',
+						'atr_14': 'atr_14',
+						'macd_12_26': 'macd_12_26',
+						'ema_10': 'ema_10',
+						'ema_20': 'ema_20',
+						'sma_5': 'sma_5',
+						'sma_20': 'sma_20',
+						'adx_20': 'adx_20',
+						'volatility_20': 'volatility_20',
+					}
+
+					for col_name, indicator_name in common_indicators.items():
+						if col_name in latest.index:
+							try:
+								value = float(latest[col_name])
+								if indicator_name not in ticker_indicators:  # Don't override strategy indicators
+									ticker_indicators[indicator_name] = round(value, 4)
+							except (ValueError, TypeError):
+								pass
+
+			# Add analysis metadata
+			ticker_indicators["entry_score"] = entry_scores.get(ticker)
+			ticker_indicators["timing_score"] = timing_scores.get(ticker)
+
+			# Add risk/reward ratio
+			rr_data = rr_metrics.get(ticker, {})
+			if rr_data.get("rr_ratio") is not None:
+				ticker_indicators["rr_ratio"] = round(float(rr_data.get("rr_ratio", 0)), 4)
+
+			indicators[ticker] = ticker_indicators
+
+		return indicators

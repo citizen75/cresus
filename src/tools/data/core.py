@@ -13,6 +13,8 @@ import pandas as pd
 import yfinance as yf
 from loguru import logger
 
+from utils.env import get_db_root
+
 
 def _get_project_root() -> Path:
 	"""Get project root from CRESUS_PROJECT_ROOT env var or current working directory."""
@@ -24,8 +26,7 @@ class Fundamental:
 
 	def __init__(self, ticker: str):
 		self.ticker = ticker.upper()
-		project_root = _get_project_root()
-		self.cache_dir = project_root / "db" / "local" / "cache" / "fundamentals"
+		self.cache_dir = get_db_root() / "cache" / "fundamentals"
 		self.cache_dir.mkdir(parents=True, exist_ok=True)
 		self.filepath = self.cache_dir / f"{self.ticker}.json"
 
@@ -174,8 +175,7 @@ class DataHistory:
 
 	def __init__(self, ticker: str):
 		self.ticker = ticker.upper()
-		project_root = _get_project_root()
-		self.cache_dir = project_root / "db" / "local" / "cache" / "history"
+		self.cache_dir = get_db_root() / "cache" / "history"
 		self.cache_dir.mkdir(parents=True, exist_ok=True)
 		self.filepath = self.cache_dir / f"{self.ticker}.parquet"
 
@@ -288,6 +288,11 @@ class DataHistory:
 
 		if df.empty:
 			return df
+
+		# Ensure timestamps are timezone-naive for comparison
+		if df["timestamp"].dt.tz is not None:
+			df = df.copy()
+			df["timestamp"] = df["timestamp"].dt.tz_localize(None)
 
 		if start_date:
 			start_dt = pd.to_datetime(start_date)

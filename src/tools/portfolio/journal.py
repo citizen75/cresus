@@ -13,7 +13,7 @@ class Journal:
 
     BASE_COLUMNS = [
         "id", "created_at", "operation", "ticker", "quantity",
-        "price", "amount", "fees", "stop_loss", "take_profit", "status", "status_at", "notes"
+        "price", "amount", "fees", "stop_loss", "take_profit", "trailing_stop_distance", "highest_price", "status", "status_at", "notes"
     ]
 
     def __init__(self, name: str = "default", context: Optional[Dict[str, Any]] = None):
@@ -66,7 +66,8 @@ class Journal:
 
     def add_transaction(self, operation: str, ticker: str, quantity: int, price: float,
                        fees: float = 0, notes: str = "", created_at: str = None,
-                       stop_loss: float = None, take_profit: float = None) -> str:
+                       stop_loss: float = None, take_profit: float = None, highest_price: float = None,
+                       trailing_stop_distance: float = None) -> str:
         """Add a new transaction to journal.
 
         Operations: BUY, SELL, CASH (deposit/withdrawal)
@@ -111,6 +112,8 @@ class Journal:
             "fees": float(fees),
             "stop_loss": float(stop_loss) if stop_loss else None,
             "take_profit": float(take_profit) if take_profit else None,
+            "trailing_stop_distance": float(trailing_stop_distance) if trailing_stop_distance else None,
+            "highest_price": float(highest_price) if highest_price else float(price_val),
             "status": "completed",
             "status_at": now,
             "notes": notes
@@ -180,22 +183,29 @@ class Journal:
         for ticker, data in open_positions.items():
             avg_entry_price = data["total_cost"] / data["quantity"] if data["quantity"] > 0 else 0
 
-            # Get stop_loss and take_profit from the most recent BUY transaction
+            # Get stop_loss, take_profit, trailing_stop_distance, and highest_price from the most recent BUY transaction
             buy_transactions = [tx for tx in data["transactions"] if tx.get("operation") == "BUY"]
             stop_loss = None
             take_profit = None
+            trailing_stop_distance = None
+            highest_price = None
             if buy_transactions:
                 most_recent_buy = buy_transactions[-1]
                 stop_loss = most_recent_buy.get("stop_loss")
                 take_profit = most_recent_buy.get("take_profit")
+                trailing_stop_distance = most_recent_buy.get("trailing_stop_distance")
+                highest_price = most_recent_buy.get("highest_price")
 
             result.append({
                 "ticker": ticker,
                 "quantity": int(data["quantity"]),
                 "avg_entry_price": round(avg_entry_price, 2),
                 "entry_fees": round(data["fees"], 2),
+                "entry_price": round(avg_entry_price, 2),
                 "stop_loss": float(stop_loss) if stop_loss else None,
                 "take_profit": float(take_profit) if take_profit else None,
+                "trailing_stop_distance": float(trailing_stop_distance) if trailing_stop_distance else None,
+                "highest_price": float(highest_price) if highest_price else round(avg_entry_price, 2),
             })
 
         return pd.DataFrame(result)
@@ -232,6 +242,70 @@ class Journal:
         df.loc[idx, "price"] = float(price)
         df.loc[idx, "amount"] = round(quantity * price, 2)
         df.loc[idx, "fees"] = float(fees)
+        df.loc[idx, "status_at"] = datetime.now().isoformat()
+
+        self.save(df)
+        return True
+
+    def update_position_stop_loss(self, ticker: str, new_stop_loss: float) -> bool:
+        """Update stop loss for the most recent BUY transaction of a ticker.
+
+        Args:
+            ticker: Ticker symbol
+            new_stop_loss: New stop loss value
+
+        Returns:
+            True if updated, False otherwise
+        """
+        df = self.load_df()
+        if df.empty:
+            return False
+
+        # Find the most recent BUY transaction for this ticker
+        df["created_at"] = pd.to_datetime(df["created_at"], errors="coerce")
+        ticker_buys = df[
+            (df["ticker"].str.upper() == ticker.upper()) &
+            (df["operation"].str.upper() == "BUY")
+        ].sort_values("created_at")
+
+        if ticker_buys.empty:
+            return False
+
+        # Update the most recent BUY transaction
+        idx = ticker_buys.index[-1]
+        df.loc[idx, "stop_loss"] = float(new_stop_loss)
+        df.loc[idx, "status_at"] = datetime.now().isoformat()
+
+        self.save(df)
+        return True
+
+    def update_position_highest_price(self, ticker: str, new_highest_price: float) -> bool:
+        """Update highest price for the most recent BUY transaction of a ticker.
+
+        Args:
+            ticker: Ticker symbol
+            new_highest_price: New highest price value
+
+        Returns:
+            True if updated, False otherwise
+        """
+        df = self.load_df()
+        if df.empty:
+            return False
+
+        # Find the most recent BUY transaction for this ticker
+        df["created_at"] = pd.to_datetime(df["created_at"], errors="coerce")
+        ticker_buys = df[
+            (df["ticker"].str.upper() == ticker.upper()) &
+            (df["operation"].str.upper() == "BUY")
+        ].sort_values("created_at")
+
+        if ticker_buys.empty:
+            return False
+
+        # Update the most recent BUY transaction
+        idx = ticker_buys.index[-1]
+        df.loc[idx, "highest_price"] = float(new_highest_price)
         df.loc[idx, "status_at"] = datetime.now().isoformat()
 
         self.save(df)

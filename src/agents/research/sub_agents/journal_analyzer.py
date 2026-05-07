@@ -111,6 +111,7 @@ class JournalAnalyzerAgent(Agent):
 
 		# Date range
 		if "created_at" in df.columns:
+			df["created_at"] = pd.to_datetime(df["created_at"], errors="coerce")
 			date_min = df["created_at"].min()
 			date_max = df["created_at"].max()
 		else:

@@ -8,7 +8,7 @@ from tools.portfolio import PortfolioManager
 from tools.portfolio.orders import Orders
 from tools.portfolio.journal import Journal
 from tools.portfolio.broker import PaperBroker
-from .sub_agents import StopLossAgent, TargetAgent, TimeLimitAgent, LimitOrderAgent
+from .sub_agents import StopLossAgent, TargetAgent, TimeLimitAgent, LimitOrderAgent, TrailingStopAgent
 
 
 class TransactAgent(Agent):
@@ -30,6 +30,7 @@ class TransactAgent(Agent):
 			context: AgentContext for shared state
 		"""
 		super().__init__(name, context)
+		self.trailing_stop_agent = TrailingStopAgent("TrailingStopAgent")
 		self.stop_loss_agent = StopLossAgent("StopLossAgent")
 		self.target_agent = TargetAgent("TargetAgent")
 		self.time_limit_agent = TimeLimitAgent("TimeLimitAgent")
@@ -70,17 +71,31 @@ class TransactAgent(Agent):
 		journal = Journal(portfolio_name, context=self.context.__dict__)
 		orders_mgr = Orders(portfolio_name, context=self.context.__dict__)
 
-		# Execute pending BUY orders at market prices
-		buy_results = self._execute_buy_orders(
+		# Execute buy orders in priority: limit orders first, then market orders
+		buy_results = []
+
+		# 1. Execute limit orders (these stay pending until price condition met)
+		self.limit_agent.context = self.context
+		limit_result = self.limit_agent.process({"day_data": day_data})
+		buy_results.extend(limit_result.get("output", {}).get("orders", []))
+
+		# 2. Execute market orders (remaining pending orders)
+		market_results = self._execute_buy_orders(
 			orders_mgr,
 			journal,
 			portfolio_name,
 			trading_date,
 			day_data
 		)
+		buy_results.extend(market_results)
 
 		# Execute exit orders via subagents in sequence
 		exit_results = []
+
+		# 0. Update trailing stops (before checking stop losses)
+		self.trailing_stop_agent.context = self.context
+		trailing_stop_result = self.trailing_stop_agent.process({"day_data": day_data})
+		self.logger.info(f"Trailing stops updated: {trailing_stop_result.get('output', {}).get('updated', 0)} positions")
 
 		# 1. Stop loss exits
 		self.stop_loss_agent.context = self.context
@@ -151,10 +166,17 @@ class TransactAgent(Agent):
 			for _, order_row in pending_orders.iterrows():
 				order_id = str(order_row.get("id", ""))
 				ticker = str(order_row.get("ticker", ""))
+				execution_method = str(order_row.get("execution_method", "market"))
+
+				# Skip limit orders (handled by LimitOrderAgent)
+				if execution_method == "limit":
+					continue
+
 				quantity = int(order_row.get("quantity", 0))
 				entry_price = float(order_row.get("entry_price", 0))
 				stop_loss = float(order_row.get("stop_loss", 0)) if order_row.get("stop_loss") else None
 				take_profit = float(order_row.get("take_profit", 0)) if order_row.get("take_profit") else None
+				trailing_stop_distance = float(order_row.get("trailing_stop_distance", 0)) if order_row.get("trailing_stop_distance") else None
 
 				# Get market price for the date (day_data is {ticker: row}, pre-sliced)
 				market_price = self._get_market_price(ticker, day_data)
@@ -207,7 +229,7 @@ class TransactAgent(Agent):
 				if result.status == "filled":
 					orders_mgr.update_order_status(order_id, "executed")
 
-					# Record BUY transaction in journal with stop loss and take profit
+					# Record BUY transaction in journal with stop loss, take profit, and trailing stop
 					journal.add_transaction(
 						operation="BUY",
 						ticker=ticker,
@@ -216,6 +238,8 @@ class TransactAgent(Agent):
 						fees=0,
 						stop_loss=stop_loss,
 						take_profit=take_profit,
+						trailing_stop_distance=trailing_stop_distance,
+						highest_price=result.filled_price,
 						notes=f"Order {order_id[:8]} executed",
 						created_at=f"{trading_date.isoformat()}T14:00:00.000000"
 					)

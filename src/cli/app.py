@@ -1,6 +1,7 @@
-"""Cresus CLI application."""
+"""Cresus CLI application - main entry point."""
 
 import os
+import json
 import cmd2
 from pathlib import Path
 from rich.console import Console
@@ -8,8 +9,14 @@ from rich.table import Table
 from rich.panel import Panel
 from rich.text import Text
 from rich import box
+
+# Import command handlers
 from cli.commands.service import ServiceManager
 from cli.commands.flow import FlowManager
+from cli.commands.data import DataCommands
+from cli.commands.portfolio import PortfolioCommands
+from cli.commands.scheduler import SchedulerCommands
+from cli.commands.info import InfoCommands
 from tools.data.manager import DataManager
 
 console = Console()
@@ -20,16 +27,27 @@ class CresusCLI(cmd2.Cmd):
 
 	intro = ""
 
-	def __init__(self):
+	def __init__(self, interactive: bool = True):
 		super().__init__()
+		self.interactive = interactive
 		self.project_root = self._find_project_root()
 		os.environ["CRESUS_PROJECT_ROOT"] = str(self.project_root)
+
+		# Initialize command handlers
 		self.service_manager = ServiceManager(self.project_root)
 		self.flow_manager = FlowManager(self.project_root)
 		self.data_manager = DataManager(self.project_root)
+		self.data_commands = DataCommands(self.data_manager)
+		self.portfolio_commands = PortfolioCommands()
+		self.scheduler_commands = SchedulerCommands()
+		self.info_commands = InfoCommands()
+
 		self._setup_history()
 		self._setup_prompt()
-		self._print_intro()
+
+		# Only print intro in interactive mode
+		if self.interactive:
+			self._print_intro()
 
 	def _setup_prompt(self):
 		"""Set up dynamic prompt with context."""
@@ -52,6 +70,11 @@ class CresusCLI(cmd2.Cmd):
 		info_table.add_row("[bold]service[/bold]", "Manage services (api, mcp, front)")
 		info_table.add_row("[bold]flow[/bold]", "Execute workflows (e.g., flow run watchlist)")
 		info_table.add_row("[bold]data[/bold]", "Manage portfolio data and cache")
+		info_table.add_row("[bold]watchlist[/bold]", "View strategy watchlist (e.g., watchlist show momentum_cac)")
+		info_table.add_row("[bold]orders[/bold]", "View pending/executed orders (e.g., orders list momentum_cac)")
+		info_table.add_row("[bold]cron[/bold]", "View scheduled cron jobs and next run times")
+		info_table.add_row("[bold]status[/bold]", "Show system status")
+		info_table.add_row("[bold]update[/bold]", "Update cresus from git (background)")
 		info_table.add_row("[bold]history[/bold]", "View command history")
 		info_table.add_row("[bold]quit[/bold] or [bold]exit[/bold]", "Exit the CLI")
 
@@ -89,6 +112,7 @@ class CresusCLI(cmd2.Cmd):
 			except Exception as e:
 				console.print(f"[yellow]Warning:[/yellow] Could not load history: {e}")
 
+	# ==================== Service Commands ====================
 	def do_service(self, args):
 		"""Manage services: start|stop|status|logs [service] [-d]"""
 		args_str = str(args).strip() if args else ""
@@ -99,180 +123,41 @@ class CresusCLI(cmd2.Cmd):
 			table.add_column("Description")
 			table.add_row("service start <api|mcp|front|all> [-d]", "Start service(s)")
 			table.add_row("service stop <api|mcp|front|all>", "Stop service(s)")
-			table.add_row("service status [service]", "Show status")
-			table.add_row("service logs <service> [lines]", "Show logs")
+			table.add_row("service status [service]", "Check service status")
+			table.add_row("service logs <api|mcp|front> [-f] [lines]", "View service logs")
 			console.print(table)
 			return
 
 		parts = args_str.split()
 		cmd = parts[0] if parts else None
-		service = parts[1] if len(parts) > 1 else None
-		daemon = "-d" in parts
 
 		if cmd == "start":
-			if not service:
-				console.print("[red]✗[/red] Usage: service start <api|mcp|front|all> [-d]")
-				return
-			if service == "all":
-				for svc in ["gateway", "front"]:
-					result = self.service_manager.start(svc, daemon)
-					svc_status = result.get("status", "error") if isinstance(result, dict) else str(result)
-					is_success = svc_status in ["started", "already_running"]
-					status = "[green]✓[/green]" if is_success else "[red]✗[/red]"
-					msg = f"{svc}: {svc_status}"
-					if result.get("pid"):
-						msg += f" (PID: {result.get('pid')})"
-					console.print(f"{status} {msg}")
-			else:
-				result = self.service_manager.start(service, daemon)
-				svc_status = result.get("status", "error") if isinstance(result, dict) else str(result)
-				is_success = svc_status in ["started", "already_running"]
-				status = "[green]✓[/green]" if is_success else "[red]✗[/red]"
-				msg = f"{service}: {svc_status}"
-				if result.get("pid"):
-					msg += f" (PID: {result.get('pid')})"
-				console.print(f"{status} {msg}")
-
+			service_names = parts[1] if len(parts) > 1 else "all"
+			background = "-d" in parts
+			self.service_manager.start_services(service_names, background=background)
 		elif cmd == "stop":
-			if not service:
-				console.print("[red]✗[/red] Usage: service stop <api|mcp|front|all>")
-				return
-			if service == "all":
-				for svc in ["api", "mcp", "front"]:
-					result = self.service_manager.stop(svc)
-					svc_status = result.get("status", "error") if isinstance(result, dict) else str(result)
-					is_success = svc_status == "stopped"
-					status = "[green]✓[/green]" if is_success else "[red]✗[/red]"
-					console.print(f"{status} {svc}: {svc_status}")
-			else:
-				result = self.service_manager.stop(service)
-				svc_status = result.get("status", "error") if isinstance(result, dict) else str(result)
-				is_success = svc_status == "stopped"
-				status = "[green]✓[/green]" if is_success else "[red]✗[/red]"
-				console.print(f"{status} {service}: {svc_status}")
-
+			service_names = parts[1] if len(parts) > 1 else "all"
+			self.service_manager.stop_services(service_names)
 		elif cmd == "status":
-			status = self.service_manager.status(service)
-			self._print_service_status(status)
-
+			service_name = parts[1] if len(parts) > 1 else None
+			self.service_manager.check_status(service_name)
 		elif cmd == "logs":
-			if not service:
-				console.print("[red]✗[/red] Usage: service logs <service> [lines]")
+			if len(parts) < 2:
+				console.print("[red]✗[/red] Usage: service logs <service> [-f] [lines]")
 				return
-			lines = int(parts[2]) if len(parts) > 2 else 20
-			logs = self.service_manager.logs(service, lines)
-			console.print(Panel(logs, title=f"Logs: {service}", expand=False))
-
+			service_name = parts[1]
+			follow = "-f" in parts
+			lines = None
+			for part in parts:
+				if part.isdigit():
+					lines = int(part)
+					break
+			self.service_manager.view_logs(service_name, follow=follow, lines=lines)
 		else:
 			console.print(f"[red]✗[/red] Unknown command: {cmd}")
 			console.print("Try: service start|stop|status|logs")
 
-	def _print_service_status(self, status: dict):
-		"""Print service status as a formatted table."""
-		table = Table(title="System Status", box=box.ROUNDED)
-		table.add_column("Service", style="cyan")
-		table.add_column("Status", style="bold")
-
-		for svc, info in status.items():
-			status_text = info.get("status", "unknown")
-			if status_text == "running":
-				status_display = Text("●", style="green") + Text(f" {status_text}")
-			else:
-				status_display = Text("●", style="red") + Text(f" {status_text}")
-			table.add_row(svc, status_display)
-
-		console.print(table)
-
-	def do_status(self, _):
-		"""Show overall system status."""
-		status = self.service_manager.status()
-		self._print_service_status(status)
-
-	def do_info(self, _):
-		"""Show project info."""
-		panel = Panel(
-			f"[cyan]Project Root:[/cyan] {self.project_root}",
-			style="cyan",
-			box=box.ROUNDED
-		)
-		console.print(panel)
-
-	def do_data(self, args):
-		"""Manage historical and fundamental data: fetch|list|clear|stats|show [options]"""
-		args_str = str(args).strip() if args else ""
-
-		if not args_str:
-			table = Table(title="Data Management Commands", box=box.ROUNDED)
-			table.add_column("Command", style="cyan")
-			table.add_column("Description")
-			table.add_row("data fetch history <ticker> [start_date]", "Fetch historical data")
-			table.add_row("data fetch fundamental <ticker>", "Fetch fundamental data")
-			table.add_row("data fetch universe <name> [start_date]", "Fetch all tickers in universe")
-			table.add_row("data fetch all <universe> [start_date]", "Fetch history + fundamental for universe")
-			table.add_row("data show <ticker>", "Show ticker info (history dates, last OHLCV, fundamentals)")
-			table.add_row("data list [history|fundamentals|all]", "List cached data")
-			table.add_row("data clear [type] [ticker]", "Clear cache (types: history, fundamentals, all)")
-			table.add_row("data stats", "Show cache statistics")
-			table.add_row("data universes", "List available universes")
-			console.print(table)
-			return
-
-		parts = args_str.split()
-		cmd = parts[0] if parts else None
-
-		if cmd == "fetch":
-			if len(parts) < 3:
-				console.print("[red]✗[/red] Usage: data fetch <history|fundamental|universe|all> <ticker|name|universe> [start_date]")
-				return
-			data_type = parts[1]
-			target = parts[2]
-			start_date = parts[3] if len(parts) > 3 else None
-
-			if data_type == "history":
-				result = self.data_manager.fetch_history(target, start_date)
-				self._print_result(result)
-			elif data_type == "fundamental":
-				result = self.data_manager.fetch_fundamental(target)
-				self._print_result(result)
-			elif data_type == "universe":
-				result = self.data_manager.fetch_universe(target, start_date)
-				self._print_universe_result(result)
-			elif data_type == "all":
-				result = self.data_manager.fetch_all(target, start_date)
-				self._print_universe_result(result)
-			else:
-				console.print(f"[red]✗[/red] Unknown data type: {data_type}")
-
-		elif cmd == "show":
-			if len(parts) < 2:
-				console.print("[red]✗[/red] Usage: data show <ticker>")
-				return
-			ticker = parts[1]
-			result = self.data_manager.show_ticker_info(ticker)
-			self._print_ticker_info(result)
-
-		elif cmd == "list":
-			data_type = parts[1] if len(parts) > 1 else "all"
-			result = self.data_manager.list_cached(data_type)
-			self._print_list_result(result)
-
-		elif cmd == "clear":
-			data_type = parts[1] if len(parts) > 1 else "all"
-			ticker = parts[2] if len(parts) > 2 else None
-			result = self.data_manager.clear_cache(data_type, ticker)
-			self._print_result(result)
-
-		elif cmd == "stats":
-			result = self.data_manager.cache_stats()
-			self._print_stats_result(result)
-
-		elif cmd == "universes":
-			self._print_universes()
-
-		else:
-			console.print(f"[red]✗[/red] Unknown command: {cmd}")
-			console.print("Try: data fetch|show|list|clear|stats|universes")
-
+	# ==================== Flow/Workflow Commands ====================
 	def do_flow(self, args):
 		"""Execute workflows: run <workflow_name> [strategy] [tickers...] [--context] [--debug]"""
 		args_str = str(args).strip() if args else ""
@@ -285,6 +170,7 @@ class CresusCLI(cmd2.Cmd):
 			table.add_row("flow run premarket <strategy>", "Generate pending orders")
 			table.add_row("flow run transact <portfolio> [date]", "Execute pending orders (default: today)")
 			table.add_row("flow run backtest <strategy> [start_date] [end_date]", "Backtest strategy over date range (YYYY-MM-DD format)")
+			table.add_row("flow run portfolio_analysis <strategy> [--backtest]", "Analyze portfolio or most recent backtest")
 			table.add_row("flow run <workflow> [strategy] [tickers...]", "Run a workflow")
 			table.add_row("flow run <workflow> [strategy] [--context]", "Run workflow and display context")
 			table.add_row("flow run <workflow> [strategy] [--debug]", "Run workflow with debug logging enabled")
@@ -296,16 +182,16 @@ class CresusCLI(cmd2.Cmd):
 
 		if cmd == "list":
 			result = self.flow_manager.list_workflows()
-			self._print_workflows_result(result)
-
+			self.flow_manager._print_workflows_result(result)
 		elif cmd == "run":
 			if len(parts) < 2:
-				console.print("[red]✗[/red] Usage: flow run <workflow_name> [strategy] [tickers...] [--context] [--debug]")
+				console.print("[red]✗[/red] Usage: flow run <workflow_name> [strategy] [tickers...] [--context] [--debug] [--backtest]")
 				return
 
 			workflow_name = parts[1]
 			include_context = "--context" in parts
 			debug = "--debug" in parts
+			use_backtest = "--backtest" in parts
 
 			# Remove workflow name and flags from parts
 			remaining = [p for p in parts[2:] if not p.startswith("--")]
@@ -314,17 +200,29 @@ class CresusCLI(cmd2.Cmd):
 			strategy = remaining[0] if remaining else "default_strategy"
 			input_data = None
 
+			# Special handling for market_regime workflow (JSON payload)
+			if workflow_name.lower() == "market_regime":
+				# Try to parse remaining args as JSON if they look like JSON
+				if remaining:
+					potential_json = " ".join(remaining)
+					if potential_json.strip().startswith("{"):
+						try:
+							input_data = json.loads(potential_json)
+							strategy = None  # market_regime doesn't use strategy parameter
+						except json.JSONDecodeError as e:
+							console.print(f"[red]✗[/red] Invalid JSON payload: {e}")
+							return
+					else:
+						console.print("[red]✗[/red] market_regime requires JSON payload (e.g., '{\"universe\": \"etf_pea\", \"action\": \"train\"}')")
+						return
 			# Special handling for backtest workflow (dates instead of tickers)
-			if workflow_name.lower() == "backtest":
+			elif workflow_name.lower() == "backtest":
 				input_data = {}
 				if len(remaining) > 1:
-					# Second argument is start_date
 					input_data["start_date"] = remaining[1]
 				if len(remaining) > 2:
-					# Third argument is end_date
 					input_data["end_date"] = remaining[2]
 			elif workflow_name.lower() in ["premarket", "transact"]:
-				# These workflows don't take tickers; strategy is sufficient
 				input_data = None
 			else:
 				# For other workflows, treat remaining items as tickers
@@ -332,679 +230,162 @@ class CresusCLI(cmd2.Cmd):
 				if tickers:
 					input_data = {"tickers": tickers}
 
-			result = self.flow_manager.run_workflow(workflow_name, strategy, input_data, include_context, debug)
-			self._print_flow_result(result)
+			result = self.flow_manager.run_workflow(workflow_name, strategy, input_data, include_context, debug, use_backtest)
+			self.flow_manager._print_flow_result(result, workflow_name)
 
+			# Display backtest results if backtest completed successfully
+			if workflow_name.lower() == "backtest" and result.get("status") == "success":
+				self._print_backtest_results(strategy, result)
 		else:
 			console.print(f"[red]✗[/red] Unknown command: {cmd}")
 			console.print("Try: flow list|run")
 
-	def _print_workflows_result(self, result):
-		"""Print available workflows."""
-		if result.get("status") == "error":
-			panel = Panel(
-				f"[red]✗[/red] {result.get('message')}",
-				style="red",
-				box=box.ROUNDED
-			)
-			console.print(panel)
-			return
+	# ==================== Data Commands ====================
+	def do_data(self, args):
+		"""Manage historical and fundamental data: fetch|list|clear|stats|show [options]"""
+		self.data_commands.handle(args)
 
-		workflows = result.get("workflows", [])
-		if not workflows:
-			panel = Panel(
-				"[yellow]No workflows available[/yellow]",
-				style="yellow",
-				box=box.ROUNDED
-			)
-			console.print(panel)
-			return
+	# ==================== Portfolio Commands ====================
+	def do_watchlist(self, args):
+		"""Display watchlist: watchlist show|extended <strategy>"""
+		self.portfolio_commands.handle_watchlist(args)
 
-		table = Table(title=f"Available Workflows ({len(workflows)})", box=box.ROUNDED)
-		table.add_column("Name", style="cyan")
-		table.add_column("Description")
-		table.add_column("Parameters", style="dim")
+	def do_orders(self, args):
+		"""Manage orders: list <strategy>"""
+		self.portfolio_commands.handle_orders(args)
 
-		for wf in workflows:
-			params = ", ".join(wf.get("parameters", []))
-			table.add_row(wf["name"], wf["description"], params)
+	# ==================== Scheduler Commands ====================
+	def do_cron(self, args):
+		"""Manage cron jobs: list"""
+		self.scheduler_commands.handle(args)
 
-		console.print(table)
+	# ==================== Info Commands ====================
+	def do_status(self, _):
+		"""Show system status."""
+		self.info_commands.handle_status()
 
-	def _print_backtest_metrics(self, output):
-		"""Print comprehensive backtest portfolio metrics."""
-		console.print()
-		
-		# Backtest metadata
-		metadata_table = Table(title="Backtest Period", box=box.ROUNDED)
-		metadata_table.add_column("Property", style="cyan")
-		metadata_table.add_column("Value", style="yellow")
-		
-		metadata_table.add_row("Start Date", output.get("start_date", "?"))
-		metadata_table.add_row("End Date", output.get("end_date", "?"))
-		metadata_table.add_row("Period", f"{output.get('period_days', 0)} days")
-		metadata_table.add_row("Backtest ID", output.get("backtest_id", "?"))
-		
-		console.print(metadata_table)
+	def do_info(self, _):
+		"""Show application info."""
+		self.info_commands.handle_info()
 
-		# Performance summary
-		console.print()
-		perf_table = Table(title="Performance Summary", box=box.ROUNDED)
-		perf_table.add_column("Metric", style="cyan")
-		perf_table.add_column("Value", style="green", justify="right")
-		
-		start_val = output.get("start_value", 100)
-		end_val = output.get("end_value", 100)
-		perf_table.add_row("Start Value", f"${start_val:,.2f}")
-		perf_table.add_row("End Value", f"${end_val:,.2f}")
-		
-		total_return = output.get("total_return_pct", 0)
-		return_color = "green" if total_return >= 0 else "red"
-		perf_table.add_row("Total Return", f"[{return_color}]{total_return:+.2f}%[/{return_color}]")
-		
-		bench_return = output.get("benchmark_return_pct", 0)
-		bench_color = "green" if bench_return >= 0 else "red"
-		perf_table.add_row("Benchmark Return", f"[{bench_color}]{bench_return:+.2f}%[/{bench_color}]")
-		
-		exposure = output.get("max_gross_exposure_pct", 0)
-		perf_table.add_row("Max Gross Exposure", f"{exposure:.2f}%")
-		
-		fees = output.get("total_fees_paid", 0)
-		perf_table.add_row("Total Fees Paid", f"${fees:,.2f}")
-		
-		console.print(perf_table)
-
-		# Risk metrics
-		console.print()
-		risk_table = Table(title="Risk Metrics", box=box.ROUNDED)
-		risk_table.add_column("Metric", style="cyan")
-		risk_table.add_column("Value", style="yellow", justify="right")
-		
-		max_dd = output.get("max_drawdown_pct", 0)
-		dd_color = "red" if max_dd < 0 else "yellow"
-		risk_table.add_row("Max Drawdown", f"[{dd_color}]{max_dd:.2f}%[/{dd_color}]")
-		
-		dd_duration = output.get("max_drawdown_duration_days", 0)
-		risk_table.add_row("Max Drawdown Duration", f"{dd_duration} days")
-		
-		console.print(risk_table)
-
-		# Trade statistics
-		console.print()
-		trades_table = Table(title="Trade Statistics", box=box.ROUNDED)
-		trades_table.add_column("Metric", style="cyan")
-		trades_table.add_column("Value", style="magenta", justify="right")
-		
-		total_trades = output.get("total_trades", 0)
-		closed_trades = output.get("closed_trades", 0)
-		open_trades = output.get("open_trades", 0)
-		
-		trades_table.add_row("Total Trades", str(total_trades))
-		trades_table.add_row("Closed Trades", str(closed_trades))
-		trades_table.add_row("Open Trades", str(open_trades))
-		
-		open_pnl = output.get("open_trade_pnl", 0)
-		open_color = "green" if open_pnl >= 0 else "red"
-		trades_table.add_row("Open Trade PnL", f"[{open_color}]${open_pnl:+,.2f}[/{open_color}]")
-		
-		win_rate = output.get("win_rate_pct", 0)
-		trades_table.add_row("Win Rate", f"{win_rate:.2f}%")
-		
-		best_trade = output.get("best_trade_pct", 0)
-		best_color = "green" if best_trade >= 0 else "red"
-		trades_table.add_row("Best Trade", f"[{best_color}]{best_trade:+.2f}%[/{best_color}]")
-		
-		worst_trade = output.get("worst_trade_pct", 0)
-		worst_color = "green" if worst_trade >= 0 else "red"
-		trades_table.add_row("Worst Trade", f"[{worst_color}]{worst_trade:+.2f}%[/{worst_color}]")
-		
-		avg_winning = output.get("avg_winning_trade_pct", 0)
-		trades_table.add_row("Avg Winning Trade", f"{avg_winning:+.2f}%")
-		
-		avg_losing = output.get("avg_losing_trade_pct", 0)
-		trades_table.add_row("Avg Losing Trade", f"{avg_losing:+.2f}%")
-		
-		console.print(trades_table)
-
-		# Trade duration and metrics
-		console.print()
-		duration_table = Table(title="Trade Duration & Ratios", box=box.ROUNDED)
-		duration_table.add_column("Metric", style="cyan")
-		duration_table.add_column("Value", style="bright_white", justify="right")
-		
-		avg_win_duration = output.get("avg_winning_trade_duration_days", 0)
-		duration_table.add_row("Avg Winning Trade Duration", f"{avg_win_duration:.1f} days")
-		
-		avg_loss_duration = output.get("avg_losing_trade_duration_days", 0)
-		duration_table.add_row("Avg Losing Trade Duration", f"{avg_loss_duration:.1f} days")
-		
-		profit_factor = output.get("profit_factor", 0)
-		duration_table.add_row("Profit Factor", f"{profit_factor:.2f}")
-		
-		expectancy = output.get("expectancy_pct", 0)
-		expectancy_color = "green" if expectancy >= 0 else "red"
-		duration_table.add_row("Expectancy", f"[{expectancy_color}]{expectancy:+.2f}%[/{expectancy_color}]")
-		
-		console.print(duration_table)
-
-		# Risk-adjusted returns
-		console.print()
-		ratios_table = Table(title="Risk-Adjusted Returns", box=box.ROUNDED)
-		ratios_table.add_column("Ratio", style="cyan")
-		ratios_table.add_column("Value", style="bright_cyan", justify="right")
-		
-		sharpe = output.get("sharpe_ratio", 0)
-		sharpe_color = "green" if sharpe >= 1 else "yellow" if sharpe >= 0 else "red"
-		ratios_table.add_row("Sharpe Ratio", f"[{sharpe_color}]{sharpe:.4f}[/{sharpe_color}]")
-		
-		sortino = output.get("sortino_ratio", 0)
-		sortino_color = "green" if sortino >= 1 else "yellow" if sortino >= 0 else "red"
-		ratios_table.add_row("Sortino Ratio", f"[{sortino_color}]{sortino:.4f}[/{sortino_color}]")
-		
-		calmar = output.get("calmar_ratio", 0)
-		calmar_color = "green" if calmar >= 0.5 else "yellow" if calmar >= 0 else "red"
-		ratios_table.add_row("Calmar Ratio", f"[{calmar_color}]{calmar:.4f}[/{calmar_color}]")
-		
-		omega = output.get("omega_ratio", 0)
-		omega_color = "green" if omega >= 1.5 else "yellow" if omega >= 1 else "red"
-		ratios_table.add_row("Omega Ratio", f"[{omega_color}]{omega:.4f}[/{omega_color}]")
-		
-		console.print(ratios_table)
-
-		# Positions breakdown (if available)
-		final_portfolio = output.get("final_portfolio", {})
-		positions = final_portfolio.get("positions", [])
-		if positions:
-			console.print()
-			positions_table = Table(title=f"Final Positions ({len(positions)})", box=box.ROUNDED)
-			positions_table.add_column("Ticker", style="cyan")
-			positions_table.add_column("Shares", style="yellow", justify="right")
-			positions_table.add_column("Entry Price", style="blue", justify="right")
-			positions_table.add_column("Current Price", style="blue", justify="right")
-			positions_table.add_column("Position Value", style="magenta", justify="right")
-			positions_table.add_column("Gain/Loss", style="bright_white", justify="right")
-			positions_table.add_column("Gain %", style="bright_white", justify="right")
-			
-			for pos in positions:
-				ticker = pos.get("ticker", "?")
-				# Fix: PortfolioManager returns 'quantity', not 'shares'
-				shares = pos.get("quantity", pos.get("shares", 0))
-				shares_str = f"{shares:,.0f}"
-				
-				# Fix: PortfolioManager returns 'avg_entry_price', not 'entry_price'
-				entry_price_val = pos.get("avg_entry_price", pos.get("entry_price", 0))
-				entry_price = f"${entry_price_val:.2f}"
-				
-				# Fix: Use 'current_price' from position data
-				current_price_val = pos.get("current_price", 0)
-				current_price = f"${current_price_val:.2f}"
-				
-				position_value = f"${pos.get('position_value', 0):,.2f}"
-				
-				gain = pos.get("position_gain", 0)
-				gain_str = f"${gain:+,.2f}"
-				gain_pct = pos.get("position_gain_pct", 0)
-				
-				gain_color = "green" if gain >= 0 else "red"
-				gain_pct_str = f"[{gain_color}]{gain_pct:+.2f}%[/{gain_color}]"
-				
-				positions_table.add_row(ticker, shares_str, entry_price, current_price, position_value, gain_str, gain_pct_str)
-			
-			console.print(positions_table)
-
-	def _print_flow_result(self, result):
-		"""Print workflow execution result."""
-		status = result.get("status", "unknown")
-
-		if status == "error":
-			panel = Panel(
-				f"[red]✗[/red] {result.get('message')}",
-				style="red",
-				box=box.ROUNDED
-			)
-			console.print(panel)
-			if result.get("available"):
-				avail = ", ".join(result.get("available", []))
-				console.print(f"[cyan]Available workflows:[/cyan] {avail}")
-			return
-
-		# Success case
-		panel = Panel(
-			f"[green]✓[/green] Workflow executed successfully",
-			style="green",
-			box=box.ROUNDED
-		)
-		console.print(panel)
-
-		# Display result details
-		if "flow" in result:
-			console.print(f"[cyan]Flow:[/cyan] {result['flow']}")
-		if "strategy" in result:
-			console.print(f"[cyan]Strategy:[/cyan] {result['strategy']}")
-		if "steps_completed" in result:
-			console.print(f"[cyan]Steps Completed:[/cyan] {result['steps_completed']}/{result.get('total_steps', '?')}")
-		if "duration_ms" in result:
-			console.print(f"[cyan]Duration:[/cyan] {result['duration_ms']:.0f}ms")
-
-		# Display backtest portfolio metrics
-		if "output" in result and isinstance(result.get("output"), dict):
-			output = result["output"]
-			if output.get("backtest_id"):
-				self._print_backtest_metrics(output)
-		if "sorted_tickers" in result:
-			sorted_tickers = result.get("sorted_tickers", [])
-			if sorted_tickers:
-				table = Table(title="Tickers by Signal Score (Descending)", box=box.ROUNDED)
-				table.add_column("Rank", style="dim")
-				table.add_column("Ticker", style="cyan")
-				table.add_column("Score", style="green")
-				table.add_column("Signals", style="yellow")
-				for i, ticker_info in enumerate(sorted_tickers, 1):
-					ticker = ticker_info.get("ticker", "?")
-					score = ticker_info.get("score", 0)
-					signal_count = ticker_info.get("signal_count", 0)
-					signals = ticker_info.get("triggered_signals", [])
-					signal_str = ", ".join(signals) if signals else "none"
-					table.add_row(str(i), ticker, f"{score:.3f}", signal_str)
-				console.print(table)
-			else:
-				console.print("[yellow]No ticker scores available[/yellow]")
-
-		# Display watchlist if present
-		if "watchlist" in result:
-			watchlist = result["watchlist"]
-			if watchlist:
-				table = Table(title="Generated Watchlist", box=box.ROUNDED)
-				table.add_column("Ticker", style="cyan")
-				for ticker in watchlist:
-					table.add_row(ticker)
-				console.print(table)
-			else:
-				console.print("[yellow]No tickers in watchlist[/yellow]")
-
-		# Display executable orders if present
-		if "executable_orders" in result:
-			orders = result["executable_orders"]
-			if orders:
-				table = Table(title=f"Executable Orders ({len(orders)})", box=box.ROUNDED)
-				table.add_column("ID", style="dim", width=12)
-				table.add_column("Ticker", style="cyan")
-				table.add_column("Shares", style="yellow", justify="right")
-				table.add_column("Entry Price", style="green", justify="right")
-				table.add_column("Execution", style="magenta")
-				table.add_column("Stop Loss", style="red", justify="right")
-				table.add_column("Take Profit", style="blue", justify="right")
-				table.add_column("Risk/Reward", style="bright_white", justify="right")
-				for order in orders:
-					order_id = order.get("id", "?")[:8]
-					ticker = order.get("ticker", "?")
-					shares = str(order.get("shares", "?"))
-					entry_price = f"${order.get('entry_price', 0):.2f}"
-					execution = order.get("execution_method", "market").upper()
-					stop_loss = f"${order.get('stop_loss', 0):.2f}" if order.get('stop_loss') else "—"
-					take_profit = f"${order.get('take_profit', 0):.2f}" if order.get('take_profit') else "—"
-					rr_ratio = f"{order.get('metadata', {}).get('rr_ratio', 0):.2f}x" if order.get('metadata', {}).get('rr_ratio') else "—"
-					table.add_row(
-						order_id, ticker, shares, entry_price, execution,
-						stop_loss, take_profit, rr_ratio
-					)
-				console.print(table)
-
-				# Show summary stats
-				total_risk = sum(o.get("risk_amount", 0) for o in orders)
-				total_value = sum(o.get("shares", 0) * o.get("entry_price", 0) for o in orders)
-				console.print(f"[cyan]Summary:[/cyan] {len(orders)} orders | ${total_value:,.0f} total value | ${total_risk:,.0f} total risk")
-
-				# Display execution results if present (paper trading)
-				if "execution_results" in result:
-					exec_results = result["execution_results"]
-					if exec_results:
-						exec_table = Table(title="Execution Results (Paper Trading)", box=box.ROUNDED)
-						exec_table.add_column("Ticker", style="cyan")
-						exec_table.add_column("Status", style="yellow")
-						exec_table.add_column("Filled Qty", style="green", justify="right")
-						exec_table.add_column("Filled Price", style="blue", justify="right")
-						exec_table.add_column("Reason", style="red")
-						for exec_result in exec_results:
-							ticker = exec_result.get("ticker", "?")
-							status = exec_result.get("status", "?").upper()
-							status_style = "green" if status == "FILLED" else "yellow"
-							filled_qty = str(exec_result.get("filled_quantity", "—"))
-							filled_price = f"${exec_result.get('filled_price', 0):.2f}" if exec_result.get('filled_price') else "—"
-							reason = exec_result.get("reason", "")
-							exec_table.add_row(ticker, f"[{status_style}]{status}[/{status_style}]", filled_qty, filled_price, reason or "—")
-						console.print(exec_table)
-			else:
-				console.print("[yellow]No executable orders[/yellow]")
-
-		# Display execution history
-		if "execution_history" in result:
-			history = result["execution_history"]
-			if history:
-				hist_table = Table(title="Execution History", box=box.ROUNDED)
-				hist_table.add_column("Step", style="cyan")
-				hist_table.add_column("Status", style="yellow")
-				for step_info in history:
-					step_name = step_info.get("step", "unknown")
-					step_status = step_info.get("status", "unknown")
-					hist_table.add_row(step_name, step_status)
-
-					# Add substeps if present (from nested flows)
-					if "substeps" in step_info:
-						for substep in step_info["substeps"]:
-							substep_name = f"  - {substep.get('step', 'unknown')}"
-							substep_status = substep.get("status", "unknown")
-							hist_table.add_row(substep_name, substep_status)
-
-				console.print(hist_table)
-
-		# Display context if present
-		if "_context" in result:
-			context = result["_context"]
-			if context:
-				context_table = Table(title="Flow Context", box=box.ROUNDED)
-				context_table.add_column("Key", style="cyan")
-				context_table.add_column("Value", style="yellow")
-				for key, value in context.items():
-					# Format value for display
-					if isinstance(value, (dict, list)):
-						value_str = str(value)[:100]
-					else:
-						value_str = str(value)
-					context_table.add_row(key, value_str)
-				console.print(context_table)
-			else:
-				console.print("[yellow]Flow context is empty[/yellow]")
-
-	def _print_result(self, result):
-		"""Print command result."""
-		status = result.get("status", "unknown")
-		message = result.get('message', 'Command executed')
-
-		if status == "success":
-			panel = Panel(
-				f"[green]✓[/green] {message}",
-				style="green",
-				box=box.ROUNDED
-			)
-		else:
-			panel = Panel(
-				f"[red]✗[/red] {message}",
-				style="red",
-				box=box.ROUNDED
-			)
-
-		console.print(panel)
-
-		if status == "error":
-			return
-
-		for key, value in result.items():
-			if key not in ("status", "message", "ticker"):
-				if isinstance(value, (dict, list)):
-					console.print(f"  [cyan]{key}:[/cyan] {value}")
-				else:
-					console.print(f"  [cyan]{key}:[/cyan] {value}")
-
-	def _print_list_result(self, result):
-		"""Print list result as formatted tables."""
-		if result.get("status") == "error":
-			panel = Panel(
-				f"[red]✗[/red] {result.get('message')}",
-				style="red",
-				box=box.ROUNDED
-			)
-			console.print(panel)
-			return
-
-		if result.get("history"):
-			hist_table = Table(title="History Cache", box=box.ROUNDED)
-			hist_table.add_column("Ticker", style="cyan")
-			hist_table.add_column("Size (KB)", style="yellow")
-			for item in result["history"]:
-				hist_table.add_row(item['ticker'], f"{item['size_kb']:.1f}")
-			console.print(hist_table)
-
-		if result.get("fundamentals"):
-			fund_table = Table(title="Fundamentals Cache", box=box.ROUNDED)
-			fund_table.add_column("Ticker", style="cyan")
-			fund_table.add_column("Size (KB)", style="yellow")
-			for item in result["fundamentals"]:
-				fund_table.add_row(item['ticker'], f"{item['size_kb']:.1f}")
-			console.print(fund_table)
-
-	def _print_stats_result(self, result):
-		"""Print cache statistics."""
-		if result.get("status") == "error":
-			panel = Panel(
-				f"[red]✗[/red] {result.get('message')}",
-				style="red",
-				box=box.ROUNDED
-			)
-			console.print(panel)
-			return
-
-		hist = result.get("history", {})
-		fund = result.get("fundamentals", {})
-
-		stats_table = Table(title="Cache Statistics", box=box.ROUNDED)
-		stats_table.add_column("Type", style="cyan")
-		stats_table.add_column("Files", style="yellow")
-		stats_table.add_column("Size (MB)", style="magenta")
-		stats_table.add_column("Path", style="dim")
-
-		stats_table.add_row(
-			"History",
-			str(hist.get('count', 0)),
-			f"{hist.get('size_mb', 0):.2f}",
-			str(hist.get('path', 'N/A'))[:40]
-		)
-		stats_table.add_row(
-			"Fundamentals",
-			str(fund.get('count', 0)),
-			f"{fund.get('size_mb', 0):.2f}",
-			str(fund.get('path', 'N/A'))[:40]
-		)
-
-		console.print(stats_table)
-		console.print(f"\n[bold]Total Size:[/bold] {result.get('total_size_mb', 0):.2f} MB")
-
-	def _print_ticker_info(self, result):
-		"""Print ticker information."""
-		if result.get("status") == "error":
-			panel = Panel(
-				f"[red]✗[/red] {result.get('message')}",
-				style="red",
-				box=box.ROUNDED
-			)
-			console.print(panel)
-			return
-
-		ticker = result.get("ticker")
-		console.print(f"\n[bold cyan]Ticker: {ticker}[/bold cyan]\n")
-
-		# History information
-		history = result.get("history", {})
-		if "message" not in history:
-			console.print("[bold]History[/bold]")
-			hist_table = Table(box=box.ROUNDED, show_header=False)
-			hist_table.add_row("Start Date", f"[yellow]{history.get('start_date')}[/yellow]")
-			hist_table.add_row("End Date", f"[yellow]{history.get('end_date')}[/yellow]")
-			hist_table.add_row("Total Rows", f"[yellow]{history.get('total_rows')}[/yellow]")
-			console.print(hist_table)
-		else:
-			console.print(f"[dim]{history.get('message')}[/dim]")
-
-		# Last OHLCV
-		ohlcv = result.get("last_ohlcv", {})
-		if "message" not in ohlcv:
-			console.print("\n[bold]Last OHLCV[/bold]")
-			ohlcv_table = Table(box=box.ROUNDED, show_header=False)
-			ohlcv_table.add_row("Date", f"[cyan]{ohlcv.get('date')}[/cyan]")
-			ohlcv_table.add_row("Open", f"[yellow]{ohlcv.get('open')}[/yellow]")
-			ohlcv_table.add_row("High", f"[yellow]{ohlcv.get('high')}[/yellow]")
-			ohlcv_table.add_row("Low", f"[yellow]{ohlcv.get('low')}[/yellow]")
-			ohlcv_table.add_row("Close", f"[green]{ohlcv.get('close')}[/green]")
-			ohlcv_table.add_row("Volume", f"[magenta]{ohlcv.get('volume'):,}[/magenta]")
-			console.print(ohlcv_table)
-		else:
-			console.print(f"[dim]{ohlcv.get('message')}[/dim]")
-
-		# Fundamental data
-		fundamental = result.get("fundamental", {})
-		if "message" not in fundamental:
-			console.print("\n[bold]Fundamental[/bold]")
-			
-			# Company info
-			company = fundamental.get("company", {})
-			if company:
-				console.print("[bold cyan]Company[/bold cyan]")
-				company_table = Table(box=box.ROUNDED, show_header=False)
-				company_table.add_row("Name", f"[yellow]{company.get('name', 'N/A')}[/yellow]")
-				company_table.add_row("Sector", f"[yellow]{company.get('sector', 'N/A')}[/yellow]")
-				company_table.add_row("Industry", f"[yellow]{company.get('industry', 'N/A')}[/yellow]")
-				console.print(company_table)
-			
-			# Quotation info
-			quotation = fundamental.get("quotation", {})
-			if quotation:
-				console.print("\n[bold cyan]Quotation[/bold cyan]")
-				quote_table = Table(box=box.ROUNDED, show_header=False)
-				quote_table.add_row("Current Price", f"[green]{quotation.get('current_price', 'N/A')}[/green]")
-				quote_table.add_row("Previous Close", f"[yellow]{quotation.get('previous_close', 'N/A')}[/yellow]")
-				quote_table.add_row("Bid", f"[cyan]{quotation.get('bid', 'N/A')}[/cyan]")
-				quote_table.add_row("Ask", f"[cyan]{quotation.get('ask', 'N/A')}[/cyan]")
-				console.print(quote_table)
-			
-			# Analyst info
-			analysts = fundamental.get("analysts", {})
-			if analysts:
-				console.print("\n[bold cyan]Analyst Ratings[/bold cyan]")
-				analyst_table = Table(box=box.ROUNDED, show_header=False)
-				analyst_table.add_row("Recommendation", f"[magenta]{analysts.get('recommendation', 'N/A')}[/magenta]")
-				analyst_table.add_row("Analyst Count", f"[yellow]{analysts.get('analyst_count', 'N/A')}[/yellow]")
-				analyst_table.add_row("Target Price", f"[yellow]{analysts.get('target_price', 'N/A')}[/yellow]")
-				upside = analysts.get('upside_potential')
-				if upside is not None:
-					color = "green" if upside > 0 else "red"
-					analyst_table.add_row("Upside Potential", f"[{color}]{upside:.2f}%[/{color}]")
-				console.print(analyst_table)
-		else:
-			console.print(f"[dim]{fundamental.get('message')}[/dim]")
-
-		console.print()
-
-	def _print_universe_result(self, result):
-		"""Print universe fetch result."""
-		status = result.get("status", "unknown")
-		message = result.get('message', 'Command executed')
-
-		if status == "success":
-			panel = Panel(
-				f"[green]✓[/green] {message}",
-				style="green",
-				box=box.ROUNDED
-			)
-		else:
-			panel = Panel(
-				f"[red]✗[/red] {message}",
-				style="red",
-				box=box.ROUNDED
-			)
-		console.print(panel)
-
-		if status == "error":
-			if result.get("available"):
-				avail = ", ".join(result.get('available', []))
-				console.print(f"[cyan]Available universes:[/cyan] {avail}")
-			return
-
-		table = Table(title="Universe Fetch Summary", box=box.ROUNDED)
-		table.add_column("Metric", style="cyan")
-		table.add_column("Value", style="yellow")
-
-		table.add_row("Universe", result.get('universe'))
-		table.add_row("Total Tickers", str(result.get('total')))
-		table.add_row("Fetched", str(result.get('fetched')))
-		table.add_row("Failed", str(result.get('failed')))
-
-		details = result.get("details", [])
-		successful = [d for d in details if d.get("status") == "success"]
-		if successful:
-			rows_fetched = sum(d.get("rows", 0) for d in successful)
-			table.add_row("Total Rows", str(rows_fetched))
-
-		console.print(table)
-
+	# ==================== Utility Commands ====================
 	def do_history(self, args):
-		"""View command history: history [N] shows last N commands (default: 20)"""
-		try:
-			count = int(str(args).strip()) if args else 20
-		except ValueError:
-			console.print("[red]✗[/red] Invalid number of commands")
-			return
-
-		if not self.history:
-			console.print("[yellow]No command history[/yellow]")
-			return
-
-		# Get last N commands
-		commands = list(self.history)[-count:]
-
-		table = Table(title=f"Command History (last {len(commands)})", box=box.ROUNDED)
-		table.add_column("#", style="dim")
-		table.add_column("Command", style="cyan")
-
-		for idx, cmd in enumerate(commands, 1):
-			table.add_row(str(idx), str(cmd))
-
-		console.print(table)
+		"""View command history."""
+		console.print("[dim]Command history saved to ~/.cresus/history[/dim]")
 
 	def do_clear(self, _):
 		"""Clear the screen."""
-		console.clear()
+		import os
+		os.system("clear" if os.name != "nt" else "cls")
 
 	def do_motd(self, _):
-		"""Show welcome banner."""
+		"""Display message of the day."""
 		self._print_intro()
 
 	def do_pwd(self, _):
-		"""Show current project root."""
-		panel = Panel(
-			f"[cyan]Project Root:[/cyan]\n{self.project_root}",
-			style="cyan",
-			box=box.ROUNDED,
-			title="Working Directory"
-		)
-		console.print(panel)
+		"""Print working directory."""
+		console.print(str(self.project_root))
 
-	def _print_universes(self):
-		"""Print available universes as a table."""
-		from tools.universe.universe import Universe
+	def do_update(self, _):
+		"""Update cresus from git repository (runs in background)."""
+		import subprocess
+		import threading
 
-		universes = Universe.list_universes()
-
-		if not universes:
-			panel = Panel(
-				"No universes found",
-				style="yellow",
-				box=box.ROUNDED
-			)
-			console.print(panel)
-			return
-
-		table = Table(title=f"Available Universes ({len(universes)})", box=box.ROUNDED)
-		table.add_column("Name", style="cyan")
-		table.add_column("Tickers", style="yellow")
-		table.add_column("Size (KB)", style="magenta")
-
-		for universe_name in universes:
-			info = Universe.get_universe_info(universe_name)
-			if info:
-				table.add_row(
-					universe_name,
-					str(info.get('count', 0)),
-					f"{info.get('file_size_kb', 0):.1f}"
+		def run_git_pull():
+			try:
+				result = subprocess.run(
+					["git", "pull"],
+					cwd=str(self.project_root),
+					capture_output=True,
+					text=True,
+					timeout=60
 				)
 
-		console.print(table)
+				if result.returncode == 0:
+					console.print("[green]✓ Update completed successfully[/green]")
+					if result.stdout:
+						console.print(f"[dim]{result.stdout}[/dim]")
+				else:
+					console.print(f"[red]✗ Update failed with exit code {result.returncode}[/red]")
+					if result.stderr:
+						console.print(f"[red]{result.stderr}[/red]")
+			except subprocess.TimeoutExpired:
+				console.print("[red]✗ Update timed out after 60 seconds[/red]")
+			except Exception as e:
+				console.print(f"[red]✗ Update error: {e}[/red]")
+
+		# Run git pull in background thread
+		thread = threading.Thread(target=run_git_pull, daemon=True)
+		thread.start()
+		console.print("[cyan]Updating cresus from git repository...[/cyan]")
+
+	def do_quit(self, _):
+		"""Exit the CLI."""
+		console.print("[cyan]Goodbye![/cyan]")
+		return True
+
+	def _print_backtest_results(self, strategy: str, result: dict):
+		"""Display backtest portfolio performance metrics."""
+		try:
+			output = result.get("output", {})
+			metrics = output.get("portfolio_metrics", {})
+
+			if not metrics:
+				return
+
+			console.print(f"\n{'='*100}")
+			console.print(f"[bold cyan]Portfolio Performance: {strategy}[/bold cyan]")
+			console.print(f"{'='*100}\n")
+
+			# Format metrics similar to vectorbt stats() output
+			metrics_display = [
+				("Start", metrics.get("start_date", "N/A"), ""),
+				("End", metrics.get("end_date", "N/A"), ""),
+				("Period", f"{metrics.get('period_days', 0)} days", ""),
+				("", "", ""),
+				("Start Value", f"${metrics.get('start_value', 0):.2f}", ""),
+				("End Value", f"${metrics.get('end_value', 0):.2f}", ""),
+				("Total Return", f"{metrics.get('total_return_pct', 0):.2f}", "%"),
+				("Benchmark Return", f"{metrics.get('benchmark_return_pct', 0):.2f}", "%"),
+				("Max Gross Exposure", f"{metrics.get('max_gross_exposure_pct', 0):.2f}", "%"),
+				("Total Fees Paid", f"${metrics.get('total_fees_paid', 0):.2f}", ""),
+				("", "", ""),
+				("Max Drawdown", f"{metrics.get('max_drawdown_pct', 0):.2f}", "%"),
+				("Max Drawdown Duration", f"{metrics.get('max_drawdown_duration_days', 0)} days", ""),
+				("", "", ""),
+				("Total Trades", f"{metrics.get('total_trades', 0):.0f}", ""),
+				("Closed Trades", f"{metrics.get('closed_trades', 0):.0f}", ""),
+				("Open Trades", f"{metrics.get('open_trades', 0):.0f}", ""),
+				("Open Trade PnL", f"${metrics.get('open_trade_pnl', 0):.2f}", ""),
+				("", "", ""),
+				("Win Rate", f"{metrics.get('win_rate_pct', 0):.2f}", "%"),
+				("Best Trade", f"{metrics.get('best_trade_pct', 0):.2f}", "%"),
+				("Worst Trade", f"{metrics.get('worst_trade_pct', 0):.2f}", "%"),
+				("Avg Winning Trade", f"{metrics.get('avg_winning_trade_pct', 0):.2f}", "%"),
+				("Avg Losing Trade", f"{metrics.get('avg_losing_trade_pct', 0):.2f}", "%"),
+				("", "", ""),
+				("Avg Winning Trade Duration", f"{metrics.get('avg_winning_trade_duration_days', 0):.1f} days", ""),
+				("Avg Losing Trade Duration", f"{metrics.get('avg_losing_trade_duration_days', 0):.1f} days", ""),
+				("", "", ""),
+				("Profit Factor", f"{metrics.get('profit_factor', 0):.6f}", ""),
+				("Expectancy", f"{metrics.get('expectancy_pct', 0):.6f}", "%"),
+				("Sharpe Ratio", f"{metrics.get('sharpe_ratio', 0):.6f}", ""),
+				("Calmar Ratio", f"{metrics.get('calmar_ratio', 0):.6f}", ""),
+				("Omega Ratio", f"{metrics.get('omega_ratio', 0):.6f}", ""),
+				("Sortino Ratio", f"{metrics.get('sortino_ratio', 0):.6f}", ""),
+			]
+
+			# Print in aligned columns
+			for metric_name, value, unit in metrics_display:
+				if not metric_name:  # Empty line
+					console.print()
+				else:
+					if unit:
+						print(f"{metric_name:<35} {value:>20} {unit}")
+					else:
+						print(f"{metric_name:<35} {value:>20}")
+
+			console.print(f"\n{'='*100}\n")
+
+		except Exception as e:
+			console.print(f"[yellow]⚠ Could not display backtest results: {e}[/yellow]")

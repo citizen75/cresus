@@ -98,23 +98,35 @@ class CronScheduler:
 		"""
 		from core.context import AgentContext
 		from flows.premarket import PreMarketFlow
+		from flows.data_fetch import DataFetchFlow
+		from flows.heartbeat import HeartbeatFlow
 
 		# Map flow names to flow classes
 		flow_classes = {
 			"premarket": PreMarketFlow,
+			"data_fetch": DataFetchFlow,
+			"heartbeat": HeartbeatFlow,
 		}
 
 		if flow_name not in flow_classes:
 			raise ValueError(f"Unknown flow: {flow_name}")
 
-		# Instantiate flow and execute
-		strategy = params.get("strategy")
-		if not strategy:
-			raise ValueError(f"Flow '{flow_name}' requires 'strategy' parameter")
+		# Instantiate flow and execute based on flow type
+		flow_class = flow_classes[flow_name]
 
-		flow = flow_classes[flow_name](strategy)
+		if flow_name == "heartbeat":
+			flow = flow_class()
+		elif flow_name == "data_fetch":
+			universe = params.get("universe", "cac40")
+			flow = flow_class(universe=universe)
+		else:
+			# Default: strategy-based flows
+			strategy = params.get("strategy")
+			if not strategy:
+				raise ValueError(f"Flow '{flow_name}' requires 'strategy' parameter")
+			flow = flow_class(strategy)
+
 		result = flow.process(params)
-
 		logger.info(f"Flow '{flow_name}' result: {result.get('status', 'unknown')}")
 
 	def _call_agent(self, agent_name: str, params: dict) -> None:
