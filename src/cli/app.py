@@ -322,17 +322,17 @@ class CresusCLI(cmd2.Cmd):
 			self.flow_manager._print_workflows_result(result)
 		elif cmd == "run":
 			if len(parts) < 2:
-				console.print("[red]✗[/red] Usage: flow run <workflow_name> [strategy] [tickers...] [--context] [--debug] [--quiet] [--backtest]")
+				console.print("[red]✗[/red] Usage: flow run <workflow_name> [strategy] [tickers...] [--context] [--debug] [-v] [--backtest]")
 				return
 
 			workflow_name = parts[1]
 			include_context = "--context" in parts
 			debug = "--debug" in parts
-			quiet = "--quiet" in parts
+			verbose = "-v" in parts
 			use_backtest = "--backtest" in parts
 
 			# Remove workflow name and flags from parts
-			remaining = [p for p in parts[2:] if not p.startswith("--")]
+			remaining = [p for p in parts[2:] if not p.startswith("-")]
 
 			# First remaining item is strategy, rest depends on workflow type
 			strategy = remaining[0] if remaining else "default_strategy"
@@ -368,19 +368,19 @@ class CresusCLI(cmd2.Cmd):
 				if tickers:
 					input_data = {"tickers": tickers}
 
-			# Enable quiet mode if requested
-			if quiet:
-				from core.logger import enable_quiet_mode
-				enable_quiet_mode()
+			# Enable verbose mode if requested
+			if verbose:
+				from core.logger import enable_verbose_mode
+				enable_verbose_mode()
 
 			try:
 				result = self.flow_manager.run_workflow(workflow_name, strategy, input_data, include_context, debug, use_backtest)
 				self.flow_manager._print_flow_result(result, workflow_name)
 			finally:
-				# Restore normal logging if quiet mode was enabled
-				if quiet:
-					from core.logger import disable_quiet_mode
-					disable_quiet_mode()
+				# Restore quiet mode if verbose mode was enabled
+				if verbose:
+					from core.logger import disable_verbose_mode
+					disable_verbose_mode()
 
 			# Display backtest results if backtest completed successfully
 			if workflow_name.lower() == "backtest" and result.get("status") == "success":

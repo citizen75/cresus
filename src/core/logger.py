@@ -9,12 +9,12 @@ try:
 	from loguru import logger as loguru_logger
 	HAS_LOGURU = True
 
-	# Configure loguru (default to INFO level)
+	# Configure loguru (default to ERROR level for quiet output)
 	loguru_logger.remove()
 	loguru_logger.add(
 		sys.stderr,
 		format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {message}",
-		level="INFO"
+		level="ERROR"
 	)
 except ImportError:
 	HAS_LOGURU = False
@@ -56,29 +56,29 @@ def disable_debug_mode():
 		loguru_logger.add(
 			sys.stderr,
 			format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {message}",
+			level="ERROR"
+		)
+
+
+def enable_verbose_mode():
+	"""Enable verbose mode - show INFO level and above."""
+	if HAS_LOGURU:
+		loguru_logger.remove()
+		loguru_logger.add(
+			sys.stderr,
+			format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {message}",
 			level="INFO"
 		)
 
 
-def enable_quiet_mode():
-	"""Enable quiet mode - only show ERROR level and above."""
+def disable_verbose_mode():
+	"""Disable verbose mode - only show ERROR level and above."""
 	if HAS_LOGURU:
 		loguru_logger.remove()
 		loguru_logger.add(
 			sys.stderr,
 			format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {message}",
 			level="ERROR"
-		)
-
-
-def disable_quiet_mode():
-	"""Disable quiet mode - show INFO level and above."""
-	if HAS_LOGURU:
-		loguru_logger.remove()
-		loguru_logger.add(
-			sys.stderr,
-			format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {message}",
-			level="INFO"
 		)
 
 
