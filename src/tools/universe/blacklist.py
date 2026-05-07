@@ -39,7 +39,7 @@ class Blacklist:
             return set()
 
         try:
-            df = pd.read_csv(self.filepath)
+            df = pd.read_csv(self.filepath, keep_default_na=False, na_values=[])
 
             # Get tickers from 'ticker' column
             if "ticker" in df.columns:
@@ -80,7 +80,7 @@ class Blacklist:
             })
         else:
             # Load existing and append
-            df = pd.read_csv(self.filepath)
+            df = pd.read_csv(self.filepath, keep_default_na=False, na_values=[])
             new_row = pd.DataFrame({
                 "ticker": [ticker.upper()],
                 "reason": [reason],
@@ -102,7 +102,7 @@ class Blacklist:
         if not self.exists():
             return
 
-        df = pd.read_csv(self.filepath)
+        df = pd.read_csv(self.filepath, keep_default_na=False, na_values=[])
         df = df[df["ticker"].str.upper() != ticker.upper()]
         df.to_csv(self.filepath, index=False)
         self._tickers = None  # Invalidate cache
