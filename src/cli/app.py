@@ -71,11 +71,12 @@ class CresusCLI(cmd2.Cmd):
 		info_table.add_row("[bold]service[/bold]", "Manage services (api, mcp, front)")
 		info_table.add_row("[bold]flow[/bold]", "Execute workflows (e.g., flow run watchlist)")
 		info_table.add_row("[bold]data[/bold]", "Manage portfolio data and cache")
+		info_table.add_row("[bold]universe[/bold]", "Manage universes (e.g., universe list|info cac40)")
 		info_table.add_row("[bold]watchlist[/bold]", "View strategy watchlist (e.g., watchlist show momentum_cac)")
 		info_table.add_row("[bold]orders[/bold]", "View pending/executed orders (e.g., orders list momentum_cac)")
 		info_table.add_row("[bold]cron[/bold]", "View scheduled cron jobs and next run times")
 		info_table.add_row("[bold]status[/bold]", "Show system status")
-		info_table.add_row("[bold]update[/bold]", "Update cresus from git (background)")
+		info_table.add_row("[bold]update[/bold]", "Update cresus from git")
 		info_table.add_row("[bold]history[/bold]", "View command history")
 		info_table.add_row("[bold]quit[/bold] or [bold]exit[/bold]", "Exit the CLI")
 
@@ -366,6 +367,57 @@ class CresusCLI(cmd2.Cmd):
 	def do_orders(self, args):
 		"""Manage orders: list <strategy>"""
 		self.portfolio_commands.handle_orders(args)
+
+	def do_universe(self, args):
+		"""Manage universes: list|info <name>"""
+		from tools.universe.universe import Universe
+		from rich.table import Table
+
+		parts = args.strip().split() if args.strip() else []
+
+		if not parts or parts[0] == "list":
+			# List all universes
+			universes = Universe.list_universes()
+
+			if not universes:
+				console.print("[yellow]No universes found in ~/.cresus/db/universes/[/yellow]")
+				return
+
+			table = Table(title="Available Universes", box=box.ROUNDED)
+			table.add_column("Universe", style="cyan")
+			table.add_column("Tickers", style="green")
+			table.add_column("Size (KB)", style="blue")
+
+			for universe_name in universes:
+				info = Universe.get_universe_info(universe_name)
+				if info:
+					table.add_row(
+						universe_name,
+						str(info["count"]),
+						f"{info['file_size_kb']:.1f}"
+					)
+				else:
+					table.add_row(universe_name, "error", "-")
+
+			console.print(table)
+
+		elif parts[0] == "info" and len(parts) > 1:
+			# Show detailed info about a universe
+			universe_name = parts[1]
+			info = Universe.get_universe_info(universe_name)
+
+			if not info:
+				console.print(f"[red]✗ Universe '{universe_name}' not found[/red]")
+				return
+
+			console.print(f"\n[bold cyan]Universe: {info['name']}[/bold cyan]")
+			console.print(f"[cyan]Path:[/cyan] {info['path']}")
+			console.print(f"[cyan]Tickers:[/cyan] {info['count']}")
+			console.print(f"[cyan]File Size:[/cyan] {info['file_size_kb']:.1f} KB")
+			console.print(f"[cyan]Columns:[/cyan] {', '.join(info['columns'])}")
+
+		else:
+			console.print("[yellow]Usage: universe list|info <name>[/yellow]")
 
 	# ==================== Scheduler Commands ====================
 	def do_cron(self, args):
