@@ -133,7 +133,8 @@ class PositionSizingAgent(Agent):
 					shares = self._fractional_sizing(cash, current_price, entry_price, stop_loss)
 
 			# Validate shares is a valid number
-			if shares and shares > 0:
+			import math
+			if shares is not None and not math.isnan(shares) and not math.isinf(shares) and shares > 0:
 				try:
 					shares_int = int(shares)
 					sized_orders.append({
@@ -183,6 +184,8 @@ class PositionSizingAgent(Agent):
 			return 0
 		if math.isinf(current_price) or math.isinf(entry_price) or math.isinf(stop_loss):
 			return 0
+		if current_price <= 0 or cash <= 0:
+			return 0
 			
 		risk_amount = cash * (self.risk_percent / 100.0)
 		price_risk = abs(entry_price - stop_loss)
@@ -217,6 +220,8 @@ class PositionSizingAgent(Agent):
 		if math.isnan(current_price) or math.isnan(rr_ratio) or math.isnan(win_rate):
 			return 0
 		if math.isinf(current_price) or math.isinf(rr_ratio) or math.isinf(win_rate):
+			return 0
+		if current_price <= 0 or cash <= 0:
 			return 0
 			
 		if rr_ratio <= 0 or win_rate <= 0:
@@ -254,6 +259,8 @@ class PositionSizingAgent(Agent):
 		if math.isnan(current_price) or math.isnan(volatility):
 			return 0
 		if math.isinf(current_price) or math.isinf(volatility):
+			return 0
+		if current_price <= 0 or cash <= 0:
 			return 0
 			
 		# Adjust risk percent inversely with volatility
