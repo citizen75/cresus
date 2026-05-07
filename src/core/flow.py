@@ -147,7 +147,9 @@ class Flow:
 
 				# Check for step failure
 				if result.get("status") == "error":
-					self.logger.error(f"Step '{step['name']}' failed: {result.get('message')}")
+					# Use warning for optional steps (they fail gracefully), error for required steps
+					log_level = self.logger.warning if not step["required"] else self.logger.error
+					log_level(f"Step '{step['name']}' failed: {result.get('message')}")
 
 					if step["required"]:
 						self.end_time = datetime.now()
