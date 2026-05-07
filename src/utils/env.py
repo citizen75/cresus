@@ -147,7 +147,10 @@ def get_gateway_mcp_enabled() -> bool:
 
 def get_gateway_cron_config() -> str:
 	"""Get gateway cron config path."""
-	return env.get("GATEWAY_CRON_CONFIG", "config/cron.yml")
+	cron_config = env.get("GATEWAY_CRON_CONFIG")
+	if cron_config:
+		return cron_config
+	return str(get_config_root() / "cron.yml")
 
 
 def get_db_root() -> Path:
@@ -164,6 +167,25 @@ def get_db_root() -> Path:
 		path = Path(db_root)
 	else:
 		path = Path.home() / ".cresus" / "db"
+
+	path.mkdir(parents=True, exist_ok=True)
+	return path
+
+
+def get_config_root() -> Path:
+	"""Get configuration root directory path.
+
+	Uses CRESUS_CONFIG_ROOT env var if set, otherwise defaults to ~/.cresus/config.
+	Creates directory if it doesn't exist.
+
+	Returns:
+		Path to configuration root directory
+	"""
+	config_root = os.environ.get("CRESUS_CONFIG_ROOT")
+	if config_root:
+		path = Path(config_root)
+	else:
+		path = Path.home() / ".cresus" / "config"
 
 	path.mkdir(parents=True, exist_ok=True)
 	return path

@@ -11,6 +11,7 @@ import uvicorn
 
 from gateway.cron import CronScheduler
 from gateway.watchdog import FileWatcher
+from utils.env import get_config_root
 
 
 class GatewayServer:
@@ -50,7 +51,7 @@ class GatewayServer:
 		self.file_watcher: Optional[FileWatcher] = None
 
 		if enable_cron and cron_config_path is None:
-			cron_config_path = Path("config/cron.yml")
+			cron_config_path = get_config_root() / "cron.yml"
 
 		self.cron_config_path = cron_config_path
 		self.running = False

@@ -11,7 +11,7 @@ from .journal import Journal
 from tools.data import Fundamental, DataHistory
 from .cache import PortfolioCache
 from .portfolio_history import PortfolioHistory
-from utils.env import get_db_root
+from utils.env import get_db_root, get_config_root
 
 
 class PortfolioManager:
@@ -41,7 +41,8 @@ class PortfolioManager:
             self.portfolios_dir = Path(portfolios_dir or db_root / "portfolios")
             self.orders_dir = Path(orders_dir or db_root / "orders")
 
-        self.config_path = Path(config_path or project_root / "config/portfolios.yml")
+        config_root = get_config_root()
+        self.config_path = Path(config_path or config_root / "portfolios.yml")
         self.portfolios_dir.mkdir(parents=True, exist_ok=True)
         self.orders_dir.mkdir(parents=True, exist_ok=True)
         self.cache = PortfolioCache(context=self.context)

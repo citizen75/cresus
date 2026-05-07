@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 import yaml
 from loguru import logger
+from utils.env import get_config_root
 
 
 class CronJobConfig:
@@ -52,10 +53,10 @@ class CronConfig:
 		"""Initialize cron config loader.
 
 		Args:
-			config_path: Path to cron.yml config file. Defaults to config/cron.yml
+			config_path: Path to cron.yml config file. Defaults to ~/.cresus/config/cron.yml
 		"""
 		if config_path is None:
-			config_path = Path("config/cron.yml")
+			config_path = get_config_root() / "cron.yml"
 
 		self.config_path = config_path
 		self.jobs: List[CronJobConfig] = []

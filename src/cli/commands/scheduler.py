@@ -7,6 +7,7 @@ from apscheduler.triggers.cron import CronTrigger
 from rich.console import Console
 from rich.table import Table
 from rich import box
+from utils.env import get_config_root
 
 console = Console()
 
@@ -27,7 +28,7 @@ class SchedulerCommands:
 	def _print_cron_jobs(self):
 		"""Display all cron jobs and their next run times."""
 		try:
-			cron_config_path = Path("config/cron.yml")
+			cron_config_path = get_config_root() / "cron.yml"
 			if not cron_config_path.exists():
 				console.print("[yellow]⚠[/yellow] Cron config file not found")
 				return
