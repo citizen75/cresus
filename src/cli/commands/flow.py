@@ -345,6 +345,9 @@ class FlowManager:
 			elif workflow_name.lower() == "market_regime":
 				self._print_market_regime_result(result, console)
 				return
+			elif workflow_name.lower() == "premarket":
+				self._print_premarket_result(result, console)
+				return
 
 		# Print summary for other workflows
 		output = result.get("output", {})
@@ -731,3 +734,76 @@ Sortino Ratio                                  {sortino:.6f}"""
 				table.add_row(regime, prob_pct)
 
 			console.print(table)
+
+	def _print_premarket_result(self, result, console):
+		"""Print pre-market flow result with watchlist and orders."""
+		from rich.table import Table
+
+		if result.get("status") != "success":
+			return
+
+		strategy = result.get("strategy", "unknown")
+		watchlist = result.get("watchlist", [])
+		ticker_scores = result.get("ticker_scores", {})
+		executable_orders = result.get("executable_orders", [])
+		orders_count = result.get("orders_count", 0)
+		watchlist_saved = result.get("watchlist_saved", {})
+
+		console.print(f"\n[bold cyan]📊 Pre-Market Analysis: {strategy}[/bold cyan]")
+		console.print("=" * 100)
+
+		# Watchlist section
+		if watchlist:
+			console.print(f"\n[bold]Watchlist ({len(watchlist)} tickers)[/bold]")
+			table = Table(box=None)
+			table.add_column("Ticker", style="cyan")
+			table.add_column("Score", style="green")
+			table.add_column("Signals", style="yellow")
+
+			for ticker in watchlist[:20]:  # Show top 20
+				score_info = ticker_scores.get(ticker, {})
+				score = score_info.get("score", 0)
+				signal_count = score_info.get("signal_count", 0)
+				table.add_row(ticker, f"{score:.3f}", str(signal_count))
+
+			console.print(table)
+
+			if len(watchlist) > 20:
+				console.print(f"[dim]... and {len(watchlist) - 20} more tickers[/dim]")
+
+		# Orders section
+		if executable_orders:
+			console.print(f"\n[bold]Generated Orders ({orders_count} orders)[/bold]")
+			table = Table(box=None)
+			table.add_column("Ticker", style="cyan")
+			table.add_column("Side", style="yellow")
+			table.add_column("Shares", style="green")
+			table.add_column("Entry Price", style="blue")
+			table.add_column("Method", style="magenta")
+
+			for order in executable_orders[:20]:  # Show top 20
+				ticker = order.get("ticker", "")
+				side = order.get("side", "BUY").upper()
+				side_color = "green" if side == "BUY" else "red"
+				shares = order.get("shares", 0)
+				entry_price = order.get("entry_price", 0)
+				method = order.get("execution_method", "market")
+
+				table.add_row(
+					ticker,
+					f"[{side_color}]{side}[/{side_color}]",
+					f"{shares:.0f}",
+					f"${entry_price:.2f}",
+					method
+				)
+
+			console.print(table)
+
+			if len(executable_orders) > 20:
+				console.print(f"[dim]... and {len(executable_orders) - 20} more orders[/dim]")
+
+		# Save status
+		if watchlist_saved:
+			saved_path = watchlist_saved.get("saved_path", "")
+			if saved_path:
+				console.print(f"\n[green]✓ Watchlist saved to:[/green] {saved_path}")
