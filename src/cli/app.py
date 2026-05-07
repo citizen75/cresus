@@ -71,7 +71,7 @@ class CresusCLI(cmd2.Cmd):
 		info_table.add_row("[bold]service[/bold]", "Manage services (api, mcp, front)")
 		info_table.add_row("[bold]flow[/bold]", "Execute workflows (e.g., flow run watchlist)")
 		info_table.add_row("[bold]data[/bold]", "Manage portfolio data and cache")
-		info_table.add_row("[bold]universe[/bold]", "Manage universes (e.g., universe list|info cac40)")
+		info_table.add_row("[bold]universe[/bold]", "Manage universes (e.g., universe list|info|blacklist cac40)")
 		info_table.add_row("[bold]watchlist[/bold]", "View strategy watchlist (e.g., watchlist show momentum_cac)")
 		info_table.add_row("[bold]orders[/bold]", "View pending/executed orders (e.g., orders list momentum_cac)")
 		info_table.add_row("[bold]cron[/bold]", "View scheduled cron jobs and next run times")
@@ -369,9 +369,11 @@ class CresusCLI(cmd2.Cmd):
 		self.portfolio_commands.handle_orders(args)
 
 	def do_universe(self, args):
-		"""Manage universes: list|info <name>"""
+		"""Manage universes: list|info <name>|blacklist <ticker>"""
 		from tools.universe.universe import Universe
+		from tools.universe.blacklist import get_blacklist
 		from rich.table import Table
+		import pandas as pd
 
 		parts = args.strip().split() if args.strip() else []
 
@@ -416,8 +418,54 @@ class CresusCLI(cmd2.Cmd):
 			console.print(f"[cyan]File Size:[/cyan] {info['file_size_kb']:.1f} KB")
 			console.print(f"[cyan]Columns:[/cyan] {', '.join(info['columns'])}")
 
+		elif parts[0] == "blacklist" and len(parts) > 1:
+			# Add ticker to blacklist
+			ticker = parts[1].upper()
+			blacklist = get_blacklist()
+
+			# Try to find the ticker name from universes
+			ticker_name = None
+			universes = Universe.list_universes()
+
+			for universe_name in universes:
+				try:
+					u = Universe(universe_name)
+					if u.exists():
+						df = u.load_df()
+						# Search in TickerYahoo column
+						if "TickerYahoo" in df.columns:
+							match = df[df["TickerYahoo"].str.upper() == ticker]
+							if not match.empty:
+								# Try to get the name from Name or CompanyName column
+								if "Name" in df.columns:
+									ticker_name = match.iloc[0]["Name"]
+									break
+								elif "CompanyName" in df.columns:
+									ticker_name = match.iloc[0]["CompanyName"]
+									break
+						# Search in ISIN column
+						if ticker_name is None and "ISIN" in df.columns:
+							match = df[df["ISIN"].str.upper() == ticker]
+							if not match.empty:
+								if "Name" in df.columns:
+									ticker_name = match.iloc[0]["Name"]
+									break
+								elif "CompanyName" in df.columns:
+									ticker_name = match.iloc[0]["CompanyName"]
+									break
+				except Exception:
+					pass
+
+			# Add to blacklist
+			reason = f"User blacklist - {ticker_name}" if ticker_name else "User blacklist"
+			blacklist.add_ticker(ticker, reason=reason)
+
+			console.print(f"[green]✓ Added {ticker} to blacklist[/green]")
+			if ticker_name:
+				console.print(f"[dim]  Name: {ticker_name}[/dim]")
+
 		else:
-			console.print("[yellow]Usage: universe list|info <name>[/yellow]")
+			console.print("[yellow]Usage: universe list|info <name>|blacklist <ticker>[/yellow]")
 
 	# ==================== Scheduler Commands ====================
 	def do_cron(self, args):
