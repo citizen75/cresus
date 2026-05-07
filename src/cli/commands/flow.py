@@ -778,8 +778,10 @@ Sortino Ratio                                  {sortino:.6f}"""
 			table.add_column("Ticker", style="cyan")
 			table.add_column("Side", style="yellow")
 			table.add_column("Shares", style="green")
-			table.add_column("Entry Price", style="blue")
-			table.add_column("Method", style="magenta")
+			table.add_column("Entry", style="blue")
+			table.add_column("Stop Loss", style="red")
+			table.add_column("Take Profit", style="green")
+			table.add_column("R:R", style="magenta")
 
 			for order in executable_orders[:20]:  # Show top 20
 				ticker = order.get("ticker", "")
@@ -787,14 +789,23 @@ Sortino Ratio                                  {sortino:.6f}"""
 				side_color = "green" if side == "BUY" else "red"
 				shares = order.get("shares", 0)
 				entry_price = order.get("entry_price", 0)
-				method = order.get("execution_method", "market")
+				stop_loss = order.get("stop_loss", 0)
+				take_profit = order.get("take_profit", 0)
+				risk_reward = order.get("risk_reward", 0)
+
+				# Format stop loss and take profit
+				stop_str = f"${stop_loss:.2f}" if stop_loss > 0 else "-"
+				tp_str = f"${take_profit:.2f}" if take_profit > 0 else "-"
+				rr_str = f"{risk_reward:.2f}x" if risk_reward > 0 else "-"
 
 				table.add_row(
 					ticker,
 					f"[{side_color}]{side}[/{side_color}]",
 					f"{shares:.0f}",
 					f"${entry_price:.2f}",
-					method
+					stop_str,
+					tp_str,
+					rr_str
 				)
 
 			console.print(table)
