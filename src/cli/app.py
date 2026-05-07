@@ -71,7 +71,8 @@ class CresusCLI(cmd2.Cmd):
 		info_table.add_row("[bold]service[/bold]", "Manage services (api, mcp, front)")
 		info_table.add_row("[bold]flow[/bold]", "Execute workflows (e.g., flow run watchlist)")
 		info_table.add_row("[bold]data[/bold]", "Manage portfolio data and cache")
-		info_table.add_row("[bold]universe[/bold]", "Manage universes (e.g., universe list|info|blacklist cac40)")
+		info_table.add_row("[bold]universe[/bold]", "Manage universes (e.g., universe list|info cac40)")
+		info_table.add_row("[bold]blacklist[/bold]", "Manage blacklist (e.g., blacklist list|add|del MOEX)")
 		info_table.add_row("[bold]watchlist[/bold]", "View strategy watchlist (e.g., watchlist show momentum_cac)")
 		info_table.add_row("[bold]orders[/bold]", "View pending/executed orders (e.g., orders list momentum_cac)")
 		info_table.add_row("[bold]cron[/bold]", "View scheduled cron jobs and next run times")
@@ -369,11 +370,9 @@ class CresusCLI(cmd2.Cmd):
 		self.portfolio_commands.handle_orders(args)
 
 	def do_universe(self, args):
-		"""Manage universes: list|info <name>|blacklist <ticker>"""
+		"""Manage universes: list|info <name>"""
 		from tools.universe.universe import Universe
-		from tools.universe.blacklist import get_blacklist
 		from rich.table import Table
-		import pandas as pd
 
 		parts = args.strip().split() if args.strip() else []
 
@@ -418,7 +417,50 @@ class CresusCLI(cmd2.Cmd):
 			console.print(f"[cyan]File Size:[/cyan] {info['file_size_kb']:.1f} KB")
 			console.print(f"[cyan]Columns:[/cyan] {', '.join(info['columns'])}")
 
-		elif parts[0] == "blacklist" and len(parts) > 1:
+		else:
+			console.print("[yellow]Usage: universe list|info <name>[/yellow]")
+
+	# ==================== Blacklist Commands ====================
+	def do_blacklist(self, args):
+		"""Manage blacklist: list|add|del <ticker>"""
+		from tools.universe.blacklist import get_blacklist
+		from tools.universe.universe import Universe
+		from rich.table import Table
+		import pandas as pd
+
+		parts = args.strip().split() if args.strip() else []
+
+		if not parts or parts[0] == "list":
+			# List all blacklisted tickers
+			blacklist = get_blacklist()
+			tickers = blacklist.get_tickers()
+
+			if not tickers:
+				console.print("[yellow]No tickers in blacklist[/yellow]")
+				return
+
+			table = Table(title="Blacklisted Tickers", box=box.ROUNDED)
+			table.add_column("Ticker", style="cyan")
+			table.add_column("Reason", style="yellow")
+			table.add_column("Date Added", style="dim")
+
+			# Read the CSV to get reason and date info
+			try:
+				df = pd.read_csv(blacklist.filepath, keep_default_na=False, na_values=[])
+				for _, row in df.iterrows():
+					table.add_row(
+						row.get("ticker", ""),
+						row.get("reason", ""),
+						row.get("date_added", "")
+					)
+			except Exception:
+				# Fallback: just list the tickers
+				for ticker in sorted(tickers):
+					table.add_row(ticker, "", "")
+
+			console.print(table)
+
+		elif parts[0] == "add" and len(parts) > 1:
 			# Add ticker to blacklist
 			ticker = parts[1].upper()
 			blacklist = get_blacklist()
@@ -464,8 +506,20 @@ class CresusCLI(cmd2.Cmd):
 			if ticker_name:
 				console.print(f"[dim]  Name: {ticker_name}[/dim]")
 
+		elif parts[0] == "del" and len(parts) > 1:
+			# Remove ticker from blacklist
+			ticker = parts[1].upper()
+			blacklist = get_blacklist()
+
+			if not blacklist.is_blacklisted(ticker):
+				console.print(f"[yellow]⚠ {ticker} not found in blacklist[/yellow]")
+				return
+
+			blacklist.remove_ticker(ticker)
+			console.print(f"[green]✓ Removed {ticker} from blacklist[/green]")
+
 		else:
-			console.print("[yellow]Usage: universe list|info <name>|blacklist <ticker>[/yellow]")
+			console.print("[yellow]Usage: blacklist list|add|del <ticker>[/yellow]")
 
 	# ==================== Scheduler Commands ====================
 	def do_cron(self, args):
