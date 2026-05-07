@@ -110,8 +110,13 @@ class PositionSizingAgent(Agent):
 
 				# Validate current_price is not NaN/Inf
 				import math
-				if math.isnan(current_price) or math.isinf(current_price) or current_price <= 0:
-					self.logger.debug(f"{ticker}: Invalid current_price ({current_price}), skipping")
+				try:
+					current_price = float(current_price)
+					if math.isnan(current_price) or math.isinf(current_price) or current_price <= 0:
+						self.logger.debug(f"{ticker}: Invalid current_price ({current_price}), skipping")
+						continue
+				except (ValueError, TypeError):
+					self.logger.debug(f"{ticker}: Cannot convert current_price to float, skipping")
 					continue
 
 				# Try to calculate position size from strategy config formula first
