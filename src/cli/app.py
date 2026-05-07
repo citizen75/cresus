@@ -182,6 +182,27 @@ class CresusCLI(cmd2.Cmd):
 		if copied_files:
 			console.print(f"[green]✓ Copied {len(copied_files)} config file(s): {', '.join(copied_files)}[/green]")
 
+		# Copy universe files from init/db/universes
+		universes_src = init_template / "db" / "universes"
+		universes_dst = cresus_home / "db" / "universes"
+
+		if universes_src.exists():
+			copied_universes = []
+			for universe_file in universes_src.glob("*.csv"):
+				dst_file = universes_dst / universe_file.name
+				if not dst_file.exists():
+					try:
+						with open(universe_file, 'r') as f:
+							content = f.read()
+						with open(dst_file, 'w') as f:
+							f.write(content)
+						copied_universes.append(universe_file.name)
+					except Exception as e:
+						console.print(f"[red]✗ Error copying {universe_file.name}: {e}[/red]")
+
+			if copied_universes:
+				console.print(f"[green]✓ Copied {len(copied_universes)} universe file(s)[/green]")
+
 		# Create .env file if it doesn't exist
 		env_file = cresus_home / ".env"
 		if not env_file.exists():

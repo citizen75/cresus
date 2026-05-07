@@ -5,6 +5,8 @@ from typing import List, Optional, Dict, Any
 import pandas as pd
 import os
 
+from utils.env import get_db_root
+
 
 class Universe:
     """Load and manage ticker universes (market lists)."""
@@ -16,8 +18,7 @@ class Universe:
             universe_name: Name of the universe (e.g., 'cac40', 'nasdaq_100')
         """
         self.universe_name = universe_name.lower()
-        project_root = Path(os.environ.get("CRESUS_PROJECT_ROOT", os.getcwd()))
-        self.filepath = project_root / "db" / "global" / "list" / f"{self.universe_name}.csv"
+        self.filepath = get_db_root() / "universes" / f"{self.universe_name}.csv"
 
     def exists(self) -> bool:
         """Check if universe file exists."""
@@ -73,13 +74,12 @@ class Universe:
     @staticmethod
     def list_universes() -> List[str]:
         """List all available universes."""
-        project_root = Path(os.environ.get("CRESUS_PROJECT_ROOT", os.getcwd()))
-        list_dir = project_root / "db" / "global" / "list"
+        universes_dir = get_db_root() / "universes"
 
-        if not list_dir.exists():
+        if not universes_dir.exists():
             return []
 
-        universes = [f.stem for f in list_dir.glob("*.csv")]
+        universes = [f.stem for f in universes_dir.glob("*.csv")]
         return sorted(universes)
 
     @staticmethod
