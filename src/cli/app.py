@@ -66,6 +66,7 @@ class CresusCLI(cmd2.Cmd):
 		info_table = Table(box=box.SIMPLE)
 		info_table.add_column("Command", style="cyan")
 		info_table.add_column("Description")
+		info_table.add_row("[bold]init[/bold]", "Initialize ~/.cresus directory structure")
 		info_table.add_row("[bold]help[/bold]", "Show all available commands")
 		info_table.add_row("[bold]service[/bold]", "Manage services (api, mcp, front)")
 		info_table.add_row("[bold]flow[/bold]", "Execute workflows (e.g., flow run watchlist)")
@@ -111,6 +112,110 @@ class CresusCLI(cmd2.Cmd):
 					console.print(f"[dim]Loaded {len(lines)} command(s) from history[/dim]")
 			except Exception as e:
 				console.print(f"[yellow]Warning:[/yellow] Could not load history: {e}")
+
+	# ==================== Init Command ====================
+	def do_init(self, _):
+		"""Initialize ~/.cresus directory structure with config files."""
+		self._init_cresus_directory()
+
+	def _init_cresus_directory(self):
+		"""Create ~/.cresus directory structure and copy config files."""
+		cresus_home = Path.home() / ".cresus"
+		console.print(f"[bold cyan]Initializing Cresus configuration[/bold cyan]")
+		console.print(f"Location: {cresus_home}\n")
+
+		# Define directory structure
+		dirs_to_create = [
+			cresus_home,
+			cresus_home / "db" / "cache" / "history",
+			cresus_home / "db" / "cache" / "fundamentals",
+			cresus_home / "db" / "models",
+			cresus_home / "db" / "regimes",
+			cresus_home / "db" / "backtests",
+			cresus_home / "db" / "portfolios",
+			cresus_home / "db" / "strategies",
+			cresus_home / "db" / "orders",
+			cresus_home / "config",
+			cresus_home / "config" / "strategies",
+		]
+
+		# Create directories
+		created_dirs = []
+		for d in dirs_to_create:
+			if not d.exists():
+				d.mkdir(parents=True, exist_ok=True)
+				created_dirs.append(d)
+
+		if created_dirs:
+			console.print(f"[green]✓ Created {len(created_dirs)} directories[/green]")
+		else:
+			console.print("[yellow]⚠ All directories already exist[/yellow]")
+
+		# Copy config files from project
+		config_files = ["cresus.yml", "cron.yml", "mcp.yml"]
+		project_config = self.project_root / "config"
+
+		copied_files = []
+		for config_file in config_files:
+			src = project_config / config_file
+			dst = cresus_home / "config" / config_file
+
+			if src.exists() and not dst.exists():
+				try:
+					with open(src, 'r') as f:
+						content = f.read()
+					with open(dst, 'w') as f:
+						f.write(content)
+					copied_files.append(config_file)
+				except Exception as e:
+					console.print(f"[red]✗ Error copying {config_file}: {e}[/red]")
+			elif dst.exists():
+				pass  # File already exists, don't overwrite
+			else:
+				console.print(f"[yellow]⚠ Source not found: {config_file}[/yellow]")
+
+		if copied_files:
+			console.print(f"[green]✓ Copied {len(copied_files)} config file(s): {', '.join(copied_files)}[/green]")
+
+		# Create .env file if it doesn't exist
+		env_file = cresus_home / ".env"
+		if not env_file.exists():
+			env_template = self.project_root / ".env.example"
+			if env_template.exists():
+				try:
+					with open(env_template, 'r') as f:
+						content = f.read()
+					with open(env_file, 'w') as f:
+						f.write(content)
+					console.print("[green]✓ Created .env from template[/green]")
+				except Exception as e:
+					console.print(f"[red]✗ Error creating .env: {e}[/red]")
+			else:
+				# Create default .env
+				default_env = """# Cresus Environment Configuration
+# See .env.example in project root for all available options
+
+API_HOST=0.0.0.0
+API_PORT=8000
+MCP_HOST=localhost
+MCP_PORT=3000
+FRONT_HOST=localhost
+FRONT_PORT=5173
+GATEWAY_CRON_ENABLED=true
+GATEWAY_MCP_ENABLED=true
+"""
+				try:
+					with open(env_file, 'w') as f:
+						f.write(default_env)
+					console.print("[green]✓ Created default .env[/green]")
+				except Exception as e:
+					console.print(f"[red]✗ Error creating .env: {e}[/red]")
+		else:
+			console.print("[yellow]⚠ .env already exists (not overwritten)[/yellow]")
+
+		console.print(f"\n[bold green]✓ Cresus initialized successfully![/bold green]")
+		console.print(f"[dim]Configuration location: {cresus_home}[/dim]")
+		console.print(f"[dim]Edit {cresus_home / '.env'} to customize settings[/dim]")
 
 	# ==================== Service Commands ====================
 	def do_service(self, args):
