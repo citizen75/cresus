@@ -1,0 +1,4 @@
+ticker,reason,date_added
+DEAD,Delisted security,2026-01-01
+NULL,Invalid ticker,2026-01-01
+TEST,Test security,2026-01-01

@@ -6,6 +6,7 @@ import pandas as pd
 import os
 
 from utils.env import get_db_root
+from .blacklist import get_blacklist
 
 
 class Universe:
@@ -28,25 +29,30 @@ class Universe:
         """Get list of ticker symbols from universe.
 
         Uses TickerYahoo column if available, otherwise falls back to ISIN.
+        Automatically excludes blacklisted tickers.
 
         Returns:
-            List of ticker symbols or ISINs
+            List of ticker symbols or ISINs (excluding blacklisted)
         """
         if not self.exists():
             raise FileNotFoundError(f"Universe '{self.universe_name}' not found")
 
         try:
             df = self.load_df()
+            blacklist = get_blacklist()
+            blacklisted_tickers = blacklist.get_tickers()
 
             # Try TickerYahoo first (preferred)
             if "TickerYahoo" in df.columns:
                 tickers = df["TickerYahoo"].dropna().str.strip().tolist()
-                return [t for t in tickers if t]  # Filter empty strings
+                # Filter empty strings and blacklisted tickers
+                return [t for t in tickers if t and t.upper() not in blacklisted_tickers]
 
             # Fallback to ISIN if TickerYahoo not available
             if "ISIN" in df.columns:
                 isins = df["ISIN"].dropna().str.strip().tolist()
-                return [i for i in isins if i]  # Filter empty strings
+                # Filter empty strings and blacklisted ISINs
+                return [i for i in isins if i and i.upper() not in blacklisted_tickers]
 
             # If neither column exists, raise error
             raise ValueError(f"Universe file missing both 'TickerYahoo' and 'ISIN' columns")
