@@ -11,6 +11,9 @@ sys.path.insert(0, str(project_root / "src"))
 os.environ.setdefault("CRESUS_PROJECT_ROOT", str(project_root))
 os.chdir(project_root)
 
+# Load environment configuration from ~/.cresus/.env
+from utils.env import env
+
 
 def main():
     """Start CLI."""
