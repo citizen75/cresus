@@ -14,6 +14,8 @@ from core.context import AgentContext
 from core.flow import Flow
 from agents.strategy.agent import StrategyAgent
 from agents.data.agent import DataAgent
+from tools.portfolio.journal import Journal
+from tools.portfolio.orders import Orders
 
 
 def _parse_date(value: Any) -> Optional[date]:
@@ -218,6 +220,12 @@ class BacktestAgent(Agent):
 					"strategy_name": strategy_name,
 					"portfolio_name": portfolio_name,
 				})
+
+			# Flush journal and orders to disk at end of day
+			journal = Journal(portfolio_name, context=self.context.__dict__)
+			journal.flush()
+			orders = Orders(portfolio_name, context=self.context.__dict__)
+			orders.flush()
 
 			backtest["daily_results"].append({"date": next_date.isoformat()})
 

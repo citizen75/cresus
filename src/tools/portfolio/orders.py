@@ -26,6 +26,7 @@ class Orders:
         # Store context for caching
         self.context = context
         self.cache_key = f"_orders_cache_{normalized_name}"
+        self.dirty_key = f"_orders_dirty_{normalized_name}"
 
         # Check if running in backtest context
         backtest_dir = None
@@ -79,12 +80,20 @@ class Orders:
         return df
 
     def save(self, df: pd.DataFrame) -> None:
-        """Save DataFrame to CSV and update context cache."""
-        df.to_csv(self.filepath, index=False, quoting=1, quotechar='"')
-        
+        """Save DataFrame to cache, mark as dirty (deferred disk write)."""
         # Update context cache
         if self.context is not None:
             self.context[self.cache_key] = df.copy()
+            # Mark cache as dirty - flush() will write to disk
+            self.context[self.dirty_key] = True
+    
+    def flush(self) -> None:
+        """Flush dirty cache to disk. Call at end of each day or at backtest end."""
+        if self.context and self.cache_key in self.context:
+            df = self.context[self.cache_key]
+            df.to_csv(self.filepath, index=False, quoting=1, quotechar='"')
+            # Mark as clean
+            self.context[self.dirty_key] = False
 
     def add_order(self, ticker: str, quantity: int, entry_price: float,
                   stop_loss: Optional[float] = None, take_profit: Optional[float] = None,

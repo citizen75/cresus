@@ -24,6 +24,7 @@ class Journal:
         # Store context for caching
         self.context = context
         self.cache_key = f"_journal_cache_{normalized_name}"
+        self.dirty_key = f"_journal_dirty_{normalized_name}"
 
         # Check if running in backtest context
         backtest_dir = None
@@ -77,12 +78,20 @@ class Journal:
         return df
 
     def save(self, df: pd.DataFrame) -> None:
-        """Save DataFrame to CSV and update context cache."""
-        df.to_csv(self.filepath, index=False, quoting=1, quotechar='"')  # QUOTE_ALL
-        
+        """Save DataFrame to cache, mark as dirty (deferred disk write)."""
         # Update context cache
         if self.context is not None:
             self.context[self.cache_key] = df.copy()
+            # Mark cache as dirty - flush() will write to disk
+            self.context[self.dirty_key] = True
+    
+    def flush(self) -> None:
+        """Flush dirty cache to disk. Call at end of each day or at backtest end."""
+        if self.context and self.cache_key in self.context:
+            df = self.context[self.cache_key]
+            df.to_csv(self.filepath, index=False, quoting=1, quotechar='"')  # QUOTE_ALL
+            # Mark as clean
+            self.context[self.dirty_key] = False
 
     def add_transaction(self, operation: str, ticker: str, quantity: int, price: float,
                        fees: float = 0, notes: str = "", created_at: str = None,
