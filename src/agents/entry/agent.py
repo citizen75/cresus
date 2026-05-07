@@ -24,6 +24,8 @@ class EntryAgent(Agent):
 		2. Entry timing - pattern and momentum analysis
 		3. Entry RR - risk/reward ratio calculation
 
+		Falls back to signal-scored tickers if watchlist is empty.
+
 		Args:
 			input_data: Input data (not used, uses context)
 
@@ -33,15 +35,30 @@ class EntryAgent(Agent):
 		if input_data is None:
 			input_data = {}
 
-		# Get watchlist from context
+		# Get watchlist from context, fall back to signal-scored tickers if empty
 		watchlist = self.context.get("watchlist")
 		if not watchlist:
-			return {
-				"status": "error",
-				"input": input_data,
-				"output": {},
-				"message": "No watchlist in context"
-			}
+			# Fall back to top signal-scored tickers if watchlist is empty
+			ticker_scores = self.context.get("ticker_scores") or {}
+			if ticker_scores:
+				# Sort by score and take top 20
+				sorted_by_score = sorted(
+					ticker_scores.items(),
+					key=lambda x: x[1].get("score", 0),
+					reverse=True
+				)
+				watchlist = [ticker for ticker, _ in sorted_by_score[:20]]
+				self.logger.debug(f"Watchlist empty, using {len(watchlist)} top signal-scored tickers for entry analysis")
+			else:
+				return {
+					"status": "error",
+					"input": input_data,
+					"output": {},
+					"message": "No watchlist or signal-scored tickers in context"
+				}
+
+		# Set watchlist in context for sub-agents
+		self.context.set("watchlist", watchlist)
 
 		# Create analysis flow with sub-agents
 		entry_flow = Flow("EntryAnalysisFlow", context=self.context)
