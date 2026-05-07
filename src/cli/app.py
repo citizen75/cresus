@@ -404,14 +404,12 @@ class CresusCLI(cmd2.Cmd):
 		import subprocess
 		import sys
 
-		console.print("[bold cyan]Updating cresus from git repository...[/bold cyan]")
-		sys.stdout.flush()
+		print("Updating cresus from git repository...", flush=True)
 
 		try:
-			console.print("[cyan]▸ Checking remote for updates...[/cyan]")
-			sys.stdout.flush()
+			print("▸ Checking remote for updates...", flush=True)
 
-			# Fetch - run directly without background thread
+			# Fetch
 			fetch_result = subprocess.run(
 				["git", "fetch"],
 				cwd=str(self.project_root),
@@ -419,12 +417,10 @@ class CresusCLI(cmd2.Cmd):
 			)
 
 			if fetch_result.returncode != 0:
-				console.print("[red]✗ Fetch failed[/red]")
-				sys.stdout.flush()
+				print("✗ Fetch failed", file=sys.stderr, flush=True)
 				return
 
-			console.print("[green]✓ Fetch complete[/green]")
-			sys.stdout.flush()
+			print("✓ Fetch complete", flush=True)
 
 			# Check how many commits to pull
 			log_result = subprocess.run(
@@ -439,15 +435,13 @@ class CresusCLI(cmd2.Cmd):
 			num_commits = len(commits_to_pull)
 
 			if num_commits == 0:
-				console.print("[green]✓ Already up to date with remote[/green]")
-				sys.stdout.flush()
+				print("✓ Already up to date with remote", flush=True)
 				return
 
-			console.print(f"[cyan]▸ Found {num_commits} commit{'s' if num_commits != 1 else ''} to pull[/cyan]")
-			console.print("[cyan]▸ Pulling changes...[/cyan]")
-			sys.stdout.flush()
+			print(f"▸ Found {num_commits} commit{'s' if num_commits != 1 else ''} to pull", flush=True)
+			print("▸ Pulling changes...", flush=True)
 
-			# Execute pull - run directly without background thread
+			# Execute pull
 			pull_result = subprocess.run(
 				["git", "pull"],
 				cwd=str(self.project_root),
@@ -455,19 +449,17 @@ class CresusCLI(cmd2.Cmd):
 			)
 
 			if pull_result.returncode == 0:
-				console.print(f"[green]✓ Update completed successfully[/green]")
-				console.print(f"[dim]Merged {num_commits} commit{'s' if num_commits != 1 else ''}[/dim]")
+				print("✓ Update completed successfully", flush=True)
+				print(f"Merged {num_commits} commit{'s' if num_commits != 1 else ''}", flush=True)
 			else:
-				console.print(f"[red]✗ Pull failed with exit code {pull_result.returncode}[/red]")
-
-			sys.stdout.flush()
+				print(f"✗ Pull failed with exit code {pull_result.returncode}", file=sys.stderr, flush=True)
 
 		except subprocess.TimeoutExpired:
-			console.print("[red]✗ Operation timed out[/red]")
-			sys.stdout.flush()
+			print("✗ Operation timed out", file=sys.stderr, flush=True)
 		except Exception as e:
-			console.print(f"[red]✗ Update error: {e}[/red]")
-			sys.stdout.flush()
+			import traceback
+			print(f"✗ Update error: {e}", file=sys.stderr, flush=True)
+			traceback.print_exc()
 
 	def do_quit(self, _):
 		"""Exit the CLI."""
