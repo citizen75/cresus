@@ -763,8 +763,15 @@ Sortino Ratio                                  {sortino:.6f}"""
 			for ticker in watchlist[:20]:  # Show top 20
 				score_info = ticker_scores.get(ticker, {})
 				score = score_info.get("score", 0)
-				signal_count = score_info.get("signal_count", 0)
-				table.add_row(ticker, f"{score:.3f}", str(signal_count))
+				triggered_signals = score_info.get("triggered_signals", [])
+
+				# Format signal names
+				if triggered_signals:
+					signals_str = ", ".join(triggered_signals)
+				else:
+					signals_str = "-"
+
+				table.add_row(ticker, f"{score:.3f}", signals_str)
 
 			console.print(table)
 
