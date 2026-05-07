@@ -538,6 +538,9 @@ GATEWAY_MCP_ENABLED=true
 		console.print("[bold cyan]Updating cresus from git repository...[/bold cyan]")
 		console.print("")
 
+		# Wait for thread to complete
+		thread.join(timeout=120)
+
 	def do_quit(self, _):
 		"""Exit the CLI."""
 		console.print("[cyan]Goodbye![/cyan]")
