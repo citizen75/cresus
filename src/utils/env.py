@@ -5,6 +5,59 @@ from pathlib import Path
 from typing import Optional
 
 
+def get_env_file() -> Path:
+	"""Get .env file path.
+
+	Uses CRESUS_ENV_FILE env var if set, otherwise defaults to ~/.cresus/.env.
+	Does NOT create the file automatically.
+
+	Returns:
+		Path to .env file
+	"""
+	env_file = os.environ.get("CRESUS_ENV_FILE")
+	if env_file:
+		return Path(env_file)
+	return Path.home() / ".cresus" / ".env"
+
+
+def get_db_root() -> Path:
+	"""Get database root directory path.
+
+	Uses CRESUS_DB_ROOT env var if set, otherwise defaults to ~/.cresus/db.
+	Creates directory if it doesn't exist.
+
+	Returns:
+		Path to database root directory
+	"""
+	db_root = os.environ.get("CRESUS_DB_ROOT")
+	if db_root:
+		path = Path(db_root)
+	else:
+		path = Path.home() / ".cresus" / "db"
+
+	path.mkdir(parents=True, exist_ok=True)
+	return path
+
+
+def get_config_root() -> Path:
+	"""Get configuration root directory path.
+
+	Uses CRESUS_CONFIG_ROOT env var if set, otherwise defaults to ~/.cresus/config.
+	Creates directory if it doesn't exist.
+
+	Returns:
+		Path to configuration root directory
+	"""
+	config_root = os.environ.get("CRESUS_CONFIG_ROOT")
+	if config_root:
+		path = Path(config_root)
+	else:
+		path = Path.home() / ".cresus" / "config"
+
+	path.mkdir(parents=True, exist_ok=True)
+	return path
+
+
 class EnvConfig:
 	"""Load and manage environment configuration from .env file."""
 
@@ -27,9 +80,8 @@ class EnvConfig:
 		self._load_env()
 
 	def _load_env(self) -> None:
-		"""Load .env file from project root."""
-		project_root = Path(os.environ.get("CRESUS_PROJECT_ROOT", "."))
-		env_file = project_root / ".env"
+		"""Load .env file from ~/.cresus/.env."""
+		env_file = get_env_file()
 
 		if env_file.exists():
 			try:
@@ -153,39 +205,3 @@ def get_gateway_cron_config() -> str:
 	return str(get_config_root() / "cron.yml")
 
 
-def get_db_root() -> Path:
-	"""Get database root directory path.
-
-	Uses CRESUS_DB_ROOT env var if set, otherwise defaults to ~/.cresus/db.
-	Creates directory if it doesn't exist.
-
-	Returns:
-		Path to database root directory
-	"""
-	db_root = os.environ.get("CRESUS_DB_ROOT")
-	if db_root:
-		path = Path(db_root)
-	else:
-		path = Path.home() / ".cresus" / "db"
-
-	path.mkdir(parents=True, exist_ok=True)
-	return path
-
-
-def get_config_root() -> Path:
-	"""Get configuration root directory path.
-
-	Uses CRESUS_CONFIG_ROOT env var if set, otherwise defaults to ~/.cresus/config.
-	Creates directory if it doesn't exist.
-
-	Returns:
-		Path to configuration root directory
-	"""
-	config_root = os.environ.get("CRESUS_CONFIG_ROOT")
-	if config_root:
-		path = Path(config_root)
-	else:
-		path = Path.home() / ".cresus" / "config"
-
-	path.mkdir(parents=True, exist_ok=True)
-	return path
