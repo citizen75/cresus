@@ -290,10 +290,35 @@ class CresusCLI(cmd2.Cmd):
 		"""Update cresus from git repository (runs in background)."""
 		import subprocess
 		import threading
+		from rich.table import Table
 
 		def run_git_pull():
 			try:
+				# Get current branch and status
+				branch_result = subprocess.run(
+					["git", "branch", "--show-current"],
+					cwd=str(self.project_root),
+					capture_output=True,
+					text=True,
+					timeout=10
+				)
+				current_branch = branch_result.stdout.strip()
+
+				# Get remote tracking branch
+				remote_result = subprocess.run(
+					["git", "rev-parse", "--abbrev-ref", "@{u}"],
+					cwd=str(self.project_root),
+					capture_output=True,
+					text=True,
+					timeout=10
+				)
+				remote_branch = remote_result.stdout.strip()
+
+				console.print(f"[cyan]Branch:[/cyan] {current_branch} → {remote_branch}")
+				console.print("")
+
 				# Fetch to see what's available
+				console.print("[cyan]▸ Fetching from remote...[/cyan]")
 				fetch_result = subprocess.run(
 					["git", "fetch"],
 					cwd=str(self.project_root),
@@ -308,9 +333,12 @@ class CresusCLI(cmd2.Cmd):
 						console.print(f"[red]{fetch_result.stderr}[/red]")
 					return
 
+				console.print("[green]✓ Fetch complete[/green]")
+				console.print("")
+
 				# Check how many commits to pull
 				log_result = subprocess.run(
-					["git", "log", "--oneline", "HEAD..@{u}"],
+					["git", "log", "--oneline", "--decorate", "HEAD..@{u}"],
 					cwd=str(self.project_root),
 					capture_output=True,
 					text=True,
@@ -321,30 +349,38 @@ class CresusCLI(cmd2.Cmd):
 				num_commits = len(commits_to_pull)
 
 				if num_commits == 0:
-					console.print("[cyan]Checking for updates...[/cyan]")
-					console.print("[green]✓ Already up to date[/green]")
+					console.print("[cyan]▸ Checking for updates...[/cyan]")
+					console.print("[green]✓ Already up to date with remote[/green]")
+					console.print("")
+
+					# Show current commit info
+					current_commit = subprocess.run(
+						["git", "log", "-1", "--oneline"],
+						cwd=str(self.project_root),
+						capture_output=True,
+						text=True,
+						timeout=10
+					)
+					if current_commit.stdout:
+						console.print(f"[dim]Current: {current_commit.stdout.strip()}[/dim]")
 					return
 
 				# Show commits that will be pulled
-				console.print(f"[cyan]Found {num_commits} commit{'s' if num_commits != 1 else ''} to pull[/cyan]")
+				console.print(f"[cyan]▸ Found {num_commits} commit{'s' if num_commits != 1 else ''} to pull[/cyan]")
 				console.print("")
-				from rich.table import Table
-				table = Table(box=None)
-				table.add_column("Commit", style="cyan")
-				table.add_column("Message", style="white")
+
+				table = Table(box=None, show_header=False)
+				table.add_column("Info", style="white")
 
 				for commit_line in commits_to_pull:
 					if commit_line.strip():
-						parts = commit_line.split(' ', 1)
-						hash_short = parts[0] if parts else ""
-						message = parts[1] if len(parts) > 1 else ""
-						table.add_row(hash_short, message)
+						table.add_row(commit_line)
 
 				console.print(table)
 				console.print("")
 
 				# Execute pull
-				console.print("[cyan]Pulling changes...[/cyan]")
+				console.print("[cyan]▸ Pulling changes...[/cyan]")
 				pull_result = subprocess.run(
 					["git", "pull"],
 					cwd=str(self.project_root),
@@ -354,8 +390,33 @@ class CresusCLI(cmd2.Cmd):
 				)
 
 				if pull_result.returncode == 0:
-					console.print("[green]✓ Update completed successfully[/green]")
-					console.print(f"[dim]Pulled {num_commits} commit{'s' if num_commits != 1 else ''}[/dim]")
+					console.print("[green]✓ Pull complete[/green]")
+					console.print("")
+
+					# Show merge stats if available
+					if "file" in pull_result.stdout.lower():
+						# Extract the summary line
+						for line in pull_result.stdout.split('\n'):
+							if 'file' in line.lower() or 'insertion' in line.lower() or 'deletion' in line.lower():
+								console.print(f"[cyan]{line.strip()}[/cyan]")
+
+					# Show new commits
+					new_log = subprocess.run(
+						["git", "log", "-n", str(num_commits), "--oneline"],
+						cwd=str(self.project_root),
+						capture_output=True,
+						text=True,
+						timeout=10
+					)
+					if new_log.stdout:
+						console.print("")
+						console.print("[cyan]▸ Merged commits:[/cyan]")
+						for line in new_log.stdout.strip().split('\n'):
+							console.print(f"  {line}")
+
+					console.print("")
+					console.print(f"[green]✓ Update completed successfully[/green]")
+					console.print(f"[dim]Merged {num_commits} commit{'s' if num_commits != 1 else ''}[/dim]")
 				else:
 					console.print(f"[red]✗ Pull failed with exit code {pull_result.returncode}[/red]")
 					if pull_result.stderr:
@@ -369,7 +430,8 @@ class CresusCLI(cmd2.Cmd):
 		# Run git pull in background thread
 		thread = threading.Thread(target=run_git_pull, daemon=True)
 		thread.start()
-		console.print("[cyan]Updating cresus from git repository...[/cyan]")
+		console.print("[bold cyan]Updating cresus from git repository...[/bold cyan]")
+		console.print("")
 
 	def do_quit(self, _):
 		"""Exit the CLI."""
