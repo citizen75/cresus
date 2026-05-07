@@ -119,11 +119,9 @@ class OrdersAgent(Agent):
 			pending_orders = df[pending_mask]
 
 			if pending_orders.empty:
-				total_orders = len(df)
-				status_summary = df["status"].value_counts().to_dict()
-				self.logger.warning(
-					f"No pending orders to expire. Total orders: {total_orders}, "
-					f"Status breakdown: {status_summary}"
+				self.logger.debug(
+					f"No pending orders to expire. Total orders: {len(df)}, "
+					f"Status breakdown: {df['status'].value_counts().to_dict()}"
 				)
 				return expired_results
 
