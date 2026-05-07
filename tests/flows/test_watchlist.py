@@ -4,6 +4,8 @@ import pytest
 import sys
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
+import pandas as pd
+from datetime import datetime, timedelta
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
@@ -12,6 +14,30 @@ from flows.watchlist import WatchlistFlow
 from core.context import AgentContext
 from agents.strategy.agent import StrategyAgent
 from agents.watchlist.agent import WatchListAgent
+
+
+@pytest.fixture
+def mock_data_history():
+	"""Mock DataHistory to return test data."""
+	def _mock_init(self, ticker):
+		self.ticker = ticker
+
+	def _mock_get_all(self, start_date=None, end_date=None):
+		# Return mock OHLCV data
+		dates = pd.date_range(start='2026-01-01', end='2026-05-07', freq='D')
+		data = {
+			'timestamp': dates,
+			'open': [100 + i*0.5 for i in range(len(dates))],
+			'high': [102 + i*0.5 for i in range(len(dates))],
+			'low': [99 + i*0.5 for i in range(len(dates))],
+			'close': [101 + i*0.5 for i in range(len(dates))],
+			'volume': [1000000] * len(dates),
+		}
+		return pd.DataFrame(data)
+
+	with patch('tools.data.core.DataHistory.__init__', _mock_init):
+		with patch('tools.data.core.DataHistory.get_all', _mock_get_all):
+			yield
 
 
 class TestWatchlistFlow:
@@ -40,7 +66,7 @@ class TestWatchlistFlow:
 		assert flow.steps[1]["name"] == "watchlist"
 		assert flow.steps[1]["agent"].name == "WatchListAgent"
 
-	def test_watchlist_flow_process_with_valid_input(self):
+	def test_watchlist_flow_process_with_valid_input(self, mock_data_history):
 		"""Test that process returns success with valid input."""
 		flow = WatchlistFlow("test_strategy")
 		input_data = {"tickers": ["AAPL", "GOOGL", "MSFT"]}
@@ -66,7 +92,7 @@ class TestWatchlistFlow:
 		# None input should fail because no tickers are provided
 		assert result.get("status") == "error"
 
-	def test_watchlist_flow_process_passes_data_to_strategy_agent(self):
+	def test_watchlist_flow_process_passes_data_to_strategy_agent(self, mock_data_history):
 		"""Test that process passes input data to strategy agent."""
 		flow = WatchlistFlow("test_strategy")
 		input_data = {"tickers": ["AAPL"], "timeframe": "1h"}
@@ -76,7 +102,7 @@ class TestWatchlistFlow:
 		strategy_input = flow.context.get("strategy_input")
 		assert strategy_input == input_data
 
-	def test_watchlist_flow_process_stores_strategy_result(self):
+	def test_watchlist_flow_process_stores_strategy_result(self, mock_data_history):
 		"""Test that process stores strategy result in context."""
 		flow = WatchlistFlow("test_strategy")
 		input_data = {"tickers": ["AAPL", "GOOGL"]}
@@ -86,7 +112,7 @@ class TestWatchlistFlow:
 		assert strategy_result is not None
 		assert strategy_result.get("status") == "success"
 
-	def test_watchlist_flow_process_returns_correct_structure(self):
+	def test_watchlist_flow_process_returns_correct_structure(self, mock_data_history):
 		"""Test that process returns correct response structure."""
 		flow = WatchlistFlow("test_strategy")
 		input_data = {"tickers": ["AAPL"]}
@@ -97,7 +123,7 @@ class TestWatchlistFlow:
 		assert "watchlist" in result
 		assert "strategy" in result
 
-	def test_watchlist_flow_multiple_executions(self):
+	def test_watchlist_flow_multiple_executions(self, mock_data_history):
 		"""Test that multiple process calls work correctly."""
 		flow = WatchlistFlow("test_strategy")
 
@@ -107,7 +133,7 @@ class TestWatchlistFlow:
 		result2 = flow.process({"tickers": ["GOOGL", "MSFT"]})
 		assert result2.get("status") == "success"
 
-	def test_watchlist_flow_context_isolation(self):
+	def test_watchlist_flow_context_isolation(self, mock_data_history):
 		"""Test that different flows have isolated contexts."""
 		flow1 = WatchlistFlow("strategy1")
 		flow2 = WatchlistFlow("strategy2")
@@ -118,7 +144,7 @@ class TestWatchlistFlow:
 		assert flow1.context is not flow2.context
 		assert flow1.steps[0]["agent"].__class__ == flow2.steps[0]["agent"].__class__
 
-	def test_watchlist_flow_with_complex_input(self):
+	def test_watchlist_flow_with_complex_input(self, mock_data_history):
 		"""Test process with complex nested input data."""
 		flow = WatchlistFlow("complex_strategy")
 		input_data = {
@@ -161,7 +187,7 @@ class TestWatchlistFlow:
 		result = flow.process({"tickers": ["GOOGL"]})
 		assert result.get("strategy") == "strategy-v2_test.1"
 
-	def test_watchlist_flow_process_sequential_calls(self):
+	def test_watchlist_flow_process_sequential_calls(self, mock_data_history):
 		"""Test that sequential process calls don't interfere."""
 		flow = WatchlistFlow("test_strategy")
 
@@ -219,7 +245,7 @@ class TestWatchlistFlow:
 
 		assert result.get("strategy") == "my_strategy"
 
-	def test_watchlist_flow_with_numeric_input_values(self):
+	def test_watchlist_flow_with_numeric_input_values(self, mock_data_history):
 		"""Test process with numeric values in input."""
 		flow = WatchlistFlow("test_strategy")
 		input_data = {
@@ -232,7 +258,7 @@ class TestWatchlistFlow:
 		result = flow.process(input_data)
 		assert result.get("status") == "success"
 
-	def test_watchlist_flow_with_list_input_values(self):
+	def test_watchlist_flow_with_list_input_values(self, mock_data_history):
 		"""Test process with list values in input."""
 		flow = WatchlistFlow("test_strategy")
 		input_data = {
@@ -244,7 +270,7 @@ class TestWatchlistFlow:
 		result = flow.process(input_data)
 		assert result.get("status") == "success"
 
-	def test_watchlist_flow_successive_calls_with_different_inputs(self):
+	def test_watchlist_flow_successive_calls_with_different_inputs(self, mock_data_history):
 		"""Test successive calls with different inputs maintain flow state."""
 		flow = WatchlistFlow("test_strategy")
 
@@ -259,7 +285,7 @@ class TestWatchlistFlow:
 			assert result.get("status") == "success"
 			assert result.get("strategy") == "test_strategy"
 
-	def test_watchlist_flow_process_with_large_ticker_list(self):
+	def test_watchlist_flow_process_with_large_ticker_list(self, mock_data_history):
 		"""Test process with large number of tickers."""
 		flow = WatchlistFlow("test_strategy")
 		large_ticker_list = [f"TICK{i}" for i in range(100)]
