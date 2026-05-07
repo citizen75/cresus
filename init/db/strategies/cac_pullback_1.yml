@@ -1,0 +1,87 @@
+name: cac_pullback
+universe: cac40
+description: Pullback strategy on CAC40 - mean reversion with support/resistance levels
+engine: TaModel
+indicators:
+- rsi_14
+- ema_20
+- ema_50
+- atr_14
+- bollinger_bands_20_2
+- adx_14
+watchlist:
+  enabled: true
+  parameters:
+    tickers:
+      max_count: 20
+      description: Top 20 pullback opportunities
+    volume:
+      min_volume: 300000
+      description: Minimum daily trading volume
+    ranking:
+      metric: score
+      description: Metric used to rank tickers
+    oversold:
+      formula: data['rsi_14'] < 40 and data['close'] < data['bollinger_bands_20_2_lower']
+      description: Price below lower Bollinger Band with RSI < 40 indicates pullback setup
+    support:
+      formula: data['close'] > data['ema_50'] and (data['close'] - data['ema_50']) / data['ema_50'] < 0.02
+      description: Price near 50-day EMA (within 2%) represents support level
+signals:
+  enabled: true
+  weights:
+    mean_reversion: 0.6
+    trend: 0.2
+    volume_anomaly: 0.2
+    momentum: 0.0
+  parameters:
+    mean_reversion:
+      formula: data['rsi_14'] < 35 and data['close'] < data['bollinger_bands_20_2_lower']
+      description: Extreme oversold conditions suggest pullback reversal opportunity
+    trend:
+      formula: data['close'] > data['ema_50'] and data['adx_14'] > 15
+      description: Uptrend confirmation - enter only if above 50-day EMA
+    volume_anomaly:
+      formula: data['volume'] > 500000
+      description: Sufficient volume for support level validation
+    momentum:
+      formula: 'False'
+      description: Momentum disabled for mean reversion strategy
+entry:
+  enabled: true
+  parameters:
+    position_size:
+      formula: max(10, min(100, 1000 / data["close"]))
+      description: Position sizing between 10-100 shares based on price
+    support_filter:
+      formula: data['close'] > data['ema_50']
+      description: Only enter when price is above 50-day EMA (must be in uptrend)
+    reversal_confirmation:
+      formula: data['rsi_14'] < 35
+      description: RSI below 35 confirms oversold condition ready for reversal
+    limit_price:
+      formula: data['close'] * 0.995
+      description: Limit order at 0.5% below market
+    max_daily_orders:
+      formula: 5
+      description: Limit orders per day to manage risk
+exit:
+  enabled: true
+  parameters:
+    stop_loss:
+      formula: data['close'] * 0.97
+      description: Stop loss at 3% below entry
+    take_profit:
+      formula: data['close'] + data['atr_14'] * 2.0
+      description: Target profit at 2 ATR above entry
+    trailing_stop:
+      formula: data['close'] - data['atr_14'] * 1.2
+      description: Trailing stop to protect pullback reversal gains
+    holding_period:
+      formula: 8
+      description: Maximum holding 8 days - pullback reversals are short-term
+    time_stop:
+      formula: 1
+      description: Cancel unfilled orders after 1 day
+backtest:
+  initial_capital: 10000

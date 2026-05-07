@@ -1,0 +1,26 @@
+name: cac_pullback
+description: CAC40 Pullback Trading Strategy
+source: cac40
+universe: cac40
+
+indicators:
+  - ema_20
+  - ema_50
+  - rsi_14
+  - adx_14
+
+buy_conditions: "data['ema_20_above_ema_50'] and data['rsi_14_below_70']"
+sell_conditions: "data['ema_20_below_ema_50']"
+
+parameters:
+  lookback: 60
+  position_size: 1000
+
+trade:
+  stop_loss: 0.05
+  take_profit: 0.08
+  max_hold_days: 30
+
+backtest:
+  initial_capital: 100000
+  commission: 0.001

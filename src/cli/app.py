@@ -205,6 +205,28 @@ class CresusCLI(cmd2.Cmd):
 			if copied_universes:
 				console.print(f"[green]✓ Copied {len(copied_universes)} universe file(s)[/green]")
 
+		# Copy strategy files from init/db/strategies
+		strategies_src = init_template / "db" / "strategies"
+		strategies_dst = cresus_home / "db" / "strategies"
+
+		if strategies_src.exists():
+			copied_strategies = []
+			for strategy_file in strategies_src.glob("*"):
+				if strategy_file.is_file():
+					dst_file = strategies_dst / strategy_file.name
+					if not dst_file.exists():
+						try:
+							with open(strategy_file, 'r') as f:
+								content = f.read()
+							with open(dst_file, 'w') as f:
+								f.write(content)
+							copied_strategies.append(strategy_file.name)
+						except Exception as e:
+							console.print(f"[red]✗ Error copying {strategy_file.name}: {e}[/red]")
+
+			if copied_strategies:
+				console.print(f"[green]✓ Copied {len(copied_strategies)} strategy file(s)[/green]")
+
 		# Create .env file if it doesn't exist
 		env_file = cresus_home / ".env"
 		if not env_file.exists():
