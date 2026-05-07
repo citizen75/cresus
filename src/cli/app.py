@@ -409,25 +409,32 @@ class CresusCLI(cmd2.Cmd):
 			try:
 				console.print("[cyan]▸ Checking remote for updates...[/cyan]")
 				sys.stdout.flush()
-				sys.stderr.flush()
 
-				# Fetch without capturing output - let it stream
-				fetch_result = subprocess.run(
+				# Fetch with real-time output capture
+				fetch_process = subprocess.Popen(
 					["git", "fetch"],
 					cwd=str(self.project_root),
-					timeout=30
+					stdout=subprocess.PIPE,
+					stderr=subprocess.STDOUT,
+					text=True,
+					bufsize=1
 				)
 
-				if fetch_result.returncode != 0:
+				# Read and print fetch output in real-time
+				for line in fetch_process.stdout:
+					if line.strip():
+						console.print(f"[dim]{line.rstrip()}[/dim]")
+					sys.stdout.flush()
+
+				fetch_result = fetch_process.wait(timeout=30)
+
+				if fetch_result != 0:
 					console.print("[red]✗ Fetch failed[/red]")
 					sys.stdout.flush()
-					sys.stderr.flush()
 					return
 
 				console.print("[green]✓ Fetch complete[/green]")
-				console.print("")
 				sys.stdout.flush()
-				sys.stderr.flush()
 
 				# Check how many commits to pull
 				log_result = subprocess.run(
@@ -443,50 +450,50 @@ class CresusCLI(cmd2.Cmd):
 
 				if num_commits == 0:
 					console.print("[green]✓ Already up to date with remote[/green]")
-					console.print("")
 					sys.stdout.flush()
 					return
 
 				console.print(f"[cyan]▸ Found {num_commits} commit{'s' if num_commits != 1 else ''} to pull[/cyan]")
-				console.print("")
-				sys.stdout.flush()
-
-				# Execute pull - don't capture output so user sees it in real-time
 				console.print("[cyan]▸ Pulling changes...[/cyan]")
-				console.print("")
 				sys.stdout.flush()
-				sys.stderr.flush()
 
-				pull_result = subprocess.run(
+				# Execute pull with real-time output
+				pull_process = subprocess.Popen(
 					["git", "pull"],
 					cwd=str(self.project_root),
-					timeout=60
+					stdout=subprocess.PIPE,
+					stderr=subprocess.STDOUT,
+					text=True,
+					bufsize=1
 				)
 
-				console.print("")
-				if pull_result.returncode == 0:
-					console.print("[green]✓ Update completed successfully[/green]")
-					console.print(f"[dim]Merged {num_commits} commit{'s' if num_commits != 1 else ''}[/dim]")
+				# Read and print pull output in real-time
+				for line in pull_process.stdout:
+					if line.strip():
+						console.print(f"[cyan]{line.rstrip()}[/cyan]")
+					sys.stdout.flush()
+
+				pull_result = pull_process.wait(timeout=60)
+
+				if pull_result == 0:
+					console.print(f"[green]✓ Update completed successfully[/green]")
 				else:
-					console.print(f"[red]✗ Pull failed with exit code {pull_result.returncode}[/red]")
+					console.print(f"[red]✗ Pull failed with exit code {pull_result}[/red]")
 
 				sys.stdout.flush()
-				sys.stderr.flush()
 
-			except subprocess.TimeoutExpired:
+			except subprocess.TimeoutExpired as e:
 				console.print("[red]✗ Operation timed out[/red]")
+				e.stdout.kill()
 				sys.stdout.flush()
-				sys.stderr.flush()
 			except Exception as e:
 				console.print(f"[red]✗ Update error: {e}[/red]")
 				sys.stdout.flush()
-				sys.stderr.flush()
 
 		# Run git pull in background thread
 		thread = threading.Thread(target=run_git_pull, daemon=False)
 		thread.start()
 		console.print("[bold cyan]Updating cresus from git repository...[/bold cyan]")
-		console.print("")
 		sys.stdout.flush()
 
 		# Wait for thread to complete
