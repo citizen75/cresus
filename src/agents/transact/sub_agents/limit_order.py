@@ -131,11 +131,23 @@ class LimitOrderAgent(Agent):
 			for _, order_row in limit_orders.iterrows():
 				order_id = str(order_row.get("id", ""))
 				ticker = str(order_row.get("ticker", ""))
-				quantity = int(order_row.get("quantity", 0))
-				entry_price = float(order_row.get("entry_price", 0))
-				limit_price = float(order_row.get("limit_price", entry_price))
-				stop_loss = float(order_row.get("stop_loss", 0)) if order_row.get("stop_loss") else None
-				take_profit = float(order_row.get("take_profit", 0)) if order_row.get("take_profit") else None
+				quantity = int(order_row.get("quantity", 0)) if order_row.get("quantity") else 0
+				
+				# Safe conversion to float with None handling
+				entry_price_val = order_row.get("entry_price")
+				entry_price = float(entry_price_val) if entry_price_val not in (None, "") else 0
+				
+				limit_price_val = order_row.get("limit_price")
+				if limit_price_val not in (None, ""):
+					limit_price = float(limit_price_val)
+				else:
+					limit_price = entry_price
+				
+				stop_loss_val = order_row.get("stop_loss")
+				stop_loss = float(stop_loss_val) if stop_loss_val not in (None, "") else None
+				
+				take_profit_val = order_row.get("take_profit")
+				take_profit = float(take_profit_val) if take_profit_val not in (None, "") else None
 
 				# Get market price for the date (day_data is {ticker: row}, pre-sliced)
 				market_price = self._get_market_price(ticker, day_data)
