@@ -65,9 +65,14 @@ class ConfigEvaluator:
 		Returns:
 			Share count as integer, or None if evaluation fails
 		"""
+		import math
 		result = ConfigEvaluator.evaluate_formula(formula, data)
 
 		if result is None:
+			return None
+
+		# Check for NaN or Inf values
+		if math.isnan(result) or math.isinf(result):
 			return None
 
 		shares = int(result)

@@ -3,6 +3,12 @@
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
 
+try:
+	from tqdm import tqdm
+	HAS_TQDM = True
+except ImportError:
+	HAS_TQDM = False
+
 from core.agent import Agent
 from core.context import AgentContext
 from core.flow import Flow
@@ -168,7 +174,12 @@ class BacktestAgent(Agent):
 
 		# Main backtest loop: pre_market → [increment] → market → post_market
 		portfolio_name = self.context.get("portfolio_name") or "default"
-		for i, current_date in enumerate(trading_days[:-1]):
+		trading_days_to_process = trading_days[:-1]
+
+		# Use progress bar if tqdm is available
+		iterator = tqdm(enumerate(trading_days_to_process), total=len(trading_days_to_process), desc="Backtest Progress") if HAS_TQDM else enumerate(trading_days_to_process)
+
+		for i, current_date in iterator:
 			next_date = trading_days[i + 1]
 
 			# Pre-market phase: signals based on data up to current_date

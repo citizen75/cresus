@@ -92,7 +92,15 @@ class PositionSizingAgent(Agent):
 			entry_price = rec.get("entry_price")
 			stop_loss = rec.get("stop_loss")
 
-			if not ticker or not entry_price or not stop_loss:
+			if not ticker or entry_price is None or stop_loss is None:
+				continue
+
+			# Skip if entry_price or stop_loss are invalid
+			try:
+				entry_price = float(entry_price)
+				stop_loss = float(stop_loss)
+			except (ValueError, TypeError):
+				self.logger.debug(f"{ticker}: Invalid entry_price or stop_loss, skipping")
 				continue
 
 			# Get current price
@@ -124,15 +132,21 @@ class PositionSizingAgent(Agent):
 				else:
 					shares = self._fractional_sizing(cash, current_price, entry_price, stop_loss)
 
-			if shares > 0:
-				sized_orders.append({
-					"ticker": ticker,
-					"shares": int(shares),
-					"entry_price": entry_price,
-					"order_value": int(shares) * current_price,
-					"risk_amount": abs(int(shares) * (entry_price - stop_loss)),
-					"sizing_method": "strategy_config" if position_size_formula else self.sizing_method,
-				})
+			# Validate shares is a valid number
+			if shares and shares > 0:
+				try:
+					shares_int = int(shares)
+					sized_orders.append({
+						"ticker": ticker,
+						"shares": shares_int,
+						"entry_price": entry_price,
+						"order_value": shares_int * current_price,
+						"risk_amount": abs(shares_int * (entry_price - stop_loss)),
+						"sizing_method": "strategy_config" if position_size_formula else self.sizing_method,
+					})
+				except (ValueError, TypeError) as e:
+					self.logger.debug(f"{ticker}: Failed to convert shares to int: {e}, skipping")
+					continue
 
 		# Store sized orders in context
 		self.context.set("sized_orders", sized_orders)
@@ -162,6 +176,14 @@ class PositionSizingAgent(Agent):
 		Returns:
 			Number of shares to trade
 		"""
+		import math
+		
+		# Validate inputs
+		if math.isnan(current_price) or math.isnan(entry_price) or math.isnan(stop_loss):
+			return 0
+		if math.isinf(current_price) or math.isinf(entry_price) or math.isinf(stop_loss):
+			return 0
+			
 		risk_amount = cash * (self.risk_percent / 100.0)
 		price_risk = abs(entry_price - stop_loss)
 
@@ -189,6 +211,14 @@ class PositionSizingAgent(Agent):
 		Returns:
 			Number of shares to trade
 		"""
+		import math
+		
+		# Validate inputs
+		if math.isnan(current_price) or math.isnan(rr_ratio) or math.isnan(win_rate):
+			return 0
+		if math.isinf(current_price) or math.isinf(rr_ratio) or math.isinf(win_rate):
+			return 0
+			
 		if rr_ratio <= 0 or win_rate <= 0:
 			return 0
 
@@ -218,6 +248,14 @@ class PositionSizingAgent(Agent):
 		Returns:
 			Number of shares to trade
 		"""
+		import math
+		
+		# Validate inputs
+		if math.isnan(current_price) or math.isnan(volatility):
+			return 0
+		if math.isinf(current_price) or math.isinf(volatility):
+			return 0
+			
 		# Adjust risk percent inversely with volatility
 		base_risk = self.risk_percent / 100.0
 		adjusted_risk = base_risk / (1 + volatility * 10)

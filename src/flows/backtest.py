@@ -21,6 +21,7 @@ from agents.research.agent import ResearchAgent
 from tools.portfolio import PortfolioManager
 from tools.portfolio.metrics import PortfolioMetrics
 from tools.strategy.strategy import StrategyManager
+from utils.env import get_db_root
 
 
 class BacktestFlow(Flow):
@@ -63,8 +64,8 @@ class BacktestFlow(Flow):
 
 		# Create backtest ID for sandboxing (timestamp + short UUID)
 		backtest_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{str(uuid.uuid4())[:8]}"
-		# Organize backtests by strategy: db/local/backtests/<strategy_name>/<timestamp>
-		backtest_dir = Path(os.environ.get("CRESUS_PROJECT_ROOT", ".")) / "db" / "local" / "backtests" / strategy_name / backtest_id
+		# Organize backtests by strategy: ~/.cresus/db/backtests/<strategy_name>/<timestamp>
+		backtest_dir = get_db_root() / "backtests" / strategy_name / backtest_id
 		backtest_dir.mkdir(parents=True, exist_ok=True)
 
 		# Set in context for sandboxing
