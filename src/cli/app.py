@@ -293,7 +293,59 @@ class CresusCLI(cmd2.Cmd):
 
 		def run_git_pull():
 			try:
-				result = subprocess.run(
+				# Fetch to see what's available
+				fetch_result = subprocess.run(
+					["git", "fetch"],
+					cwd=str(self.project_root),
+					capture_output=True,
+					text=True,
+					timeout=30
+				)
+
+				if fetch_result.returncode != 0:
+					console.print("[red]✗ Fetch failed[/red]")
+					if fetch_result.stderr:
+						console.print(f"[red]{fetch_result.stderr}[/red]")
+					return
+
+				# Check how many commits to pull
+				log_result = subprocess.run(
+					["git", "log", "--oneline", "HEAD..@{u}"],
+					cwd=str(self.project_root),
+					capture_output=True,
+					text=True,
+					timeout=10
+				)
+
+				commits_to_pull = log_result.stdout.strip().split('\n') if log_result.stdout.strip() else []
+				num_commits = len(commits_to_pull)
+
+				if num_commits == 0:
+					console.print("[cyan]Checking for updates...[/cyan]")
+					console.print("[green]✓ Already up to date[/green]")
+					return
+
+				# Show commits that will be pulled
+				console.print(f"[cyan]Found {num_commits} commit{'s' if num_commits != 1 else ''} to pull[/cyan]")
+				console.print("")
+				from rich.table import Table
+				table = Table(box=None)
+				table.add_column("Commit", style="cyan")
+				table.add_column("Message", style="white")
+
+				for commit_line in commits_to_pull:
+					if commit_line.strip():
+						parts = commit_line.split(' ', 1)
+						hash_short = parts[0] if parts else ""
+						message = parts[1] if len(parts) > 1 else ""
+						table.add_row(hash_short, message)
+
+				console.print(table)
+				console.print("")
+
+				# Execute pull
+				console.print("[cyan]Pulling changes...[/cyan]")
+				pull_result = subprocess.run(
 					["git", "pull"],
 					cwd=str(self.project_root),
 					capture_output=True,
@@ -301,16 +353,16 @@ class CresusCLI(cmd2.Cmd):
 					timeout=60
 				)
 
-				if result.returncode == 0:
+				if pull_result.returncode == 0:
 					console.print("[green]✓ Update completed successfully[/green]")
-					if result.stdout:
-						console.print(f"[dim]{result.stdout}[/dim]")
+					console.print(f"[dim]Pulled {num_commits} commit{'s' if num_commits != 1 else ''}[/dim]")
 				else:
-					console.print(f"[red]✗ Update failed with exit code {result.returncode}[/red]")
-					if result.stderr:
-						console.print(f"[red]{result.stderr}[/red]")
+					console.print(f"[red]✗ Pull failed with exit code {pull_result.returncode}[/red]")
+					if pull_result.stderr:
+						console.print(f"[red]{pull_result.stderr}[/red]")
+
 			except subprocess.TimeoutExpired:
-				console.print("[red]✗ Update timed out after 60 seconds[/red]")
+				console.print("[red]✗ Operation timed out after 60 seconds[/red]")
 			except Exception as e:
 				console.print(f"[red]✗ Update error: {e}[/red]")
 

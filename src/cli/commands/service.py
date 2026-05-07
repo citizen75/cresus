@@ -132,3 +132,84 @@ class ServiceManager:
             return "\n".join(lines_list[-lines:])
         except Exception as e:
             return f"Error reading logs: {e}"
+
+    def check_status(self, service: Optional[str] = None) -> Dict[str, Any]:
+        """Check status of service(s) and display results."""
+        from rich.console import Console
+        from rich.table import Table
+
+        console = Console()
+        result = self.status(service)
+
+        # Display status table
+        table = Table(title="Service Status" if not service else f"Status: {service}")
+        table.add_column("Service", style="cyan")
+        table.add_column("Status", style="white")
+        table.add_column("PID", style="green")
+
+        for svc_name, svc_status in result.items():
+            if "error" in svc_status:
+                table.add_row(svc_name, "[red]Error[/red]", "-")
+            else:
+                status = svc_status.get("status", "unknown")
+                status_color = "green" if status == "running" else "red"
+                pid = str(svc_status.get("pid", "-"))
+                table.add_row(svc_name, f"[{status_color}]{status}[/{status_color}]", pid)
+
+        console.print(table)
+        return result
+
+    def start_services(self, service_names: str = "all", background: bool = False) -> None:
+        """Start one or more services."""
+        from rich.console import Console
+
+        console = Console()
+
+        if service_names == "all":
+            services = list(self.SERVICES.keys())
+        else:
+            services = [service_names]
+
+        for service in services:
+            result = self.start(service, daemon=background)
+            if result.get("status") == "started":
+                console.print(f"[green]✓[/green] Started {service} (PID: {result['pid']})")
+            elif result.get("status") == "already_running":
+                console.print(f"[yellow]⚠[/yellow] {service} already running (PID: {result['pid']})")
+            else:
+                console.print(f"[red]✗[/red] Failed to start {service}: {result.get('message', 'Unknown error')}")
+
+    def stop_services(self, service_names: str = "all") -> None:
+        """Stop one or more services."""
+        from rich.console import Console
+
+        console = Console()
+
+        if service_names == "all":
+            services = list(self.SERVICES.keys())
+        else:
+            services = [service_names]
+
+        for service in services:
+            result = self.stop(service)
+            if result.get("status") == "stopped":
+                console.print(f"[green]✓[/green] Stopped {service}")
+            elif result.get("status") == "not_running":
+                console.print(f"[yellow]⚠[/yellow] {service} not running")
+            else:
+                console.print(f"[red]✗[/red] Failed to stop {service}: {result.get('message', 'Unknown error')}")
+
+    def view_logs(self, service: str, follow: bool = False, lines: Optional[int] = None) -> None:
+        """View service logs."""
+        from rich.console import Console
+
+        console = Console()
+
+        if lines is None:
+            lines = 20 if not follow else 50
+
+        logs = self.logs(service, lines)
+        console.print(logs)
+
+        if follow:
+            console.print("[cyan]Tailing logs (follow mode) - not implemented yet[/cyan]")
