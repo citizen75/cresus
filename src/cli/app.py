@@ -421,6 +421,7 @@ class CresusCLI(cmd2.Cmd):
 				if show_metrics:
 					console.print("[dim][DEBUG] Skipping portfolio metrics display (metrics mode enabled)[/dim]")
 				else:
+					# For backtest, show portfolio metrics and research analysis
 					self._print_backtest_results(strategy, result)
 		else:
 			console.print(f"[red]✗[/red] Unknown command: {cmd}")
@@ -753,6 +754,20 @@ class CresusCLI(cmd2.Cmd):
 						print(f"{metric_name:<35} {value:>20}")
 
 			console.print(f"\n{'='*100}\n")
+			
+			# Display research analysis if available
+			research = output.get("research", {})
+			issues = research.get("identified_issues", [])
+			
+			if issues:
+				console.print(f"[yellow]⚠️  Research Findings ({len(issues)} issue{'s' if len(issues) != 1 else ''})[/yellow]")
+				console.print("-" * 100)
+				for i, issue in enumerate(issues, 1):
+					severity_color = {"critical": "red", "high": "yellow", "medium": "blue", "low": "cyan"}.get(issue.get("severity", "low"), "white")
+					console.print(f"\n{i}. [bold]{issue.get('message')}[/bold]")
+					console.print(f"   Severity: [{severity_color}]{issue.get('severity', 'unknown').upper()}[/{severity_color}]")
+					console.print(f"   Details: {issue.get('details', 'N/A')}")
+				console.print(f"\n{'='*100}\n")
 
 		except Exception as e:
 			console.print(f"[yellow]⚠ Could not display backtest results: {e}[/yellow]")
