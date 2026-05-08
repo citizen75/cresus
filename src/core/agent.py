@@ -71,7 +71,7 @@ class Agent:
 		Execution time is recorded in context metadata:
 		- context.metadata: Dict with structure:
 			{
-				"agent_timings": [
+				"agent_metrics": [
 					{"name": "AgentName", "duration_ms": 123.45, "ticker_count": 10},
 					...
 				]
@@ -136,15 +136,15 @@ class Agent:
 				if isinstance(context_data_history, dict):
 					ticker_count = len(context_data_history)
 			
-			# Ensure agent_timings list exists
-			if "agent_timings" not in metadata:
-				metadata["agent_timings"] = []
+			# Ensure agent_metrics list exists
+			if "agent_metrics" not in metadata:
+				metadata["agent_metrics"] = []
 			
-			# Append this agent's timing
-			timing_entry = {
+			# Append this agent's metrics
+			metric_entry = {
 				"name": self.name,
 				"duration_ms": round(duration_ms, 2)
 			}
 			if ticker_count > 0:
-				timing_entry["ticker_count"] = ticker_count
-			metadata["agent_timings"].append(timing_entry)
+				metric_entry["ticker_count"] = ticker_count
+			metadata["agent_metrics"].append(metric_entry)

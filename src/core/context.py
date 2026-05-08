@@ -14,40 +14,40 @@ class AgentContext:
         """Get a value from the context."""
         return getattr(self, key, None)
     
-    def get_agent_timings(self) -> List[Dict[str, Any]]:
-        """Get all recorded agent execution timings.
+    def get_agent_metrics(self) -> List[Dict[str, Any]]:
+        """Get all recorded agent execution metrics.
         
         Returns:
             List of dicts with structure:
             [
-                {"name": "AgentName", "duration_ms": 123.45},
+                {"name": "AgentName", "duration_ms": 123.45, "ticker_count": 10},
                 ...
             ]
         """
         metadata = self.get("metadata") or {}
-        return metadata.get("agent_timings", [])
+        return metadata.get("agent_metrics", [])
     
-    def print_agent_timings(self) -> None:
+    def print_agent_metrics(self) -> None:
         """Print a formatted summary of agent execution times and ticker counts."""
-        timings = self.get_agent_timings()
-        if not timings:
-            print("No agent timings recorded")
+        metrics = self.get_agent_metrics()
+        if not metrics:
+            print("No agent metrics recorded")
             return
         
         print("\n" + "=" * 80)
         print("Agent Execution Times (with Ticker Tracking)")
         print("=" * 80)
         
-        total_ms = sum(t["duration_ms"] for t in timings)
+        total_ms = sum(t["duration_ms"] for t in metrics)
         
         # Sort by duration descending
-        sorted_timings = sorted(timings, key=lambda x: x["duration_ms"], reverse=True)
+        sorted_metrics = sorted(metrics, key=lambda x: x["duration_ms"], reverse=True)
         
-        for timing in sorted_timings:
-            name = timing["name"]
-            duration = timing["duration_ms"]
+        for metric in sorted_metrics:
+            name = metric["name"]
+            duration = metric["duration_ms"]
             pct = (duration / total_ms * 100) if total_ms > 0 else 0
-            ticker_count = timing.get("ticker_count", "")
+            ticker_count = metric.get("ticker_count", "")
             ticker_str = f"  [{ticker_count} tickers]" if ticker_count else ""
             print(f"  {name:50s} {duration:8.2f}ms ({pct:5.1f}%){ticker_str}")
         

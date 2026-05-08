@@ -836,7 +836,7 @@ Sortino Ratio                                  {sortino:.6f}"""
 		"""Print agent execution metrics as a formatted table, aggregated by agent name.
 		
 		Args:
-			context: AgentContext or dict with metadata containing agent_timings
+			context: AgentContext or dict with metadata containing agent_metrics
 		"""
 		from rich.console import Console
 		from rich.table import Table
@@ -844,24 +844,24 @@ Sortino Ratio                                  {sortino:.6f}"""
 		
 		console = Console()
 		
-		# Extract timings from context
-		timings = None
-		if hasattr(context, 'get_agent_timings'):
+		# Extract metrics from context
+		metrics = None
+		if hasattr(context, 'get_agent_metrics'):
 			# AgentContext object
-			timings = context.get_agent_timings()
+			metrics = context.get_agent_metrics()
 		elif isinstance(context, dict):
 			# Dict context
 			metadata = context.get("metadata", {})
-			timings = metadata.get("agent_timings", [])
+			metrics = metadata.get("agent_metrics", [])
 		
-		if not timings:
+		if not metrics:
 			return
 		
-		# Aggregate timings by agent name
+		# Aggregate metrics by agent name
 		agent_stats = defaultdict(lambda: {"count": 0, "total_ms": 0.0})
-		for timing in timings:
-			name = timing["name"]
-			duration = timing["duration_ms"]
+		for metric in metrics:
+			name = metric["name"]
+			duration = metric["duration_ms"]
 			agent_stats[name]["count"] += 1
 			agent_stats[name]["total_ms"] += duration
 		
