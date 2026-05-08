@@ -62,7 +62,7 @@ class Agent:
 		}
 
 	def run(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-		"""Run the agent with error handling, validation, and timing instrumentation.
+		"""Run the agent with error handling, validation, timing instrumentation, and ticker tracking.
 
 		This is the public API method. It validates inputs, calls process(),
 		and handles any exceptions that occur during execution. Context is
@@ -72,7 +72,7 @@ class Agent:
 		- context.metadata: Dict with structure:
 			{
 				"agent_timings": [
-					{"name": "AgentName", "duration_ms": 123.45},
+					{"name": "AgentName", "duration_ms": 123.45, "ticker_count": 10},
 					...
 				]
 			}
@@ -126,12 +126,25 @@ class Agent:
 			
 			metadata = self.context.get("metadata")
 			
+			# Count tickers in data_history if present (check input_data first, then context)
+			ticker_count = 0
+			if "data_history" in input_data and isinstance(input_data["data_history"], dict):
+				ticker_count = len(input_data["data_history"])
+			elif self.context.get("data_history"):
+				# Fall back to context if not in input
+				context_data_history = self.context.get("data_history")
+				if isinstance(context_data_history, dict):
+					ticker_count = len(context_data_history)
+			
 			# Ensure agent_timings list exists
 			if "agent_timings" not in metadata:
 				metadata["agent_timings"] = []
 			
 			# Append this agent's timing
-			metadata["agent_timings"].append({
+			timing_entry = {
 				"name": self.name,
 				"duration_ms": round(duration_ms, 2)
-			})
+			}
+			if ticker_count > 0:
+				timing_entry["ticker_count"] = ticker_count
+			metadata["agent_timings"].append(timing_entry)

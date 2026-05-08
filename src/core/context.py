@@ -28,14 +28,14 @@ class AgentContext:
         return metadata.get("agent_timings", [])
     
     def print_agent_timings(self) -> None:
-        """Print a formatted summary of agent execution times."""
+        """Print a formatted summary of agent execution times and ticker counts."""
         timings = self.get_agent_timings()
         if not timings:
             print("No agent timings recorded")
             return
         
         print("\n" + "=" * 80)
-        print("Agent Execution Times")
+        print("Agent Execution Times (with Ticker Tracking)")
         print("=" * 80)
         
         total_ms = sum(t["duration_ms"] for t in timings)
@@ -47,7 +47,9 @@ class AgentContext:
             name = timing["name"]
             duration = timing["duration_ms"]
             pct = (duration / total_ms * 100) if total_ms > 0 else 0
-            print(f"  {name:50s} {duration:8.2f}ms ({pct:5.1f}%)")
+            ticker_count = timing.get("ticker_count", "")
+            ticker_str = f"  [{ticker_count} tickers]" if ticker_count else ""
+            print(f"  {name:50s} {duration:8.2f}ms ({pct:5.1f}%){ticker_str}")
         
         print("-" * 80)
         print(f"  {'Total':50s} {total_ms:8.2f}ms (100.0%)")

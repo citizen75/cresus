@@ -67,6 +67,7 @@ class DataAgent(Agent):
 		# Note: Load all data - filtering by current_date happens in analysis agents
 		data_history = {}
 		indicators_calculated = {}
+		self.logger.info(f"Loading data for {len(tickers)} tickers")
 		for ticker in tickers:
 			try:
 				# Load cached data using DataHistory
@@ -127,6 +128,15 @@ class DataAgent(Agent):
 		# Get updated data_history and tickers from context after filtering
 		final_data_history = self.context.get("data_history")
 		final_tickers = self.context.get("tickers")
+		
+		final_ticker_count = len(final_tickers) if final_tickers else 0
+		initial_ticker_count = len(data_history)
+		removed_count = initial_ticker_count - final_ticker_count
+		
+		if removed_count > 0:
+			self.logger.info(f"DataAgent final: {final_ticker_count} tickers after filtering (removed {removed_count})")
+		else:
+			self.logger.info(f"DataAgent final: {final_ticker_count} tickers after filtering")
 
 		return {
 			"status": "success",

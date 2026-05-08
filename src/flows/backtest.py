@@ -62,6 +62,10 @@ class BacktestFlow(Flow):
 				"message": "strategy parameter required",
 			}
 
+		# Extract dates for later use in context.json
+		start_date = flow_input.get("start_date")
+		end_date = flow_input.get("end_date")
+
 		# Create backtest ID for sandboxing (timestamp + short UUID)
 		backtest_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{str(uuid.uuid4())[:8]}"
 		# Organize backtests by strategy: ~/.cresus/db/backtests/<strategy_name>/<timestamp>
@@ -100,8 +104,8 @@ class BacktestFlow(Flow):
 		# Run backtest through agent
 		agent_result = backtest_agent.process({
 			"strategy_name": strategy_name,
-			"start_date": flow_input.get("start_date"),
-			"end_date": flow_input.get("end_date"),
+			"start_date": start_date,
+			"end_date": end_date,
 			"lookback_days": flow_input.get("lookback_days", 365),
 		})
 
@@ -180,6 +184,24 @@ class BacktestFlow(Flow):
 				print("=" * 80 + "\n")
 		except Exception as e:
 			self.logger.debug(f"Could not print agent timings: {e}")
+
+		# Save context with execution metrics and ticker counts to context.json
+		try:
+			import json
+			context_data = {
+				"backtest_id": backtest_id,
+				"strategy": strategy_name,
+				"start_date": str(start_date),
+				"end_date": str(end_date),
+				"metadata": self.context.get("metadata") or {},
+				"execution_history": self.context.get("execution_history") or [],
+			}
+			context_file = Path(backtest_dir) / "context.json"
+			with open(context_file, 'w') as f:
+				json.dump(context_data, f, indent=2, default=str)
+			self.logger.debug(f"Saved execution context to {context_file}")
+		except Exception as e:
+			self.logger.warning(f"Could not save context.json: {e}")
 
 		return {
 			"status": "success",
