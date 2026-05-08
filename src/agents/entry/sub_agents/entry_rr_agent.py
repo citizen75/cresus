@@ -89,6 +89,9 @@ class EntryRRAgent(Agent):
 
 		Uses strategy configuration formulas if available, otherwise
 		falls back to support/resistance level detection.
+		
+		When take_profit is explicitly disabled (formula: 'False'), uses only
+		stop_loss for risk definition, suitable for trailing stop strategies.
 
 		Args:
 			df: DataFrame with OHLCV data
@@ -106,6 +109,7 @@ class EntryRRAgent(Agent):
 			# Try to load strategy config for exit formulas
 			strategy_name = self.context.get("strategy_name") if self.context else None
 			exit_config = {}
+			take_profit_disabled = False
 			
 			if strategy_name:
 				try:
@@ -114,6 +118,11 @@ class EntryRRAgent(Agent):
 					if strategy_result.get("status") == "success":
 						strategy_data = strategy_result.get("data", {})
 						exit_config = strategy_data.get("exit", {}).get("parameters", {})
+						# Check if take_profit is explicitly disabled
+						if "take_profit" in exit_config:
+							tp_formula = exit_config["take_profit"].get("formula", "").strip().lower()
+							if tp_formula == 'false':
+								take_profit_disabled = True
 				except Exception as e:
 					self.logger.debug(f"Could not load strategy config: {e}")
 
@@ -135,13 +144,14 @@ class EntryRRAgent(Agent):
 
 			# Try to evaluate take_profit formula from config
 			take_profit = None
-			if "take_profit" in exit_config:
+			if not take_profit_disabled and "take_profit" in exit_config:
 				tp_formula = exit_config["take_profit"].get("formula")
 				if tp_formula:
 					take_profit = ConfigEvaluator.evaluate_formula(tp_formula, data_context)
 
 			# If config formulas didn't work, use fallback support/resistance method
-			if stop_loss is None or take_profit is None:
+			# But skip fallback if take_profit is explicitly disabled (trailing stop strategy)
+			if stop_loss is None or (take_profit is None and not take_profit_disabled):
 				# Identify support (lowest low in recent period) and resistance (highest high)
 				lookback = min(20, len(df))
 				recent_data = df.iloc[-lookback:]
@@ -174,29 +184,39 @@ class EntryRRAgent(Agent):
 				# Use fallback values if config formulas didn't evaluate
 				if stop_loss is None:
 					stop_loss = support
-				if take_profit is None:
+				if take_profit is None and not take_profit_disabled:
 					take_profit = resistance
 
-			# Calculate risk and reward
-			risk = current_price - stop_loss
-			reward = take_profit - current_price
-
-			if risk <= 0 or reward <= 0:
+			# Validate stop_loss
+			if stop_loss is None or stop_loss >= current_price:
 				return None
 
-			rr_ratio = reward / risk
+			risk = current_price - stop_loss
+			
+			# If take_profit is disabled, use 1:1 RR ratio (stop_loss distance as reward target)
+			# This allows entries to be processed through order pipeline with trailing stop as sole exit
+			if take_profit_disabled or take_profit is None:
+				take_profit = current_price + risk  # 1:1 RR as placeholder for trailing stop
+				reward = risk
+				rr_ratio = 1.0
+			else:
+				reward = take_profit - current_price
+				if reward <= 0:
+					return None
+				rr_ratio = reward / risk
 
 			return {
 				"entry_price": round(current_price, 4),
 				"support_level": round(stop_loss, 4),
 				"resistance_level": round(take_profit, 4),
 				"stop_loss": round(stop_loss, 4),
-				"take_profit": round(take_profit, 4),
+				"take_profit": round(take_profit, 4) if take_profit else None,
 				"risk_amount": round(risk, 4),
 				"reward_amount": round(reward, 4),
 				"rr_ratio": round(rr_ratio, 2),
 				"risk_pct": round((risk / current_price) * 100, 2),
 				"reward_pct": round((reward / current_price) * 100, 2),
+				"take_profit_disabled": take_profit_disabled,
 			}
 
 		except Exception as e:

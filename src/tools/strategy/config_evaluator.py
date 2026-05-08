@@ -21,9 +21,13 @@ class ConfigEvaluator:
 			data: Dictionary with data context (e.g., OHLCV data)
 
 		Returns:
-			Evaluated result as float, or None if evaluation fails
+			Evaluated result as float, or None if evaluation fails or formula is disabled (False)
 		"""
 		if not formula or not isinstance(formula, str):
+			return None
+
+		# Handle disabled formulas: return None for 'False' (string) or False (boolean result)
+		if formula.strip().lower() == 'false':
 			return None
 
 		try:
@@ -40,6 +44,10 @@ class ConfigEvaluator:
 
 			# Evaluate the formula
 			result = eval(formula, {"__builtins__": {}}, namespace)
+
+			# If result is boolean False, treat as disabled
+			if isinstance(result, bool) and result is False:
+				return None
 
 			# Convert to float
 			if result is not None:
