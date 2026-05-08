@@ -7,7 +7,6 @@ from pathlib import Path
 from core.agent import Agent
 from core.context import AgentContext
 from tools.formula import evaluate
-from tools.indicators.indicators import calculate as calculate_indicators
 from tools.strategy.strategy import StrategyManager
 
 
@@ -144,18 +143,12 @@ class VolatilityAgent(Agent):
 			# Extract indicator names from formula
 			indicators = self._extract_indicators(formula)
 
-			# Calculate only missing indicators (skip if already in data)
+			# Check that all required indicators are available (calculated by DataAgent)
 			if indicators:
 				missing_indicators = [ind for ind in indicators if ind not in ticker_data.columns]
 				if missing_indicators:
-					try:
-						calculated = calculate_indicators(missing_indicators, ticker_data)
-						# Add calculated indicators as columns
-						for indicator_name, series in calculated.items():
-							ticker_data[indicator_name] = series
-					except Exception as e:
-						self.logger.debug(f"Failed to calculate indicators {indicators}: {e}")
-						return False
+					self.logger.error(f"Missing indicators {missing_indicators} not pre-calculated by DataAgent for formula: {formula}")
+					return False
 
 			# Get latest row
 			latest = ticker_data.iloc[-1]
