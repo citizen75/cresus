@@ -26,14 +26,22 @@ class PostMarketFlow(Flow):
 	Used in BacktestAgent's third phase after market close.
 	"""
 
-	def __init__(self, strategy: str = "default"):
+	def __init__(self, strategy: str = "default", context: Optional[Any] = None):
 		"""Initialize post-market flow.
 
 		Args:
 			strategy: Strategy name
+			context: Optional AgentContext for shared state
 		"""
-		super().__init__(f"PostMarketFlow[{strategy}]")
+		super().__init__(f"PostMarketFlow[{strategy}]", context=context)
 		self.strategy = strategy
+		self._setup_steps()
+
+	def _setup_steps(self) -> None:
+		"""Set up post-market flow steps (called once at init)."""
+		# Add OrdersAgent to expire pending orders
+		orders_agent = OrdersAgent("OrdersExpireStep", self.context)
+		self.add_step(orders_agent, required=False)
 
 	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
 		"""Execute post-market flow at end of trading day.
@@ -48,10 +56,6 @@ class PostMarketFlow(Flow):
 			Flow result with execution history
 		"""
 		input_data = input_data or {}
-
-		# Add OrdersAgent to expire pending orders
-		orders_agent = OrdersAgent("OrdersExpireStep", self.context)
-		self.add_step(orders_agent, required=False)
 
 		# Execute the flow
 		return super().process(input_data)

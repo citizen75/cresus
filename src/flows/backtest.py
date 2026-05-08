@@ -94,8 +94,7 @@ class BacktestFlow(Flow):
 		backtest_agent.set_market_flow(transact_flow)
 
 		# Set post-market flow (cleanup: expire pending orders, update metrics)
-		postmarket_flow = PostMarketFlow(strategy_name)
-		postmarket_flow.context = self.context
+		postmarket_flow = PostMarketFlow(strategy_name, context=self.context)
 		backtest_agent.set_postmarket_flow(postmarket_flow)
 
 		# Run backtest through agent
