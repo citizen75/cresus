@@ -244,6 +244,10 @@ class DataHistory:
 				df_new.rename(columns={"index": "Date"}, inplace=True)
 
 			df_new["Date"] = pd.to_datetime(df_new["Date"])
+			# Ensure timestamps are timezone-naive
+			if df_new["Date"].dt.tz is not None:
+				df_new["Date"] = df_new["Date"].dt.tz_localize(None)
+			
 			df_new = df_new.rename(columns={
 				"Date": "timestamp",
 				"Open": "open",
@@ -256,6 +260,11 @@ class DataHistory:
 
 			# Combine with existing if present
 			if has_data:
+				# Ensure existing data is also timezone-naive for consistency
+				if "timestamp" in df_existing.columns and df_existing["timestamp"].dt.tz is not None:
+					df_existing = df_existing.copy()
+					df_existing["timestamp"] = df_existing["timestamp"].dt.tz_localize(None)
+				
 				df_combined = pd.concat([df_existing, df_new], ignore_index=True)
 				df_combined = df_combined.drop_duplicates(subset=["timestamp", "ticker"], keep="last")
 				df_combined = df_combined.sort_values("timestamp")
