@@ -102,6 +102,7 @@ class Agent:
 			}
 
 		start_time = time.time()
+		response = None
 		try:
 			self.logger.debug(f"Starting {self.name} with input keys: {list(input_data.keys())}")
 			response = self.process(input_data)
@@ -110,12 +111,13 @@ class Agent:
 		except Exception as e:
 			error_msg = str(e)
 			self.logger.error(f"Failed {self.name}: {error_msg}")
-			return {
+			response = {
 				"status": STATUS_ERROR,
 				"input": input_data,
 				"output": {},
 				"message": error_msg,
 			}
+			return response
 		finally:
 			# Record execution time in context metadata
 			duration_ms = (time.time() - start_time) * 1000
@@ -126,15 +128,27 @@ class Agent:
 			
 			metadata = self.context.get("metadata")
 			
-			# Count tickers in data_history if present (check input_data first, then context)
+			# Count tickers being processed at this step:
+			# Priority: watchlist (filtered list) > tickers (current list) > data_history (all loaded)
 			ticker_count = 0
-			if "data_history" in input_data and isinstance(input_data["data_history"], dict):
-				ticker_count = len(input_data["data_history"])
-			elif self.context.get("data_history"):
-				# Fall back to context if not in input
-				context_data_history = self.context.get("data_history")
-				if isinstance(context_data_history, dict):
-					ticker_count = len(context_data_history)
+			
+			# First check watchlist (filtered tickers that made it through filters)
+			watchlist = self.context.get("watchlist")
+			if isinstance(watchlist, list) and len(watchlist) > 0:
+				ticker_count = len(watchlist)
+			else:
+				# Fall back to current tickers in context
+				tickers = self.context.get("tickers")
+				if isinstance(tickers, list) and len(tickers) > 0:
+					ticker_count = len(tickers)
+				else:
+					# Fall back to data_history (all loaded tickers)
+					if "data_history" in input_data and isinstance(input_data["data_history"], dict):
+						ticker_count = len(input_data["data_history"])
+					elif self.context.get("data_history"):
+						context_data_history = self.context.get("data_history")
+						if isinstance(context_data_history, dict):
+							ticker_count = len(context_data_history)
 			
 			# Ensure agent_metrics list exists
 			if "agent_metrics" not in metadata:
