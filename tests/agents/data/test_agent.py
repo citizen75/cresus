@@ -46,12 +46,12 @@ class TestDataAgent(unittest.TestCase):
 	def test_process_loads_tickers_from_input(self):
 		"""Test that process loads data for tickers from input."""
 		mock_df = pd.DataFrame({
-			"timestamp": pd.date_range("2026-01-01", periods=10),
-			"open": [100 + i for i in range(10)],
-			"high": [102 + i for i in range(10)],
-			"low": [99 + i for i in range(10)],
-			"close": [101 + i for i in range(10)],
-			"volume": [1000000] * 10,
+			"timestamp": pd.date_range("2025-10-01", periods=120),  # 120 days of data
+			"open": [100 + i for i in range(120)],
+			"high": [102 + i for i in range(120)],
+			"low": [99 + i for i in range(120)],
+			"close": [101 + i for i in range(120)],
+			"volume": [1000000] * 120,
 		})
 
 		with patch("agents.data.agent.DataHistory") as mock_dh_class:
@@ -73,8 +73,8 @@ class TestDataAgent(unittest.TestCase):
 		self.context.set("tickers", ["MSFT", "AMZN"])
 
 		mock_df = pd.DataFrame({
-			"timestamp": pd.date_range("2026-01-01", periods=5),
-			"close": [300, 301, 302, 303, 304],
+			"timestamp": pd.date_range("2025-10-01", periods=120),  # 120 days of data
+			"close": [300 + i for i in range(120)],
 		})
 
 		with patch("agents.data.agent.DataHistory") as mock_dh_class:
@@ -111,8 +111,8 @@ class TestDataAgent(unittest.TestCase):
 	def test_process_partial_tickers_fail(self):
 		"""Test that process continues when some tickers fail."""
 		mock_df = pd.DataFrame({
-			"timestamp": pd.date_range("2026-01-01", periods=5),
-			"close": [100, 101, 102, 103, 104],
+			"timestamp": pd.date_range("2025-10-01", periods=120),  # 120 days of data
+			"close": [100 + i for i in range(120)],
 		})
 
 		call_count = [0]
@@ -198,8 +198,8 @@ class TestDataAgent(unittest.TestCase):
 	def test_process_multiple_calls(self):
 		"""Test that multiple process calls work correctly."""
 		mock_df = pd.DataFrame({
-			"timestamp": pd.date_range("2026-01-01", periods=10),
-			"close": [100 + i for i in range(10)],
+			"timestamp": pd.date_range("2025-10-01", periods=120),  # 120 days of data
+			"close": [100 + i for i in range(120)],
 		})
 
 		with patch("agents.data.agent.DataHistory") as mock_dh_class:

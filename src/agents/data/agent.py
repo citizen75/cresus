@@ -4,6 +4,7 @@ from typing import Any, Dict, Optional, List
 from core.agent import Agent
 from tools.indicators.indicators import calculate as calculate_indicators
 from tools.data.core import DataHistory
+from agents.data.sub_agents import DataQualityAgent, DataQuantityAgent
 
 
 class DataAgent(Agent):
@@ -101,6 +102,32 @@ class DataAgent(Agent):
 		if indicators_calculated:
 			self.context.set("indicators_calculated", indicators_calculated)
 
+		# Run data quality filtering
+		quality_agent = DataQualityAgent()
+		quality_agent.context = self.context
+		quality_result = quality_agent.process()
+		if quality_result.get("status") == "success":
+			removed_quality = quality_result["output"].get("removed_count", 0)
+			if removed_quality > 0:
+				self.logger.info(f"DataQualityAgent removed {removed_quality} stale tickers: {quality_result['output'].get('removed_tickers', [])}")
+		else:
+			self.logger.warning(f"DataQualityAgent failed: {quality_result.get('message', 'unknown error')}")
+
+		# Run data quantity filtering
+		quantity_agent = DataQuantityAgent()
+		quantity_agent.context = self.context
+		quantity_result = quantity_agent.process()
+		if quantity_result.get("status") == "success":
+			removed_quantity = quantity_result["output"].get("removed_count", 0)
+			if removed_quantity > 0:
+				self.logger.info(f"DataQuantityAgent removed {removed_quantity} tickers with insufficient data: {quantity_result['output'].get('removed_tickers', [])}")
+		else:
+			self.logger.warning(f"DataQuantityAgent failed: {quantity_result.get('message', 'unknown error')}")
+
+		# Get updated data_history and tickers from context after filtering
+		final_data_history = self.context.get("data_history")
+		final_tickers = self.context.get("tickers")
+
 		return {
 			"status": "success",
 			"input": input_data,
@@ -108,6 +135,8 @@ class DataAgent(Agent):
 				"tickers": tickers,
 				"count": len(tickers) if isinstance(tickers, list) else 0,
 				"data_fetched": len(data_history),
+				"data_after_quality_filter": quality_result["output"].get("filtered_count", 0) if quality_result.get("status") == "success" else len(data_history),
+				"data_after_quantity_filter": len(final_data_history),
 				"indicators": indicators,
 				"indicators_count": len([k for v in indicators_calculated.values() for k in v]),
 			},
