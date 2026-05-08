@@ -43,7 +43,13 @@ class AgentContext:
         # Sort by duration descending
         sorted_metrics = sorted(metrics, key=lambda x: x["duration_ms"], reverse=True)
         
-        for metric in sorted_metrics:
+        # Filter out metrics with negligible duration (< 1ms or rounds to 0.0%)
+        significant_metrics = [
+            m for m in sorted_metrics 
+            if m["duration_ms"] >= 1.0 or (m["duration_ms"] / total_ms * 100 if total_ms > 0 else 0) >= 0.05
+        ]
+        
+        for metric in significant_metrics:
             name = metric["name"]
             duration = metric["duration_ms"]
             pct = (duration / total_ms * 100) if total_ms > 0 else 0

@@ -418,9 +418,7 @@ class CresusCLI(cmd2.Cmd):
 
 			# Display backtest results if backtest completed successfully (unless -m flag shows metrics instead)
 			if workflow_name.lower() == "backtest" and result.get("status") == "success":
-				if show_metrics:
-					console.print("[dim][DEBUG] Skipping portfolio metrics display (metrics mode enabled)[/dim]")
-				else:
+				if not show_metrics:
 					# For backtest, show portfolio metrics and research analysis
 					self._print_backtest_results(strategy, result)
 		else:

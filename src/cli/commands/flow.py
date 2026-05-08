@@ -857,28 +857,41 @@ Sortino Ratio                                  {sortino:.6f}"""
 		if not metrics:
 			return
 		
-		# Aggregate metrics by agent name
-		agent_stats = defaultdict(lambda: {"count": 0, "total_ms": 0.0})
+		# Aggregate metrics by agent name (track ticker counts too)
+		agent_stats = defaultdict(lambda: {"count": 0, "total_ms": 0.0, "ticker_counts": []})
 		for metric in metrics:
 			name = metric["name"]
 			duration = metric["duration_ms"]
+			ticker_count = metric.get("ticker_count", None)
 			agent_stats[name]["count"] += 1
 			agent_stats[name]["total_ms"] += duration
+			if ticker_count is not None:
+				agent_stats[name]["ticker_counts"].append(ticker_count)
 		
 		# Calculate averages
 		aggregated = []
 		for name, stats in agent_stats.items():
 			avg_ms = stats["total_ms"] / stats["count"]
+			avg_tickers = None
+			if stats["ticker_counts"]:
+				avg_tickers = sum(stats["ticker_counts"]) / len(stats["ticker_counts"])
 			aggregated.append({
 				"name": name,
 				"count": stats["count"],
 				"avg_ms": avg_ms,
-				"total_ms": stats["total_ms"]
+				"total_ms": stats["total_ms"],
+				"avg_tickers": avg_tickers
 			})
 		
 		# Sort by total duration descending
 		aggregated.sort(key=lambda x: x["total_ms"], reverse=True)
 		total_ms = sum(s["total_ms"] for s in aggregated)
+		
+		# Filter out metrics with negligible duration (< 1ms total or rounds to 0.0%)
+		significant_aggregated = [
+			s for s in aggregated
+			if s["total_ms"] >= 1.0 or (s["total_ms"] / total_ms * 100 if total_ms > 0 else 0) >= 0.05
+		]
 		
 		# Create table
 		table = Table(title="Agent Execution Times (Aggregated)", box=None)
@@ -886,28 +899,34 @@ Sortino Ratio                                  {sortino:.6f}"""
 		table.add_column("Count", style="magenta", justify="right")
 		table.add_column("Avg (ms)", style="green", justify="right")
 		table.add_column("Total (ms)", style="blue", justify="right")
+		table.add_column("Avg Tickers", style="white", justify="right")
 		table.add_column("Percentage", style="yellow", justify="right")
 		
-		for stat in aggregated:
+		for stat in significant_aggregated:
 			name = stat["name"]
 			count = stat["count"]
 			avg = stat["avg_ms"]
 			total = stat["total_ms"]
+			avg_tickers = stat["avg_tickers"]
 			pct = (total / total_ms * 100) if total_ms > 0 else 0
+			
+			tickers_str = f"{avg_tickers:.0f}" if avg_tickers is not None else ""
 			table.add_row(
 				name,
 				f"{count}",
 				f"{avg:.2f}",
 				f"{total:.2f}",
+				tickers_str,
 				f"{pct:.1f}%"
 			)
 		
 		# Add total row
 		table.add_row(
 			"[bold]Total[/bold]",
-			f"[bold]{len(timings)}[/bold]",
+			f"[bold]{len(metrics)}[/bold]",
 			"",
 			f"[bold]{total_ms:.2f}[/bold]",
+			"",
 			"[bold]100.0%[/bold]"
 		)
 		
