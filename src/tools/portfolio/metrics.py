@@ -138,11 +138,21 @@ class PortfolioMetrics(PortfolioManager):
         }
 
     def _empty_metrics(self, start_date: Optional[str], end_date: Optional[str], start_value: float) -> Dict[str, Any]:
-        """Return empty metrics structure."""
+        """Return empty metrics structure with correct period calculation."""
+        # Calculate period from dates even if no trades
+        period_days = 0
+        if start_date and end_date:
+            try:
+                start_dt = pd.to_datetime(start_date)
+                end_dt = pd.to_datetime(end_date)
+                period_days = (end_dt - start_dt).days
+            except:
+                period_days = 0
+        
         return {
             "start_date": start_date or "N/A",
             "end_date": end_date or "N/A",
-            "period_days": 0,
+            "period_days": period_days,
             "start_value": start_value,
             "end_value": start_value,
             "total_return_pct": 0.0,
