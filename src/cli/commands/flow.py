@@ -833,13 +833,14 @@ Sortino Ratio                                  {sortino:.6f}"""
 				console.print(f"\n[green]✓ Watchlist saved to:[/green] {saved_path}")
 
 	def print_agent_metrics(self, context: Any) -> None:
-		"""Print agent execution metrics as a formatted table.
+		"""Print agent execution metrics as a formatted table, aggregated by agent name.
 		
 		Args:
 			context: AgentContext or dict with metadata containing agent_timings
 		"""
 		from rich.console import Console
 		from rich.table import Table
+		from collections import defaultdict
 		
 		console = Console()
 		
@@ -856,29 +857,56 @@ Sortino Ratio                                  {sortino:.6f}"""
 		if not timings:
 			return
 		
-		# Sort by duration descending
-		sorted_timings = sorted(timings, key=lambda x: x["duration_ms"], reverse=True)
-		total_ms = sum(t["duration_ms"] for t in sorted_timings)
-		
-		# Create table
-		table = Table(title="Agent Execution Times", box=None)
-		table.add_column("Agent Name", style="cyan")
-		table.add_column("Duration (ms)", style="green", justify="right")
-		table.add_column("Percentage", style="yellow", justify="right")
-		
-		for timing in sorted_timings:
+		# Aggregate timings by agent name
+		agent_stats = defaultdict(lambda: {"count": 0, "total_ms": 0.0})
+		for timing in timings:
 			name = timing["name"]
 			duration = timing["duration_ms"]
-			pct = (duration / total_ms * 100) if total_ms > 0 else 0
+			agent_stats[name]["count"] += 1
+			agent_stats[name]["total_ms"] += duration
+		
+		# Calculate averages
+		aggregated = []
+		for name, stats in agent_stats.items():
+			avg_ms = stats["total_ms"] / stats["count"]
+			aggregated.append({
+				"name": name,
+				"count": stats["count"],
+				"avg_ms": avg_ms,
+				"total_ms": stats["total_ms"]
+			})
+		
+		# Sort by total duration descending
+		aggregated.sort(key=lambda x: x["total_ms"], reverse=True)
+		total_ms = sum(s["total_ms"] for s in aggregated)
+		
+		# Create table
+		table = Table(title="Agent Execution Times (Aggregated)", box=None)
+		table.add_column("Agent Name", style="cyan")
+		table.add_column("Count", style="magenta", justify="right")
+		table.add_column("Avg (ms)", style="green", justify="right")
+		table.add_column("Total (ms)", style="blue", justify="right")
+		table.add_column("Percentage", style="yellow", justify="right")
+		
+		for stat in aggregated:
+			name = stat["name"]
+			count = stat["count"]
+			avg = stat["avg_ms"]
+			total = stat["total_ms"]
+			pct = (total / total_ms * 100) if total_ms > 0 else 0
 			table.add_row(
 				name,
-				f"{duration:.2f}",
+				f"{count}",
+				f"{avg:.2f}",
+				f"{total:.2f}",
 				f"{pct:.1f}%"
 			)
 		
 		# Add total row
 		table.add_row(
 			"[bold]Total[/bold]",
+			f"[bold]{len(timings)}[/bold]",
+			"",
 			f"[bold]{total_ms:.2f}[/bold]",
 			"[bold]100.0%[/bold]"
 		)
