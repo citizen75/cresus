@@ -132,7 +132,7 @@ class BacktestFlow(Flow):
 		self.logger.info(f"Using initial capital: ${initial_capital:.2f}")
 
 		# Calculate comprehensive backtest metrics
-		metrics_calculator = PortfolioMetrics(context=self.context)
+		metrics_calculator = PortfolioMetrics(context=self.context.__dict__)
 		metrics = metrics_calculator.calculate_backtest_metrics(
 			name=portfolio_name,
 			start_date=flow_input.get("start_date"),
