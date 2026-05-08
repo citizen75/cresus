@@ -329,6 +329,7 @@ class CresusCLI(cmd2.Cmd):
 			include_context = "--context" in parts
 			debug = "--debug" in parts
 			use_backtest = "--backtest" in parts
+			show_metrics = "-m" in parts
 
 			# Count verbosity level (-v, -vv, -vvv)
 			verbosity_level = 0
@@ -390,8 +391,18 @@ class CresusCLI(cmd2.Cmd):
 					original_debug = True  # Enable debug mode for -vvv
 
 			try:
-				result = self.flow_manager.run_workflow(workflow_name, strategy, input_data, include_context, original_debug, use_backtest)
+				result = self.flow_manager.run_workflow(workflow_name, strategy, input_data, include_context, original_debug, use_backtest, show_metrics)
 				self.flow_manager._print_flow_result(result, workflow_name)
+				
+				# Display agent metrics if requested
+				if show_metrics and result.get("status") == "success":
+					# Get context from various flow types
+					flow_context = None
+					if "_context" in result:
+						flow_context = result["_context"]
+					
+					if flow_context or include_context:
+						self.flow_manager.print_agent_metrics(flow_context or {})
 			finally:
 				# Restore default log level
 				if verbosity_level > 0:

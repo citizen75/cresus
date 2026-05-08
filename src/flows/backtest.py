@@ -157,6 +157,31 @@ class BacktestFlow(Flow):
 			"issue_count": research_output.get("total_issues", 0),
 		}
 
+		# Print agent timing summary to stdout
+		try:
+			timings = self.context.get_agent_timings()
+			if timings:
+				print("\n" + "=" * 80)
+				print("Agent Execution Times")
+				print("=" * 80)
+				
+				total_ms = sum(t["duration_ms"] for t in timings)
+				
+				# Sort by duration descending
+				sorted_timings = sorted(timings, key=lambda x: x["duration_ms"], reverse=True)
+				
+				for timing in sorted_timings:
+					name = timing["name"]
+					duration = timing["duration_ms"]
+					pct = (duration / total_ms * 100) if total_ms > 0 else 0
+					print(f"  {name:50s} {duration:8.2f}ms ({pct:5.1f}%)")
+				
+				print("-" * 80)
+				print(f"  {'Total':50s} {total_ms:8.2f}ms (100.0%)")
+				print("=" * 80 + "\n")
+		except Exception as e:
+			self.logger.debug(f"Could not print agent timings: {e}")
+
 		return {
 			"status": "success",
 			"output": backtest_output,

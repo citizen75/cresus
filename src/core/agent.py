@@ -1,5 +1,6 @@
 """Agent base class for Cresus."""
 
+import time
 from typing import Any, Dict, Optional
 from .context import AgentContext
 from .logger import AgentLogger
@@ -61,11 +62,20 @@ class Agent:
 		}
 
 	def run(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-		"""Run the agent with error handling and validation.
+		"""Run the agent with error handling, validation, and timing instrumentation.
 
 		This is the public API method. It validates inputs, calls process(),
 		and handles any exceptions that occur during execution. Context is
 		accessed via self.context.
+
+		Execution time is recorded in context metadata:
+		- context.metadata: Dict with structure:
+			{
+				"agent_timings": [
+					{"name": "AgentName", "duration_ms": 123.45},
+					...
+				]
+			}
 
 		Args:
 			input_data: Optional dictionary of input data
@@ -91,6 +101,7 @@ class Agent:
 				"message": "Input data must be a dictionary",
 			}
 
+		start_time = time.time()
 		try:
 			self.logger.debug(f"Starting {self.name} with input keys: {list(input_data.keys())}")
 			response = self.process(input_data)
@@ -105,3 +116,22 @@ class Agent:
 				"output": {},
 				"message": error_msg,
 			}
+		finally:
+			# Record execution time in context metadata
+			duration_ms = (time.time() - start_time) * 1000
+			
+			# Ensure metadata dict exists
+			if not self.context.get("metadata"):
+				self.context.set("metadata", {})
+			
+			metadata = self.context.get("metadata")
+			
+			# Ensure agent_timings list exists
+			if "agent_timings" not in metadata:
+				metadata["agent_timings"] = []
+			
+			# Append this agent's timing
+			metadata["agent_timings"].append({
+				"name": self.name,
+				"duration_ms": round(duration_ms, 2)
+			})

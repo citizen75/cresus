@@ -31,7 +31,7 @@ class FlowManager:
 		self.project_root = project_root
 		self.strategy_manager = StrategyManager(project_root)
 
-	def run_workflow(self, workflow_name: str, strategy: str = "default", input_data: Optional[Dict[str, Any]] = None, include_context: bool = False, debug: bool = False, use_backtest: bool = False) -> Dict[str, Any]:
+	def run_workflow(self, workflow_name: str, strategy: str = "default", input_data: Optional[Dict[str, Any]] = None, include_context: bool = False, debug: bool = False, use_backtest: bool = False, show_metrics: bool = False) -> Dict[str, Any]:
 		"""Run a workflow.
 
 		Args:
@@ -40,6 +40,8 @@ class FlowManager:
 			input_data: Optional input data for the workflow
 			include_context: Whether to include flow context in result
 			debug: Enable debug logging
+			use_backtest: Use backtest mode
+			show_metrics: Display agent execution metrics table
 
 		Returns:
 			Workflow result dictionary
@@ -50,6 +52,10 @@ class FlowManager:
 		# Enable debug mode if requested
 		if debug:
 			enable_debug_mode()
+		
+		# Auto-enable include_context if metrics are requested
+		if show_metrics:
+			include_context = True
 		
 		try:
 			if workflow_name.lower() == "signals":
@@ -825,3 +831,58 @@ Sortino Ratio                                  {sortino:.6f}"""
 			saved_path = watchlist_saved.get("saved_path", "")
 			if saved_path:
 				console.print(f"\n[green]✓ Watchlist saved to:[/green] {saved_path}")
+
+	def print_agent_metrics(self, context: Any) -> None:
+		"""Print agent execution metrics as a formatted table.
+		
+		Args:
+			context: AgentContext or dict with metadata containing agent_timings
+		"""
+		from rich.console import Console
+		from rich.table import Table
+		
+		console = Console()
+		
+		# Extract timings from context
+		timings = None
+		if hasattr(context, 'get_agent_timings'):
+			# AgentContext object
+			timings = context.get_agent_timings()
+		elif isinstance(context, dict):
+			# Dict context
+			metadata = context.get("metadata", {})
+			timings = metadata.get("agent_timings", [])
+		
+		if not timings:
+			return
+		
+		# Sort by duration descending
+		sorted_timings = sorted(timings, key=lambda x: x["duration_ms"], reverse=True)
+		total_ms = sum(t["duration_ms"] for t in sorted_timings)
+		
+		# Create table
+		table = Table(title="Agent Execution Times", box=None)
+		table.add_column("Agent Name", style="cyan")
+		table.add_column("Duration (ms)", style="green", justify="right")
+		table.add_column("Percentage", style="yellow", justify="right")
+		
+		for timing in sorted_timings:
+			name = timing["name"]
+			duration = timing["duration_ms"]
+			pct = (duration / total_ms * 100) if total_ms > 0 else 0
+			table.add_row(
+				name,
+				f"{duration:.2f}",
+				f"{pct:.1f}%"
+			)
+		
+		# Add total row
+		table.add_row(
+			"[bold]Total[/bold]",
+			f"[bold]{total_ms:.2f}[/bold]",
+			"[bold]100.0%[/bold]"
+		)
+		
+		console.print("\n")
+		console.print(table)
+		console.print()
