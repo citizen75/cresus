@@ -348,7 +348,7 @@ class TestBacktestAgentLooping:
 			result = agent.process({"strategy_name": "test"})
 
 			assert result["status"] == "error"
-			assert "No trading days found" in result["message"]
+			assert "No historical data" in result["message"]
 
 	def test_process_fills_daily_results(self):
 		"""Test that daily_results are populated with dates."""

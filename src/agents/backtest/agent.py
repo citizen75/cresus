@@ -54,6 +54,29 @@ def _get_trading_days(data_history: Dict, start_date: date, end_date: date) -> L
 	return sorted(d for d in dates if start_date <= d <= end_date)
 
 
+def _get_data_date_range(data_history: Dict) -> Optional[tuple]:
+	"""Get the date range of available data.
+
+	Args:
+		data_history: Dict of {ticker: DataFrame} where each DataFrame has 'timestamp' column
+
+	Returns:
+		Tuple of (min_date, max_date) or None if no data
+	"""
+	if not data_history:
+		return None
+
+	all_dates = []
+	for ticker_data in data_history.values():
+		if not ticker_data.empty and "timestamp" in ticker_data.columns:
+			all_dates.extend(ticker_data["timestamp"].dt.date.unique())
+
+	if not all_dates:
+		return None
+
+	return (min(all_dates), max(all_dates))
+
+
 class BacktestAgent(Agent):
 	"""Agent for orchestrating multi-phase backtest loops.
 
@@ -158,6 +181,45 @@ class BacktestAgent(Agent):
 
 		# Extract trading days from context
 		data_history = self.context.get("data_history") or {}
+		
+		# Check if requested date range overlaps with available data
+		data_range = _get_data_date_range(data_history)
+		if not data_range:
+			return {
+				"status": "error",
+				"input": input_data,
+				"output": {},
+				"message": "No historical data available for any tickers",
+			}
+		
+		data_min_date, data_max_date = data_range
+		
+		# Validate requested date range
+		if start_date > data_max_date:
+			return {
+				"status": "error",
+				"input": input_data,
+				"output": {},
+				"message": f"Start date {start_date.isoformat()} is after available data (ends {data_max_date.isoformat()})",
+			}
+		
+		if end_date < data_min_date:
+			return {
+				"status": "error",
+				"input": input_data,
+				"output": {},
+				"message": f"End date {end_date.isoformat()} is before available data (starts {data_min_date.isoformat()})",
+			}
+		
+		# Adjust dates to available range if needed
+		if start_date < data_min_date:
+			self.logger.warning(f"Start date {start_date.isoformat()} adjusted to first available date {data_min_date.isoformat()}")
+			start_date = data_min_date
+		
+		if end_date > data_max_date:
+			self.logger.warning(f"End date {end_date.isoformat()} adjusted to last available date {data_max_date.isoformat()}")
+			end_date = data_max_date
+		
 		trading_days = _get_trading_days(data_history, start_date, end_date)
 
 		if not trading_days:
@@ -165,7 +227,7 @@ class BacktestAgent(Agent):
 				"status": "error",
 				"input": input_data,
 				"output": {},
-				"message": "No trading days found in date range",
+				"message": f"No trading days found between {start_date.isoformat()} and {end_date.isoformat()}. Available data: {data_min_date.isoformat()} to {data_max_date.isoformat()}",
 			}
 
 		self.logger.info(f"Found {len(trading_days)} trading days")
