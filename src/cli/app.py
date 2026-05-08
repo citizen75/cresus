@@ -392,7 +392,10 @@ class CresusCLI(cmd2.Cmd):
 
 			try:
 				result = self.flow_manager.run_workflow(workflow_name, strategy, input_data, include_context, original_debug, use_backtest, show_metrics)
-				self.flow_manager._print_flow_result(result, workflow_name)
+				
+				# Print flow result unless -m flag is used (metrics view replaces output)
+				if not show_metrics:
+					self.flow_manager._print_flow_result(result, workflow_name)
 				
 				# Display agent metrics if requested
 				if show_metrics and result.get("status") == "success":
@@ -409,8 +412,8 @@ class CresusCLI(cmd2.Cmd):
 					from core.logger import set_log_level
 					set_log_level("ERROR")
 
-			# Display backtest results if backtest completed successfully
-			if workflow_name.lower() == "backtest" and result.get("status") == "success":
+			# Display backtest results if backtest completed successfully (unless -m flag shows metrics instead)
+			if workflow_name.lower() == "backtest" and result.get("status") == "success" and not show_metrics:
 				self._print_backtest_results(strategy, result)
 		else:
 			console.print(f"[red]✗[/red] Unknown command: {cmd}")
