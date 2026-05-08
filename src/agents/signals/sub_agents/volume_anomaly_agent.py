@@ -92,15 +92,17 @@ class VolumeAnomalyAgent(Agent):
 			# Extract indicators from formula
 			indicators = self._extract_indicators(formula)
 
-			# Calculate missing indicators
+			# Calculate only missing indicators (skip if already in data)
 			if indicators:
-				try:
-					calculated = calculate_indicators(indicators, ticker_data)
-					for indicator_name, series in calculated.items():
-						ticker_data[indicator_name] = series
-				except Exception as e:
-					self.logger.debug(f"Failed to calculate indicators: {e}")
-					return False
+				missing_indicators = [ind for ind in indicators if ind not in ticker_data.columns]
+				if missing_indicators:
+					try:
+						calculated = calculate_indicators(missing_indicators, ticker_data)
+						for indicator_name, series in calculated.items():
+							ticker_data[indicator_name] = series
+					except Exception as e:
+						self.logger.debug(f"Failed to calculate indicators: {e}")
+						return False
 
 			# Get latest row
 			latest = ticker_data.iloc[-1]

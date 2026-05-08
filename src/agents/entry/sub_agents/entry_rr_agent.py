@@ -121,6 +121,7 @@ class EntryRRAgent(Agent):
 			data_context = {
 				"close": current_price,
 				"atr_14": float(latest.get("atr_14", 0)),
+				"atr_20": float(latest.get("atr_20", 0)),
 				"high": float(latest.get("high", 0)),
 				"low": float(latest.get("low", 0)),
 			}
