@@ -330,6 +330,10 @@ class CresusCLI(cmd2.Cmd):
 			debug = "--debug" in parts
 			use_backtest = "--backtest" in parts
 			show_metrics = "-m" in parts
+			
+			# Debug: verify -m flag detection
+			if show_metrics:
+				console.print("[dim][DEBUG] Metrics display mode enabled (-m flag detected)[/dim]")
 
 			# Count verbosity level (-v, -vv, -vvv)
 			verbosity_level = 0
@@ -413,8 +417,11 @@ class CresusCLI(cmd2.Cmd):
 					set_log_level("ERROR")
 
 			# Display backtest results if backtest completed successfully (unless -m flag shows metrics instead)
-			if workflow_name.lower() == "backtest" and result.get("status") == "success" and not show_metrics:
-				self._print_backtest_results(strategy, result)
+			if workflow_name.lower() == "backtest" and result.get("status") == "success":
+				if show_metrics:
+					console.print("[dim][DEBUG] Skipping portfolio metrics display (metrics mode enabled)[/dim]")
+				else:
+					self._print_backtest_results(strategy, result)
 		else:
 			console.print(f"[red]✗[/red] Unknown command: {cmd}")
 			console.print("Try: flow list|run")
