@@ -76,8 +76,8 @@ exit:
       formula: close[0] + atr_14[0] * 2.0
       description: Target profit at 2 ATR above entry
     trailing_stop:
-      formula: close[0] - atr_14[0] * 1.2
-      description: Trailing stop to protect pullback reversal gains
+      formula: close[0] * 0.96
+      description: Percentage-based trailing stop at 4% below entry protects pullback gains
     holding_period:
       formula: 8
       description: Maximum holding 8 days - pullback reversals are short-term

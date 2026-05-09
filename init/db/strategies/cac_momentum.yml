@@ -87,9 +87,8 @@ exit:
       description: Target at 2.6 ATR maintains ~2:1 reward/risk and aligns with realistic
         swing move potential
     trailing_stop:
-      formula: close[0] - 1.5 * atr_14[0]
-      description: Trailing stop at 1.5 ATR allows trends to develop while protecting
-        gains (reduces premature exits)
+      formula: close[0] * 0.97
+      description: Percentage-based trailing stop at 3% below entry price provides consistent protection relative to price level
     holding_period:
       formula: 12
       description: Maximum holding period of 12 trading days aligned with momentum

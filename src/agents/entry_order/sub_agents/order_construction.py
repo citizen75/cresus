@@ -93,12 +93,37 @@ class OrderConstructionAgent(Agent):
 			trailing_stop_distance = None
 			holding_period = None
 
-			# Calculate trailing_stop_distance based on the stop_loss
-			# If trailing_stop is configured, the distance is (entry_price - initial_stop_loss)
-			if "trailing_stop" in exit_config and stop_loss is not None and entry_price is not None:
-				# The initial trailing distance is the distance from entry to the initial stop loss
-				# This distance will be maintained as the price rises (hence "trailing")
-				trailing_stop_distance = entry_price - stop_loss
+			# Calculate trailing_stop_distance from formula if configured
+			# The formula should return the trailing stop level (e.g., close * 0.95 for 5% trail)
+			# Distance is calculated as: entry_price - stop_level
+			if "trailing_stop" in exit_config and entry_price is not None:
+				ts_config = exit_config["trailing_stop"]
+				
+				# Try to evaluate the formula if present
+				if isinstance(ts_config, dict) and "formula" in ts_config:
+					ts_formula = ts_config.get("formula")
+					if ts_formula:
+						# Build evaluation context with entry price
+						data_context = {
+							"close": entry_price,
+							"entry": entry_price,
+						}
+						
+						# Try to evaluate the formula
+						try:
+							ts_value = ConfigEvaluator.evaluate_formula(ts_formula, data_context)
+							if ts_value is not None:
+								import math
+								if not math.isnan(ts_value) and not math.isinf(ts_value):
+									# Formula returns the stop level, distance is difference from entry
+									trailing_stop_distance = entry_price - ts_value
+						except Exception:
+							# Fallback: use stop_loss-based distance if available
+							if stop_loss is not None:
+								trailing_stop_distance = entry_price - stop_loss
+				elif stop_loss is not None:
+					# Fallback: use stop_loss-based distance
+					trailing_stop_distance = entry_price - stop_loss
 
 			if "holding_period" in exit_config:
 				hp_formula = exit_config["holding_period"].get("formula")
