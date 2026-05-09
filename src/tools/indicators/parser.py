@@ -27,6 +27,7 @@ class FormulaParser:
         'upper', 'lower', 'middle',  # Bollinger Bands
         'line', 'signal', 'histogram',  # MACD
         'plus', 'minus',  # DMI
+        'open', 'high', 'low', 'close',  # Heikin Ashi, Smooth Heikin Ashi
     }
 
     @staticmethod

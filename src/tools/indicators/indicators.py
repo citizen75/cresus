@@ -118,12 +118,13 @@ def calculate(
         formula_map[formula] = (indicator_name, params)
 
         # Track indicators to calculate (avoid duplicate calculations)
-        # Create key from indicator name + sorted params to detect duplicates
-        param_key = tuple(sorted(params.items()))
+        # Remove __component__ from param_key since it doesn't affect calculation
+        params_for_calc = {k: v for k, v in params.items() if k != '__component__'}
+        param_key = tuple(sorted(params_for_calc.items()))
         indicator_key = (indicator_name, param_key)
 
         if indicator_key not in indicators_to_calc:
-            indicators_to_calc[indicator_key] = (indicator_name, params)
+            indicators_to_calc[indicator_key] = (indicator_name, params_for_calc)
 
     # Calculate indicators
     calc_results = {}  # Maps (indicator_name, param_tuple) -> result (Series or Dict)
@@ -138,8 +139,9 @@ def calculate(
 
     # Map results back to formula strings
     results = {}
-    for formula, (indicator_name, params) in formula_map.items():
-        # Extract component if present (for multi-return indicators)
+    for formula, (indicator_name, params_orig) in formula_map.items():
+        # Create a copy and extract component if present (for multi-return indicators)
+        params = params_orig.copy()
         component = params.pop('__component__', None)
 
         param_key = tuple(sorted(params.items()))
@@ -157,6 +159,8 @@ def calculate(
                     f"{indicator_name}_{component}",
                     f"bb_{component}",  # For Bollinger Bands
                     f"macd_{component}",  # For MACD
+                    f"ha_{component}",  # For Heikin Ashi
+                    f"sha_{component}",  # For Smooth Heikin Ashi
                 ]
                 found = False
                 for key in possible_keys:
@@ -296,6 +300,14 @@ def _register_all_indicators():
         from .change import change_pct, change_log
         register_indicator("chgpct", change_pct.calculate)
         register_indicator("chglog", change_log.calculate)
+    except ImportError:
+        pass
+
+    try:
+        # Core indicators
+        from .core import heikin_ashi
+        register_indicator("ha", heikin_ashi.calculate)
+        register_indicator("sha", heikin_ashi.calculate_smooth)
     except ImportError:
         pass
 

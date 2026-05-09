@@ -43,11 +43,15 @@ INDICATOR_PARAMS = {
     # Change indicators
     "chgpct": {"params": ["period"], "defaults": {"period": 1}},
     "chglog": {"params": ["period"], "defaults": {"period": 1}},
+
+    # Core indicators
+    "ha": {"params": [], "defaults": {}},  # Heikin Ashi
+    "sha": {"params": ["period"], "defaults": {"period": 14}},  # Smooth Heikin Ashi
 }
 
 # Indicator return types
 RETURN_SINGLE = {"rsi", "macd_line", "macd_signal", "macd_histogram", "adx", "obv", "mfi", "cmf", "vwap"}
-RETURN_DICT = {"macd", "bb", "bollinger_bands", "dmi", "pivot"}  # Return multiple series
+RETURN_DICT = {"macd", "bb", "bollinger_bands", "dmi", "pivot", "ha", "sha"}  # Return multiple series
 
 # Default periods if not specified
 DEFAULT_FAST_PERIOD = 12
