@@ -28,6 +28,7 @@ class FormulaParser:
         'line', 'signal', 'histogram',  # MACD
         'plus', 'minus',  # DMI
         'open', 'high', 'low', 'close',  # Heikin Ashi, Smooth Heikin Ashi
+        'green', 'red',  # Color indicators
     }
 
     @staticmethod

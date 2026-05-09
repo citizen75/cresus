@@ -98,6 +98,8 @@ def calculate(
         "ha_high": ha_high_series,
         "ha_low": ha_low_series,
         "ha_close": ha_close_series,
+        "ha_green": pd.Series((ha_close_series > ha_open_series).astype(int), index=ha_close_series.index),
+        "ha_red": pd.Series((ha_close_series < ha_open_series).astype(int), index=ha_close_series.index),
         "ha": ha_close_series,  # Default to close
     }
 
@@ -123,6 +125,8 @@ def calculate_smooth(
             - 'sha_high': Smooth HA High
             - 'sha_low': Smooth HA Low
             - 'sha_close': Smooth HA Close
+            - 'sha_green': 1 if close > open (bullish), 0 otherwise
+            - 'sha_red': 1 if close < open (bearish), 0 otherwise
     """
     # First calculate regular Heikin Ashi
     ha_dict = calculate(data, history_df=history_df, **kwargs)
@@ -139,10 +143,16 @@ def calculate_smooth(
     sha_low = ha_low.ewm(span=period, adjust=False).mean()
     sha_close = ha_close.ewm(span=period, adjust=False).mean()
 
+    # Calculate color indicators
+    sha_green = pd.Series((sha_close > sha_open).astype(int), index=sha_close.index)
+    sha_red = pd.Series((sha_close < sha_open).astype(int), index=sha_close.index)
+
     return {
         "sha_open": sha_open,
         "sha_high": sha_high,
         "sha_low": sha_low,
         "sha_close": sha_close,
+        "sha_green": sha_green,
+        "sha_red": sha_red,
         "sha": sha_close,  # Default to close
     }
