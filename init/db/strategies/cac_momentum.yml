@@ -1,6 +1,7 @@
 name: cac_momentum
 universe: cac40
-description: Momentum strategy on CAC40 stocks - trend following with momentum confirmation and extension control
+description: Momentum strategy on CAC40 stocks - trend following with momentum confirmation
+  and extension control
 engine: TaModel
 indicators:
 - atr_14
@@ -22,11 +23,14 @@ watchlist:
       metric: score
       description: Metric used to rank and sort tickers in the watchlist
     trend:
-      formula: data['close'] > data['ema_10'] and data['ema_10'] > data['ema_20'] and data['adx_20'] > 25 and ((data['ema_10'] - data['ema_20']) / data['ema_20']) > 0.005
-      description: 'Improved trend detection: price > EMA10 > EMA20, ADX > 25 and EMA gap > 0.5% ensures real trend structure'
+      formula: close[0] > ema_10[0] and ema_10[0] > ema_20[0] and adx_20[0] > 25 and
+        ((ema_10[0] - ema_20[0]) / ema_20[0]) > 0.005
+      description: 'Improved trend detection: price > EMA10 > EMA20, ADX > 25 and
+        EMA gap > 0.5% ensures real trend structure'
     volatility:
-      formula: data['atr_14'] > data['close'] * 0.012
-      description: 'Volatility filter: ATR > 1.2% of price ensures sufficient expansion potential'
+      formula: atr_14[0] > close[0] * 0.012
+      description: 'Volatility filter: ATR > 1.2% of price ensures sufficient expansion
+        potential'
 signals:
   enabled: true
   weights:
@@ -36,16 +40,19 @@ signals:
     mean_reversion: 0.0
   parameters:
     momentum:
-      formula: data['macd_12_26'] > 0.5 and data['rsi_9'] > 60 and data['rsi_9'] < 80
-      description: 'Momentum signal: MACD strength > 0.5 with RSI in 60-80 range confirms sustainable bullish momentum (avoids weak or extreme conditions)'
+      formula: macd_12_26[0] > 0.5 and rsi_9[0] > 60 and rsi_9[0] < 80
+      description: 'Momentum signal: MACD strength > 0.5 with RSI in 60-80 range confirms
+        sustainable bullish momentum (avoids weak or extreme conditions)'
     trend:
-      formula: data['close'] > data['ema_10'] and data['ema_10'] > data['ema_20'] and data['adx_20'] > 25
-      description: 'Trend signal: Strong uptrend confirmed with ADX > 25 (filters weak trend environments)'
+      formula: close[0] > ema_10[0] and ema_10[0] > ema_20[0] and adx_20[0] > 25
+      description: 'Trend signal: Strong uptrend confirmed with ADX > 25 (filters
+        weak trend environments)'
     mean_reversion:
       formula: 'False'
-      description: Mean reversion disabled - momentum strategy is trend-following not counter-trend
+      description: Mean reversion disabled - momentum strategy is trend-following
+        not counter-trend
     volume_anomaly:
-      formula: data['volume'] > 1000000
+      formula: volume[0] > 1000000
       description: 'Volume anomaly signal: Volume > 1M shares indicates strong participation'
 entry:
   enabled: true
@@ -54,34 +61,42 @@ entry:
       formula: 2
       description: Maximum orders (buys) allowed per day to match watchlist size
     position_size:
-      formula: 1000 / data["close"]
+      formula: 1000 / close[0]
       description: Fixed capital allocation per trade
     extension_filter:
-      formula: (data['close'] - data['ema_10']) / data['ema_10'] < 0.05
-      description: Avoid entries when price is more than 5% above EMA10 (prevents chasing extended moves)
+      formula: (close[0] - ema_10[0]) / ema_10[0] < 0.05
+      description: Avoid entries when price is more than 5% above EMA10 (prevents
+        chasing extended moves)
     limit_price:
-      formula: data['close'] * 0.99
-      description: Use limit orders at 1% below current price to improve entries (reduces slippage and avoids chasing)
+      formula: close[0] * 0.99
+      description: Use limit orders at 1% below current price to improve entries (reduces
+        slippage and avoids chasing)
     regime_filter:
-      formula: data['close'] > data['ema_20'] and data['adx_20'] > 20
-      description: Trade only when market regime is trending (reduces losses in choppy conditions)
+      formula: close[0] > ema_20[0] and adx_20[0] > 20
+      description: Trade only when market regime is trending (reduces losses in choppy
+        conditions)
 exit:
   enabled: true
   parameters:
     stop_loss:
-      formula: data['close'] - data['atr_14'] * 1.3
-      description: Stop loss at 1.3 ATR below entry balances noise tolerance and risk control
+      formula: close[0] - atr_14[0] * 1.3
+      description: Stop loss at 1.3 ATR below entry balances noise tolerance and risk
+        control
     take_profit:
-      formula: data['close'] + data['atr_14'] * 2.6
-      description: Target at 2.6 ATR maintains ~2:1 reward/risk and aligns with realistic swing move potential
+      formula: close[0] + atr_14[0] * 2.6
+      description: Target at 2.6 ATR maintains ~2:1 reward/risk and aligns with realistic
+        swing move potential
     trailing_stop:
-      formula: data['close'] - 1.5 * data['atr_14']
-      description: Trailing stop at 1.5 ATR allows trends to develop while protecting gains (reduces premature exits)
+      formula: close[0] - 1.5 * atr_14[0]
+      description: Trailing stop at 1.5 ATR allows trends to develop while protecting
+        gains (reduces premature exits)
     holding_period:
       formula: 12
-      description: Maximum holding period of 12 trading days aligned with momentum decay cycle
+      description: Maximum holding period of 12 trading days aligned with momentum
+        decay cycle
     time_stop:
       formula: 1
-      description: Cancel unfilled entry orders after 1 day (separates execution logic from holding logic)
+      description: Cancel unfilled entry orders after 1 day (separates execution logic
+        from holding logic)
 backtest:
   initial_capital: 10000

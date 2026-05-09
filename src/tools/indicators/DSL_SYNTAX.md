@@ -1,21 +1,22 @@
-# Indicators DSL Engine - Complete Guide
+# Indicators DSL Engine & Formula Syntax - Complete Guide
 
 ## Overview
 
-The Indicators DSL Engine is a unified, high-performance system for calculating technical indicators. It provides:
+The Indicators DSL Engine provides:
 
-- **DSL Syntax**: Simple parameter syntax (e.g., `rsi_14`, `ema_20`, `bb_20_2`)
+- **Indicator DSL**: Simple parameter syntax (e.g., `rsi_14`, `ema_20`, `bb_20_2`)
+- **Formula DSL**: Simplified condition syntax for buy/sell rules and trend signals
 - **Selective Calculation**: Only compute requested indicators
 - **History Support**: Optional historical data to avoid redundant lookups
 - **Strict Validation**: Clear error messages on invalid parameters
 - **Type Organization**: Indicators grouped by category
 
-## API
+## Indicators API
 
 ### Main Function
 
 ```python
-from src.tools.finance.indicators import calculate
+from src.tools.indicators import calculate
 
 results = calculate(
     formulas: List[str],           # DSL formula strings
@@ -28,7 +29,7 @@ results = calculate(
 
 ```python
 import pandas as pd
-from src.tools.finance.indicators import calculate
+from src.tools.indicators import calculate
 
 # Load data
 data = pd.read_csv("AAPL.csv")
@@ -48,6 +49,120 @@ results = calculate(
     history_df=historical_data
 )
 ```
+
+## Formula DSL - Simplified Condition Syntax
+
+### Overview
+
+Write clear, readable conditions in strategy configs:
+
+**Before (Traditional):**
+```python
+data['close'] > data['ema_20'] and data['ema_20'] > data['ema_50'] and data['adx_14'] > 25
+```
+
+**After (DSL):**
+```python
+close[0] > ema_20[0] and ema_20[0] > ema_50[0] and adx_14[0] > 25
+```
+
+### Syntax Reference
+
+| Syntax | Meaning | Example | Expands To |
+|--------|---------|---------|-----------|
+| `indicator[0]` | Current bar | `close[0]` | `data['close']` |
+| `indicator[-1]` | Previous bar | `ema_20[-1]` | `data.shift(1)['ema_20']` |
+| `indicator[-2]` | 2 bars back | `rsi_14[-2]` | `data.shift(2)['rsi_14']` |
+| `indicator[n]` | n bars back | `atr_14[-5]` | `data.shift(5)['atr_14']` |
+
+### Examples
+
+```yaml
+# Simple condition
+buy_conditions: close[0] > ema_20[0]
+
+# Multiple conditions (AND)
+buy_conditions: close[0] > ema_20[0] and ema_20[0] > ema_50[0] and rsi_14[0] > 40
+
+# Historical comparison
+buy_conditions: sha_10_green[0] == 1 and sha_10_red[-1] == 1
+
+# Trend strength
+buy_conditions: close[0] > ema_20[0] and adx_14[0] > adx_14[-1]
+
+# Complex logic
+buy_conditions: |
+  (close[0] > ema_20[0] and ema_20[0] > ema_50[0]) and
+  (rsi_14[0] > 40 and rsi_14[0] < 80) and
+  (adx_14[0] > 25)
+
+# Color indicators (binary)
+buy_conditions: sha_10_green[0] == 1 and sha_10_red[-1] == 1 and ema_20[0] < close[0]
+```
+
+### Operators
+
+| Operator | Use | Example |
+|----------|-----|---------|
+| `>` | Greater than | `close[0] > 100` |
+| `<` | Less than | `close[0] < ema_20[0]` |
+| `==` | Equal | `sha_10_green[0] == 1` |
+| `>=` | Greater or equal | `adx_14[0] >= 25` |
+| `<=` | Less or equal | `rsi_14[0] <= 70` |
+| `and` | Both true | `close[0] > 100 and rsi_14[0] > 50` |
+| `or` | Either true | `close[0] > 100 or rsi_14[0] > 80` |
+| `not` | Negate | `not (close[0] < 100)` |
+
+### Usage in Strategy Config
+
+```yaml
+name: my_strategy
+universe: etf_pea
+
+indicators:
+  - close
+  - ema_20
+  - ema_50
+  - rsi_14
+  - adx_14
+  - sha_10
+
+# In buy conditions
+buy_conditions: |
+  close[0] > ema_20[0] and 
+  ema_20[0] > ema_50[0] and 
+  rsi_14[0] > 40
+
+# In sell conditions
+sell_conditions: |
+  close[0] < ema_20[0] or 
+  rsi_14[0] < 30
+
+# In signals configuration
+signals:
+  parameters:
+    trend:
+      formula: |
+        close[0] > ema_20[0] and 
+        ema_20[0] > ema_50[0] and 
+        adx_14[0] > 25
+
+# In watchlist configuration
+watchlist:
+  parameters:
+    trend:
+      formula: close[0] > ema_20[0] and adx_14[0] > 20
+```
+
+### Backward Compatibility
+
+The old `data['...']` syntax still works! Mix both syntaxes if needed:
+
+```python
+close[0] > data['ema_20'] and data['rsi_14'] > 50
+```
+
+Both will be automatically converted to the same internal representation.
 
 ## DSL Syntax Reference
 

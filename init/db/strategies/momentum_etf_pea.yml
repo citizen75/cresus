@@ -1,61 +1,66 @@
 name: momentum_cac40_etf
 universe: cac40_etf
-description: Momentum strategy for CAC40 ETFs - trend-following momentum with volatility confirmation
+description: Momentum strategy for CAC40 ETFs - trend-following momentum with volatility
+  confirmation
 engine: TaModel
 indicators:
-  - atr_14
-  - atr_20
-  - rsi_14
-  - ema_20
-  - ema_50
-  - adx_20
-  - macd_12_26
-  - sma_200
-
-buy_conditions: data['close'] > data['ema_20'] and data['ema_20'] > data['ema_50'] and data['macd_12_26'] > 0 and data['adx_20'] > 25 and data['rsi_14'] > 40
-
-sell_conditions: data['close'] < data['ema_20'] or data['macd_12_26'] < 0 or data['rsi_14'] < 30
-
+- atr_14
+- atr_20
+- rsi_14
+- ema_20
+- ema_50
+- adx_20
+- macd_12_26
+- sma_200
+buy_conditions: close[0] > ema_20[0] and ema_20[0] > ema_50[0] and macd_12_26[0] >
+  0 and adx_20[0] > 25 and rsi_14[0] > 40
+sell_conditions: close[0] < ema_20[0] or macd_12_26[0] < 0 or rsi_14[0] < 30
 watchlist:
   enabled: true
   parameters:
     tickers:
       max_count: 15
-      description: Maximum number of CAC40 ETFs to track based on liquidity and momentum strength
+      description: Maximum number of CAC40 ETFs to track based on liquidity and momentum
+        strength
     volume:
       min_volume: 1000000
-      description: Minimum daily trading volume for ETF inclusion (higher threshold for ETFs)
+      description: Minimum daily trading volume for ETF inclusion (higher threshold
+        for ETFs)
     ranking:
       metric: momentum_score
       description: Metric used to rank ETFs by momentum strength
     trend:
-      formula: data['close'] > data['ema_20'] and data['ema_20'] > data['ema_50'] and data['adx_20'] > 25
-      description: 'ETF Trend detection: price > EMA20 > EMA50 AND ADX > 25 indicates sustained uptrend'
+      formula: close[0] > ema_20[0] and ema_20[0] > ema_50[0] and adx_20[0] > 25
+      description: 'ETF Trend detection: price > EMA20 > EMA50 AND ADX > 25 indicates
+        sustained uptrend'
     volatility:
-      formula: data['atr_14'] > data['close'] * 0.02
-      description: 'Volatility filter: ATR > 2% of price ensures adequate momentum movement'
-
+      formula: atr_14[0] > close[0] * 0.02
+      description: 'Volatility filter: ATR > 2% of price ensures adequate momentum
+        movement'
 signals:
   enabled: true
   weights:
-    momentum: 0.50
+    momentum: 0.5
     trend: 0.35
-    volume_anomaly: 0.10
+    volume_anomaly: 0.1
     mean_reversion: 0.05
   parameters:
     momentum:
-      formula: data['macd_12_26'] > 0 and data['rsi_14'] > 50 and data['rsi_14'] < 80
-      description: 'ETF Momentum signal: MACD positive with RSI in bullish zone (50-80) avoids overbought extremes'
+      formula: macd_12_26[0] > 0 and rsi_14[0] > 50 and rsi_14[0] < 80
+      description: 'ETF Momentum signal: MACD positive with RSI in bullish zone (50-80)
+        avoids overbought extremes'
     trend:
-      formula: data['close'] > data['sma_200'] and data['ema_20'] > data['ema_50'] and data['adx_20'] > 25
-      description: 'Trend signal: Price > SMA200 (long-term uptrend) with EMA alignment and strong ADX'
+      formula: close[0] > sma_200[0] and ema_20[0] > ema_50[0] and adx_20[0] > 25
+      description: 'Trend signal: Price > SMA200 (long-term uptrend) with EMA alignment
+        and strong ADX'
     mean_reversion:
-      formula: data['rsi_14'] > 70 and data['close'] > data['ema_20']
-      description: 'Mild mean reversion: Take profits on oversold bounces while maintaining trend bias'
+      formula: rsi_14[0] > 70 and close[0] > ema_20[0]
+      description: 'Mild mean reversion: Take profits on oversold bounces while maintaining
+        trend bias'
     volume_anomaly:
-      formula: data['volume'] > 2000000
-      description: 'Volume anomaly signal: Volume > 2M shares indicates institutional participation in ETF'
-
+      formula: volume[0] > 2000000
+      description: 'Volume anomaly signal: Volume > 2M shares indicates institutional
+        participation in ETF'
 risk_management:
   stop_loss:
     atr_multiple: 2.0

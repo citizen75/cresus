@@ -2,14 +2,22 @@
 
 from typing import Any, Dict, Optional
 import pandas as pd
+from .dsl_helpers import simplify_formula, is_dsl_formula
 
 
 def evaluate(formula: str, data: Dict[str, Any]) -> bool:
 	"""Evaluate a formula expression safely.
 
+	Supports both traditional and simplified DSL syntax:
+	- Traditional: "data['close'] > data['ema_20']"
+	- DSL: "close[0] > ema_20[0]"
+
 	Args:
-		formula: Python expression string using 'data' dict notation
-		         Example: "data['close'] > data['ema_20'] and data['adx_14'] > 25"
+		formula: Python expression string
+		         Examples:
+		         - Traditional: "data['close'] > data['ema_20'] and data['adx_14'] > 25"
+		         - DSL: "close[0] > ema_20[0] and adx_14[0] > 25"
+		         - Mixed with shift: "sha_10_green[-1] == 1 and ema_20[0] < close[0]"
 		data: Dictionary of column values for the formula
 
 	Returns:
@@ -22,6 +30,10 @@ def evaluate(formula: str, data: Dict[str, Any]) -> bool:
 		raise ValueError("Formula cannot be empty")
 
 	try:
+		# Convert DSL syntax if present
+		if is_dsl_formula(formula):
+			formula = simplify_formula(formula)
+		
 		# Use pandas eval for safer expression evaluation
 		result = pd.eval(formula, local_dict={"data": data}, global_dict={})
 		return bool(result)
