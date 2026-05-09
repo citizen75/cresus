@@ -480,6 +480,32 @@ Sortino Ratio                                  {sortino:.6f}"""
 		else:
 			console.print(f"\n[green]✓ No issues found![/green]")
 
+		# Journal Analytics - Exit Type Analysis
+		if journal:
+			exit_analysis = journal.get("exit_analysis", {})
+			if exit_analysis and exit_analysis.get("total_exits", 0) > 0:
+				console.print(f"\n[bold cyan]📊 Trade Exit Analysis[/bold cyan]")
+				console.print("-" * 100)
+				
+				total_exits = exit_analysis.get("total_exits", 0)
+				exit_types = exit_analysis.get("exit_types", {})
+				
+				console.print(f"\n[bold]Total Exits: {total_exits}[/bold]")
+				console.print()
+				
+				# Display each exit type
+				exit_type_info = [
+					("Target Hit", exit_types.get("target_hit", {}), "green"),
+					("Stop Loss", exit_types.get("stop_loss", {}), "red"),
+					("Expired", exit_types.get("expired", {}), "yellow"),
+					("Other", exit_types.get("other", {}), "white"),
+				]
+				
+				for label, info, color in exit_type_info:
+					count = info.get("count", 0)
+					pct = info.get("pct", 0.0)
+					console.print(f"[{color}]  {label:15} {count:3d} exits ({pct:5.1f}%)[/{color}]")
+
 		# Orders Analytics data
 		orders_analysis = research.get("orders_analysis", {})
 		if orders_analysis:

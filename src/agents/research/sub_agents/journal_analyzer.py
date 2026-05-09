@@ -14,6 +14,8 @@ class JournalAnalyzerAgent(Agent):
 	- Win/loss statistics
 	- Entry/exit price discrepancies
 	- Position sizing consistency
+	- Exit type analysis: target hits, stop losses, expired orders
+	- Exit ratios and percentages
 	"""
 
 	def __init__(self, name: str = "JournalAnalyzerAgent"):
@@ -90,6 +92,8 @@ class JournalAnalyzerAgent(Agent):
 		df = df.copy()
 		df["price"] = pd.to_numeric(df["price"], errors="coerce")
 		df["quantity"] = pd.to_numeric(df["quantity"], errors="coerce")
+		df["stop_loss"] = pd.to_numeric(df["stop_loss"], errors="coerce")
+		df["take_profit"] = pd.to_numeric(df["take_profit"], errors="coerce")
 
 		# Basic counts
 		total_trades = len(df)
@@ -108,6 +112,9 @@ class JournalAnalyzerAgent(Agent):
 		# Check for anomalies
 		zero_price_trades = len(df[df["price"] == 0])
 		zero_quantity_trades = len(df[df["quantity"] == 0])
+
+		# Analyze exit types for completed/closed trades
+		exit_analysis = self._analyze_exit_types(df)
 
 		# Date range
 		if "created_at" in df.columns:
@@ -146,5 +153,85 @@ class JournalAnalyzerAgent(Agent):
 				"zero_price_trades": zero_price_trades,
 				"zero_quantity_trades": zero_quantity_trades,
 			},
+			"exit_analysis": exit_analysis,
 			"by_ticker": ticker_stats,
+		}
+
+	def _analyze_exit_types(self, df: pd.DataFrame) -> Dict[str, Any]:
+		"""Analyze how trades were exited (target, stop loss, expired, etc).
+
+		Args:
+			df: Journal DataFrame with sell orders
+
+		Returns:
+			Dict with exit type analysis
+		"""
+		sell_trades = df[df["operation"] == "SELL"]
+		
+		if sell_trades.empty:
+			return {
+				"total_exits": 0,
+				"exit_types": {},
+				"target_hit_ratio": 0.0,
+				"stop_loss_ratio": 0.0,
+				"expired_ratio": 0.0,
+				"other_ratio": 0.0,
+			}
+
+		# Analyze each exit to determine how it happened
+		target_hits = 0
+		stop_losses = 0
+		expired = 0
+		other_exits = 0
+
+		for _, row in sell_trades.iterrows():
+			exit_price = row["price"]
+			take_profit = row["take_profit"]
+			stop_loss = row["stop_loss"]
+			notes = str(row.get("notes", "")).lower() if row.get("notes") else ""
+
+			# Check exit type by comparing price to targets
+			if pd.notna(take_profit) and exit_price >= take_profit * 0.99:  # Allow 1% tolerance
+				target_hits += 1
+			elif pd.notna(stop_loss) and exit_price <= stop_loss * 1.01:  # Allow 1% tolerance
+				stop_losses += 1
+			elif "expired" in notes or "timeout" in notes or "expir" in notes:
+				expired += 1
+			else:
+				other_exits += 1
+
+		total_exits = len(sell_trades)
+		target_ratio = target_hits / total_exits if total_exits > 0 else 0.0
+		sl_ratio = stop_losses / total_exits if total_exits > 0 else 0.0
+		expired_ratio = expired / total_exits if total_exits > 0 else 0.0
+		other_ratio = other_exits / total_exits if total_exits > 0 else 0.0
+
+		return {
+			"total_exits": total_exits,
+			"exit_types": {
+				"target_hit": {
+					"count": target_hits,
+					"ratio": round(target_ratio, 3),
+					"pct": round(target_ratio * 100, 1),
+				},
+				"stop_loss": {
+					"count": stop_losses,
+					"ratio": round(sl_ratio, 3),
+					"pct": round(sl_ratio * 100, 1),
+				},
+				"expired": {
+					"count": expired,
+					"ratio": round(expired_ratio, 3),
+					"pct": round(expired_ratio * 100, 1),
+				},
+				"other": {
+					"count": other_exits,
+					"ratio": round(other_ratio, 3),
+					"pct": round(other_ratio * 100, 1),
+				},
+			},
+			"target_hit_ratio": round(target_ratio, 3),
+			"stop_loss_ratio": round(sl_ratio, 3),
+			"expired_ratio": round(expired_ratio, 3),
+			"other_ratio": round(other_ratio, 3),
 		}
