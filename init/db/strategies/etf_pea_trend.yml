@@ -1,0 +1,73 @@
+name: etf_pea_trend
+universe: cac40_etf
+description: Trend-following strategy for CAC40 ETFs with fixed €1500 position sizing
+engine: TaModel
+indicators:
+- atr_14
+- rsi_14
+- ema_20
+- ema_50
+- adx_20
+- macd_12_26
+watchlist:
+  enabled: true
+  parameters:
+    tickers:
+      max_count: 10
+      description: Maximum 10 ETFs to track for trend-following
+    volume:
+      min_volume: 1000000
+      description: Minimum daily trading volume for ETF inclusion
+    ranking:
+      metric: score
+      description: Rank ETFs by trend strength
+    trend:
+      formula: close[0] > ema_20[0] and ema_20[0] > ema_50[0] and adx_20[0] > 25
+      description: 'Trend detection: Price > EMA20 > EMA50 with strong ADX confirms uptrend'
+    volatility:
+      formula: atr_14[0] > close[0] * 0.015
+      description: 'Volatility filter: ATR > 1.5% of price ensures adequate movement'
+signals:
+  enabled: true
+  weights:
+    momentum: 0.4
+    trend: 0.5
+    volume_anomaly: 0.1
+    mean_reversion: 0.0
+  parameters:
+    momentum:
+      formula: macd_12_26[0] > 0 and rsi_14[0] > 50 and rsi_14[0] < 80
+      description: 'Momentum signal: MACD positive with RSI in bullish zone (50-80)'
+    trend:
+      formula: close[0] > ema_20[0] and ema_20[0] > ema_50[0] and adx_20[0] > 25
+      description: 'Trend signal: Strong uptrend confirmation with ADX > 25'
+    mean_reversion:
+      formula: 'False'
+      description: Mean reversion disabled for pure trend-following
+    volume_anomaly:
+      formula: volume[0] > 2000000
+      description: 'Volume anomaly: Volume > 2M indicates strong participation'
+entry:
+  enabled: true
+  parameters:
+    position_size:
+      formula: 1500 / close[0]
+      description: Fixed capital allocation of €1500 per ETF position (consistent sizing)
+    max_daily_orders:
+      formula: 3
+      description: Maximum 3 buys per day to limit daily allocation
+exit:
+  enabled: true
+  parameters:
+    stop_loss:
+      formula: close[0] * 0.96
+      description: Stop loss at 4% below entry (tight for ETFs)
+    take_profit:
+      formula: close[0] * 1.08
+      description: Take profit at 8% above entry
+    trailing_stop:
+      formula: close[0] * 0.97
+      description: Percentage-based trailing stop at 3% below highest price
+    holding_period:
+      formula: 60
+      description: Exit after 60 days maximum holding period
