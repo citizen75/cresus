@@ -185,20 +185,35 @@ class JournalAnalyzerAgent(Agent):
 		other_exits = 0
 
 		for _, row in sell_trades.iterrows():
-			exit_price = row["price"]
-			take_profit = row["take_profit"]
-			stop_loss = row["stop_loss"]
 			notes = str(row.get("notes", "")).lower() if row.get("notes") else ""
-
-			# Check exit type by comparing price to targets
-			if pd.notna(take_profit) and exit_price >= take_profit * 0.99:  # Allow 1% tolerance
+			
+			# First check notes field for explicit exit type indicators
+			if "take profit" in notes or "target" in notes:
 				target_hits += 1
-			elif pd.notna(stop_loss) and exit_price <= stop_loss * 1.01:  # Allow 1% tolerance
+			elif "stop loss" in notes or "stop_loss" in notes:
 				stop_losses += 1
 			elif "expired" in notes or "timeout" in notes or "expir" in notes:
 				expired += 1
 			else:
-				other_exits += 1
+				# Fall back to price comparison if available
+				exit_price = row["price"]
+				take_profit = row["take_profit"]
+				stop_loss = row["stop_loss"]
+				
+				# Try to parse numeric values (may be empty strings)
+				try:
+					tp = float(take_profit) if take_profit and take_profit != "" else None
+					sl = float(stop_loss) if stop_loss and stop_loss != "" else None
+				except (ValueError, TypeError):
+					tp = None
+					sl = None
+				
+				if tp is not None and exit_price >= tp * 0.99:  # Allow 1% tolerance
+					target_hits += 1
+				elif sl is not None and exit_price <= sl * 1.01:  # Allow 1% tolerance
+					stop_losses += 1
+				else:
+					other_exits += 1
 
 		total_exits = len(sell_trades)
 		target_ratio = target_hits / total_exits if total_exits > 0 else 0.0
