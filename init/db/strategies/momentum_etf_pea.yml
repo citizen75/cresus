@@ -61,6 +61,21 @@ signals:
       formula: volume[0] > 2000000
       description: 'Volume anomaly signal: Volume > 2M shares indicates institutional
         participation in ETF'
+entry:
+  enabled: true
+  parameters:
+    position_size:
+      formula: 1000 / close[0]
+      description: Fixed capital allocation of €1000 per ETF trade
+exit:
+  enabled: true
+  parameters:
+    stop_loss:
+      formula: close[0] - atr_14[0] * 2.0
+      description: Stop loss at 2x ATR below entry for volatility-adjusted risk
+    take_profit:
+      formula: close[0] + atr_14[0] * 3.5
+      description: Take profit target at 3.5x ATR above entry for asymmetric risk-reward
 risk_management:
   stop_loss:
     atr_multiple: 2.0

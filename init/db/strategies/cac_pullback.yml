@@ -7,15 +7,24 @@ indicators:
 - ema_50
 - rsi_14
 - adx_14
-buy_conditions: ema_20_above_ema_50[0] and rsi_14_below_70[0]
-sell_conditions: ema_20_below_ema_50[0]
-parameters:
-  lookback: 60
-  position_size: 1000
-trade:
-  stop_loss: 0.05
-  take_profit: 0.08
-  max_hold_days: 30
+entry:
+  enabled: true
+  parameters:
+    position_size:
+      formula: 1000 / close[0]
+      description: Fixed capital allocation of €1000 per trade
+exit:
+  enabled: true
+  parameters:
+    stop_loss:
+      formula: close[0] * 0.95
+      description: Stop loss at 5% below entry
+    take_profit:
+      formula: close[0] * 1.08
+      description: Take profit at 8% above entry
+    holding_period:
+      formula: 30
+      description: Exit after 30 days maximum
 backtest:
-  initial_capital: 100000
-  commission: 0.001
+  initial_capital: 10000
+  commission: 0.0

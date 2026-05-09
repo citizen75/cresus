@@ -10,9 +10,21 @@ indicators:
 - ema_20
 - adx_20
 - macd_12_26
-buy_conditions: close[0] > ema_10[0] and ema_10[0] > ema_20[0] and macd_12_26[0] >
-  0 and adx_20[0] > 20
-sell_conditions: close[0] < ema_10[0] or macd_12_26[0] < 0
+entry:
+  enabled: true
+  parameters:
+    position_size:
+      formula: 1000 / close[0]
+      description: Fixed capital allocation of €1000 per trade
+exit:
+  enabled: true
+  parameters:
+    stop_loss:
+      formula: close[0] * 0.97
+      description: Stop loss at 3% below entry
+    take_profit:
+      formula: close[0] * 1.05
+      description: Take profit at 5% above entry
 watchlist:
   enabled: true
   parameters:
