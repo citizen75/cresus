@@ -58,6 +58,30 @@ def simplify_formula(formula: str, for_dataframe: bool = False) -> str:
 		# Use word boundaries to avoid partial matches
 		formula = re.sub(r'\band\b', '&', formula)
 		formula = re.sub(r'\bor\b', '|', formula)
+		
+		# Add parentheses around comparisons and convert bare Series to boolean
+		# Split by & and |, process each part
+		parts = re.split(r'(&|\|)', formula)
+		result_parts = []
+		for part in parts:
+			part = part.strip()
+			if part in ('&', '|'):
+				result_parts.append(part)
+			elif any(op in part for op in ['==', '!=', '<', '>', '<=', '>=']):
+				# This part has a comparison, wrap it if not already wrapped
+				if not (part.startswith('(') and part.endswith(')')):
+					result_parts.append(f'({part})')
+				else:
+					result_parts.append(part)
+			elif part:
+				# This is a bare Series reference (no comparison)
+				# Convert to boolean by checking != 0
+				if not (part.startswith('(') and part.endswith(')')):
+					result_parts.append(f'(({part}) != 0)')
+				else:
+					result_parts.append(f'({part} != 0)')
+		
+		formula = ' '.join(result_parts)
 	
 	return formula
 
