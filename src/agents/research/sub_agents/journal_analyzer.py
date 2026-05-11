@@ -178,27 +178,6 @@ class JournalAnalyzerAgent(Agent):
 				"other_ratio": 0.0,
 			}
 
-		# Load strategy config to check if take_profit is enabled
-		take_profit_enabled = True  # Default to enabled for backward compatibility
-		strategy_name = self.context.get("strategy_name") if self.context else None
-		if strategy_name:
-			try:
-				from tools.strategy.strategy import StrategyManager
-				strategy_manager = StrategyManager()
-				strategy_result = strategy_manager.load_strategy(strategy_name)
-				if strategy_result.get("status") == "success":
-					strategy_data = strategy_result.get("data", {})
-					take_profit_config = strategy_data.get("exit", {}).get("parameters", {}).get("take_profit", {})
-					# Check if take_profit formula is False (disabled)
-					if isinstance(take_profit_config, dict):
-						formula = take_profit_config.get("formula", "")
-						take_profit_enabled = formula != "False" and formula != "'False'" and formula.lower() != "false"
-					else:
-						take_profit_enabled = take_profit_config != "False"
-			except Exception as e:
-				self.logger.debug(f"Could not load strategy config for take_profit check: {e}")
-				take_profit_enabled = True  # Default to enabled if we can't load config
-
 		# Analyze each exit to determine how it happened
 		target_hits = 0
 		stop_losses = 0
@@ -206,45 +185,48 @@ class JournalAnalyzerAgent(Agent):
 		other_exits = 0
 
 		for _, row in sell_trades.iterrows():
-			notes = str(row.get("notes", "")).lower() if row.get("notes") else ""
+			# Primary: Use exit_type column if available (explicit classification from transact agent)
+			exit_type = str(row.get("exit_type", "")).lower().strip() if row.get("exit_type") else ""
 			
-			# First check notes field for explicit exit type indicators
-			if "take profit" in notes or "target" in notes:
-				# Only count as target hit if take_profit is enabled
-				if take_profit_enabled:
-					target_hits += 1
-				else:
-					# If take_profit is disabled, this must be something else (stop loss, expired, etc)
-					# Check if it's a stop loss
-					if "stop loss" not in notes and "stop_loss" not in notes:
-						other_exits += 1
-					else:
-						stop_losses += 1
-			elif "stop loss" in notes or "stop_loss" in notes:
+			if exit_type == "take_profit":
+				target_hits += 1
+			elif exit_type == "stop_loss":
 				stop_losses += 1
-			elif "expired" in notes or "timeout" in notes or "expir" in notes:
+			elif exit_type == "expired":
 				expired += 1
+			elif exit_type:
+				# Unknown exit type - classify as other
+				other_exits += 1
 			else:
-				# Fall back to price comparison if available
-				exit_price = row["price"]
-				take_profit = row["take_profit"]
-				stop_loss = row["stop_loss"]
+				# Fallback: Parse notes field if exit_type not set (for backward compatibility)
+				notes = str(row.get("notes", "")).lower() if row.get("notes") else ""
 				
-				# Try to parse numeric values (may be empty strings)
-				try:
-					tp = float(take_profit) if take_profit and take_profit != "" else None
-					sl = float(stop_loss) if stop_loss and stop_loss != "" else None
-				except (ValueError, TypeError):
-					tp = None
-					sl = None
-				
-				# Only consider target hit if take_profit is enabled AND price matches
-				if take_profit_enabled and tp is not None and exit_price >= tp * 0.99:  # Allow 1% tolerance
+				if "take profit" in notes or "target" in notes:
 					target_hits += 1
-				elif sl is not None and exit_price <= sl * 1.01:  # Allow 1% tolerance
+				elif "stop loss" in notes or "stop_loss" in notes:
 					stop_losses += 1
+				elif "expired" in notes or "timeout" in notes or "expir" in notes:
+					expired += 1
 				else:
-					other_exits += 1
+					# Last resort: Use price comparison
+					exit_price = row["price"]
+					take_profit = row["take_profit"]
+					stop_loss = row["stop_loss"]
+					
+					# Try to parse numeric values (may be empty strings)
+					try:
+						tp = float(take_profit) if take_profit and take_profit != "" else None
+						sl = float(stop_loss) if stop_loss and stop_loss != "" else None
+					except (ValueError, TypeError):
+						tp = None
+						sl = None
+					
+					if tp is not None and exit_price >= tp * 0.99:  # Allow 1% tolerance
+						target_hits += 1
+					elif sl is not None and exit_price <= sl * 1.01:  # Allow 1% tolerance
+						stop_losses += 1
+					else:
+						other_exits += 1
 
 		total_exits = len(sell_trades)
 		target_ratio = target_hits / total_exits if total_exits > 0 else 0.0

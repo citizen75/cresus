@@ -13,7 +13,7 @@ class Journal:
 
     BASE_COLUMNS = [
         "id", "created_at", "operation", "ticker", "quantity",
-        "price", "amount", "fees", "stop_loss", "take_profit", "trailing_stop_distance", "highest_price", "status", "status_at", "notes"
+        "price", "amount", "fees", "stop_loss", "take_profit", "trailing_stop_distance", "highest_price", "status", "status_at", "exit_type", "notes"
     ]
 
     def __init__(self, name: str = "default", context: Optional[Dict[str, Any]] = None):
@@ -96,11 +96,12 @@ class Journal:
     def add_transaction(self, operation: str, ticker: str, quantity: int, price: float,
                        fees: float = 0, notes: str = "", created_at: str = None,
                        stop_loss: float = None, take_profit: float = None, highest_price: float = None,
-                       trailing_stop_distance: float = None) -> str:
+                       trailing_stop_distance: float = None, exit_type: str = None) -> str:
         """Add a new transaction to journal.
 
         Operations: BUY, SELL, CASH (deposit/withdrawal)
         For CASH: ticker should be "CASH", quantity is the amount (positive=deposit, negative=withdrawal)
+        For SELL: exit_type should specify how the exit occurred (e.g., 'stop_loss', 'take_profit', 'expired', 'manual')
 
         Returns the transaction ID.
         """
@@ -145,6 +146,7 @@ class Journal:
             "highest_price": float(highest_price) if highest_price else float(price_val),
             "status": "completed",
             "status_at": now,
+            "exit_type": exit_type if operation_upper == "SELL" else None,
             "notes": notes
         }
 

@@ -102,10 +102,14 @@ class TransactAgent(Agent):
 		stop_loss_result = self.stop_loss_agent.process({"day_data": day_data})
 		exit_results.extend(stop_loss_result.get("output", {}).get("exits", []))
 
-		# 2. Take profit exits
-		self.target_agent.context = self.context
-		target_result = self.target_agent.process({"day_data": day_data})
-		exit_results.extend(target_result.get("output", {}).get("exits", []))
+		# 2. Take profit exits (only if enabled in strategy)
+		take_profit_enabled = self._is_take_profit_enabled()
+		if take_profit_enabled:
+			self.target_agent.context = self.context
+			target_result = self.target_agent.process({"day_data": day_data})
+			exit_results.extend(target_result.get("output", {}).get("exits", []))
+		else:
+			self.logger.info("Take profit is disabled in strategy, skipping target agent")
 
 		# 3. Time limit exits
 		self.time_limit_agent.context = self.context
@@ -275,3 +279,43 @@ class TransactAgent(Agent):
 			return float(row.get("close")) if "close" in row else None
 		except (ValueError, AttributeError):
 			return None
+
+	def _is_take_profit_enabled(self) -> bool:
+		"""Check if take_profit is enabled in strategy configuration.
+
+		In backtest mode, reads strategy config from strategy_name in context.
+		In paper trading mode, conservatively enables take_profit (allows TargetAgent to check).
+
+		Returns:
+			True if take_profit should be evaluated, False if disabled
+		"""
+		strategy_name = self.context.get("strategy_name")
+		if not strategy_name:
+			# No strategy context (e.g., paper trading) - allow target agent to run
+			self.logger.debug("No strategy_name in context, enabling take_profit")
+			return True
+
+		try:
+			from tools.strategy.strategy import StrategyManager
+			strategy_config = StrategyManager.load_strategy(strategy_name)
+			if not strategy_config:
+				self.logger.warning(f"Could not load strategy config for {strategy_name}, enabling take_profit")
+				return True
+
+			# Check if take_profit is explicitly disabled
+			exit_params = strategy_config.get("exit", {}).get("parameters", {})
+			take_profit = exit_params.get("take_profit", {})
+
+			# If formula is 'False' (string) or False (bool), it's disabled
+			formula = take_profit.get("formula")
+			is_disabled = formula == "False" or formula is False
+			
+			self.logger.info(f"Strategy {strategy_name}: take_profit.formula={repr(formula)}, disabled={is_disabled}")
+			
+			if is_disabled:
+				return False
+
+			return True
+		except Exception as e:
+			self.logger.warning(f"Error checking take_profit enabled: {e}, assuming enabled")
+			return True

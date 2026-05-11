@@ -165,7 +165,8 @@ class TimeLimitAgent(Agent):
 						price=exit_price,
 						fees=0,
 						notes=f"Time limit exit after {holding_days} days",
-						created_at=f"{trading_date.isoformat()}T14:00:00.000000"
+						created_at=f"{trading_date.isoformat()}T14:00:00.000000",
+						exit_type="expired"
 					)
 
 					# Mark related pending orders as executed

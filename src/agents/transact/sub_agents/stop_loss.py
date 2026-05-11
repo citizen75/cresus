@@ -136,7 +136,8 @@ class StopLossAgent(Agent):
 						price=exit_price,
 						fees=0,
 						notes=f"Stop loss exit @ {exit_price:.2f}",
-						created_at=f"{trading_date.isoformat()}T14:00:00.000000"
+						created_at=f"{trading_date.isoformat()}T14:00:00.000000",
+						exit_type="stop_loss"
 					)
 
 					# Mark related pending orders as executed
