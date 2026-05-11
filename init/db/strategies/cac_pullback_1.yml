@@ -71,7 +71,7 @@ exit:
   parameters:
     stop_loss:
       formula: close[0] * 0.97
-      description: Stop loss at 3% below entry
+      description: Trailing stop at 3% below current price (moves up as price rises)
     take_profit:
       formula: close[0] + atr_14[0] * 2.0
       description: Target profit at 2 ATR above entry

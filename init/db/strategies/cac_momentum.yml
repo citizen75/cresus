@@ -80,8 +80,7 @@ exit:
   parameters:
     stop_loss:
       formula: close[0] - atr_14[0] * 1.3
-      description: Stop loss at 1.3 ATR below entry balances noise tolerance and risk
-        control
+      description: Trailing stop at 1.3x ATR below current price (volatility-adjusted, moves up as price rises)
     take_profit:
       formula: close[0] + atr_14[0] * 2.6
       description: Target at 2.6 ATR maintains ~2:1 reward/risk and aligns with realistic

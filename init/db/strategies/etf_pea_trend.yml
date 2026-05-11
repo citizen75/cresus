@@ -61,7 +61,7 @@ exit:
   parameters:
     stop_loss:
       formula: close[0] * 0.96
-      description: Stop loss at 4% below entry (tight for ETFs)
+      description: Trailing stop at 4% below current price (moves up as price rises)
     take_profit:
       formula: close[0] * 1.08
       description: Take profit at 8% above entry

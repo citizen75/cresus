@@ -72,14 +72,14 @@ exit:
   parameters:
     stop_loss:
       formula: close[0] - atr_14[0] * 2.0
-      description: Stop loss at 2x ATR below entry for volatility-adjusted risk
+      description: Trailing stop at 2x ATR below current price (volatility-adjusted, moves up as price rises)
     take_profit:
       formula: close[0] + atr_14[0] * 3.5
       description: Take profit target at 3.5x ATR above entry for asymmetric risk-reward
 risk_management:
   stop_loss:
     atr_multiple: 2.0
-    description: Stop loss set at 2x ATR below entry for volatility-adjusted risk
+    description: Trailing stop set at 2x ATR below current price for volatility-adjusted risk (moves up as price rises)
   take_profit:
     atr_multiple: 3.5
     description: Take profit target at 3.5x ATR above entry for asymmetric risk-reward
