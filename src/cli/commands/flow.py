@@ -831,9 +831,13 @@ Sortino Ratio                                  {sortino:.6f}"""
 					for ind in indicators:
 						if ind in latest.index:
 							val = latest[ind]
-							# Format numeric values
+							# Format values based on type and name
 							if isinstance(val, (int, float)):
-								if val == int(val):
+								# Boolean indicators (green/red flags)
+								if ind.endswith(("_green", "_red")):
+									row_data.append("✓" if val else "✗")
+								# Regular numeric values
+								elif val == int(val):
 									row_data.append(str(int(val)))
 								else:
 									row_data.append(f"{val:.2f}")
