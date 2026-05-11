@@ -783,13 +783,25 @@ Sortino Ratio                                  {sortino:.6f}"""
 		executable_orders = result.get("executable_orders", [])
 		orders_count = result.get("orders_count", 0)
 		watchlist_saved = result.get("watchlist_saved", {})
+		target_date = result.get("target_date")
+		indicators = result.get("indicators", [])
 
 		console.print(f"\n[bold cyan]📊 Pre-Market Analysis: {strategy}[/bold cyan]")
 		console.print("=" * 100)
 
 		# Watchlist section
 		if watchlist:
-			console.print(f"\n[bold]Watchlist ({len(watchlist)} tickers)[/bold]")
+			# Build watchlist header with date and indicators
+			watchlist_header = f"Watchlist ({len(watchlist)} tickers)"
+			if target_date:
+				watchlist_header += f" - {target_date}"
+			if indicators:
+				indicators_str = ", ".join(indicators[:5])  # Show first 5 indicators
+				if len(indicators) > 5:
+					indicators_str += f" (+{len(indicators) - 5} more)"
+				watchlist_header += f"\nIndicators: {indicators_str}"
+			console.print(f"\n[bold]{watchlist_header}[/bold]")
+			
 			table = Table(box=None)
 			table.add_column("Ticker", style="cyan")
 			table.add_column("Score", style="green")

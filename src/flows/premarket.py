@@ -134,6 +134,11 @@ class PreMarketFlow(Flow):
 		watchlist = self.context.get("watchlist") or []
 		result["watchlist"] = watchlist
 
+		# Include target date and indicators for display
+		result["target_date"] = target_date
+		strategy_config = self.context.get("strategy_config") or {}
+		result["indicators"] = strategy_config.get("indicators", [])
+
 		# Extract and include signals data and scores
 		signals = self.context.get("signals") or {}
 		result["signals"] = signals
