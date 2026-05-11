@@ -369,7 +369,11 @@ class EntryOrderAgent(Agent):
 						quantity=result.filled_quantity,
 						price=result.filled_price,
 						fees=0,  # Paper trading has no fees
+						stop_loss=order.get("stop_loss"),
 						notes=f"Order {order_id}: {metadata.get('strategy', 'unknown')}",
+						take_profit=order.get("take_profit"),
+						trailing_stop_distance=order.get("trailing_stop_distance"),
+						highest_price=result.filled_price,
 						created_at=created_at
 					)
 
