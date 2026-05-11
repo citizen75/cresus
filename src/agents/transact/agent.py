@@ -211,7 +211,7 @@ class TransactAgent(Agent):
 					market_price = entry_price
 
 				# Execute at better of entry_price or market price
-				execution_price = min(market_price, entry_price)
+				execution_price = market_price
 
 				# Validate and adjust stop_loss/take_profit based on execution price
 				# If order was created on a previous day, these values might be stale
