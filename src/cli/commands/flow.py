@@ -797,9 +797,7 @@ Sortino Ratio                                  {sortino:.6f}"""
 			if target_date:
 				watchlist_header += f" - {target_date}"
 			if indicators:
-				indicators_str = ", ".join(indicators[:5])  # Show first 5 indicators
-				if len(indicators) > 5:
-					indicators_str += f" (+{len(indicators) - 5} more)"
+				indicators_str = ", ".join(indicators)
 				watchlist_header += f"\nIndicators: {indicators_str}"
 			console.print(f"\n[bold]{watchlist_header}[/bold]")
 			
@@ -808,9 +806,8 @@ Sortino Ratio                                  {sortino:.6f}"""
 			table.add_column("Score", style="green")
 			table.add_column("Signals", style="yellow")
 			
-			# Add columns for first 8 indicators
-			display_indicators = indicators[:8]
-			for ind in display_indicators:
+			# Add columns for all indicators
+			for ind in indicators:
 				table.add_column(ind, style="dim")
 
 			for ticker in watchlist[:20]:  # Show top 20
@@ -831,7 +828,7 @@ Sortino Ratio                                  {sortino:.6f}"""
 				if ticker_data is not None and not ticker_data.empty:
 					# Get latest row (index 0, since sorted newest-first)
 					latest = ticker_data.iloc[0]
-					for ind in display_indicators:
+					for ind in indicators:
 						if ind in latest.index:
 							val = latest[ind]
 							# Format numeric values
@@ -846,7 +843,7 @@ Sortino Ratio                                  {sortino:.6f}"""
 							row_data.append("-")
 				else:
 					# No data for ticker
-					row_data.extend(["-"] * len(display_indicators))
+					row_data.extend(["-"] * len(indicators))
 
 				table.add_row(*row_data)
 
