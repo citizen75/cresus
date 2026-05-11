@@ -315,6 +315,139 @@ def _register_all_indicators():
         pass
 
 
+def register_indicators_for_formulas(formulas: List[str]) -> None:
+	"""Dynamically register only the indicators needed for specific formulas.
+	
+	Parses the given indicator formulas and registers only the required indicators.
+	This is more efficient than registering all indicators upfront.
+	
+	Args:
+		formulas: List of indicator formulas (e.g., ["rsi_14", "ema_20", "bb_20_2"])
+	"""
+	if not formulas:
+		return
+	
+	# Extract unique indicator names from formulas
+	indicators_needed = set()
+	for formula in formulas:
+		try:
+			indicator_name, _ = parse_formula(formula)
+			indicators_needed.add(indicator_name)
+		except:
+			# If formula parsing fails, skip it
+			pass
+	
+	# Map of indicator names to their registration logic
+	_register_indicator_modules(indicators_needed)
+
+
+def _register_indicator_modules(indicator_names: set) -> None:
+	"""Register only the requested indicator modules.
+	
+	Args:
+		indicator_names: Set of indicator names to register (e.g., {"rsi", "ema", "bb"})
+	"""
+	if not indicator_names:
+		return
+	
+	# Momentum indicators
+	if any(ind in indicator_names for ind in ["rsi", "macd", "roc", "mom"]):
+		try:
+			from .momentum import rsi, macd, roc
+			if "rsi" in indicator_names:
+				register_indicator("rsi", rsi.calculate)
+			if "macd" in indicator_names:
+				register_indicator("macd", macd.calculate)
+			if "roc" in indicator_names:
+				register_indicator("roc", roc.calculate)
+		except ImportError:
+			pass
+	
+	# Trend indicators
+	if any(ind in indicator_names for ind in ["ema", "sma", "adx", "dmi"]):
+		try:
+			from .trend import ema, sma, adx
+			if "ema" in indicator_names:
+				register_indicator("ema", ema.calculate)
+			if "sma" in indicator_names:
+				register_indicator("sma", sma.calculate)
+			if "adx" in indicator_names or "dmi" in indicator_names:
+				register_indicator("adx", adx.calculate)
+		except ImportError:
+			pass
+	
+	# Volatility indicators
+	if any(ind in indicator_names for ind in ["atr", "bb", "bollinger_bands", "parkinson", "rs"]):
+		try:
+			from .volatility import atr, bb, parkinson, rogers_satchell
+			if "atr" in indicator_names:
+				register_indicator("atr", atr.calculate)
+			if "bb" in indicator_names or "bollinger_bands" in indicator_names:
+				register_indicator("bb", bb.calculate)
+				register_indicator("bollinger_bands", bb.calculate)
+			if "parkinson" in indicator_names:
+				register_indicator("parkinson", parkinson.calculate)
+			if "rs" in indicator_names:
+				register_indicator("rs", rogers_satchell.calculate)
+		except ImportError:
+			pass
+	
+	# Volume indicators
+	if any(ind in indicator_names for ind in ["obv", "mfi", "cmf", "vratio", "vwap", "volume_sma"]):
+		try:
+			from .volume import obv, mfi, cmf, volume_ratio, vwap, volume_ma
+			if "obv" in indicator_names:
+				register_indicator("obv", obv.calculate)
+			if "mfi" in indicator_names:
+				register_indicator("mfi", mfi.calculate)
+			if "cmf" in indicator_names:
+				register_indicator("cmf", cmf.calculate)
+			if "vratio" in indicator_names:
+				register_indicator("vratio", volume_ratio.calculate)
+			if "vwap" in indicator_names:
+				register_indicator("vwap", vwap.calculate)
+			if any(ind in indicator_names for ind in ["volume_sma_20", "volume_20ma"]):
+				register_indicator("volume_sma_20", lambda df: volume_ma.calculate(df, period=20))
+				register_indicator("volume_20ma", lambda df: volume_ma.calculate(df, period=20))
+		except ImportError:
+			pass
+	
+	# Support/Resistance indicators
+	if any(ind in indicator_names for ind in ["support", "resistance", "pivot"]):
+		try:
+			from .support import levels, pivots
+			if "support" in indicator_names:
+				register_indicator("support", levels.calculate)
+			if "resistance" in indicator_names:
+				register_indicator("resistance", levels.calculate)
+			if "pivot" in indicator_names:
+				register_indicator("pivot", pivots.calculate)
+		except ImportError:
+			pass
+	
+	# Change indicators
+	if any(ind in indicator_names for ind in ["chgpct", "chglog"]):
+		try:
+			from .change import change_pct, change_log
+			if "chgpct" in indicator_names:
+				register_indicator("chgpct", change_pct.calculate)
+			if "chglog" in indicator_names:
+				register_indicator("chglog", change_log.calculate)
+		except ImportError:
+			pass
+	
+	# Core indicators
+	if any(ind in indicator_names for ind in ["ha", "sha"]):
+		try:
+			from .core import heikin_ashi
+			if "ha" in indicator_names:
+				register_indicator("ha", heikin_ashi.calculate)
+			if "sha" in indicator_names:
+				register_indicator("sha", heikin_ashi.calculate_smooth)
+		except ImportError:
+			pass
+
+
 def indicator(
     name: str,
     data: pd.DataFrame = None,

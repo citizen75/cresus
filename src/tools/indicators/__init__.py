@@ -16,6 +16,7 @@ from .indicators import (
     register_indicator,
     get_registered_indicator,
     list_available_indicators,
+    register_indicators_for_formulas,
 )
 from .parser import parse_formula, validate_formula
 from .validator import DataValidator
@@ -33,6 +34,7 @@ __all__ = [
 	"calculate",
 	"indicator",
 	"register_indicator",
+	"register_indicators_for_formulas",
 	"get_registered_indicator",
 	"list_available_indicators",
 	# Parser

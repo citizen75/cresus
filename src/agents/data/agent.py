@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, Optional, List
 from core.agent import Agent
-from tools.indicators.indicators import calculate as calculate_indicators
+from tools.indicators.indicators import calculate as calculate_indicators, register_indicators_for_formulas
 from tools.data.core import DataHistory
 from agents.data.sub_agents import DataQualityAgent, DataQuantityAgent
 
@@ -65,6 +65,10 @@ class DataAgent(Agent):
 			strategy_config = self.context.get("strategy_config")
 			if strategy_config:
 				indicators = strategy_config.get("indicators", [])
+
+		# Register only the indicators needed for this strategy
+		if indicators:
+			register_indicators_for_formulas(indicators)
 
 		# Load cached price history for all tickers
 		# Note: Load all data - filtering by current_date happens in analysis agents
