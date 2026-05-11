@@ -4,6 +4,7 @@ from typing import Any, Dict, Optional
 from core.agent import Agent
 from core.flow import Flow
 from agents.entry_order.sub_agents import (
+	PositionDuplicateFilterAgent,
 	PositionSizingAgent,
 	EntryTimingAgent,
 	RiskGuardAgent,
@@ -18,11 +19,12 @@ from tools.portfolio.orders import Orders
 class EntryOrderAgent(Agent):
 	"""Agent for converting entry opportunities to executable orders.
 
-	Orchestrates four sub-agents to bridge entry analysis and order execution:
-	1. Position Sizing - Calculate shares based on portfolio metrics
-	2. Entry Timing - Determine execution method and timing
-	3. Risk Guard - Validate portfolio-level constraints
-	4. Order Construction - Assemble final executable orders
+	Orchestrates five sub-agents to bridge entry analysis and order execution:
+	1. Position Duplicate Filter - Remove recommendations with existing positions
+	2. Position Sizing - Calculate shares based on portfolio metrics
+	3. Entry Timing - Determine execution method and timing
+	4. Risk Guard - Validate portfolio-level constraints
+	5. Order Construction - Assemble final executable orders
 
 	Integrates with PortfolioManager to access portfolio state.
 	"""
@@ -52,11 +54,12 @@ class EntryOrderAgent(Agent):
 	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
 		"""Process entry recommendations into executable orders.
 
-		Executes four-step pipeline:
-		1. Position Sizing - Calculate order sizes
-		2. Entry Timing - Determine execution method
-		3. Risk Guard - Validate constraints
-		4. Order Construction - Build executable orders
+		Executes five-step pipeline:
+		1. Position Duplicate Filter - Remove duplicate position entries
+		2. Position Sizing - Calculate order sizes
+		3. Entry Timing - Determine execution method
+		4. Risk Guard - Validate constraints
+		5. Order Construction - Build executable orders
 
 		Args:
 			input_data: Input data (optional, uses context)
@@ -87,6 +90,12 @@ class EntryOrderAgent(Agent):
 
 		# Create order processing flow with sub-agents
 		order_flow = Flow("EntryOrderFlow", context=self.context)
+
+		# Add position duplicate filter step (before sizing)
+		order_flow.add_step(
+			PositionDuplicateFilterAgent("PositionDuplicateFilterStep"),
+			required=True
+		)
 
 		# Add position sizing step
 		order_flow.add_step(
