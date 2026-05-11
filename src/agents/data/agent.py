@@ -85,6 +85,10 @@ class DataAgent(Agent):
 					self.logger.warning(f"No cached data available for {ticker}")
 					continue
 
+				# Remove deprecated volume_20ma column if present (replaced by volume_sma_20)
+				if 'volume_20ma' in ticker_data.columns:
+					ticker_data = ticker_data.drop(columns=['volume_20ma'])
+
 				# Calculate indicators if specified
 				if indicators:
 					try:

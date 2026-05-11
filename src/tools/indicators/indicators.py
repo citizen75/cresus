@@ -284,8 +284,7 @@ def _register_all_indicators():
         register_indicator("vratio", volume_ratio.calculate)
         register_indicator("vwap", vwap.calculate)
         register_indicator("volume_sma_20", lambda df: volume_ma.calculate(df, period=20))
-        # Backwards compatibility alias
-        register_indicator("volume_20ma", lambda df: volume_ma.calculate(df, period=20))
+
     except ImportError:
         pass
 
