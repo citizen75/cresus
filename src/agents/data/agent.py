@@ -89,6 +89,10 @@ class DataAgent(Agent):
 				if 'volume_20ma' in ticker_data.columns:
 					ticker_data = ticker_data.drop(columns=['volume_20ma'])
 
+				# Sort data in descending order (newest first) for historical analysis
+				# This enables shift notation: [-1] = most recent, [-2] = yesterday, etc.
+				ticker_data = ticker_data.iloc[::-1].reset_index(drop=True)
+
 				# Calculate indicators if specified
 				if indicators:
 					try:
