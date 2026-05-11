@@ -31,8 +31,6 @@ def evaluate(formula: str, data) -> bool:
 		raise ValueError("Formula cannot be empty")
 
 	try:
-		print(f"Evaluating formula: {formula} with data: {data}")
-		
 		# Check if data is a DataFrame or dict to determine how to simplify formula
 		is_dataframe = isinstance(data, pd.DataFrame)
 		
