@@ -61,6 +61,11 @@ class PortfolioAnalysisFlow(Flow):
 
 		# Set portfolio name in context
 		self.context.set("portfolio_name", self.portfolio_name)
+		
+		# Set strategy_name (used by JournalAnalyzerAgent for take_profit check)
+		# In backtest mode, portfolio_name is the strategy name
+		if self.use_backtest or flow_input.get("use_backtest", False):
+			self.context.set("strategy_name", self.portfolio_name)
 
 		# Load portfolio journal
 		import pandas as pd
