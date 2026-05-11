@@ -8,6 +8,7 @@ from tools.portfolio import PortfolioManager
 from tools.portfolio.orders import Orders
 from tools.portfolio.journal import Journal
 from tools.portfolio.broker import PaperBroker
+from tools.strategy import StrategyManager
 from .sub_agents import StopLossAgent, TargetAgent, TimeLimitAgent, LimitOrderAgent, TrailingStopAgent
 
 
@@ -88,6 +89,27 @@ class TransactAgent(Agent):
 			day_data
 		)
 		buy_results.extend(market_results)
+
+		# Load strategy config to get holding_period for exits (if not already set)
+		if not self.context.get("holding_period"):
+			strategy_name = self.context.get("strategy_name")
+			if strategy_name:
+				try:
+					sm = StrategyManager()
+					strategy_config = sm.load_strategy(strategy_name)
+					if strategy_config and "exit" in strategy_config:
+						exit_config = strategy_config.get("exit", {})
+						if "parameters" in exit_config and "holding_period" in exit_config["parameters"]:
+							hp_formula = exit_config["parameters"]["holding_period"].get("formula")
+							if hp_formula:
+								try:
+									holding_period = int(float(hp_formula))
+									self.context.set("holding_period", holding_period)
+									self.logger.debug(f"Set holding_period to {holding_period} from strategy config")
+								except (ValueError, TypeError):
+									pass
+				except Exception as e:
+					self.logger.debug(f"Could not load holding_period from strategy: {e}")
 
 		# Execute exit orders via subagents in sequence
 		exit_results = []

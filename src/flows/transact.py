@@ -77,17 +77,6 @@ class TransactFlow(Flow):
 		orders_mgr = Orders(portfolio_name, context=self.context.__dict__)
 		pending_orders = orders_mgr.get_pending_orders()
 
-		if pending_orders.empty:
-			return {
-				"status": "success",
-				"message": f"No pending orders for {portfolio_name} on {trading_date}",
-				"output": {
-					"executed": 0,
-					"failed": 0,
-					"details": [],
-				}
-			}
-
 		# Step 2: Get pre-sliced day data from BacktestAgent (already organized by date)
 		# BacktestAgent creates day_data_cache to avoid filtering on each iteration
 		next_day_data = self.context.get("next_day_data") or {}
@@ -100,7 +89,8 @@ class TransactFlow(Flow):
 		# Store day data in context for TransactAgent
 		self.context.set("day_data", next_day_data)
 
-		# Step 3: Execute pending orders with day data
+		# Step 3: Execute pending orders and exits with day data
+		# NOTE: Always run TransactAgent to check for exits, even without pending buy orders
 		transact_agent = TransactAgent("TransactAgent", self.context)
 		result = transact_agent.process(flow_input)
 
