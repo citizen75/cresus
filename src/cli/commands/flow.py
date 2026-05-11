@@ -785,6 +785,7 @@ Sortino Ratio                                  {sortino:.6f}"""
 		watchlist_saved = result.get("watchlist_saved", {})
 		target_date = result.get("target_date")
 		indicators = result.get("indicators", [])
+		data_history = result.get("data_history", {})
 
 		console.print(f"\n[bold cyan]📊 Pre-Market Analysis: {strategy}[/bold cyan]")
 		console.print("=" * 100)
@@ -806,6 +807,11 @@ Sortino Ratio                                  {sortino:.6f}"""
 			table.add_column("Ticker", style="cyan")
 			table.add_column("Score", style="green")
 			table.add_column("Signals", style="yellow")
+			
+			# Add columns for first 8 indicators
+			display_indicators = indicators[:8]
+			for ind in display_indicators:
+				table.add_column(ind, style="dim")
 
 			for ticker in watchlist[:20]:  # Show top 20
 				score_info = ticker_scores.get(ticker, {})
@@ -818,7 +824,31 @@ Sortino Ratio                                  {sortino:.6f}"""
 				else:
 					signals_str = "-"
 
-				table.add_row(ticker, f"{score:.3f}", signals_str)
+				# Get indicator values for this ticker
+				row_data = [ticker, f"{score:.3f}", signals_str]
+				
+				ticker_data = data_history.get(ticker)
+				if ticker_data is not None and not ticker_data.empty:
+					# Get latest row (index 0, since sorted newest-first)
+					latest = ticker_data.iloc[0]
+					for ind in display_indicators:
+						if ind in latest.index:
+							val = latest[ind]
+							# Format numeric values
+							if isinstance(val, (int, float)):
+								if val == int(val):
+									row_data.append(str(int(val)))
+								else:
+									row_data.append(f"{val:.2f}")
+							else:
+								row_data.append(str(val))
+						else:
+							row_data.append("-")
+				else:
+					# No data for ticker
+					row_data.extend(["-"] * len(display_indicators))
+
+				table.add_row(*row_data)
 
 			console.print(table)
 

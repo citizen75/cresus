@@ -138,6 +138,10 @@ class PreMarketFlow(Flow):
 		result["target_date"] = target_date
 		strategy_config = self.context.get("strategy_config") or {}
 		result["indicators"] = strategy_config.get("indicators", [])
+		
+		# Include data_history for indicator value display
+		data_history = self.context.get("data_history") or {}
+		result["data_history"] = data_history
 
 		# Extract and include signals data and scores
 		signals = self.context.get("signals") or {}
