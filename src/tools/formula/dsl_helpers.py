@@ -15,11 +15,12 @@ from typing import Dict
 DSL_PATTERN = r'(\w+)\[(-?\d+)\]'
 
 
-def simplify_formula(formula: str) -> str:
+def simplify_formula(formula: str, for_dataframe: bool = False) -> str:
 	"""Convert DSL shorthand to pandas shift notation.
 	
 	Args:
 		formula: Formula string with optional DSL syntax
+		for_dataframe: If True, convert 'and'/'or' to '&'/'|' for Series operations
 		
 	Returns:
 		Formula with DSL syntax converted to data['...'] and shift notation
@@ -48,7 +49,17 @@ def simplify_formula(formula: str) -> str:
 			# Future bars (rare): indicator[1] → data.shift(-1)['indicator']
 			return f"data.shift(-{shift_value})['{indicator}']"
 	
-	return re.sub(DSL_PATTERN, replace_shift, formula)
+	# First replace shift notation
+	formula = re.sub(DSL_PATTERN, replace_shift, formula)
+	
+	# If evaluating on DataFrame, convert 'and'/'or' to '&'/'|' for Series operations
+	if for_dataframe:
+		# Replace logical operators with bitwise equivalents
+		# Use word boundaries to avoid partial matches
+		formula = re.sub(r'\band\b', '&', formula)
+		formula = re.sub(r'\bor\b', '|', formula)
+	
+	return formula
 
 
 def is_dsl_formula(formula: str) -> bool:

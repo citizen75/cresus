@@ -33,12 +33,21 @@ def evaluate(formula: str, data) -> bool:
 	try:
 		print(f"Evaluating formula: {formula} with data: {data}")
 		
+		# Check if data is a DataFrame or dict to determine how to simplify formula
+		is_dataframe = isinstance(data, pd.DataFrame)
+		
 		# Convert DSL syntax if present
 		if is_dsl_formula(formula):
-			formula = simplify_formula(formula)
+			# For DataFrames, also convert 'and'/'or' to '&'/'|' for Series operations
+			formula = simplify_formula(formula, for_dataframe=is_dataframe)
 		
 		# Use pandas eval for safer expression evaluation
 		result = pd.eval(formula, local_dict={"data": data}, global_dict={})
+		
+		# If result is a Series (from DataFrame), get the last value
+		if isinstance(result, pd.Series):
+			result = result.iloc[-1]
+		
 		return bool(result)
 
 	except KeyError as e:
