@@ -235,6 +235,13 @@ class BacktestAgent(Agent):
 
 		# Pre-slice data by date for efficient access (avoid filtering on each iteration)
 		day_data_cache = self._create_day_data_cache(data_history)
+		self.logger.debug(f"BacktestAgent: day_data_cache has {len(day_data_cache)} dates")
+		if day_data_cache:
+			cache_dates = sorted(day_data_cache.keys())
+			self.logger.debug(f"BacktestAgent: Cache dates: {cache_dates[0]} to {cache_dates[-1]}")
+			first_date = cache_dates[0]
+			if first_date in day_data_cache:
+				self.logger.debug(f"BacktestAgent: First date {first_date} has {len(day_data_cache[first_date])} tickers")
 
 		# Main backtest loop: pre_market → [increment] → market → post_market
 		portfolio_name = self.context.get("portfolio_name") or "default"
@@ -263,6 +270,7 @@ class BacktestAgent(Agent):
 
 			# Pass next_date OHLCV data to market flow (no reloading)
 			next_day_data = day_data_cache.get(next_date, {})
+			self.logger.debug(f"BacktestAgent: next_date={next_date}, next_day_data has {len(next_day_data)} tickers")
 			self.context.set("next_day_data", next_day_data)
 
 			# Market phase: execute on next_date prices with pre-loaded data

@@ -118,7 +118,12 @@ class BacktestFlow(Flow):
 		backtest_output["backtest_dir"] = str(backtest_dir)
 		backtest_output["portfolio"] = portfolio_name
 
-		# Get final portfolio metrics from sandboxed context
+		# Flush portfolio journal from memory to disk
+		from tools.portfolio.journal import Journal
+		journal = Journal(portfolio_name, context=self.context.__dict__)
+		journal.flush()
+		
+		# Get final portfolio metrics from persisted journal
 		pm = PortfolioManager(context=self.context.__dict__)
 		final_portfolio = pm.get_portfolio_summary(portfolio_name)
 		if final_portfolio:
@@ -134,12 +139,17 @@ class BacktestFlow(Flow):
 		
 		self.logger.info(f"Using initial capital: ${initial_capital:.2f}")
 
-		# Calculate comprehensive backtest metrics
+		# Use actual start/end dates from backtest output
+		# BacktestAgent adjusts end_date if needed (e.g., to last available data)
+		actual_start_date = backtest_output.get("start_date", flow_input.get("start_date"))
+		actual_end_date = backtest_output.get("end_date", flow_input.get("end_date"))
+
+		# Calculate comprehensive backtest metrics from persisted portfolio
 		metrics_calculator = PortfolioMetrics(context=self.context.__dict__)
 		metrics = metrics_calculator.calculate_backtest_metrics(
 			name=portfolio_name,
-			start_date=flow_input.get("start_date"),
-			end_date=flow_input.get("end_date"),
+			start_date=actual_start_date,
+			end_date=actual_end_date,
 			start_value=initial_capital
 		)
 		# Add metrics under portfolio_metrics key
@@ -160,36 +170,36 @@ class BacktestFlow(Flow):
 			"issue_count": research_output.get("total_issues", 0),
 		}
 
-		# Print agent metrics summary to stdout
-		try:
-			metrics = self.context.get_agent_metrics()
-			if metrics:
-				print("\n" + "=" * 80)
-				print("Agent Execution Times")
-				print("=" * 80)
-				
-				total_ms = sum(t["duration_ms"] for t in metrics)
-				
-				# Sort by duration descending
-				sorted_metrics = sorted(metrics, key=lambda x: x["duration_ms"], reverse=True)
-				
-				# Filter out metrics with negligible duration (< 1ms or rounds to 0.0%)
-				significant_metrics = [
-					m for m in sorted_metrics 
-					if m["duration_ms"] >= 1.0 or (m["duration_ms"] / total_ms * 100 if total_ms > 0 else 0) >= 0.05
-				]
-				
-				for metric in significant_metrics:
-					name = metric["name"]
-					duration = metric["duration_ms"]
-					pct = (duration / total_ms * 100) if total_ms > 0 else 0
-					print(f"  {name:50s} {duration:8.2f}ms ({pct:5.1f}%)")
-				
-				print("-" * 80)
-				print(f"  {'Total':50s} {total_ms:8.2f}ms (100.0%)")
-				print("=" * 80 + "\n")
-		except Exception as e:
-			self.logger.debug(f"Could not print agent metrics: {e}")
+		# Print agent metrics summary to stdout (disabled - only show portfolio metrics in backtest output)
+		# try:
+		# 	metrics = self.context.get_agent_metrics()
+		# 	if metrics:
+		# 		print("\n" + "=" * 80)
+		# 		print("Agent Execution Times")
+		# 		print("=" * 80)
+		# 		
+		# 		total_ms = sum(t["duration_ms"] for t in metrics)
+		# 		
+		# 		# Sort by duration descending
+		# 		sorted_metrics = sorted(metrics, key=lambda x: x["duration_ms"], reverse=True)
+		# 		
+		# 		# Filter out metrics with negligible duration (< 1ms or rounds to 0.0%)
+		# 		significant_metrics = [
+		# 			m for m in sorted_metrics 
+		# 			if m["duration_ms"] >= 1.0 or (m["duration_ms"] / total_ms * 100 if total_ms > 0 else 0) >= 0.05
+		# 		]
+		# 		
+		# 		for metric in significant_metrics:
+		# 			name = metric["name"]
+		# 			duration = metric["duration_ms"]
+		# 			pct = (duration / total_ms * 100) if total_ms > 0 else 0
+		# 			print(f"  {name:50s} {duration:8.2f}ms ({pct:5.1f}%)")
+		# 		
+		# 		print("-" * 80)
+		# 		print(f"  {'Total':50s} {total_ms:8.2f}ms (100.0%)")
+		# 		print("=" * 80 + "\n")
+		# except Exception as e:
+		# 	self.logger.debug(f"Could not print agent metrics: {e}")
 
 		# Save context with execution metrics and ticker counts to context.json
 		try:

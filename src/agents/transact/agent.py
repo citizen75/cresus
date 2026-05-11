@@ -96,7 +96,8 @@ class TransactAgent(Agent):
 			if strategy_name:
 				try:
 					sm = StrategyManager()
-					strategy_config = sm.load_strategy(strategy_name)
+					result = sm.load_strategy(strategy_name)
+					strategy_config = result.get("data", {}) if result.get("status") == "success" else {}
 					if strategy_config and "exit" in strategy_config:
 						exit_config = strategy_config.get("exit", {})
 						if "parameters" in exit_config and "holding_period" in exit_config["parameters"]:

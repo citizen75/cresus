@@ -117,6 +117,12 @@ class PreMarketFlow(Flow):
 		self.context.set("portfolio_name", flow_input["portfolio_name"])
 		self.context.set("strategy_name", self.strategy_name)
 
+		# Handle date-specific watchlist (slice data to specific date if provided)
+		if "date" in flow_input:
+			# If date is provided, slice data_history to that date before processing
+			# This allows viewing the watchlist as it was on a specific trading date
+			self._set_data_history_for_date(self.context, flow_input["date"])
+
 		# Execute parent flow logic
 		result = super().process(flow_input)
 
@@ -181,6 +187,50 @@ class PreMarketFlow(Flow):
 		result["strategy"] = self.strategy_name
 
 		return result
+
+	def _set_data_history_for_date(self, context: Any, date_str: str) -> None:
+		"""Slice data_history to include only data up to a specific date.
+
+		This allows viewing the watchlist as it was on a specific trading date.
+
+		Args:
+			context: AgentContext containing data_history
+			date_str: Date string in YYYY-MM-DD format
+		"""
+		import pandas as pd
+		from datetime import date as date_type
+
+		# Parse date string
+		try:
+			target_date = date_type.fromisoformat(date_str)
+		except (ValueError, TypeError):
+			self.logger.warning(f"Invalid date format: {date_str}, using all available data")
+			return
+
+		data_history = context.get("data_history")
+		if not data_history:
+			return
+
+		# Slice each ticker's data to target_date and earlier
+		sliced_history = {}
+		for ticker, df in data_history.items():
+			if df.empty:
+				sliced_history[ticker] = df
+				continue
+
+			# Get timestamp column
+			if "timestamp" in df.columns:
+				timestamps = pd.to_datetime(df["timestamp"])
+			else:
+				timestamps = pd.to_datetime(df.index)
+
+			# Extract dates and filter to target_date and earlier
+			dates = timestamps.dt.date
+			mask = dates <= target_date
+			sliced_history[ticker] = df[mask].copy()
+
+		context.set("data_history", sliced_history)
+		self.logger.info(f"Sliced data_history to {date_str} for watchlist analysis")
 
 	def _strategy_to_portfolio_name(self, strategy_name: str) -> str:
 		"""Convert strategy name to portfolio name format.

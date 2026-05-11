@@ -137,7 +137,8 @@ class TargetAgent(Agent):
 						fees=0,
 						notes=f"Take profit exit @ {exit_price:.2f}",
 						created_at=f"{trading_date.isoformat()}T14:00:00.000000",
-						exit_type="take_profit"
+						exit_type="take_profit",
+						status_at=f"{trading_date.isoformat()}T14:00:00.000000"
 					)
 
 					# Mark related pending orders as executed

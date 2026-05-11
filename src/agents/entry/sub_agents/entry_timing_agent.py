@@ -50,6 +50,12 @@ class EntryTimingAgent(Agent):
 
 			df = data_history[ticker]
 			if len(df) < 5:  # Need at least 5 days for analysis
+				self.logger.warning(f"Insufficient data ({len(df)} rows) for {ticker}, skipping timing score")
+				continue
+
+			# Validate that data has at least a close column
+			if 'close' not in df.columns and 'Close' not in df.columns:
+				self.logger.warning(f"Missing 'close' column for {ticker}, skipping timing score")
 				continue
 
 			# Calculate timing score based on recent price action

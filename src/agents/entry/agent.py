@@ -4,7 +4,7 @@ from typing import Any, Dict, Optional
 from core.agent import Agent
 from core.flow import Flow
 from tools.portfolio import PortfolioManager
-from agents.entry.sub_agents import EntryScoreAgent, EntryTimingAgent, EntryRRAgent
+from agents.entry.sub_agents import EntryScoreAgent, EntryTimingAgent, EntryRRAgent, EntryFilterAgent
 
 
 class EntryAgent(Agent):
@@ -108,6 +108,17 @@ class EntryAgent(Agent):
 		filtered_count = original_count - len(recommendations)
 		if filtered_count > 0:
 			self.logger.info(f"Filtered {filtered_count} duplicate positions from {original_count} recommendations")
+
+		# Apply entry filter from strategy config
+		filter_agent = EntryFilterAgent("EntryFilterStep", context=self.context)
+		self.context.set("entry_recommendations", recommendations)
+		filter_result = filter_agent.process()
+		if filter_result.get("status") == "success":
+			filtered_recs = filter_result.get("output", {})
+			blocked = filtered_recs.get("filtered_count", 0)
+			if blocked > 0:
+				self.logger.info(f"Entry filter blocked {blocked} recommendations")
+		recommendations = self.context.get("entry_recommendations") or recommendations
 
 		# Store in context for downstream processing
 		self.context.set("entry_recommendations", recommendations)

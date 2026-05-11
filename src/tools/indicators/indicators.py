@@ -277,12 +277,15 @@ def _register_all_indicators():
 
     try:
         # Volume indicators
-        from .volume import obv, mfi, cmf, volume_ratio, vwap
+        from .volume import obv, mfi, cmf, volume_ratio, vwap, volume_ma
         register_indicator("obv", obv.calculate)
         register_indicator("mfi", mfi.calculate)
         register_indicator("cmf", cmf.calculate)
         register_indicator("vratio", volume_ratio.calculate)
         register_indicator("vwap", vwap.calculate)
+        register_indicator("volume_sma_20", lambda df: volume_ma.calculate(df, period=20))
+        # Backwards compatibility alias
+        register_indicator("volume_20ma", lambda df: volume_ma.calculate(df, period=20))
     except ImportError:
         pass
 

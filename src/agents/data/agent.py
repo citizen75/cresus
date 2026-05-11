@@ -29,11 +29,14 @@ class DataAgent(Agent):
 		existing_data_history = self.context.get("data_history")
 		if existing_data_history:
 			self.logger.debug("data_history already in context (backtest mode), skipping DataAgent load")
+			tickers = list(existing_data_history.keys())
+			# Store tickers in context for downstream agents
+			self.context.set("tickers", tickers)
 			return {
 				"status": "success",
 				"input": input_data,
 				"output": {
-					"tickers": list(existing_data_history.keys()),
+					"tickers": tickers,
 					"count": len(existing_data_history),
 					"data_fetched": len(existing_data_history),
 					"indicators": [],

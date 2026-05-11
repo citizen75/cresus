@@ -38,6 +38,7 @@ class FormulaParser:
 
         Args:
             formula: DSL formula string (e.g., "rsi_14", "bb_20_2", "obv", "bb_20_2_lower", "bollinger_bands_20_2_lower")
+                     or registered indicator name (e.g., "volume_20ma")
 
         Returns:
             Tuple of (indicator_name, parameters_dict)
@@ -50,6 +51,16 @@ class FormulaParser:
 
         # Normalize to lowercase
         formula = formula.strip().lower()
+
+        # Check if this is a registered indicator (e.g., volume_20ma)
+        # Do lazy import to avoid circular dependency
+        try:
+            from . import get_registered_indicator
+            if get_registered_indicator(formula) is not None:
+                # It's a registered indicator, return as-is with no parameters
+                return formula, {}
+        except (ImportError, AttributeError):
+            pass
 
         # Extract indicator name and parameter string
         match = re.match(FormulaParser.PATTERN, formula)

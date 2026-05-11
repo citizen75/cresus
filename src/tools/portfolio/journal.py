@@ -96,12 +96,15 @@ class Journal:
     def add_transaction(self, operation: str, ticker: str, quantity: int, price: float,
                        fees: float = 0, notes: str = "", created_at: str = None,
                        stop_loss: float = None, take_profit: float = None, highest_price: float = None,
-                       trailing_stop_distance: float = None, exit_type: str = None) -> str:
+                       trailing_stop_distance: float = None, exit_type: str = None, status_at: str = None) -> str:
         """Add a new transaction to journal.
 
         Operations: BUY, SELL, CASH (deposit/withdrawal)
         For CASH: ticker should be "CASH", quantity is the amount (positive=deposit, negative=withdrawal)
         For SELL: exit_type should specify how the exit occurred (e.g., 'stop_loss', 'take_profit', 'expired', 'manual')
+
+        Args:
+            status_at: Timestamp when transaction status was set (defaults to current time if not provided)
 
         Returns the transaction ID.
         """
@@ -116,8 +119,10 @@ class Journal:
         now = datetime.now().isoformat()
         # Use provided created_at or default to now
         tx_created_at = created_at if created_at else now
-
+        # status_at should be the transaction date (created_at) only for SELL transactions
+        # For BUY transactions, status_at should remain empty/None
         operation_upper = operation.upper()
+        tx_status_at = status_at if status_at is not None else (tx_created_at if operation_upper == "SELL" else "")
 
         # Handle CASH operations
         if operation_upper == "CASH":
@@ -145,7 +150,7 @@ class Journal:
             "trailing_stop_distance": float(trailing_stop_distance) if trailing_stop_distance else None,
             "highest_price": float(highest_price) if highest_price else float(price_val),
             "status": "completed",
-            "status_at": now,
+            "status_at": tx_status_at,
             "exit_type": exit_type if operation_upper == "SELL" else None,
             "notes": notes
         }

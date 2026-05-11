@@ -62,6 +62,9 @@ class PortfolioHistory:
             logger.warning("No valid dates in journal")
             return {"status": "error", "message": "No valid dates in journal"}
 
+        # Normalize created_at to date-only (00:00:00) for date-based comparisons
+        df_valid["created_at"] = df_valid["created_at"].dt.normalize()
+
         # Get date range
         first_tx_date = df_valid["created_at"].min()
         last_tx_date = df_valid["created_at"].max()
@@ -70,8 +73,8 @@ class PortfolioHistory:
             logger.warning("Invalid dates in journal")
             return {"status": "error", "message": "Invalid dates in journal"}
 
-        first_tx_date = pd.Timestamp(first_tx_date).normalize()
-        last_tx_date = pd.Timestamp(last_tx_date).normalize()
+        first_tx_date = pd.Timestamp(first_tx_date)
+        last_tx_date = pd.Timestamp(last_tx_date)
 
         logger.info(f"Date range: {first_tx_date} to {last_tx_date}")
 

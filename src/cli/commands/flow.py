@@ -354,6 +354,9 @@ class FlowManager:
 			elif workflow_name.lower() == "premarket":
 				self._print_premarket_result(result, console)
 				return
+			elif workflow_name.lower() == "backtest":
+				# Backtest results are printed separately in app.py, skip summary here
+				return
 
 		# Print summary for other workflows
 		output = result.get("output", {})

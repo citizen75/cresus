@@ -17,6 +17,7 @@ from cli.commands.data import DataCommands
 from cli.commands.portfolio import PortfolioCommands
 from cli.commands.scheduler import SchedulerCommands
 from cli.commands.info import InfoCommands
+from cli.commands.strategy import StrategyCommands
 from tools.data.manager import DataManager
 
 console = Console()
@@ -41,6 +42,7 @@ class CresusCLI(cmd2.Cmd):
 		self.portfolio_commands = PortfolioCommands()
 		self.scheduler_commands = SchedulerCommands()
 		self.info_commands = InfoCommands()
+		self.strategy_commands = StrategyCommands(self.project_root)
 
 		self._setup_history()
 		self._setup_prompt()
@@ -70,6 +72,7 @@ class CresusCLI(cmd2.Cmd):
 		info_table.add_row("[bold]help[/bold]", "Show all available commands")
 		info_table.add_row("[bold]service[/bold]", "Manage services (api, mcp, front)")
 		info_table.add_row("[bold]flow[/bold]", "Execute workflows (e.g., flow run watchlist)")
+		info_table.add_row("[bold]strategy[/bold]", "Validate strategies (e.g., strategy check single_etf --fix)")
 		info_table.add_row("[bold]data[/bold]", "Manage portfolio data and cache")
 		info_table.add_row("[bold]universe[/bold]", "Manage universes (e.g., universe list|info cac40)")
 		info_table.add_row("[bold]blacklist[/bold]", "Manage blacklist (e.g., blacklist list|add|del MOEX)")
@@ -374,7 +377,12 @@ class CresusCLI(cmd2.Cmd):
 					input_data["start_date"] = remaining[1]
 				if len(remaining) > 2:
 					input_data["end_date"] = remaining[2]
-			elif workflow_name.lower() in ["premarket", "transact"]:
+			elif workflow_name.lower() == "premarket":
+				# Pre-market can accept an optional date parameter
+				input_data = {}
+				if len(remaining) > 1:
+					input_data["date"] = remaining[1]
+			elif workflow_name.lower() == "transact":
 				input_data = None
 			else:
 				# For other workflows, treat remaining items as tickers
@@ -595,6 +603,43 @@ class CresusCLI(cmd2.Cmd):
 	def do_cron(self, args):
 		"""Manage cron jobs: list"""
 		self.scheduler_commands.handle(args)
+
+	# ==================== Strategy Commands ====================
+	def do_strategy(self, args):
+		"""Manage and validate strategies.
+		
+		Usage:
+		  strategy check <strategy_name> [--fix]    Check strategy configuration and optionally fix issues
+		
+		Examples:
+		  strategy check single_etf
+		  strategy check single_etf --fix
+		"""
+		if not args:
+			console.print("[yellow]Usage: strategy check <strategy_name> [--fix][/yellow]")
+			return
+
+		parts = args.split()
+		command = parts[0] if parts else None
+
+		if command == "check":
+			if len(parts) < 2:
+				console.print("[red]Error: strategy_name required[/red]")
+				console.print("[yellow]Usage: strategy check <strategy_name> [--fix][/yellow]")
+				return
+
+			strategy_name = parts[1]
+			fix = "--fix" in parts
+
+			try:
+				result = self.strategy_commands.check(strategy_name, fix=fix)
+				if result.get("status") != "success":
+					console.print(f"[red]Error: {result.get('message', 'Unknown error')}[/red]")
+			except Exception as e:
+				console.print(f"[red]Error: {e}[/red]")
+		else:
+			console.print("[red]Unknown strategy command[/red]")
+			console.print("[yellow]Available commands: check[/yellow]")
 
 	# ==================== Info Commands ====================
 	def do_status(self, _):

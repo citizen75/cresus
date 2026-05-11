@@ -50,6 +50,12 @@ class EntryScoreAgent(Agent):
 
 			df = data_history[ticker]
 			if df.empty:
+				self.logger.warning(f"Empty data for {ticker}, skipping entry score")
+				continue
+
+			# Validate that data has at least a close column
+			if 'close' not in df.columns and 'Close' not in df.columns:
+				self.logger.warning(f"Missing 'close' column for {ticker}, skipping entry score")
 				continue
 
 			# Get the latest row for analysis

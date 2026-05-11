@@ -30,6 +30,8 @@ def evaluate(formula: str, data: Dict[str, Any]) -> bool:
 		raise ValueError("Formula cannot be empty")
 
 	try:
+		print(f"Evaluating formula: {formula} with data: {data}")
+		
 		# Convert DSL syntax if present
 		if is_dsl_formula(formula):
 			formula = simplify_formula(formula)
@@ -38,5 +40,9 @@ def evaluate(formula: str, data: Dict[str, Any]) -> bool:
 		result = pd.eval(formula, local_dict={"data": data}, global_dict={})
 		return bool(result)
 
+	except KeyError as e:
+		# Extract the missing key from the error message
+		missing_key = str(e).strip("'\"")
+		raise ValueError(f"Missing indicator or column '{missing_key}' in formula '{formula}'. Available columns: {list(data.keys())}")
 	except Exception as e:
 		raise ValueError(f"Failed to evaluate formula '{formula}': {str(e)}")

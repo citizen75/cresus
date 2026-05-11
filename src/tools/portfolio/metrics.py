@@ -46,34 +46,58 @@ class PortfolioMetrics(PortfolioManager):
             return self._empty_metrics(start_date, end_date, start_value)
         
         history_df = pd.DataFrame(history_list)
-        if history_df.empty or len(history_df) < 2:
+        if history_df.empty:
             return self._empty_metrics(start_date, end_date, start_value)
         
-        # Determine actual date range from history
+        # Determine actual date range - use provided dates if available, otherwise from history
         history_df['date'] = pd.to_datetime(history_df['date'])
         # Rename 'value' column to 'portfolio_value' for consistency
         if 'value' in history_df.columns:
             history_df.rename(columns={'value': 'portfolio_value'}, inplace=True)
         
-        actual_start_dt = history_df['date'].min()
-        actual_end_dt = history_df['date'].max()
-        actual_start_value = history_df['portfolio_value'].iloc[0] if len(history_df) > 0 else start_value
-        actual_end_value = history_df['portfolio_value'].iloc[-1] if len(history_df) > 0 else start_value
+        # Use provided dates if available, otherwise use history dates
+        if start_dt:
+            actual_start_dt = start_dt
+        else:
+            actual_start_dt = history_df['date'].min()
+            
+        if end_dt:
+            actual_end_dt = end_dt
+        else:
+            actual_end_dt = history_df['date'].max()
+        
+        # Get values for start and end (from history if available)
+        history_in_range = history_df[(history_df['date'] >= actual_start_dt) & (history_df['date'] <= actual_end_dt)]
+        
+        if len(history_in_range) > 0:
+            actual_start_value = history_in_range['portfolio_value'].iloc[0] if len(history_in_range) > 0 else start_value
+            actual_end_value = history_in_range['portfolio_value'].iloc[-1] if len(history_in_range) > 0 else start_value
+        else:
+            # No transaction history in the provided date range, use start value
+            actual_start_value = start_value
+            actual_end_value = start_value
+            history_in_range = history_df
         
         # Calculate basic metrics
         period_duration = actual_end_dt - actual_start_dt
         total_return = ((actual_end_value - actual_start_value) / actual_start_value * 100) if actual_start_value > 0 else 0
         
-        # Calculate daily returns
-        history_df['daily_return'] = history_df['portfolio_value'].pct_change() * 100
-        daily_returns = history_df['daily_return'].fillna(0).values
+        # Calculate daily returns (from filtered range)
+        history_in_range['daily_return'] = history_in_range['portfolio_value'].pct_change() * 100
+        daily_returns = history_in_range['daily_return'].fillna(0).values
         
-        # Trade analysis
+        # Trade analysis (filter trades to requested date range)
         completed_trades = df[df['status'] == 'completed'].copy()
-        trades_analysis = self._analyze_trades(completed_trades, history_df)
+        if 'created_at' in completed_trades.columns:
+            completed_trades['created_at'] = pd.to_datetime(completed_trades['created_at'], errors='coerce')
+            completed_trades = completed_trades[
+                (completed_trades['created_at'] >= actual_start_dt) & 
+                (completed_trades['created_at'] <= actual_end_dt)
+            ]
+        trades_analysis = self._analyze_trades(completed_trades, history_in_range)
         
-        # Drawdown analysis
-        max_dd, max_dd_duration = self._calculate_max_drawdown(history_df)
+        # Drawdown analysis (on filtered range)
+        max_dd, max_dd_duration = self._calculate_max_drawdown(history_in_range)
         
         # Risk metrics
         sharpe = self._calculate_sharpe_ratio(daily_returns)

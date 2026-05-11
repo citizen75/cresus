@@ -53,6 +53,12 @@ class EntryRRAgent(Agent):
 
 			df = data_history[ticker]
 			if len(df) < 10:  # Need at least 10 days for meaningful analysis
+				self.logger.warning(f"Insufficient data ({len(df)} rows) for {ticker}, skipping RR calculation")
+				continue
+
+			# Validate that data has at least a close column
+			if 'close' not in df.columns and 'Close' not in df.columns:
+				self.logger.warning(f"Missing 'close' column for {ticker}, skipping RR calculation")
 				continue
 
 			# Calculate RR metrics

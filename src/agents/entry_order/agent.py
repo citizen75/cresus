@@ -201,7 +201,7 @@ class EntryOrderAgent(Agent):
 					risk_amount=order.get("risk_amount"),
 					risk_reward=order.get("risk_reward"),
 					metadata=metadata,
-					created_at=created_at
+					created_at=created_at,
 				)
 			self.logger.info(f"Created {len(executable_orders)} pending orders (not executed)")
 
