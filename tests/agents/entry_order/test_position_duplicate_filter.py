@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import Mock, patch, MagicMock
 
 from core.context import AgentContext
-from agents.entry_order.sub_agents import PositionDuplicateFilterAgent
+from agents.entry.sub_agents import PositionDuplicateFilterAgent
 
 
 class TestPositionDuplicateFilterAgent(unittest.TestCase):
@@ -28,7 +28,7 @@ class TestPositionDuplicateFilterAgent(unittest.TestCase):
 		self.assertEqual(result["status"], "success")
 		self.assertIn("No entry recommendations", result["message"])
 
-	@patch("agents.entry_order.sub_agents.position_duplicate_filter.PortfolioManager")
+	@patch("agents.entry.sub_agents.position_duplicate_filter.PortfolioManager")
 	def test_process_portfolio_not_found(self, mock_pm_class):
 		"""Test process when portfolio is not found."""
 		# Setup mocks
@@ -52,7 +52,7 @@ class TestPositionDuplicateFilterAgent(unittest.TestCase):
 		self.assertEqual(result["status"], "error")
 		self.assertIn("not found", result["message"])
 
-	@patch("agents.entry_order.sub_agents.position_duplicate_filter.PortfolioManager")
+	@patch("agents.entry.sub_agents.position_duplicate_filter.PortfolioManager")
 	def test_filter_duplicate_position(self, mock_pm_class):
 		"""Test filtering out recommendation with existing position."""
 		# Setup mocks
@@ -109,7 +109,7 @@ class TestPositionDuplicateFilterAgent(unittest.TestCase):
 		self.assertEqual(filtered_items[0]["ticker"], "AAPL")
 		self.assertIn("Position already exists", filtered_items[0]["reason"])
 
-	@patch("agents.entry_order.sub_agents.position_duplicate_filter.PortfolioManager")
+	@patch("agents.entry.sub_agents.position_duplicate_filter.PortfolioManager")
 	def test_no_duplicates(self, mock_pm_class):
 		"""Test when no recommendations have duplicate positions."""
 		# Setup mocks
@@ -163,7 +163,7 @@ class TestPositionDuplicateFilterAgent(unittest.TestCase):
 		filtered_items = self.context.get("filtered_duplicate_items")
 		self.assertEqual(len(filtered_items), 0)
 
-	@patch("agents.entry_order.sub_agents.position_duplicate_filter.PortfolioManager")
+	@patch("agents.entry.sub_agents.position_duplicate_filter.PortfolioManager")
 	def test_case_insensitive_ticker_matching(self, mock_pm_class):
 		"""Test that ticker matching is case-insensitive."""
 		# Setup mocks
@@ -205,7 +205,7 @@ class TestPositionDuplicateFilterAgent(unittest.TestCase):
 		remaining_recs = self.context.get("entry_recommendations")
 		self.assertEqual(len(remaining_recs), 0)
 
-	@patch("agents.entry_order.sub_agents.position_duplicate_filter.PortfolioManager")
+	@patch("agents.entry.sub_agents.position_duplicate_filter.PortfolioManager")
 	def test_empty_portfolio(self, mock_pm_class):
 		"""Test filtering when portfolio has no positions."""
 		# Setup mocks

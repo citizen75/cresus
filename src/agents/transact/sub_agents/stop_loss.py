@@ -87,7 +87,6 @@ class StopLossAgent(Agent):
 		try:
 			# Get all open positions from journal (source of truth)
 			open_positions = journal.get_open_positions()
-			self.logger.debug(f"StopLossAgent: Checking {len(open_positions)} open positions")
 			if open_positions.empty:
 				return execution_results
 
