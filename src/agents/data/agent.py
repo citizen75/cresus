@@ -89,17 +89,16 @@ class DataAgent(Agent):
 				if 'volume_20ma' in ticker_data.columns:
 					ticker_data = ticker_data.drop(columns=['volume_20ma'])
 
-				# Sort data in descending order (newest first) for historical analysis
-				# This enables shift notation: [-1] = most recent, [-2] = yesterday, etc.
-				ticker_data = ticker_data.sort_values('timestamp', ascending=False).reset_index(drop=True)
-
-				# Calculate indicators if specified
+				# Calculate indicators on chronologically ordered data (ascending)
+				# This ensures time-series indicators like EMA are calculated correctly
 				if indicators:
 					try:
-						calculated = calculate_indicators(indicators, ticker_data)
+						# Sort in ascending order for indicator calculation
+						ticker_data_asc = ticker_data.sort_values('timestamp', ascending=True).reset_index(drop=True)
+						calculated = calculate_indicators(indicators, ticker_data_asc)
 						indicators_calculated[ticker] = calculated
 
-						# Add calculated indicators as columns to the data
+						# Add calculated indicators as columns to the original data
 						for indicator_name, series in calculated.items():
 							ticker_data[indicator_name] = series
 
@@ -108,6 +107,10 @@ class DataAgent(Agent):
 						ticker_data.to_parquet(dh.filepath, index=False)
 					except Exception as e:
 						self.logger.warning(f"Failed to calculate indicators for {ticker}: {e}")
+
+				# Sort data in descending order (newest first) for historical analysis
+				# This enables shift notation: [-1] = most recent, [-2] = yesterday, etc.
+				ticker_data = ticker_data.sort_values('timestamp', ascending=False).reset_index(drop=True)
 
 				data_history[ticker] = ticker_data
 			except Exception as e:
