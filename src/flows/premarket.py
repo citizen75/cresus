@@ -116,15 +116,19 @@ class PreMarketFlow(Flow):
 		# Ensure portfolio_name is set in context for sub-agents
 		self.context.set("portfolio_name", flow_input["portfolio_name"])
 		self.context.set("strategy_name", self.strategy_name)
-
-		# Handle date-specific watchlist (slice data to specific date if provided)
-		if "date" in flow_input:
-			# If date is provided, slice data_history to that date before processing
-			# This allows viewing the watchlist as it was on a specific trading date
-			self._set_data_history_for_date(self.context, flow_input["date"])
+		
+		# Store target date in context for DataAgent to filter data
+		target_date = flow_input.get("date")
+		if target_date:
+			self.context.set("target_date", target_date)
 
 		# Execute parent flow logic
 		result = super().process(flow_input)
+		
+		# After data is loaded, filter to target date if provided
+		if target_date:
+			self._set_data_history_for_date(self.context, target_date)
+			self.logger.info(f"Sliced data_history to {target_date}")
 
 		# Extract and include watchlist data
 		watchlist = self.context.get("watchlist") or []

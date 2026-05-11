@@ -114,9 +114,9 @@ class EntryFilterAgent(Agent):
 						if len(last_5_days) > 0:
 							self.logger.debug(f"  Latest row sha_10_green={last_5_days.iloc[0].get('sha_10_green', 'N/A')}, sha_10_red={last_5_days.iloc[0].get('sha_10_red', 'N/A')}")
 				except Exception as e:
-					self.logger.warning(f"Error evaluating entry_filter for {ticker}: {e}")
+					self.logger.error(f"Error evaluating entry_filter for {ticker}: {e}")
 					# On error, pass through the recommendation
-					filtered_recommendations.append(rec)
+					#filtered_recommendations.append(rec)
 
 			# Update context with filtered recommendations
 			self.context.set("entry_recommendations", filtered_recommendations)
