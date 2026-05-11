@@ -41,6 +41,7 @@ class TransactFlow(Flow):
 			input_data: Input data with:
 				- date: Trading date (YYYY-MM-DD or date object) - required
 				- portfolio_name: Portfolio to execute for (default: "default")
+				- strategy_name: Strategy name (optional, for backtest mode)
 
 		Returns:
 			Flow result with execution details
@@ -63,9 +64,14 @@ class TransactFlow(Flow):
 			trading_date = date_input
 
 		portfolio_name = flow_input.get("portfolio_name", "default")
+		strategy_name = flow_input.get("strategy_name")
 
 		self.context.set("date", trading_date)
 		self.context.set("portfolio_name", portfolio_name)
+		
+		# Set strategy_name in context if provided (needed by TransactAgent for take_profit check)
+		if strategy_name:
+			self.context.set("strategy_name", strategy_name)
 
 		# Step 1: Get pending orders to determine which tickers to load
 		orders_mgr = Orders(portfolio_name, context=self.context.__dict__)

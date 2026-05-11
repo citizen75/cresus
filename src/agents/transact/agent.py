@@ -297,9 +297,16 @@ class TransactAgent(Agent):
 
 		try:
 			from tools.strategy.strategy import StrategyManager
-			strategy_config = StrategyManager.load_strategy(strategy_name)
-			if not strategy_config:
+			manager = StrategyManager()
+			result = manager.load_strategy(strategy_name)
+			
+			if result.get("status") != "success":
 				self.logger.warning(f"Could not load strategy config for {strategy_name}, enabling take_profit")
+				return True
+			
+			strategy_config = result.get("data", {})
+			if not strategy_config:
+				self.logger.warning(f"Empty strategy config for {strategy_name}, enabling take_profit")
 				return True
 
 			# Check if take_profit is explicitly disabled
