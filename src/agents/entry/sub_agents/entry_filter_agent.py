@@ -100,8 +100,8 @@ class EntryFilterAgent(Agent):
 					continue
 
 				# Get last 5 days of data for evaluation (supports shift notation like [-1], [-2])
-				last_5_days = df.iloc[-5:].copy() if len(df) >= 5 else df.copy()
-
+				# Data is sorted newest-first, so [:5] gets the most recent 5 days
+				last_5_days = df.iloc[:5].copy() if len(df) >= 5 else df.copy()
 				# Evaluate entry_filter formula
 				try:
 					passes_filter = evaluate(entry_filter_formula, last_5_days)

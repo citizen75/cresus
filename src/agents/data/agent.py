@@ -91,7 +91,7 @@ class DataAgent(Agent):
 
 				# Sort data in descending order (newest first) for historical analysis
 				# This enables shift notation: [-1] = most recent, [-2] = yesterday, etc.
-				ticker_data = ticker_data.iloc[::-1].reset_index(drop=True)
+				ticker_data = ticker_data.sort_values('timestamp', ascending=False).reset_index(drop=True)
 
 				# Calculate indicators if specified
 				if indicators:
