@@ -210,8 +210,8 @@ class TestDSLEvaluationIntegration:
 			"rsi_14": 55,
 		}
 		
-		# Mix DSL and traditional notation
-		formula = "close[0] > ema_20[0] and data['rsi_14'] > 50"
+		# Use pure DSL notation (mixed syntax no longer supported)
+		formula = "close[0] > ema_20[0] && rsi_14[0] > 50"
 		result = evaluate(formula, data)
 		assert result is True
 
