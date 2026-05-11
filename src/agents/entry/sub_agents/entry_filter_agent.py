@@ -109,14 +109,10 @@ class EntryFilterAgent(Agent):
 						filtered_recommendations.append(rec)
 					else:
 						blocked_count += 1
-						self.logger.debug(f"Entry filter blocked {ticker}: formula={entry_filter_formula}")
-						self.logger.debug(f"  Available columns: {list(last_5_days.columns)}")
-						if len(last_5_days) > 0:
-							self.logger.debug(f"  Latest row sha_10_green={last_5_days.iloc[0].get('sha_10_green', 'N/A')}, sha_10_red={last_5_days.iloc[0].get('sha_10_red', 'N/A')}")
 				except Exception as e:
-					self.logger.error(f"Error evaluating entry_filter for {ticker}: {e}")
-					# On error, pass through the recommendation
-					#filtered_recommendations.append(rec)
+					self.logger.warning(f"Entry filter evaluation error for {ticker}: {e}")
+					# On formula error, block the recommendation (don't pass through)
+					blocked_count += 1
 
 			# Update context with filtered recommendations
 			self.context.set("entry_recommendations", filtered_recommendations)
