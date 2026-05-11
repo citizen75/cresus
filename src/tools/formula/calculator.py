@@ -5,7 +5,7 @@ import pandas as pd
 from .dsl_helpers import simplify_formula, is_dsl_formula
 
 
-def evaluate(formula: str, data: Dict[str, Any]) -> bool:
+def evaluate(formula: str, data) -> bool:
 	"""Evaluate a formula expression safely.
 
 	Supports both traditional and simplified DSL syntax:
@@ -18,7 +18,8 @@ def evaluate(formula: str, data: Dict[str, Any]) -> bool:
 		         - Traditional: "data['close'] > data['ema_20'] and data['adx_14'] > 25"
 		         - DSL: "close[0] > ema_20[0] and adx_14[0] > 25"
 		         - Mixed with shift: "sha_10_green[-1] == 1 and ema_20[0] < close[0]"
-		data: Dictionary of column values for the formula
+		data: Dictionary of column values or DataFrame for the formula
+		      Can be a dict (evaluates current bar) or DataFrame (supports shift notation)
 
 	Returns:
 		Boolean result of the formula evaluation
@@ -43,6 +44,10 @@ def evaluate(formula: str, data: Dict[str, Any]) -> bool:
 	except KeyError as e:
 		# Extract the missing key from the error message
 		missing_key = str(e).strip("'\"")
-		raise ValueError(f"Missing indicator or column '{missing_key}' in formula '{formula}'. Available columns: {list(data.keys())}")
+		if isinstance(data, dict):
+			available = list(data.keys())
+		else:
+			available = list(data.columns) if hasattr(data, 'columns') else []
+		raise ValueError(f"Missing indicator or column '{missing_key}' in formula '{formula}'. Available columns: {available}")
 	except Exception as e:
 		raise ValueError(f"Failed to evaluate formula '{formula}': {str(e)}")

@@ -99,12 +99,12 @@ class EntryFilterAgent(Agent):
 					filtered_recommendations.append(rec)
 					continue
 
-				# Get latest bar data
-				latest_data = df.iloc[-1].to_dict()
+				# Get last 5 days of data for evaluation (supports shift notation like [-1], [-2])
+				last_5_days = df.iloc[-5:].copy() if len(df) >= 5 else df.copy()
 
 				# Evaluate entry_filter formula
 				try:
-					passes_filter = evaluate(entry_filter_formula, latest_data)
+					passes_filter = evaluate(entry_filter_formula, last_5_days)
 					if passes_filter:
 						filtered_recommendations.append(rec)
 					else:
