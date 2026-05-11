@@ -3,7 +3,8 @@
 from typing import Any, Dict, Optional
 from core.agent import Agent
 from core.flow import Flow
-from agents.entry.sub_agents import EntryScoreAgent, EntryTimingAgent, EntryRRAgent, PositionDuplicateFilterAgent
+from tools.portfolio import PortfolioManager
+from agents.entry.sub_agents import EntryScoreAgent, EntryTimingAgent, EntryRRAgent
 
 
 class EntryAgent(Agent):
@@ -63,12 +64,6 @@ class EntryAgent(Agent):
 		# Create analysis flow with sub-agents
 		entry_flow = Flow("EntryAnalysisFlow", context=self.context)
 
-		# Add position duplicate filter as first step
-		entry_flow.add_step(
-			PositionDuplicateFilterAgent("PositionDuplicateFilterStep"),
-			required=True
-		)
-
 		# Add sub-agents in sequence
 		entry_flow.add_step(
 			EntryScoreAgent("EntryScoreStep"),
@@ -106,6 +101,13 @@ class EntryAgent(Agent):
 		recommendations = self._create_recommendations(
 			watchlist, entry_scores, timing_scores, rr_metrics
 		)
+
+		# Filter duplicates from recommendations AFTER analysis
+		original_count = len(recommendations)
+		recommendations = self._filter_duplicate_recommendations(recommendations)
+		filtered_count = original_count - len(recommendations)
+		if filtered_count > 0:
+			self.logger.info(f"Filtered {filtered_count} duplicate positions from {original_count} recommendations")
 
 		# Store in context for downstream processing
 		self.context.set("entry_recommendations", recommendations)
@@ -270,3 +272,32 @@ class EntryAgent(Agent):
 			}
 			for i, r in enumerate(recommendations[:count])
 		]
+
+	def _filter_duplicate_recommendations(self, recommendations: list) -> list:
+		"""Filter entry recommendations to remove tickers with existing open positions.
+
+		Args:
+			recommendations: List of entry recommendations
+
+		Returns:
+			Filtered list excluding duplicates
+		"""
+		try:
+			portfolio_name = self.context.get("portfolio_name") or "default"
+			pm = PortfolioManager(context=self.context.__dict__)
+			portfolio_details = pm.get_portfolio_details(portfolio_name)
+
+			if not portfolio_details:
+				return recommendations
+
+			# Get existing open positions (case-insensitive)
+			existing_positions = portfolio_details.get("positions", [])
+			existing_tickers = {pos["ticker"].upper() for pos in existing_positions}
+
+			# Filter recommendations
+			filtered = [r for r in recommendations if r.get("ticker", "").upper() not in existing_tickers]
+			return filtered
+		except Exception as e:
+			self.logger.error(f"Error filtering duplicate recommendations: {e}")
+			return recommendations
+
