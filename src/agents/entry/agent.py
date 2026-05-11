@@ -4,6 +4,7 @@ from typing import Any, Dict, Optional
 from core.agent import Agent
 from core.flow import Flow
 from agents.entry.sub_agents import EntryScoreAgent, EntryTimingAgent, EntryRRAgent
+from agents.entry_order.sub_agents import PositionDuplicateFilterAgent
 
 
 class EntryAgent(Agent):
@@ -62,6 +63,12 @@ class EntryAgent(Agent):
 
 		# Create analysis flow with sub-agents
 		entry_flow = Flow("EntryAnalysisFlow", context=self.context)
+
+		# Add position duplicate filter as first step
+		entry_flow.add_step(
+			PositionDuplicateFilterAgent("PositionDuplicateFilterStep"),
+			required=False
+		)
 
 		# Add sub-agents in sequence
 		entry_flow.add_step(
