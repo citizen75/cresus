@@ -56,13 +56,25 @@ def evaluate(formula: str, data: Union[dict, pd.DataFrame]) -> bool:
 		return bool(result)
 
 	except KeyError as e:
-		# Extract the missing key from the error message
-		missing_key = str(e).strip("'\"")
+		# Check if this is a DSL parser error (already has good message)
+		error_msg = str(e).strip("'\"")
+		if error_msg.startswith("Indicator"):
+			# DSL error - raise as ValueError with original message
+			raise ValueError(error_msg)
+		
+		# Traditional pandas KeyError - enhance with available columns
 		if isinstance(data, dict):
 			available = list(data.keys())
 		else:
 			available = list(data.columns) if hasattr(data, 'columns') else []
-		raise ValueError(f"Missing indicator or column '{missing_key}' in formula '{formula}'. Available columns: {available}")
+		raise ValueError(f"Missing indicator or column '{error_msg}' in formula '{formula}'. Available columns: {available}")
+	except ValueError as e:
+		# Re-raise ValueError from DSL parser as-is (already has good message)
+		error_msg = str(e)
+		if "not found" in error_msg or "not supported" in error_msg or "Formula syntax" in error_msg:
+			raise  # Re-raise DSL parser error as-is
+		# Otherwise wrap with more context
+		raise ValueError(f"Failed to evaluate formula '{formula}': {error_msg}")
 	except SyntaxError as e:
 		raise ValueError(f"Formula syntax error: {str(e)}")
 	except Exception as e:
