@@ -102,9 +102,6 @@ class DataAgent(Agent):
 						for indicator_name, series in calculated.items():
 							ticker_data[indicator_name] = series
 
-						# Save updated data back to cache
-						dh.filepath.parent.mkdir(parents=True, exist_ok=True)
-						ticker_data.to_parquet(dh.filepath, index=False)
 					except Exception as e:
 						self.logger.warning(f"Failed to calculate indicators for {ticker}: {e}")
 
