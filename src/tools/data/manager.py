@@ -254,17 +254,20 @@ class DataManager:
                 errors_df = pd.DataFrame(results["errors"])
                 errors_df["timestamp"] = datetime.now().isoformat()
 
-                # Create universe errors directory
-                universe_dir = get_db_root() / "universe"
-                universe_dir.mkdir(parents=True, exist_ok=True)
+                # Create universes errors directory (plural)
+                universes_dir = get_db_root() / "universes"
+                universes_dir.mkdir(parents=True, exist_ok=True)
 
                 # Save to CSV
-                errors_file = universe_dir / f"{universe_name}_errors.csv"
+                errors_file = universes_dir / f"{universe_name}_errors.csv"
 
                 # Append to existing file if it exists
                 if errors_file.exists():
                     existing_df = pd.read_csv(errors_file)
                     errors_df = pd.concat([existing_df, errors_df], ignore_index=True)
+
+                # Deduplicate: keep only unique tickers (first occurrence)
+                errors_df = errors_df.drop_duplicates(subset=['ticker'], keep='first')
 
                 errors_df.to_csv(errors_file, index=False)
                 results["errors_file"] = str(errors_file)
