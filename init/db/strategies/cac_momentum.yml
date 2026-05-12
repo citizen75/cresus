@@ -76,11 +76,11 @@ entry:
       description: Trade only when market regime is trending (reduces losses in choppy
         conditions)
     entry_filter:
-      formula: close[0] > ema_20[0]
+      formula: close[0] > ema_20[0] and adx_20[0] > 20
       description: Entry condition filter
     order_type:
-      formula: market
-      description: Order type for entry (market or limit)
+      formula: limit
+      description: Order type for entry execution
 exit:
   enabled: true
   parameters:

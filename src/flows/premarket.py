@@ -78,6 +78,11 @@ class PreMarketFlow(Flow):
 			watchlist_agent = WatchListAgent("WatchListAgent", self.context)
 			self.add_step(watchlist_agent, step_name="watchlist", required=True)
 
+		# Exit analysis step - evaluate exit conditions FIRST on existing positions
+		# Must run before entry to prevent same-day entry/exit on the same position
+		exit_agent = ExitAgent("ExitAgent", self.context)
+		self.add_step(exit_agent, step_name="exit", required=False)
+
 		# Entry analysis step - analyze trade entry points for watchlist tickers
 		entry_agent = EntryAgent("EntryAgent", self.context)
 		self.add_step(entry_agent, step_name="entry", required=False)
@@ -89,11 +94,6 @@ class PreMarketFlow(Flow):
 		# Save watchlist step - persist watchlist to disk with OHLCV and signal data
 		save_agent = SaveWatchlistAgent("SaveWatchlistAgent", self.strategy_name, context=self.context)
 		self.add_step(save_agent, step_name="save_watchlist", required=False)
-
-		# Exit analysis step - evaluate exit conditions and generate SELL orders
-		# Runs last to ensure all entry orders are created before checking exits
-		exit_agent = ExitAgent("ExitAgent", self.context)
-		self.add_step(exit_agent, step_name="exit", required=False)
 
 	def process(self, input_data: Optional[Dict[str, Any]] = None, save: bool = True) -> Dict[str, Any]:
 		"""Process input data through the pre-market flow.

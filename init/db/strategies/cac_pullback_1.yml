@@ -70,8 +70,8 @@ entry:
       formula: close[0] > ema_20[0]
       description: Entry condition filter
     order_type:
-      formula: market
-      description: Order type for entry (market or limit)
+      formula: limit
+      description: Order type for entry execution
 exit:
   enabled: true
   parameters:
