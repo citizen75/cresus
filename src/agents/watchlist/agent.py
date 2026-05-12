@@ -62,18 +62,6 @@ class WatchListAgent(Agent):
 
 		# Step 3: Initialize watchlist from tickers
 		tickers = self.context.get("tickers") or []
-
-		# IMPORTANT: Preserve entry-valid tickers even if they don't meet all watchlist criteria
-		# Entry_filter ensures tickers meet signal/pattern requirements, so they should be included
-		entry_recommendations = self.context.get("entry_recommendations") or []
-		if entry_recommendations:
-			entry_rec_tickers = {rec.get("ticker") for rec in entry_recommendations}
-			# Add entry-valid tickers to the watchlist initialization
-			tickers_with_entry = list(set(tickers) | entry_rec_tickers)
-			self.logger.info(f"[WATCHLIST] Added {len(entry_rec_tickers)} entry-valid tickers to watchlist pool")
-			self.logger.debug(f"[WATCHLIST] Entry-valid tickers: {list(entry_rec_tickers)}")
-			tickers = tickers_with_entry
-
 		self.context.set("watchlist", tickers)
 		self.logger.debug(f"Initialized watchlist with {len(tickers)} tickers from universe")
 
@@ -143,19 +131,6 @@ class WatchListAgent(Agent):
 
 		# Get final watchlist from context
 		watchlist = self.context.get("watchlist") or []
-
-		# CRITICAL FIX: Ensure entry-valid tickers are in final watchlist
-		# Even if they were filtered out by max_count, they should be included
-		entry_recommendations = self.context.get("entry_recommendations") or []
-		if entry_recommendations:
-			entry_rec_tickers = {rec.get("ticker") for rec in entry_recommendations}
-			watchlist_set = set(watchlist)
-			missing_entries = entry_rec_tickers - watchlist_set
-			if missing_entries:
-				self.logger.info(f"[WATCHLIST] Including {len(missing_entries)} entry-valid tickers in final watchlist")
-				self.logger.debug(f"[WATCHLIST] Entry-valid tickers: {list(missing_entries)}")
-				watchlist = list(watchlist_set | entry_rec_tickers)
-				self.context.set("watchlist", watchlist)
 
 		return {
 			"status": "success",

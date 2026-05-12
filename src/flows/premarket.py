@@ -43,10 +43,14 @@ class PreMarketFlow(Flow):
 
 	def _setup_default_steps(self) -> None:
 		"""Set up default steps for pre-market flow.
-		
-		Flow order depends on mode:
-		- Backtest: Strategy → Data → Watchlist (filter small) → Signals (on filtered)
-		- Live: Strategy → Data → Signals (on all) → Watchlist (filter with signal scores)
+
+		Flow order:
+		1. Strategy - load config and tickers
+		2. Data - fetch data and calculate indicators
+		3. Signals - generate trading signals (backtest: on watchlist; live: on all)
+		4. Watchlist - filter and sort tickers for trading
+		5. Entry - apply entry_filter to watchlist tickers
+		6. Entry_order - create executable orders
 		"""
 		# Strategy step - load tickers and strategy config
 		strategy_agent = StrategyAgent(f"StrategyAgent[{self.strategy_name}]", self.context)
@@ -60,32 +64,27 @@ class PreMarketFlow(Flow):
 		# In backtest mode, filter watchlist BEFORE signals to reduce computation
 		# This significantly speeds up backtests (filters 258 → ~20 before signal analysis)
 		is_backtest = self.context.get("backtest_id") is not None
-		
+
 		if is_backtest:
-			# Backtest: Watchlist → Signals → Entry (for speed optimization)
+			# Backtest: Watchlist BEFORE Signals (for speed optimization)
 			watchlist_agent = WatchListAgent("WatchListAgent", self.context)
 			self.add_step(watchlist_agent, step_name="watchlist", required=True)
 
 			# Signals step - generate trading signals on filtered watchlist only
 			signals_agent = SignalsAgent("SignalsAgent", self.context)
 			self.add_step(signals_agent, step_name="signals", required=True)
-
-			# Entry analysis step - analyze trade entry points for watchlist tickers
-			entry_agent = EntryAgent("EntryAgent", self.context)
-			self.add_step(entry_agent, step_name="entry", required=False)
 		else:
-			# Live: Signals → Entry → Watchlist (entry validates before watchlist filters)
+			# Live: Signals on all tickers first, then Watchlist
 			signals_agent = SignalsAgent("SignalsAgent", self.context)
 			self.add_step(signals_agent, step_name="signals", required=True)
 
-			# Entry analysis step - apply entry_filter to all signal-scored tickers
-			entry_agent = EntryAgent("EntryAgent", self.context)
-			self.add_step(entry_agent, step_name="entry", required=False)
-
-			# Watchlist step - filter tickers based on strategy criteria
-			# Includes entry-valid tickers to ensure they're not filtered out
+			# Watchlist step - filter tickers based on strategy criteria and signal scores
 			watchlist_agent = WatchListAgent("WatchListAgent", self.context)
 			self.add_step(watchlist_agent, step_name="watchlist", required=True)
+
+		# Entry step - apply entry_filter to watchlist tickers
+		entry_agent = EntryAgent("EntryAgent", self.context)
+		self.add_step(entry_agent, step_name="entry", required=False)
 
 		# Entry order step - convert entry signals to executable orders
 		entry_order_agent = EntryOrderAgent("EntryOrderAgent", self.context)
