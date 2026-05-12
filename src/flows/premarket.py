@@ -82,6 +82,10 @@ class PreMarketFlow(Flow):
 			watchlist_agent = WatchListAgent("WatchListAgent", self.context)
 			self.add_step(watchlist_agent, step_name="watchlist", required=True)
 
+		# Note: Data slicing to target_date must happen BEFORE entry analysis
+		# so that entry_filter evaluates on the correct date's data
+		# This is handled explicitly in process() method
+
 		# Entry step - apply entry_filter to watchlist tickers
 		entry_agent = EntryAgent("EntryAgent", self.context)
 		self.add_step(entry_agent, step_name="entry", required=False)
@@ -126,7 +130,7 @@ class PreMarketFlow(Flow):
 		# Ensure portfolio_name is set in context for sub-agents
 		self.context.set("portfolio_name", flow_input["portfolio_name"])
 		self.context.set("strategy_name", self.strategy_name)
-		
+
 		# Store target date in context for DataAgent to filter data
 		target_date = flow_input.get("date")
 		if target_date:
@@ -134,11 +138,28 @@ class PreMarketFlow(Flow):
 
 		# Execute parent flow logic
 		result = super().process(flow_input)
-		
-		# After data is loaded, filter to target date if provided
+
+		# After all steps complete, slice data to target_date if provided
+		# Then re-run entry and downstream agents with sliced data
+		# This ensures entry_filter evaluates on correct historical rows
 		if target_date:
 			self._set_data_history_for_date(self.context, target_date)
 			self.logger.info(f"Sliced data_history to {target_date}")
+
+			# Re-run entry step with sliced data
+			entry_step = self.get_step("entry")
+			if entry_step:
+				self.logger.debug("Re-running entry step with sliced data")
+				entry_result = entry_step.get("agent").process({})
+				entry_step["result"] = entry_result
+				self.context.set("entry_recommendations", entry_result.get("output", {}).get("top_opportunities", []))
+
+				# Re-run entry_order step with updated entry_recommendations
+				entry_order_step = self.get_step("entry_order")
+				if entry_order_step:
+					self.logger.debug("Re-running entry_order step with updated recommendations")
+					eo_result = entry_order_step.get("agent").process({})
+					entry_order_step["result"] = eo_result
 
 		# Extract and include watchlist data
 		watchlist = self.context.get("watchlist") or []
