@@ -18,10 +18,33 @@ class TestStrategyManager:
 
 	@pytest.fixture
 	def temp_project(self):
-		"""Create a temporary project directory."""
+		"""Create a temporary project directory with template."""
 		with TemporaryDirectory() as tmpdir:
 			project_root = Path(tmpdir)
 			(project_root / "db" / "local").mkdir(parents=True, exist_ok=True)
+
+			# Create template directory and file
+			template_dir = project_root / "init" / "templates"
+			template_dir.mkdir(parents=True, exist_ok=True)
+
+			template_data = {
+				"name": "template_name",
+				"universe": "cac40",
+				"description": "Strategy description",
+				"engine": "TaModel",
+				"indicators": [],
+				"watchlist": {"enabled": True, "parameters": {}},
+				"signals": {"enabled": True, "weights": {}, "parameters": {}},
+				"entry": {"enabled": True, "parameters": {"position_size": {"formula": "1000"}}},
+				"order": {"enabled": True, "parameters": {"position_sizing": {"formula": "1000"}}},
+				"exit": {"enabled": True, "parameters": {"stop_loss": {"formula": "0.95"}, "holding_period": {"formula": "10"}}},
+				"backtest": {"initial_capital": 10000},
+			}
+
+			template_file = template_dir / "strategy.yml"
+			with open(template_file, "w") as f:
+				yaml.dump(template_data, f)
+
 			yield project_root
 
 	@pytest.fixture
@@ -194,8 +217,16 @@ class TestStrategyManager:
 		"""Test validating a valid strategy."""
 		strategy_data = {
 			"name": "valid_strategy",
-			"source": "cac40",
-			"agents": {"Agent": {}},
+			"universe": "cac40",
+			"description": "Test strategy",
+			"engine": "TaModel",
+			"indicators": ["ema_20"],
+			"watchlist": {"enabled": True, "parameters": {}},
+			"signals": {"enabled": True, "weights": {}, "parameters": {}},
+			"entry": {"enabled": True, "parameters": {"position_size": {"formula": "1000"}}},
+			"order": {"enabled": True, "parameters": {"position_sizing": {"formula": "1000"}}},
+			"exit": {"enabled": True, "parameters": {"stop_loss": {"formula": "0.95"}, "holding_period": {"formula": "10"}}},
+			"backtest": {"initial_capital": 10000},
 		}
 
 		manager.save_strategy("valid_strategy", strategy_data)
@@ -338,3 +369,240 @@ class TestStrategyManager:
 		assert "s2" in names
 		assert "s3" in names
 		assert "s4" not in names
+
+	def test_load_template_returns_structure(self, manager):
+		"""Test that _load_template returns complete structure."""
+		template = manager._load_template()
+
+		# Check all required top-level keys exist
+		assert "name" in template
+		assert "universe" in template
+		assert "description" in template
+		assert "engine" in template
+		assert "indicators" in template
+
+		# Check all required sections exist
+		assert "watchlist" in template
+		assert "signals" in template
+		assert "entry" in template
+		assert "order" in template
+		assert "exit" in template
+		assert "backtest" in template
+
+	def test_load_template_signals_has_weights_and_parameters(self, manager):
+		"""Test that signals section in template has weights and parameters."""
+		template = manager._load_template()
+		signals = template.get("signals", {})
+
+		assert "weights" in signals
+		assert "parameters" in signals
+
+	def test_load_template_order_has_position_sizing(self, manager):
+		"""Test that order section in template has position_sizing parameter."""
+		template = manager._load_template()
+		order = template.get("order", {})
+
+		assert "parameters" in order
+		assert "position_sizing" in order.get("parameters", {})
+
+	def test_check_strategy_valid(self, manager):
+		"""Test check_strategy on a valid strategy."""
+		strategy_data = {
+			"name": "valid_strategy",
+			"universe": "cac40",
+			"description": "Test strategy",
+			"engine": "TaModel",
+			"indicators": ["ema_20"],
+			"watchlist": {"enabled": True, "parameters": {}},
+			"signals": {"enabled": True, "weights": {}, "parameters": {}},
+			"entry": {"enabled": True, "parameters": {"position_size": {"formula": "1000"}}},
+			"order": {"enabled": True, "parameters": {"position_sizing": {"formula": "1000"}}},
+			"exit": {"enabled": True, "parameters": {"stop_loss": {"formula": "0.95"}, "holding_period": {"formula": "10"}}},
+			"backtest": {"initial_capital": 10000},
+		}
+
+		manager.save_strategy("valid_strategy", strategy_data)
+		result = manager.check_strategy("valid_strategy")
+
+		assert result.get("valid") is True
+		assert result.get("issues") == []
+		assert result.get("issue_count") == 0
+
+	def test_check_strategy_missing_sections(self, manager):
+		"""Test check_strategy detects missing sections."""
+		strategy_data = {
+			"name": "incomplete_strategy",
+			"universe": "cac40",
+			"description": "Incomplete",
+			"engine": "TaModel",
+			"indicators": [],
+		}
+
+		manager.save_strategy("incomplete_strategy", strategy_data)
+		result = manager.check_strategy("incomplete_strategy")
+
+		assert result.get("valid") is False
+		assert result.get("issue_count") > 0
+		issues = result.get("issues", [])
+		assert any("watchlist" in issue for issue in issues)
+		assert any("order" in issue for issue in issues)
+
+	def test_check_strategy_missing_sub_fields(self, manager):
+		"""Test check_strategy detects missing sub-fields."""
+		strategy_data = {
+			"name": "missing_fields",
+			"universe": "cac40",
+			"description": "Test",
+			"engine": "TaModel",
+			"indicators": [],
+			"watchlist": {"enabled": True, "parameters": {}},
+			"signals": {"enabled": False},  # Missing weights and parameters
+			"entry": {"enabled": True, "parameters": {}},  # Missing position_size
+			"order": {"enabled": True, "parameters": {}},
+			"exit": {"enabled": True, "parameters": {}},
+			"backtest": {"initial_capital": 10000},
+		}
+
+		manager.save_strategy("missing_fields", strategy_data)
+		result = manager.check_strategy("missing_fields")
+
+		assert result.get("valid") is False
+		issues = result.get("issues", [])
+		assert any("signals.weights" in issue for issue in issues)
+		assert any("signals.parameters" in issue for issue in issues)
+		assert any("entry.parameters.position_size" in issue for issue in issues)
+
+	def test_fix_strategy_adds_missing_sections(self, manager):
+		"""Test fix_strategy adds missing sections."""
+		strategy_data = {
+			"name": "incomplete",
+			"universe": "cac40",
+			"description": "Test",
+			"engine": "TaModel",
+			"indicators": [],
+			"watchlist": {"enabled": True, "parameters": {}},
+			"signals": {"enabled": False},
+			"entry": {"enabled": True, "parameters": {"position_size": {"formula": "1000"}}},
+			"exit": {"enabled": True, "parameters": {"stop_loss": {"formula": "0.95"}, "holding_period": {"formula": "10"}}},
+			"backtest": {"initial_capital": 10000},
+		}
+
+		manager.save_strategy("incomplete", strategy_data)
+		result = manager.fix_strategy("incomplete")
+
+		assert result.get("status") == "success"
+		assert len(result.get("changes", [])) > 0
+
+		# Verify the fix actually saved
+		loaded = manager.load_strategy("incomplete")
+		loaded_data = loaded.get("data", {})
+		assert "order" in loaded_data
+		assert "weights" in loaded_data.get("signals", {})
+		assert "parameters" in loaded_data.get("signals", {})
+
+	def test_fix_strategy_adds_missing_sub_parameters(self, manager):
+		"""Test fix_strategy adds missing sub-parameters."""
+		strategy_data = {
+			"name": "missing_params",
+			"universe": "cac40",
+			"description": "Test",
+			"engine": "TaModel",
+			"indicators": [],
+			"watchlist": {"enabled": True, "parameters": {}},
+			"signals": {"enabled": False},
+			"entry": {"enabled": True, "parameters": {"position_size": {"formula": "1000"}}},
+			"order": {"enabled": True, "parameters": {}},  # Empty, should be populated
+			"exit": {"enabled": True, "parameters": {"stop_loss": {"formula": "0.95"}, "holding_period": {"formula": "10"}}},
+			"backtest": {"initial_capital": 10000},
+		}
+
+		manager.save_strategy("missing_params", strategy_data)
+		result = manager.fix_strategy("missing_params")
+
+		assert result.get("status") == "success"
+
+		# Verify order.parameters was populated
+		loaded = manager.load_strategy("missing_params")
+		order_params = loaded.get("data", {}).get("order", {}).get("parameters", {})
+		assert "position_sizing" in order_params
+
+	def test_fix_strategy_dry_run(self, manager):
+		"""Test fix_strategy with dry_run doesn't save."""
+		strategy_data = {
+			"name": "dry_run_test",
+			"universe": "cac40",
+			"description": "Test",
+			"engine": "TaModel",
+			"indicators": [],
+			"watchlist": {"enabled": True, "parameters": {}},
+			"signals": {"enabled": False},
+			"entry": {"enabled": True, "parameters": {"position_size": {"formula": "1000"}}},
+			"exit": {"enabled": True, "parameters": {"stop_loss": {"formula": "0.95"}, "holding_period": {"formula": "10"}}},
+			"backtest": {"initial_capital": 10000},
+		}
+
+		manager.save_strategy("dry_run_test", strategy_data)
+		result = manager.fix_strategy("dry_run_test", dry_run=True)
+
+		assert result.get("status") == "success"
+		assert result.get("dry_run") is True
+
+		# Verify the fix was NOT saved
+		loaded = manager.load_strategy("dry_run_test")
+		assert "order" not in loaded.get("data", {})  # Should not have been added
+
+	def test_fix_strategy_reports_changes(self, manager):
+		"""Test fix_strategy reports changes made."""
+		strategy_data = {
+			"name": "report_test",
+			"universe": "cac40",
+			"description": "Test",
+			"engine": "TaModel",
+			"indicators": [],
+			"watchlist": {"enabled": True, "parameters": {}},
+			"signals": {"enabled": False},
+			"entry": {"enabled": True, "parameters": {"position_size": {"formula": "1000"}}},
+			"exit": {"enabled": True, "parameters": {"stop_loss": {"formula": "0.95"}, "holding_period": {"formula": "10"}}},
+			"backtest": {"initial_capital": 10000},
+		}
+
+		manager.save_strategy("report_test", strategy_data)
+		result = manager.fix_strategy("report_test")
+
+		changes = result.get("changes", [])
+		assert len(changes) > 0
+		assert any("signals.weights" in c for c in changes)
+		assert any("signals.parameters" in c for c in changes)
+		assert any("order" in c for c in changes)
+
+	def test_validate_strategy_requires_top_level_fields(self, manager):
+		"""Test validate_strategy_config requires top-level fields."""
+		strategy_data = {"name": "incomplete"}
+
+		manager.save_strategy("incomplete", strategy_data)
+		result = manager.validate_strategy_config("incomplete")
+
+		assert result.get("valid") is False
+		issues = result.get("issues", [])
+		assert any("universe" in issue for issue in issues)
+		assert any("engine" in issue for issue in issues)
+
+	def test_validate_strategy_requires_sections(self, manager):
+		"""Test validate_strategy_config requires all sections."""
+		strategy_data = {
+			"name": "test",
+			"universe": "cac40",
+			"description": "Test",
+			"engine": "TaModel",
+			"indicators": [],
+		}
+
+		manager.save_strategy("test", strategy_data)
+		result = manager.validate_strategy_config("test")
+
+		assert result.get("valid") is False
+		issues = result.get("issues", [])
+		assert any("watchlist" in issue for issue in issues)
+		assert any("entry" in issue for issue in issues)
+		assert any("order" in issue for issue in issues)
+		assert any("exit" in issue for issue in issues)
