@@ -137,7 +137,15 @@ class StopLossAgent(Agent):
 							if hasattr(market_row, 'items'):  # pandas Series or dict
 								for key, value in market_row.items():
 									try:
-										market_metadata[key] = float(value) if value is not None else None
+										if value is None or (hasattr(value, '__class__') and 'NaT' in str(value)):
+											market_metadata[key] = None
+										elif hasattr(value, 'isoformat'):  # datetime/Timestamp
+											market_metadata[key] = value.isoformat()
+										else:
+											try:
+												market_metadata[key] = float(value)
+											except (ValueError, TypeError):
+												market_metadata[key] = str(value)
 									except (ValueError, TypeError):
 										market_metadata[key] = value
 							if not market_metadata:  # If empty after iteration, set to None

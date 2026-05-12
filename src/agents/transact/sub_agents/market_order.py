@@ -207,13 +207,20 @@ class MarketOrderAgent(Agent):
 							else:
 								market_metadata = dict(market_row)
 
-							# Clean up: convert NaN to None and ensure numeric values are proper floats
+							# Clean up: convert NaN to None, numeric values to floats, timestamps to strings
 							for key in list(market_metadata.keys()):
 								val = market_metadata[key]
 								if pd.isna(val):
 									market_metadata[key] = None
 								elif isinstance(val, (int, float)):
 									market_metadata[key] = float(val)
+								elif hasattr(val, 'isoformat'):  # datetime/Timestamp
+									market_metadata[key] = val.isoformat()
+								elif isinstance(val, str):
+									market_metadata[key] = val
+								else:
+									# Convert other types to string as fallback
+									market_metadata[key] = str(val)
 						except Exception as e:
 							self.logger.debug(f"Error extracting market metadata for {ticker}: {e}")
 							market_metadata = None

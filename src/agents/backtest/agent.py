@@ -181,7 +181,7 @@ class BacktestAgent(Agent):
 
 		# Extract trading days from context
 		data_history = self.context.get("data_history") or {}
-		
+
 		# Check if requested date range overlaps with available data
 		data_range = _get_data_date_range(data_history)
 		if not data_range:
@@ -268,7 +268,7 @@ class BacktestAgent(Agent):
 			# Increment to next trading day
 			self.context.set("current_date", next_date)
 
-			# Pass next_date OHLCV data to market flow (no reloading)
+			# Pass next_date OHLCV data to market flow (use cached data, not stale previous day data)
 			next_day_data = day_data_cache.get(next_date, {})
 			self.logger.debug(f"BacktestAgent: next_date={next_date}, next_day_data has {len(next_day_data)} tickers")
 			self.context.set("next_day_data", next_day_data)
