@@ -1,4 +1,4 @@
-"""Stop loss exit agent for handling stop loss triggered exits."""
+"""Stop loss exit agent for handling both fix and trailing stop losses."""
 
 from typing import Any, Dict, Optional, List
 from datetime import date as date_type
@@ -214,7 +214,7 @@ class StopLossAgent(Agent):
 						f"(stop_loss hit at {stop_loss})"
 					)
 				else:
-					self.logger.debug(f"    SL not hit: {day_low:.2f} > {stop_loss:.2f}")
+					self.logger.debug(f"    SL not hit: {day_low:.2f} > {effective_stop_loss:.2f}")
 
 		except Exception as e:
 			self.logger.error(f"Error executing stop loss exits: {e}")
