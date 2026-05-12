@@ -325,6 +325,19 @@ class TransactAgent(Agent):
 				ticker = str(order_row.get("ticker", ""))
 				execution_method = str(order_row.get("execution_method", "market"))
 
+				# Skip SELL orders (handled by _execute_sell_orders)
+				is_sell_order = False
+				try:
+					metadata_str = order_row.get("metadata", "")
+					if metadata_str:
+						metadata_dict = json.loads(metadata_str) if isinstance(metadata_str, str) else metadata_str
+						is_sell_order = metadata_dict.get("order_type") == "SELL"
+				except (json.JSONDecodeError, TypeError, AttributeError):
+					pass
+
+				if is_sell_order:
+					continue
+
 				# Skip limit orders (handled by LimitOrderAgent)
 				if execution_method == "limit":
 					continue
