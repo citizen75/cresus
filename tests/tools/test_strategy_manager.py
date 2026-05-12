@@ -43,7 +43,7 @@ class TestStrategyManager:
 					}
 				},
 				"order": {"enabled": True, "parameters": {"position_sizing": {"formula": "1000"}}},
-				"exit": {"enabled": True, "parameters": {"stop_loss": {"formula": "0.95"}, "holding_period": {"formula": "10"}}},
+				"exit": {"enabled": True, "parameters": {"stop": {"type": "fix", "formula": "0.95"}, "take_profit": {"formula": "1.05"}, "holding_period": {"formula": "10"}}},
 				"backtest": {"initial_capital": 10000},
 			}
 
@@ -229,9 +229,9 @@ class TestStrategyManager:
 			"indicators": ["ema_20"],
 			"watchlist": {"enabled": True, "parameters": {}},
 			"signals": {"enabled": True, "weights": {}, "parameters": {}},
-			"entry": {"enabled": True, "parameters": {"position_size": {"formula": "1000"}}},
+			"entry": {"enabled": True, "parameters": {"position_size": {"formula": "1000"}, "entry_filter": {"formula": "close[0] > ema_20[0]", "description": "Entry filter condition"}}},
 			"order": {"enabled": True, "parameters": {"position_sizing": {"formula": "1000"}}},
-			"exit": {"enabled": True, "parameters": {"stop_loss": {"formula": "0.95"}, "holding_period": {"formula": "10"}}},
+			"exit": {"enabled": True, "parameters": {"stop": {"type": "fix", "formula": "0.95"}, "take_profit": {"formula": "1.05"}, "holding_period": {"formula": "10"}}},
 			"backtest": {"initial_capital": 10000},
 		}
 
@@ -421,9 +421,9 @@ class TestStrategyManager:
 			"indicators": ["ema_20"],
 			"watchlist": {"enabled": True, "parameters": {}},
 			"signals": {"enabled": True, "weights": {}, "parameters": {}},
-			"entry": {"enabled": True, "parameters": {"position_size": {"formula": "1000"}}},
+			"entry": {"enabled": True, "parameters": {"position_size": {"formula": "1000"}, "entry_filter": {"formula": "close[0] > ema_20[0]", "description": "Entry filter condition"}}},
 			"order": {"enabled": True, "parameters": {"position_sizing": {"formula": "1000"}}},
-			"exit": {"enabled": True, "parameters": {"stop_loss": {"formula": "0.95"}, "holding_period": {"formula": "10"}}},
+			"exit": {"enabled": True, "parameters": {"stop": {"type": "fix", "formula": "0.95"}, "take_profit": {"formula": "1.05"}, "holding_period": {"formula": "10"}}},
 			"backtest": {"initial_capital": 10000},
 		}
 
@@ -489,7 +489,7 @@ class TestStrategyManager:
 			"watchlist": {"enabled": True, "parameters": {}},
 			"signals": {"enabled": False},
 			"entry": {"enabled": True, "parameters": {"position_size": {"formula": "1000"}}},
-			"exit": {"enabled": True, "parameters": {"stop_loss": {"formula": "0.95"}, "holding_period": {"formula": "10"}}},
+			"exit": {"enabled": True, "parameters": {"stop": {"type": "fix", "formula": "0.95"}, "holding_period": {"formula": "10"}}},
 			"backtest": {"initial_capital": 10000},
 		}
 
@@ -518,7 +518,7 @@ class TestStrategyManager:
 			"signals": {"enabled": False},
 			"entry": {"enabled": True, "parameters": {"position_size": {"formula": "1000"}}},
 			"order": {"enabled": True, "parameters": {}},  # Empty, should be populated
-			"exit": {"enabled": True, "parameters": {"stop_loss": {"formula": "0.95"}, "holding_period": {"formula": "10"}}},
+			"exit": {"enabled": True, "parameters": {"stop": {"type": "fix", "formula": "0.95"}, "holding_period": {"formula": "10"}}},
 			"backtest": {"initial_capital": 10000},
 		}
 
@@ -543,7 +543,7 @@ class TestStrategyManager:
 			"watchlist": {"enabled": True, "parameters": {}},
 			"signals": {"enabled": False},
 			"entry": {"enabled": True, "parameters": {"position_size": {"formula": "1000"}}},
-			"exit": {"enabled": True, "parameters": {"stop_loss": {"formula": "0.95"}, "holding_period": {"formula": "10"}}},
+			"exit": {"enabled": True, "parameters": {"stop": {"type": "fix", "formula": "0.95"}, "holding_period": {"formula": "10"}}},
 			"backtest": {"initial_capital": 10000},
 		}
 
@@ -568,7 +568,7 @@ class TestStrategyManager:
 			"watchlist": {"enabled": True, "parameters": {}},
 			"signals": {"enabled": False},
 			"entry": {"enabled": True, "parameters": {"position_size": {"formula": "1000"}}},
-			"exit": {"enabled": True, "parameters": {"stop_loss": {"formula": "0.95"}, "holding_period": {"formula": "10"}}},
+			"exit": {"enabled": True, "parameters": {"stop": {"type": "fix", "formula": "0.95"}, "holding_period": {"formula": "10"}}},
 			"backtest": {"initial_capital": 10000},
 		}
 
@@ -634,7 +634,7 @@ class TestStrategyManager:
 			"exit": {
 				"enabled": True,
 				"parameters": {
-					"stop_loss": {"formula": "close[0] - 10"},
+					"stop": {"type": "fix", "formula": "close[0] - 10"},
 					"holding_period": {"formula": "10"}
 				}
 			},
@@ -670,7 +670,7 @@ class TestStrategyManager:
 			"exit": {
 				"enabled": True,
 				"parameters": {
-					"stop_loss": {"formula": "close[0] - atr_14[0]"},  # atr_14 not defined
+					"stop": {"type": "fix", "formula": "close[0] - atr_14[0]"},  # atr_14 not defined
 					"holding_period": {"formula": "10"}
 				}
 			},
@@ -707,7 +707,7 @@ class TestStrategyManager:
 			"exit": {
 				"enabled": True,
 				"parameters": {
-					"stop_loss": {"formula": "close[0] - ema_20[0] * 0.02"},
+					"stop": {"type": "fix", "formula": "close[0] - ema_20[0] * 0.02"},
 					"holding_period": {"formula": "10"}
 				}
 			},
@@ -743,7 +743,7 @@ class TestStrategyManager:
 			"exit": {
 				"enabled": True,
 				"parameters": {
-					"stop_loss": {"formula": "close[0]"},
+					"stop": {"type": "fix", "formula": "close[0]"},
 					"holding_period": {"formula": "10"}
 				}
 			},
@@ -782,7 +782,7 @@ class TestStrategyManager:
 			"exit": {
 				"enabled": True,
 				"parameters": {
-					"stop_loss": {"formula": "0.90"},  # Different from template
+					"stop": {"type": "fix", "formula": "0.90"},  # Different from template
 					"holding_period": {"formula": "5"}  # Different from template
 				}
 			},
@@ -805,7 +805,7 @@ class TestStrategyManager:
 		assert "ema_10" in fixed.get("indicators", [])  # Added from formula reference
 		assert fixed.get("signals", {}).get("weights") == {"custom_signal": 0.8}
 		assert fixed.get("order", {}).get("parameters", {}).get("position_sizing", {}).get("formula") == "custom_formula"
-		assert fixed.get("exit", {}).get("parameters", {}).get("stop_loss", {}).get("formula") == "0.90"
+		assert fixed.get("exit", {}).get("parameters", {}).get("stop", {}).get("formula") == "0.90"
 		assert fixed.get("backtest", {}).get("initial_capital") == 20000
 
 	def test_fix_strategy_only_adds_missing_not_duplicates(self, manager):
@@ -824,7 +824,7 @@ class TestStrategyManager:
 			},
 			"entry": {"enabled": True, "parameters": {"position_size": {"formula": "1000"}}},
 			"order": {"enabled": True, "parameters": {"position_sizing": {"formula": "1000"}}},
-			"exit": {"enabled": True, "parameters": {"stop_loss": {"formula": "0.95"}, "holding_period": {"formula": "10"}}},
+			"exit": {"enabled": True, "parameters": {"stop": {"type": "fix", "formula": "0.95"}, "holding_period": {"formula": "10"}}},
 			"backtest": {"initial_capital": 10000},
 		}
 
@@ -864,7 +864,7 @@ class TestStrategyManager:
 			"exit": {
 				"enabled": True,
 				"parameters": {
-					"stop_loss": {"formula": "0.95"},
+					"stop": {"type": "fix", "formula": "0.95"},
 					"holding_period": {"formula": "10"},
 					"invalid_exit": {"formula": "bad"}
 				}
@@ -908,7 +908,7 @@ class TestStrategyManager:
 			"signals": {"enabled": True, "weights": {}, "parameters": {}},
 			"entry": {"enabled": True, "parameters": {"position_size": {"formula": "1000"}}},
 			"order": {"enabled": True, "parameters": {"position_sizing": {"formula": "1000"}}},
-			"exit": {"enabled": True, "parameters": {"stop_loss": {"formula": "0.95"}, "holding_period": {"formula": "10"}}},
+			"exit": {"enabled": True, "parameters": {"stop": {"type": "fix", "formula": "0.95"}, "holding_period": {"formula": "10"}}},
 			"backtest": {"initial_capital": 10000},
 		}
 
@@ -931,7 +931,7 @@ class TestStrategyManager:
 			"signals": {"enabled": True, "weights": {}, "parameters": {}},
 			"entry": {"enabled": True, "parameters": {"position_size": {"formula": "1000"}}},
 			"order": {"enabled": True, "parameters": {"position_sizing": {"formula": "1000"}}},
-			"exit": {"enabled": True, "parameters": {"stop_loss": {"formula": "0.95"}, "holding_period": {"formula": "10"}}},
+			"exit": {"enabled": True, "parameters": {"stop": {"type": "fix", "formula": "0.95"}, "holding_period": {"formula": "10"}}},
 			"backtest": {"initial_capital": 10000},
 		}
 
@@ -967,7 +967,7 @@ class TestStrategyManager:
 				}
 			},
 			"order": {"enabled": True, "parameters": {"position_sizing": {"formula": "1000"}}},
-			"exit": {"enabled": True, "parameters": {"stop_loss": {"formula": "0.95"}, "holding_period": {"formula": "10"}}},
+			"exit": {"enabled": True, "parameters": {"stop": {"type": "fix", "formula": "0.95"}, "holding_period": {"formula": "10"}}},
 			"backtest": {"initial_capital": 10000},
 		}
 
