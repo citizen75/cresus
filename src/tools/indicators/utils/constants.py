@@ -52,7 +52,7 @@ INDICATOR_PARAMS = {
 
 # Indicator return types
 RETURN_SINGLE = {"rsi", "macd_line", "macd_signal", "macd_histogram", "adx", "obv", "mfi", "cmf", "vwap"}
-RETURN_DICT = {"macd", "bb", "bollinger_bands", "dmi", "pivot", "ha", "sha"}  # Return multiple series
+RETURN_DICT = {"macd", "bb", "bollinger_bands", "dmi", "pivot", "ha", "sha", "hama"}  # Return multiple series
 
 # Default periods if not specified
 DEFAULT_FAST_PERIOD = 12
