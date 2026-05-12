@@ -254,5 +254,49 @@ class TestExitStopConfiguration:
 		assert not is_valid
 		assert any("stop" in err for err in errors)
 
+	def test_fix_strategy_actually_saves_changes(self, manager):
+		"""Test that fix_strategy actually saves the fixed strategy (reproduces --fix issue)."""
+		strategy_data = {
+			"name": "fix_test_strategy",
+			"universe": "cac40",
+			"description": "Test",
+			"engine": "TaModel",
+			"indicators": ["ema_20"],
+			"entry": {
+				"enabled": True,
+				"parameters": {
+					"position_size": {"formula": "1000"},
+					# Missing: entry_filter
+					"order_type": {"formula": "market"}
+				}
+			},
+			"exit": {
+				"enabled": True,
+				"parameters": {
+					# Missing: stop
+					"take_profit": {"formula": "close[0] * 1.05"},
+					"holding_period": {"formula": "10"}
+				}
+			}
+		}
+
+		manager.save_strategy("fix_test_strategy", strategy_data)
+
+		# Actual fix (not dry run) - this is where the issue occurred
+		result = manager.fix_strategy("fix_test_strategy", dry_run=False)
+
+		# Should not return "Unknown error"
+		assert result["status"] == "success", f"Fix failed with: {result.get('message', result)}"
+		assert "entry_filter" in str(result.get("changes", [])).lower()
+		assert "stop" in str(result.get("changes", [])).lower()
+
+		# Verify the fixed strategy can be loaded and validated
+		loaded = manager.load_strategy("fix_test_strategy")
+		assert loaded["status"] == "success"
+
+		fixed_data = loaded["data"]
+		assert "entry_filter" in fixed_data.get("entry", {}).get("parameters", {})
+		assert "stop" in fixed_data.get("exit", {}).get("parameters", {})
+
 if __name__ == "__main__":
 	pytest.main([__file__, "-v"])
