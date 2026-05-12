@@ -20,6 +20,7 @@ from agents.data.agent import DataAgent
 from agents.signals.agent import SignalsAgent
 from agents.entry.agent import EntryAgent
 from agents.entry_order.agent import EntryOrderAgent
+from agents.exit.agent import ExitAgent
 
 
 class PreMarketFlow(Flow):
@@ -88,6 +89,11 @@ class PreMarketFlow(Flow):
 		# Save watchlist step - persist watchlist to disk with OHLCV and signal data
 		save_agent = SaveWatchlistAgent("SaveWatchlistAgent", self.strategy_name, context=self.context)
 		self.add_step(save_agent, step_name="save_watchlist", required=False)
+
+		# Exit analysis step - evaluate exit conditions and generate SELL orders
+		# Runs last to ensure all entry orders are created before checking exits
+		exit_agent = ExitAgent("ExitAgent", self.context)
+		self.add_step(exit_agent, step_name="exit", required=False)
 
 	def process(self, input_data: Optional[Dict[str, Any]] = None, save: bool = True) -> Dict[str, Any]:
 		"""Process input data through the pre-market flow.
