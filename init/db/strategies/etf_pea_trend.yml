@@ -1,6 +1,7 @@
 name: etf_pea_trend
 universe: cac40_etf
-description: Trend-following strategy for CAC40 ETFs with fixed €1500 position sizing
+description: "Trend-following strategy for CAC40 ETFs with fixed \u20AC1500 position\
+  \ sizing"
 engine: TaModel
 indicators:
 - atr_14
@@ -23,7 +24,8 @@ watchlist:
       description: Rank ETFs by trend strength
     trend:
       formula: close[0] > ema_20[0] and ema_20[0] > ema_50[0] and adx_20[0] > 25
-      description: 'Trend detection: Price > EMA20 > EMA50 with strong ADX confirms uptrend'
+      description: 'Trend detection: Price > EMA20 > EMA50 with strong ADX confirms
+        uptrend'
     volatility:
       formula: atr_14[0] > close[0] * 0.015
       description: 'Volatility filter: ATR > 1.5% of price ensures adequate movement'
@@ -52,23 +54,25 @@ entry:
   parameters:
     position_size:
       formula: 1500 / close[0]
-      description: Fixed capital allocation of €1500 per ETF position (consistent sizing)
+      description: "Fixed capital allocation of \u20AC1500 per ETF position (consistent\
+        \ sizing)"
     max_daily_orders:
       formula: 3
       description: Maximum 3 buys per day to limit daily allocation
     entry_filter:
       formula: close[0] > ema_20[0] and ema_20[0] > ema_50[0] and adx_20[0] > 25
-      description: Entry only on strong uptrends with confirmed trend strength
+      description: Entry condition filter
     order_type:
       formula: market
-      description: Use market orders for immediate entry on trend signals
+      description: Order type for entry execution
 exit:
   enabled: true
   parameters:
     stop:
       type: trailing
       formula: close[0] * 0.97
-      description: Trailing stop at 3% below highest price reached during holding period
+      description: Trailing stop at 3% below highest price reached during holding
+        period
     take_profit:
       formula: close[0] * 1.08
       description: Take profit at 8% above entry
