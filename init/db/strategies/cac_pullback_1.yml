@@ -66,23 +66,27 @@ entry:
     max_daily_orders:
       formula: 5
       description: Limit orders per day to manage risk
+    entry_filter:
+      formula: close[0] > ema_20[0]
+      description: Entry condition filter
+    order_type:
+      formula: market
+      description: Order type for entry (market or limit)
 exit:
   enabled: true
   parameters:
-    stop_loss:
-      formula: close[0] * 0.97
-      description: Trailing stop at 3% below current price (moves up as price rises)
     take_profit:
       formula: close[0] + atr_14[0] * 2.0
       description: Target profit at 2 ATR above entry
-    trailing_stop:
-      formula: close[0] * 0.96
-      description: Percentage-based trailing stop at 4% below entry protects pullback gains
     holding_period:
       formula: 8
       description: Maximum holding 8 days - pullback reversals are short-term
     time_stop:
       formula: 1
       description: Cancel unfilled orders after 1 day
+    stop:
+      type: trailing
+      formula: close[0] * 0.97
+      description: Trailing stop at 3% below current price (moves up as price rises)
 backtest:
   initial_capital: 10000

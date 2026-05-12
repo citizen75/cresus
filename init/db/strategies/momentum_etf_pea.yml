@@ -66,20 +66,29 @@ entry:
   parameters:
     position_size:
       formula: 1000 / close[0]
-      description: Fixed capital allocation of €1000 per ETF trade
+      description: "Fixed capital allocation of \u20AC1000 per ETF trade"
+    entry_filter:
+      formula: close[0] > ema_20[0]
+      description: Entry condition filter
+    order_type:
+      formula: market
+      description: Order type for entry (market or limit)
 exit:
   enabled: true
   parameters:
-    stop_loss:
-      formula: close[0] - atr_14[0] * 2.0
-      description: Trailing stop at 2x ATR below current price (volatility-adjusted, moves up as price rises)
     take_profit:
       formula: close[0] + atr_14[0] * 3.5
       description: Take profit target at 3.5x ATR above entry for asymmetric risk-reward
+    stop:
+      type: trailing
+      formula: close[0] - atr_14[0] * 2.0
+      description: Trailing stop at 2x ATR below current price (volatility-adjusted,
+        moves up as price rises)
 risk_management:
   stop_loss:
     atr_multiple: 2.0
-    description: Trailing stop set at 2x ATR below current price for volatility-adjusted risk (moves up as price rises)
+    description: Trailing stop set at 2x ATR below current price for volatility-adjusted
+      risk (moves up as price rises)
   take_profit:
     atr_multiple: 3.5
     description: Take profit target at 3.5x ATR above entry for asymmetric risk-reward

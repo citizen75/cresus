@@ -75,19 +75,19 @@ entry:
       formula: close[0] > ema_20[0] and adx_20[0] > 20
       description: Trade only when market regime is trending (reduces losses in choppy
         conditions)
+    entry_filter:
+      formula: close[0] > ema_20[0]
+      description: Entry condition filter
+    order_type:
+      formula: market
+      description: Order type for entry (market or limit)
 exit:
   enabled: true
   parameters:
-    stop_loss:
-      formula: close[0] - atr_14[0] * 1.3
-      description: Trailing stop at 1.3x ATR below current price (volatility-adjusted, moves up as price rises)
     take_profit:
       formula: close[0] + atr_14[0] * 2.6
       description: Target at 2.6 ATR maintains ~2:1 reward/risk and aligns with realistic
         swing move potential
-    trailing_stop:
-      formula: close[0] * 0.97
-      description: Percentage-based trailing stop at 3% below entry price provides consistent protection relative to price level
     holding_period:
       formula: 12
       description: Maximum holding period of 12 trading days aligned with momentum
@@ -96,5 +96,10 @@ exit:
       formula: 1
       description: Cancel unfilled entry orders after 1 day (separates execution logic
         from holding logic)
+    stop:
+      type: trailing
+      formula: close[0] - atr_14[0] * 1.3
+      description: Trailing stop at 1.3x ATR below current price (volatility-adjusted,
+        moves up as price rises)
 backtest:
   initial_capital: 10000

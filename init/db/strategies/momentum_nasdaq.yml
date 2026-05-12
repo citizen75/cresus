@@ -15,16 +15,23 @@ entry:
   parameters:
     position_size:
       formula: 1000 / close[0]
-      description: Fixed capital allocation of €1000 per trade
+      description: "Fixed capital allocation of \u20AC1000 per trade"
+    entry_filter:
+      formula: close[0] > ema_20[0]
+      description: Entry condition filter
+    order_type:
+      formula: market
+      description: Order type for entry (market or limit)
 exit:
   enabled: true
   parameters:
-    stop_loss:
-      formula: close[0] * 0.97
-      description: Trailing stop at 3% below current price (moves up as price rises)
     take_profit:
       formula: close[0] * 1.05
       description: Take profit at 5% above entry
+    stop:
+      type: trailing
+      formula: close[0] * 0.97
+      description: Trailing stop at 3% below current price (moves up as price rises)
 watchlist:
   enabled: true
   parameters:

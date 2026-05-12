@@ -56,18 +56,22 @@ entry:
     max_daily_orders:
       formula: 3
       description: Maximum 3 buys per day to limit daily allocation
+    entry_filter:
+      formula: close[0] > ema_20[0] and ema_20[0] > ema_50[0] and adx_20[0] > 25
+      description: Entry only on strong uptrends with confirmed trend strength
+    order_type:
+      formula: market
+      description: Use market orders for immediate entry on trend signals
 exit:
   enabled: true
   parameters:
-    stop_loss:
-      formula: close[0] * 0.96
-      description: Trailing stop at 4% below current price (moves up as price rises)
+    stop:
+      type: trailing
+      formula: close[0] * 0.97
+      description: Trailing stop at 3% below highest price reached during holding period
     take_profit:
       formula: close[0] * 1.08
       description: Take profit at 8% above entry
-    trailing_stop:
-      formula: close[0] * 0.97
-      description: Percentage-based trailing stop at 3% below highest price
     holding_period:
       formula: 60
       description: Exit after 60 days maximum holding period
