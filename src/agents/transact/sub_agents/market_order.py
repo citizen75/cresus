@@ -2,6 +2,7 @@
 
 from typing import Any, Dict, Optional, List
 from datetime import date as date_type
+import pandas as pd
 from core.agent import Agent
 from tools.portfolio.orders import Orders
 from tools.portfolio.journal import Journal
@@ -55,6 +56,7 @@ class MarketOrderAgent(Agent):
 		# Filter for market orders only (orders with execution_method=market)
 		market_orders = self._get_market_orders(orders_mgr)
 		self.logger.debug(f"[MarketOrderAgent] Found {len(market_orders)} market orders out of {len(orders_mgr.load_df())} total orders")
+		self.logger.debug(f"[MarketOrderAgent] day_data has {len(day_data)} tickers: {list(day_data.keys())[:5] if day_data else 'empty'}")
 		if market_orders.empty:
 			self.logger.debug("[MarketOrderAgent] No market orders to execute")
 			return {
@@ -190,20 +192,26 @@ class MarketOrderAgent(Agent):
 				if result.status == "filled":
 					orders_mgr.update_order_status(order_id, "executed")
 
-					# Get market data row for metadata
+					# Get market data row for metadata (OHLCV + indicators at execution time)
 					market_row = day_data.get(ticker)
-					market_metadata = {}
+					market_metadata = None
+
 					if market_row is not None:
-						# Extract OHLCV and indicators from row (handles pandas Series or dict)
+						# Extract OHLCV and indicators from row (pandas Series or dict)
 						try:
-							if hasattr(market_row, 'items'):  # pandas Series or dict
+							market_metadata = {}
+							if hasattr(market_row, 'items'):
 								for key, value in market_row.items():
 									try:
-										market_metadata[key] = float(value) if value is not None else None
+										# Try to convert to float, keep as-is if fails
+										market_metadata[key] = float(value) if pd.notna(value) else None
 									except (ValueError, TypeError):
 										market_metadata[key] = value
-						except Exception:
-							pass
+							if len(market_metadata) == 0:
+								market_metadata = None
+						except Exception as e:
+							self.logger.warning(f"Error extracting market metadata for {ticker}: {e}")
+							market_metadata = None
 
 					# Record BUY transaction in journal with stop loss and take profit
 					journal.add_transaction(

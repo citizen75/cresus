@@ -177,18 +177,22 @@ class TimeLimitAgent(Agent):
 
 					# Get market data row for metadata
 					market_row = day_data.get(ticker)
-					market_metadata = {}
+					market_metadata = None
 					if market_row is not None:
 						# Extract OHLCV and indicators from row (handles pandas Series or dict)
 						try:
+							market_metadata = {}
 							if hasattr(market_row, 'items'):  # pandas Series or dict
 								for key, value in market_row.items():
 									try:
 										market_metadata[key] = float(value) if value is not None else None
 									except (ValueError, TypeError):
 										market_metadata[key] = value
-						except Exception:
-							pass
+							if not market_metadata:  # If empty after iteration, set to None
+								market_metadata = None
+						except Exception as e:
+							self.logger.debug(f"Error extracting market metadata for {ticker}: {e}")
+							market_metadata = None
 
 					# Record SELL transaction
 					journal.add_transaction(

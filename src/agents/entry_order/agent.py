@@ -205,8 +205,8 @@ class EntryOrderAgent(Agent):
 											metadata[key] = float(value) if value is not None else None
 										except (ValueError, TypeError):
 											metadata[key] = value
-						except Exception:
-							pass
+						except Exception as e:
+							self.logger.debug(f"Error extracting market metadata for {order.get('ticker')}: {e}")
 
 				orders_mgr.add_order(
 					ticker=order.get("ticker"),
@@ -335,8 +335,8 @@ class EntryOrderAgent(Agent):
 											metadata[key] = float(value) if value is not None else None
 										except (ValueError, TypeError):
 											metadata[key] = value
-						except Exception:
-							pass
+						except Exception as e:
+							self.logger.debug(f"Error extracting market metadata for {order.get('ticker')}: {e}")
 
 				order_id = orders_mgr.add_order(
 					ticker=order.get("ticker"),
@@ -394,19 +394,23 @@ class EntryOrderAgent(Agent):
 
 					# Get market data for metadata if available
 					day_data = self.context.get("day_data") or {}
-					market_metadata = {}
+					market_metadata = None
 					if day_data and order.get("ticker") in day_data:
 						market_row = day_data[order.get("ticker")]
 						if market_row is not None:
 							try:
+								market_metadata = {}
 								if hasattr(market_row, 'items'):  # pandas Series or dict
 									for key, value in market_row.items():
 										try:
 											market_metadata[key] = float(value) if value is not None else None
 										except (ValueError, TypeError):
 											market_metadata[key] = value
-							except Exception:
-								pass
+								if not market_metadata:  # If empty after iteration, set to None
+									market_metadata = None
+							except Exception as e:
+								self.logger.debug(f"Error extracting market metadata for {order.get('ticker')}: {e}")
+								market_metadata = None
 
 					journal.add_transaction(
 						operation="BUY",
