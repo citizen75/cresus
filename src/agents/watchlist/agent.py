@@ -4,7 +4,7 @@ from typing import Any, Dict, Optional
 from core.agent import Agent
 from core.flow import Flow
 from agents.data.agent import DataAgent
-from agents.watchlist.sub_agents import MaxTickersAgent, FilterVolumeAgent, RankTickersAgent, TrendAgent, VolatilityAgent, FilterStaleDataAgent
+from agents.watchlist.sub_agents import MaxTickersAgent, FilterVolumeAgent, RankTickersAgent, TrendAgent, VolatilityAgent, FilterStaleDataAgent, FilterOpenPositionsAgent
 
 
 class WatchListAgent(Agent):
@@ -112,7 +112,7 @@ class WatchListAgent(Agent):
 			watchlist_flow.add_step(
 				MaxTickersAgent(
 					"MaxTickersStep",
-					max_tickers=watchlist_params.get("max_count", 50)
+					max_tickers=int(watchlist_params.get("max_count", 50))
 				),
 				required=False
 			)
@@ -184,6 +184,13 @@ class WatchListAgent(Agent):
 		has_volatility = "volatility" in params
 		has_ranking = "ranking" in params
 
+		# Extract max_count and ensure it's an integer
+		max_count = params.get("tickers", {}).get("max_count", defaults["max_count"])
+		try:
+			max_count = int(max_count)
+		except (ValueError, TypeError):
+			max_count = defaults["max_count"]
+
 		return {
 			"volume_enabled": "volume" in params,
 			"trend_enabled": has_trend,
@@ -191,5 +198,5 @@ class WatchListAgent(Agent):
 			"ranking_enabled": has_ranking,
 			"metric": params.get("ranking", {}).get("metric", defaults["metric"]) if has_ranking else defaults["metric"],
 			"max_enabled": True,
-			"max_count": params.get("tickers", {}).get("max_count", defaults["max_count"]),
+			"max_count": max_count,
 		}
