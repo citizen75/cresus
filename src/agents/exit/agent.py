@@ -1,24 +1,23 @@
-"""Exit agent for evaluating and generating exit orders."""
+"""Exit agent for evaluating exit conditions."""
 
 from typing import Any, Dict, Optional, List
 from core.agent import Agent
 from core.flow import Flow
 from agents.exit.sub_agents import ExitConditionAgent, TrailingStopAgent, StopLossAgent
 from tools.portfolio.journal import Journal
-from tools.portfolio.orders import Orders
 
 
 class ExitAgent(Agent):
-	"""Agent for evaluating exit conditions and generating SELL orders.
+	"""Agent for evaluating exit conditions and updating context.
 
-	Orchestrates exit analysis for open positions and generates SELL orders
-	when exit conditions are met. Orders are passed to TransactAgent for execution.
+	Evaluates exit conditions for all open positions and stores results
+	in context for TransactAgent to execute. Does not create orders or transactions.
 
-	Exit conditions checked:
-	1. Condition-based exits (formula evaluation)
-	2. Stop loss (price-based exits at TransactAgent level)
-	3. Take profit (price-based exits at TransactAgent level)
-	4. Holding period (time-based exits at TransactAgent level)
+	Exit conditions evaluated:
+	1. Stop loss (fix or trailing) - calculates effective levels
+	2. Take profit targets
+	3. Holding period limits
+	4. Condition-based exits
 	"""
 
 	def __init__(self, name: str = "ExitAgent", context: Optional[Any] = None):
@@ -34,16 +33,16 @@ class ExitAgent(Agent):
 		self.exit_condition_agent = ExitConditionAgent("ExitConditionAgent")
 
 	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-		"""Generate SELL orders for open positions that meet exit conditions.
+		"""Evaluate exit conditions and update context.
 
-		Evaluates all exit conditions and generates SELL orders for positions
-		that should be closed. Orders are saved to pending orders table.
+		Evaluates all exit conditions for open positions and stores results
+		in context. Does not create or save orders - TransactAgent handles execution.
 
 		Args:
 			input_data: Input data (optional, uses context)
 
 		Returns:
-			Response dictionary with generated SELL orders
+			Response dictionary with evaluation status
 		"""
 		if input_data is None:
 			input_data = {}
@@ -62,7 +61,7 @@ class ExitAgent(Agent):
 			self.logger.debug("No open positions to evaluate for exits")
 			return {
 				"status": "success",
-				"output": {"exit_orders": []},
+				"output": {},
 				"message": "No open positions to evaluate",
 			}
 
@@ -71,13 +70,13 @@ class ExitAgent(Agent):
 		# Create exit evaluation flow
 		exit_flow = Flow("ExitEvaluationFlow", context=self.context)
 
-		# Add stop loss exits (handles both fix and trailing types)
+		# Add stop loss evaluation (calculates effective stop losses)
 		exit_flow.add_step(
 			StopLossAgent("StopLossStep"),
 			required=False
 		)
 
-		# Add trailing stop update step (runs before condition evaluation)
+		# Add trailing stop updates (updates highest price tracking)
 		exit_flow.add_step(
 			TrailingStopAgent("TrailingStopStep"),
 			required=False
@@ -89,68 +88,19 @@ class ExitAgent(Agent):
 			required=False
 		)
 
-		# Execute the flow
+		# Execute the flow (results stored in context, not orders)
 		flow_result = exit_flow.process({
 			"day_data": day_data,
 			"data_history": data_history,
 		})
 
-		# Collect all exit orders from sub-agents
-		all_exit_orders = []
+		if flow_result.get("status") != "success":
+			self.logger.warning(f"Exit evaluation flow failed: {flow_result.get('message', 'Unknown error')}")
 
-		if flow_result.get("status") == "success":
-			output = flow_result.get("output", {})
-			all_exit_orders.extend(output.get("exit_orders", []))
-
-		# Save exit orders to pending orders table
-		orders_mgr = Orders(portfolio_name, context=self.context.__dict__)
-		saved_order_ids = []
-
-		for order in all_exit_orders:
-			try:
-				# Use add_order method with metadata flag to mark as SELL order
-				metadata = {
-					"order_type": "SELL",
-					"exit_type": order.get("exit_type"),
-					**order.get("metadata", {})
-				}
-
-				# Add market data to metadata if available
-				day_data = self.context.get("day_data") or {}
-				if day_data and order.get("ticker") in day_data:
-					market_row = day_data[order.get("ticker")]
-					if market_row is not None:
-						try:
-							if hasattr(market_row, 'items'):  # pandas Series or dict
-								for key, value in market_row.items():
-									if key not in metadata:  # Don't override order metadata
-										try:
-											metadata[key] = float(value) if value is not None else None
-										except (ValueError, TypeError):
-											metadata[key] = value
-						except Exception:
-							pass
-
-				order_id = orders_mgr.add_order(
-					ticker=order.get("ticker"),
-					quantity=order.get("quantity"),
-					entry_price=order.get("exit_price", 0),
-					execution_method=order.get("execution_method", "market"),
-					metadata=metadata,
-					replace_same_day=False
-				)
-				saved_order_ids.append(order_id)
-				self.logger.debug(f"Saved SELL order {order_id[:8]} for {order.get('ticker')}")
-			except Exception as e:
-				self.logger.error(f"Error saving SELL order for {order.get('ticker')}: {e}")
-
-		self.logger.info(f"[EXIT] Generated {len(all_exit_orders)} SELL orders for {len(saved_order_ids)} saved")
+		self.logger.info(f"[EXIT] Exit evaluation complete")
 
 		return {
 			"status": "success",
-			"output": {
-				"exit_orders": all_exit_orders,
-				"saved_order_ids": saved_order_ids,
-			},
-			"message": f"Generated and saved {len(all_exit_orders)} SELL orders",
+			"output": {},
+			"message": "Exit conditions evaluated, results in context",
 		}
