@@ -4,7 +4,6 @@
 name: strategy_name
 universe: cac40  # Data source: cac40, srd, enx_large, nasdaq_100, etf_pea, etc.
 description: Brief description of strategy objectives and logic
-engine: TaModel  # Engine type: TaModel, LightGbmModel, AnomalyModel
 
 # Technical indicators to calculate and make available to formulas
 indicators:
