@@ -191,6 +191,23 @@ class EntryOrderAgent(Agent):
 				# Include limit_price_formula in metadata for re-evaluation at execution time
 				if order.get("limit_price_formula"):
 					metadata["limit_price_formula"] = order.get("limit_price_formula")
+
+				# Add market data to metadata if available
+				day_data = self.context.get("day_data") or {}
+				if day_data and order.get("ticker") in day_data:
+					market_row = day_data[order.get("ticker")]
+					if market_row is not None:
+						try:
+							if hasattr(market_row, 'items'):  # pandas Series or dict
+								for key, value in market_row.items():
+									if key not in metadata:  # Don't override strategy metadata
+										try:
+											metadata[key] = float(value) if value is not None else None
+										except (ValueError, TypeError):
+											metadata[key] = value
+						except Exception:
+							pass
+
 				orders_mgr.add_order(
 					ticker=order.get("ticker"),
 					quantity=order.get("shares"),
@@ -304,6 +321,23 @@ class EntryOrderAgent(Agent):
 			for order in orders:
 				# Save order to Orders file (pending status)
 				metadata = order.get("metadata", {})
+
+				# Add market data to metadata if available
+				day_data = self.context.get("day_data") or {}
+				if day_data and order.get("ticker") in day_data:
+					market_row = day_data[order.get("ticker")]
+					if market_row is not None:
+						try:
+							if hasattr(market_row, 'items'):  # pandas Series or dict
+								for key, value in market_row.items():
+									if key not in metadata:  # Don't override strategy metadata
+										try:
+											metadata[key] = float(value) if value is not None else None
+										except (ValueError, TypeError):
+											metadata[key] = value
+						except Exception:
+							pass
+
 				order_id = orders_mgr.add_order(
 					ticker=order.get("ticker"),
 					quantity=order.get("shares"),

@@ -108,6 +108,22 @@ class ExitAgent(Agent):
 					**order.get("metadata", {})
 				}
 
+				# Add market data to metadata if available
+				day_data = self.context.get("day_data") or {}
+				if day_data and order.get("ticker") in day_data:
+					market_row = day_data[order.get("ticker")]
+					if market_row is not None:
+						try:
+							if hasattr(market_row, 'items'):  # pandas Series or dict
+								for key, value in market_row.items():
+									if key not in metadata:  # Don't override order metadata
+										try:
+											metadata[key] = float(value) if value is not None else None
+										except (ValueError, TypeError):
+											metadata[key] = value
+						except Exception:
+							pass
+
 				order_id = orders_mgr.add_order(
 					ticker=order.get("ticker"),
 					quantity=order.get("quantity"),
