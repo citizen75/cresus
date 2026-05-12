@@ -358,6 +358,17 @@ class EntryOrderAgent(Agent):
 						else:
 							created_at = f"{context_date.isoformat()}T14:00:00.000000"
 
+					# Get market data for metadata if available
+					day_data = self.context.get("day_data") or {}
+					market_metadata = {}
+					if day_data and order.get("ticker") in day_data:
+						market_row = day_data[order.get("ticker")]
+						for key in market_row.keys():
+							try:
+								market_metadata[key] = float(market_row[key]) if market_row[key] is not None else None
+							except (ValueError, TypeError):
+								market_metadata[key] = market_row[key]
+
 					journal.add_transaction(
 						operation="BUY",
 						ticker=order.get("ticker"),
@@ -369,7 +380,8 @@ class EntryOrderAgent(Agent):
 						take_profit=order.get("take_profit"),
 						trailing_stop_distance=order.get("trailing_stop_distance"),
 						highest_price=result.filled_price,
-						created_at=created_at
+						created_at=created_at,
+						metadata=market_metadata if market_metadata else None
 					)
 
 					self.logger.info(

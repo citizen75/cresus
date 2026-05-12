@@ -175,6 +175,17 @@ class TimeLimitAgent(Agent):
 					}
 					execution_results.append(execution_result)
 
+					# Get market data row for metadata
+					market_row = day_data.get(ticker, {})
+					market_metadata = {}
+					if market_row:
+						# Extract OHLCV and indicators from row
+						for key in market_row.keys():
+							try:
+								market_metadata[key] = float(market_row[key]) if market_row[key] is not None else None
+							except (ValueError, TypeError):
+								market_metadata[key] = market_row[key]
+
 					# Record SELL transaction
 					journal.add_transaction(
 						operation="SELL",
@@ -185,7 +196,8 @@ class TimeLimitAgent(Agent):
 						notes=f"Time limit exit after {holding_days} days",
 						created_at=f"{trading_date.isoformat()}T14:00:00.000000",
 						exit_type="expired",
-						status_at=f"{trading_date.isoformat()}T14:00:00.000000"
+						status_at=f"{trading_date.isoformat()}T14:00:00.000000",
+						metadata=market_metadata
 					)
 
 					# Mark related pending orders as executed

@@ -6,6 +6,7 @@ from typing import Dict, Any, Optional, List
 import pandas as pd
 import os
 import uuid
+import json
 
 
 class Journal:
@@ -13,7 +14,7 @@ class Journal:
 
     BASE_COLUMNS = [
         "id", "created_at", "operation", "ticker", "quantity",
-        "price", "amount", "fees", "stop_loss", "take_profit", "trailing_stop_distance", "highest_price", "status", "status_at", "exit_type", "notes"
+        "price", "amount", "fees", "stop_loss", "take_profit", "trailing_stop_distance", "highest_price", "status", "status_at", "exit_type", "notes", "metadata"
     ]
 
     def __init__(self, name: str = "default", context: Optional[Dict[str, Any]] = None):
@@ -96,7 +97,8 @@ class Journal:
     def add_transaction(self, operation: str, ticker: str, quantity: int, price: float,
                        fees: float = 0, notes: str = "", created_at: str = None,
                        stop_loss: float = None, take_profit: float = None, highest_price: float = None,
-                       trailing_stop_distance: float = None, exit_type: str = None, status_at: str = None) -> str:
+                       trailing_stop_distance: float = None, exit_type: str = None, status_at: str = None,
+                       metadata: Optional[Dict[str, Any]] = None) -> str:
         """Add a new transaction to journal.
 
         Operations: BUY, SELL, CASH (deposit/withdrawal)
@@ -136,6 +138,13 @@ class Journal:
             ticker_val = ticker.upper()
             price_val = float(price)
 
+        metadata_json = ""
+        if metadata:
+            try:
+                metadata_json = json.dumps(metadata)
+            except Exception:
+                metadata_json = ""
+
         new_row = {
             "id": transaction_id,
             "created_at": tx_created_at,
@@ -152,7 +161,8 @@ class Journal:
             "status": "completed",
             "status_at": tx_status_at,
             "exit_type": exit_type if operation_upper == "SELL" else None,
-            "notes": notes
+            "notes": notes,
+            "metadata": metadata_json
         }
 
         import warnings

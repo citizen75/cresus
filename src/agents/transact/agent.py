@@ -264,6 +264,17 @@ class TransactAgent(Agent):
 					except (json.JSONDecodeError, TypeError):
 						pass
 
+					# Get market data row for metadata
+					market_row = day_data.get(ticker, {})
+					market_metadata = {}
+					if market_row:
+						# Extract OHLCV and indicators from row
+						for key in market_row.keys():
+							try:
+								market_metadata[key] = float(market_row[key]) if market_row[key] is not None else None
+							except (ValueError, TypeError):
+								market_metadata[key] = market_row[key]
+
 					# Record SELL transaction in journal
 					journal.add_transaction(
 						operation="SELL",
@@ -273,7 +284,8 @@ class TransactAgent(Agent):
 						fees=0,
 						notes=f"Order {order_id[:8]} executed",
 						created_at=f"{trading_date.isoformat()}T14:00:00.000000",
-						exit_type=exit_type
+						exit_type=exit_type,
+						metadata=market_metadata
 					)
 
 					self.logger.info(
@@ -396,6 +408,17 @@ class TransactAgent(Agent):
 				if result.status == "filled":
 					orders_mgr.update_order_status(order_id, "executed")
 
+					# Get market data row for metadata
+					market_row = day_data.get(ticker, {})
+					market_metadata = {}
+					if market_row:
+						# Extract OHLCV and indicators from row
+						for key in market_row.keys():
+							try:
+								market_metadata[key] = float(market_row[key]) if market_row[key] is not None else None
+							except (ValueError, TypeError):
+								market_metadata[key] = market_row[key]
+
 					# Record BUY transaction in journal with stop loss, take profit, and trailing stop
 					journal.add_transaction(
 						operation="BUY",
@@ -408,7 +431,8 @@ class TransactAgent(Agent):
 						trailing_stop_distance=trailing_stop_distance,
 						highest_price=result.filled_price,
 						notes=f"Order {order_id[:8]} executed",
-						created_at=f"{trading_date.isoformat()}T14:00:00.000000"
+						created_at=f"{trading_date.isoformat()}T14:00:00.000000",
+						metadata=market_metadata
 					)
 
 					self.logger.info(

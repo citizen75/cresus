@@ -217,6 +217,17 @@ class LimitOrderAgent(Agent):
 				if result.status == "filled":
 					orders_mgr.update_order_status(order_id, "executed")
 
+					# Get market data row for metadata
+					market_row = day_data.get(ticker, {})
+					market_metadata = {}
+					if market_row:
+						# Extract OHLCV and indicators from row
+						for key in market_row.keys():
+							try:
+								market_metadata[key] = float(market_row[key]) if market_row[key] is not None else None
+							except (ValueError, TypeError):
+								market_metadata[key] = market_row[key]
+
 					# Record BUY transaction in journal with stop loss and take profit
 					journal.add_transaction(
 						operation="BUY",
@@ -227,7 +238,8 @@ class LimitOrderAgent(Agent):
 						stop_loss=stop_loss,
 						take_profit=take_profit,
 						notes=f"Limit order {order_id[:8]} executed @ {limit_price:.2f}",
-						created_at=f"{trading_date.isoformat()}T14:00:00.000000"
+						created_at=f"{trading_date.isoformat()}T14:00:00.000000",
+						metadata=market_metadata
 					)
 
 					self.logger.info(

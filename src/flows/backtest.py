@@ -249,6 +249,18 @@ class BacktestFlow(Flow):
 		except Exception as e:
 			self.logger.warning(f"Could not save context.json: {e}")
 
+		# Copy strategy file to backtest directory for reference
+		try:
+			strategy_manager = StrategyManager()
+			strategy_file = strategy_manager._get_strategy_file(strategy_name)
+			if strategy_file.exists():
+				import shutil
+				dest_file = Path(backtest_dir) / f"{strategy_name}.yml"
+				shutil.copy2(strategy_file, dest_file)
+				self.logger.info(f"Copied strategy file to {dest_file}")
+		except Exception as e:
+			self.logger.warning(f"Could not copy strategy file: {e}")
+
 		return {
 			"status": "success",
 			"output": backtest_output,
