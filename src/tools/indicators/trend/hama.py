@@ -98,6 +98,10 @@ def calculate(
 
     ma_line = _apply_ma(trend_source, ema_line, ma_line_type)
 
+    # Calculate color signals
+    hama_green = (hama_close > hama_open).astype(int)  # 1 for bullish, 0 for bearish
+    hama_red = (hama_close < hama_open).astype(int)    # 1 for bearish, 0 for bullish
+
     # Extract only current period if history was used
     if history_df is not None:
         result_len = len(data)
@@ -106,6 +110,8 @@ def calculate(
         hama_low = hama_low.iloc[-result_len:].reset_index(drop=True)
         hama_close = hama_close.iloc[-result_len:].reset_index(drop=True)
         ma_line = ma_line.iloc[-result_len:].reset_index(drop=True)
+        hama_green = hama_green.iloc[-result_len:].reset_index(drop=True)
+        hama_red = hama_red.iloc[-result_len:].reset_index(drop=True)
 
     return {
         'close': hama_close.fillna(closes.mean()),  # Default return
@@ -113,6 +119,8 @@ def calculate(
         'high': hama_high.fillna(highs.mean()),
         'low': hama_low.fillna(lows.mean()),
         'trend': ma_line.fillna(closes.mean()),  # trend = MA line
+        'green': hama_green,  # 1 when close > open (bullish)
+        'red': hama_red,      # 1 when close < open (bearish)
     }
 
 
