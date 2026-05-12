@@ -363,11 +363,16 @@ class EntryOrderAgent(Agent):
 					market_metadata = {}
 					if day_data and order.get("ticker") in day_data:
 						market_row = day_data[order.get("ticker")]
-						for key in market_row.keys():
+						if market_row is not None:
 							try:
-								market_metadata[key] = float(market_row[key]) if market_row[key] is not None else None
-							except (ValueError, TypeError):
-								market_metadata[key] = market_row[key]
+								if hasattr(market_row, 'items'):  # pandas Series or dict
+									for key, value in market_row.items():
+										try:
+											market_metadata[key] = float(value) if value is not None else None
+										except (ValueError, TypeError):
+											market_metadata[key] = value
+							except Exception:
+								pass
 
 					journal.add_transaction(
 						operation="BUY",

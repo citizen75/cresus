@@ -265,15 +265,19 @@ class TransactAgent(Agent):
 						pass
 
 					# Get market data row for metadata
-					market_row = day_data.get(ticker, {})
+					market_row = day_data.get(ticker)
 					market_metadata = {}
-					if market_row:
-						# Extract OHLCV and indicators from row
-						for key in market_row.keys():
-							try:
-								market_metadata[key] = float(market_row[key]) if market_row[key] is not None else None
-							except (ValueError, TypeError):
-								market_metadata[key] = market_row[key]
+					if market_row is not None:
+						# Extract OHLCV and indicators from row (handles pandas Series or dict)
+						try:
+							if hasattr(market_row, 'items'):  # pandas Series or dict
+								for key, value in market_row.items():
+									try:
+										market_metadata[key] = float(value) if value is not None else None
+									except (ValueError, TypeError):
+										market_metadata[key] = value
+						except Exception:
+							pass
 
 					# Record SELL transaction in journal
 					journal.add_transaction(
@@ -409,15 +413,19 @@ class TransactAgent(Agent):
 					orders_mgr.update_order_status(order_id, "executed")
 
 					# Get market data row for metadata
-					market_row = day_data.get(ticker, {})
+					market_row = day_data.get(ticker)
 					market_metadata = {}
-					if market_row:
-						# Extract OHLCV and indicators from row
-						for key in market_row.keys():
-							try:
-								market_metadata[key] = float(market_row[key]) if market_row[key] is not None else None
-							except (ValueError, TypeError):
-								market_metadata[key] = market_row[key]
+					if market_row is not None:
+						# Extract OHLCV and indicators from row (handles pandas Series or dict)
+						try:
+							if hasattr(market_row, 'items'):  # pandas Series or dict
+								for key, value in market_row.items():
+									try:
+										market_metadata[key] = float(value) if value is not None else None
+									except (ValueError, TypeError):
+										market_metadata[key] = value
+						except Exception:
+							pass
 
 					# Record BUY transaction in journal with stop loss, take profit, and trailing stop
 					journal.add_transaction(
