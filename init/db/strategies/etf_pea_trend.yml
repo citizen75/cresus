@@ -82,3 +82,6 @@ exit:
     holding_period:
       formula: 60
       description: Exit after 60 days maximum holding period
+    condition:
+      formula: 'False'
+      description: Exit condition disabled - using stop loss and trailing stop only
