@@ -62,33 +62,30 @@ class PreMarketFlow(Flow):
 		is_backtest = self.context.get("backtest_id") is not None
 		
 		if is_backtest:
-			# Backtest: filter first for speed
+			# Backtest: Watchlist → Signals → Entry (for speed optimization)
 			watchlist_agent = WatchListAgent("WatchListAgent", self.context)
 			self.add_step(watchlist_agent, step_name="watchlist", required=True)
-			
+
 			# Signals step - generate trading signals on filtered watchlist only
 			signals_agent = SignalsAgent("SignalsAgent", self.context)
 			self.add_step(signals_agent, step_name="signals", required=True)
+
+			# Entry analysis step - analyze trade entry points for watchlist tickers
+			entry_agent = EntryAgent("EntryAgent", self.context)
+			self.add_step(entry_agent, step_name="entry", required=False)
 		else:
-			# Live: signals on all tickers first, then entry filter, then watchlist
+			# Live: Signals → Entry → Watchlist (entry validates before watchlist filters)
 			signals_agent = SignalsAgent("SignalsAgent", self.context)
 			self.add_step(signals_agent, step_name="signals", required=True)
 
-			# Entry analysis step - apply entry_filter to ALL signal-scored tickers BEFORE watchlist
-			# This ensures entry-valid tickers survive to watchlist filtering
+			# Entry analysis step - apply entry_filter to all signal-scored tickers
 			entry_agent = EntryAgent("EntryAgent", self.context)
 			self.add_step(entry_agent, step_name="entry", required=False)
 
-			# Watchlist step - filter tickers based on strategy criteria and entry validity
-			# Operates on both entry-valid tickers and other tickers to build final watchlist
+			# Watchlist step - filter tickers based on strategy criteria
+			# Includes entry-valid tickers to ensure they're not filtered out
 			watchlist_agent = WatchListAgent("WatchListAgent", self.context)
 			self.add_step(watchlist_agent, step_name="watchlist", required=True)
-
-		# For backtest mode, entry was not added above, so add it here if in backtest
-		if is_backtest:
-			# Entry analysis step - analyze trade entry points for watchlist tickers (backtest)
-			entry_agent = EntryAgent("EntryAgent", self.context)
-			self.add_step(entry_agent, step_name="entry", required=False)
 
 		# Entry order step - convert entry signals to executable orders
 		entry_order_agent = EntryOrderAgent("EntryOrderAgent", self.context)
