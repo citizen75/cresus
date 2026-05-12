@@ -145,19 +145,22 @@ class OrderConstructionAgent(Agent):
 			# Determine execution method and limit price
 			execution_method = order.get("execution_method", "market")
 			limit_price = None
+			limit_price_formula = None
 
-			# Check if entry config specifies limit orders
-			if "limit_price" in entry_config:
-				# Allow strategy to use limit orders
+			# Only calculate limit_price if execution_method is "limit"
+			# Respect the execution_method set by EntryTimingAgent (from strategy order_type config)
+			if execution_method == "limit" and "limit_price" in entry_config:
+				# Calculate limit price for limit orders
 				lp_formula = entry_config["limit_price"].get("formula")
 				if lp_formula:
+					# Store formula for later evaluation at execution time with fresh market data
+					limit_price_formula = lp_formula
+					# For now, use entry_price as placeholder - will be re-evaluated at execution
 					data_context = {
 						"close": entry_price,
 						"atr_14": rec.get("risk_amount", 0),
 					}
 					limit_price = evaluate_numeric_formula(lp_formula, data_context)
-					if limit_price:
-						execution_method = "limit"
 
 			executable_order = {
 				"id": self._generate_order_id(ticker),
@@ -165,6 +168,7 @@ class OrderConstructionAgent(Agent):
 				"shares": order.get("shares"),
 				"entry_price": entry_price,
 				"limit_price": limit_price,
+				"limit_price_formula": limit_price_formula,  # Store formula for re-evaluation at execution time
 				"execution_method": execution_method,
 				"limit_offset": order.get("limit_offset", 0),
 				"scale_count": order.get("scale_count", 1),

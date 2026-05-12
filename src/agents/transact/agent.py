@@ -14,6 +14,7 @@ from .sub_agents import (
 	TargetAgent,
 	TimeLimitAgent,
 	LimitOrderAgent,
+	MarketOrderAgent,
 )
 
 
@@ -41,6 +42,7 @@ class TransactAgent(Agent):
 		self.target_agent = TargetAgent("TargetAgent")
 		self.time_limit_agent = TimeLimitAgent("TimeLimitAgent")
 		self.limit_agent = LimitOrderAgent("LimitOrderAgent")
+		self.market_agent = MarketOrderAgent("MarketOrderAgent")
 
 	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
 		"""Execute pending BUY orders and manage exits (stop_loss) for a specific date.
@@ -94,15 +96,10 @@ class TransactAgent(Agent):
 		limit_result = self.limit_agent.process({"day_data": day_data})
 		buy_results.extend(limit_result.get("output", {}).get("orders", []))
 
-		# 2. Execute market orders (remaining pending orders)
-		market_results = self._execute_buy_orders(
-			orders_mgr,
-			journal,
-			portfolio_name,
-			trading_date,
-			day_data
-		)
-		buy_results.extend(market_results)
+		# 2. Execute market orders (fill immediately at market price)
+		self.market_agent.context = self.context
+		market_result = self.market_agent.process({"day_data": day_data})
+		buy_results.extend(market_result.get("output", {}).get("orders", []))
 
 		# Load strategy config to get holding_period for exits (if not already set)
 		if not self.context.get("holding_period"):

@@ -74,9 +74,12 @@ entry:
     extension_filter:
       formula: (close[0] - ema_10[0]) / ema_10[0] < 0.05
       description: Avoid chasing extended moves
+    order_type:
+      formula: limit
+      description: "limit or market - determines how entry orders are executed"
     limit_price:
       formula: close[0] * 0.99
-      description: Limit order price (leave out for market orders)
+      description: Limit order price (only used if order_type is limit)
 
 order:
   enabled: true
@@ -90,9 +93,6 @@ order:
     max_positions:
       formula: 5
       description: 5 positions max at any time
-    order_type:
-      formula: 'limit'
-      description: "limit or market"
     fees:
       formula: 0.001
       description: Estimated fees as a percentage of trade value

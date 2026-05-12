@@ -188,6 +188,9 @@ class EntryOrderAgent(Agent):
 						created_at = f"{context_date.isoformat()}T09:00:00.000000"
 
 				metadata = order.get("metadata", {})
+				# Include limit_price_formula in metadata for re-evaluation at execution time
+				if order.get("limit_price_formula"):
+					metadata["limit_price_formula"] = order.get("limit_price_formula")
 				orders_mgr.add_order(
 					ticker=order.get("ticker"),
 					quantity=order.get("shares"),

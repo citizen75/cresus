@@ -122,6 +122,15 @@ class EntryFilterAgent(Agent):
 				# Data is sorted newest-first, so [:5] gets the most recent 5 days
 				last_5_days = df.iloc[:5].copy() if len(df) >= 5 else df.copy()
 
+				# Debug: Show available columns and values for first few rows
+				if len(last_5_days) > 0:
+					available_cols = list(last_5_days.columns)
+					self.logger.debug(f"[ENTRY-FILTER] {ticker}: Available columns: {available_cols}")
+					if 'sha_10_red' in available_cols and 'sha_10_green' in available_cols:
+						for i in range(min(3, len(last_5_days))):
+							row = last_5_days.iloc[i]
+							self.logger.debug(f"[ENTRY-FILTER] {ticker}[{i}]: sha_10_red={row.get('sha_10_red')}, sha_10_green={row.get('sha_10_green')}")
+
 				# Evaluate entry_filter formula
 				try:
 					passes_filter = evaluate(entry_filter_formula, last_5_days)

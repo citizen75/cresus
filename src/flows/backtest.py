@@ -79,14 +79,33 @@ class BacktestFlow(Flow):
 
 		# Load and set strategy_config early (needed by all agents and flows)
 		from tools.strategy import StrategyManager
+		from tools.strategy.validator import StrategyValidator
 		sm = StrategyManager()
 		strategy_result = sm.load_strategy(strategy_name)
-		if strategy_result.get("status") == "success":
-			strategy_config = strategy_result.get("data", {})
-			self.context.set("strategy_config", strategy_config)
-			self.logger.debug(f"Loaded strategy_config for {strategy_name}")
-		else:
-			self.logger.warning(f"Could not load strategy_config for {strategy_name}")
+		if strategy_result.get("status") != "success":
+			return {
+				"status": "error",
+				"message": f"Failed to load strategy '{strategy_name}': {strategy_result.get('message', 'Unknown error')}"
+			}
+
+		strategy_config = strategy_result.get("data", {})
+
+		# Validate strategy configuration
+		validator = StrategyValidator()
+		is_valid, validation_errors = validator.validate(strategy_config)
+		if not is_valid:
+			error_msg = f"Strategy '{strategy_name}' validation failed:\n"
+			for error in validation_errors:
+				error_msg += f"  - {error}\n"
+			self.logger.error(error_msg)
+			return {
+				"status": "error",
+				"message": error_msg,
+				"validation_errors": validation_errors
+			}
+
+		self.context.set("strategy_config", strategy_config)
+		self.logger.info(f"Loaded and validated strategy: {strategy_name}")
 
 		# Derive portfolio name from strategy if not provided
 		portfolio_name = flow_input.get("portfolio_name") or self._strategy_to_portfolio_name(strategy_name)

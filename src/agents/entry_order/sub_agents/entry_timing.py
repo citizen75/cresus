@@ -41,23 +41,30 @@ class EntryTimingAgent(Agent):
 				"message": "No sized orders to time"
 			}
 
+		# Get order_type from strategy config
+		strategy_config = self.context.get("strategy_config") or {}
+		entry_config = strategy_config.get("entry", {})
+		order_type_param = entry_config.get("parameters", {}).get("order_type", {})
+		order_type_formula = order_type_param.get("formula", "limit") if isinstance(order_type_param, dict) else order_type_param
+
+		# Parse order_type formula (simple string value)
+		configured_order_type = str(order_type_formula).lower().strip()
+
 		timed_orders = []
 		for order in sized_orders:
 			ticker = order.get("ticker")
-			entry_score = self._get_entry_score(ticker)
-			momentum = self._get_momentum(ticker)
 
-			# Determine execution method
-			if entry_score >= 80 and momentum > 0.5:
-				execution_method = "market"
+			# Use configured order_type from strategy
+			execution_method = configured_order_type
+
+			# Set offsets based on execution method
+			if execution_method == "market":
 				limit_offset = 0
 				scale_count = 1
-			elif entry_score >= 65 and momentum > 0:
-				execution_method = "limit"
+			elif execution_method == "limit":
 				limit_offset = -0.005  # 0.5% below market
 				scale_count = 1
-			else:
-				execution_method = "scale_in"
+			else:  # scale_in or other
 				limit_offset = -0.01  # 1% below market
 				scale_count = 3  # Scale in over 3 bars
 
