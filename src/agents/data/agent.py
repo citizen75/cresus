@@ -11,27 +11,45 @@ class DataAgent(Agent):
 	"""Agent for managing and processing data-related tasks."""
 
 	def _find_missing_indicators(self, data_history: dict, required_indicators: list) -> list:
-		"""Find which indicators are missing across all tickers.
+		"""Find which indicators are missing or invalid across all tickers.
 
 		Args:
 			data_history: Dict of {ticker: DataFrame}
 			required_indicators: List of indicator names to check
 
 		Returns:
-			List of missing indicator names (empty if all present)
+			List of missing/invalid indicator names (empty if all present and valid)
 		"""
 		if not data_history:
 			return required_indicators
 
 		# Get columns from first non-empty DataFrame
 		existing_columns = set()
+		sample_df = None
 		for df in data_history.values():
 			if not df.empty:
 				existing_columns = set(df.columns)
+				sample_df = df
 				break
 
-		# Find missing indicators
-		missing = [ind for ind in required_indicators if ind not in existing_columns]
+		# Find missing indicators AND indicators that are invalid (entirely NaN or NaN in recent rows)
+		missing = []
+		for ind in required_indicators:
+			if ind not in existing_columns:
+				missing.append(ind)
+			elif sample_df is not None and ind in sample_df.columns:
+				col = sample_df[ind]
+				# Check if the indicator column is entirely NaN or NaN in the most recent rows
+				if col.isna().all():
+					# Entirely NaN
+					missing.append(ind)
+				else:
+					# Check if most recent rows (last rows in DataFrame, which are the newest by timestamp) are NaN
+					recent_count = min(5, len(col))
+					if col.iloc[-recent_count:].isna().sum() > 0:
+						# Recent rows have NaN - need to recalculate
+						missing.append(ind)
+
 		return missing
 
 	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
