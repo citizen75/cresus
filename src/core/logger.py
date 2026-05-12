@@ -110,50 +110,40 @@ class AgentLogger:
 
 	def info(self, message: str):
 		"""Log an info level message."""
-		formatted_msg = f"[{self.agent_name}] {message}"
+		formatted_msg = f"[{self.agent_name}]  {message}"
 		if HAS_LOGURU:
-			frame = inspect.currentframe().f_back
-			rel_path = _get_relative_path(frame.f_code.co_filename)
-			loguru_logger.info(f"{rel_path}:{frame.f_lineno} - {formatted_msg}")
+			loguru_logger.info(formatted_msg)
 		else:
 			print(f"INFO: {formatted_msg}")
 
 	def error(self, message: str):
 		"""Log an error level message."""
-		formatted_msg = f"[{self.agent_name}] {message}"
+		formatted_msg = f"[{self.agent_name}]  {message}"
 		if HAS_LOGURU:
-			frame = inspect.currentframe().f_back
-			rel_path = _get_relative_path(frame.f_code.co_filename)
-			loguru_logger.error(f"{rel_path}:{frame.f_lineno} - {formatted_msg}")
+			loguru_logger.error(formatted_msg)
 		else:
 			print(f"ERROR: {formatted_msg}")
 
 	def debug(self, message: str):
 		"""Log a debug level message."""
-		formatted_msg = f"[{self.agent_name}] {message}"
+		formatted_msg = f"[{self.agent_name}]  {message}"
 		if HAS_LOGURU:
-			frame = inspect.currentframe().f_back
-			rel_path = _get_relative_path(frame.f_code.co_filename)
-			loguru_logger.debug(f"{rel_path}:{frame.f_lineno} - {formatted_msg}")
+			loguru_logger.debug(formatted_msg)
 		else:
 			print(f"DEBUG: {formatted_msg}")
 
 	def warning(self, message: str):
 		"""Log a warning level message."""
-		formatted_msg = f"[{self.agent_name}] {message}"
+		formatted_msg = f"[{self.agent_name}]  {message}"
 		if HAS_LOGURU:
-			frame = inspect.currentframe().f_back
-			rel_path = _get_relative_path(frame.f_code.co_filename)
-			loguru_logger.warning(f"{rel_path}:{frame.f_lineno} - {formatted_msg}")
+			loguru_logger.warning(formatted_msg)
 		else:
 			print(f"WARNING: {formatted_msg}")
 
 	def exception(self, message: str):
 		"""Log an exception level message."""
-		formatted_msg = f"[{self.agent_name}] {message}"
+		formatted_msg = f"[{self.agent_name}]  {message}"
 		if HAS_LOGURU:
-			frame = inspect.currentframe().f_back
-			rel_path = _get_relative_path(frame.f_code.co_filename)
-			loguru_logger.exception(f"{rel_path}:{frame.f_lineno} - {formatted_msg}")
+			loguru_logger.exception(formatted_msg)
 		else:
 			print(f"EXCEPTION: {formatted_msg}")
