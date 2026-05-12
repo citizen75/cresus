@@ -5,11 +5,13 @@ from datetime import date as date_type
 from core.agent import Agent
 from tools.portfolio.journal import Journal
 from tools.portfolio.orders import Orders
+from tools.strategy.strategy import StrategyManager
 
 
 class StopLossAgent(Agent):
 	"""Execute stop loss exits when price falls below stop loss level.
 
+	Handles both fix (static) and trailing (dynamic) stop losses.
 	Checks all open positions and exits any that hit their stop loss price.
 	Uses journal as source of truth for positions (no broker dependency).
 	"""
@@ -69,6 +71,7 @@ class StopLossAgent(Agent):
 	) -> List[Dict[str, Any]]:
 		"""Check open positions and execute exits if stop_loss hit.
 
+		Handles both fix (static) and trailing (dynamic) stop losses.
 		Records SELL transactions directly in journal (no broker needed).
 		Marks corresponding orders as executed.
 
@@ -84,6 +87,22 @@ class StopLossAgent(Agent):
 		execution_results = []
 		orders_mgr = Orders(portfolio_name, context=self.context.__dict__)
 
+		# Load strategy config to get stop_type
+		strategy_name = self.context.get("strategy_name") if self.context else None
+		stop_type = "fix"  # Default to fix
+
+		if strategy_name:
+			try:
+				strategy_manager = StrategyManager()
+				strategy_result = strategy_manager.load_strategy(strategy_name)
+				if strategy_result.get("status") == "success":
+					strategy_data = strategy_result.get("data", {})
+					exit_config = strategy_data.get("exit", {}).get("parameters", {})
+					if "stop" in exit_config:
+						stop_type = exit_config["stop"].get("type", "fix")
+			except Exception as e:
+				self.logger.debug(f"Could not load strategy config: {e}")
+
 		try:
 			# Get all open positions from journal (source of truth)
 			open_positions = journal.get_open_positions()
@@ -94,8 +113,10 @@ class StopLossAgent(Agent):
 				ticker = str(position.get("ticker", ""))
 				quantity = int(position.get("quantity", 0))
 				stop_loss = float(position.get("stop_loss", 0)) if position.get("stop_loss") else None
+				highest_price = float(position.get("highest_price", 0)) if position.get("highest_price") else None
+				trailing_stop_distance = float(position.get("trailing_stop_distance", 0)) if position.get("trailing_stop_distance") else None
 
-				self.logger.debug(f"  Position {ticker}: qty={quantity}, SL={stop_loss}")
+				self.logger.debug(f"  Position {ticker}: qty={quantity}, type={stop_type}, SL={stop_loss}")
 
 				if not stop_loss or quantity <= 0:
 					self.logger.debug(f"    Skipping: no SL or zero qty")
@@ -103,22 +124,39 @@ class StopLossAgent(Agent):
 
 				# Get market data for today (day_data is {ticker: row}, pre-sliced)
 				day_low = self._get_day_low(ticker, day_data)
-				self.logger.debug(f"    day_low={day_low}")
+				day_high = self._get_day_high(ticker, day_data)
+				self.logger.debug(f"    day_low={day_low}, day_high={day_high}")
 				if day_low is None:
 					self.logger.debug(f"    No market data")
 					continue
 
+				# For trailing stops, update highest_price and calculate dynamic stop loss
+				effective_stop_loss = stop_loss
+				if stop_type == "trailing" and trailing_stop_distance is not None:
+					if day_high is not None and highest_price is not None and day_high > highest_price:
+						# Update highest price for trailing stop
+						new_highest = day_high
+						journal.update_position_highest_price(ticker, new_highest)
+						highest_price = new_highest
+						self.logger.debug(f"    Updated highest_price to {new_highest:.2f}")
+
+					# Calculate dynamic stop loss for trailing stop
+					if highest_price is not None:
+						effective_stop_loss = highest_price - trailing_stop_distance
+						self.logger.debug(f"    Trailing stop: highest={highest_price:.2f}, distance={trailing_stop_distance:.2f}, dynamic_SL={effective_stop_loss:.2f}")
+
 				# Check if stop_loss was hit
-				if day_low <= stop_loss:
-					self.logger.info(f"STOP LOSS HIT: {ticker} day_low={day_low:.2f} <= SL={stop_loss:.2f}")
+				if day_low <= effective_stop_loss:
+					self.logger.info(f"STOP LOSS HIT: {ticker} day_low={day_low:.2f} <= SL={effective_stop_loss:.2f} ({stop_type})")
 
 					# Execute EXIT at stop_loss price
-					exit_price = stop_loss
+					exit_price = effective_stop_loss
 
 					execution_result = {
 						"ticker": ticker,
 						"quantity": quantity,
-						"stop_loss": stop_loss,
+						"stop_loss": effective_stop_loss,
+						"stop_type": stop_type,
 						"day_low": day_low,
 						"status": "filled",
 						"exit_price": exit_price,
@@ -219,5 +257,24 @@ class StopLossAgent(Agent):
 		row = day_data[ticker]
 		try:
 			return float(row.get("low")) if "low" in row else None
+		except (ValueError, AttributeError):
+			return None
+
+	def _get_day_high(self, ticker: str, day_data: Dict[str, Any]) -> Optional[float]:
+		"""Get daily high price for ticker from day data.
+
+		Args:
+			ticker: Ticker symbol
+			day_data: Pre-sliced market data {ticker: row}
+
+		Returns:
+			Daily high price or None
+		"""
+		if ticker not in day_data:
+			return None
+
+		row = day_data[ticker]
+		try:
+			return float(row.get("high")) if "high" in row else None
 		except (ValueError, AttributeError):
 			return None
