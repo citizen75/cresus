@@ -188,6 +188,9 @@ class DataManager:
     def fetch_all(self, universe_name: str, start_date: str = None) -> Dict[str, Any]:
         """Fetch both historical and fundamental data for all tickers in a universe."""
         try:
+            import pandas as pd
+            from datetime import datetime
+
             universe = Universe(universe_name)
             if not universe.exists():
                 return {
@@ -212,6 +215,7 @@ class DataManager:
                 "fundamental_fetched": 0,
                 "fundamental_failed": 0,
                 "details": [],
+                "errors": [],
             }
 
             for ticker in tickers:
@@ -221,6 +225,11 @@ class DataManager:
                     results["history_fetched"] += 1
                 else:
                     results["history_failed"] += 1
+                    results["errors"].append({
+                        "ticker": ticker,
+                        "type": "history",
+                        "message": history_result.get("message", "Unknown error"),
+                    })
 
                 # Fetch fundamental
                 fundamental_result = self.fetch_fundamental(ticker)
@@ -228,12 +237,37 @@ class DataManager:
                     results["fundamental_fetched"] += 1
                 else:
                     results["fundamental_failed"] += 1
+                    results["errors"].append({
+                        "ticker": ticker,
+                        "type": "fundamental",
+                        "message": fundamental_result.get("message", "Unknown error"),
+                    })
 
                 results["details"].append({
                     "ticker": ticker,
                     "history": history_result.get("status"),
                     "fundamental": fundamental_result.get("status"),
                 })
+
+            # Save errors to CSV if any exist
+            if results["errors"]:
+                errors_df = pd.DataFrame(results["errors"])
+                errors_df["timestamp"] = datetime.now().isoformat()
+
+                # Create universe errors directory
+                universe_dir = get_db_root() / "universe"
+                universe_dir.mkdir(parents=True, exist_ok=True)
+
+                # Save to CSV
+                errors_file = universe_dir / f"{universe_name}_errors.csv"
+
+                # Append to existing file if it exists
+                if errors_file.exists():
+                    existing_df = pd.read_csv(errors_file)
+                    errors_df = pd.concat([existing_df, errors_df], ignore_index=True)
+
+                errors_df.to_csv(errors_file, index=False)
+                results["errors_file"] = str(errors_file)
 
             results["message"] = f"Fetched history for {results['history_fetched']}/{results['total']} tickers and fundamental for {results['fundamental_fetched']}/{results['total']} tickers from {universe_name}"
             return results

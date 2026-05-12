@@ -65,7 +65,8 @@ class DataFetchFlow(Flow):
 					f"history={result.get('history_fetched')}/{result.get('total')}, "
 					f"fundamental={result.get('fundamental_fetched')}/{result.get('total')}"
 				)
-				return {
+
+				response = {
 					"status": "success",
 					"universe": universe,
 					"message": result.get("message", "Data fetch completed"),
@@ -75,6 +76,13 @@ class DataFetchFlow(Flow):
 					"fundamental_failed": result.get("fundamental_failed", 0),
 					"total_tickers": result.get("total", 0),
 				}
+
+				# Include errors file path if errors occurred
+				if result.get("errors_file"):
+					response["errors_file"] = result.get("errors_file")
+					logger.info(f"Errors logged to: {result.get('errors_file')}")
+
+				return response
 			else:
 				logger.error(f"Data fetch failed for {universe}: {result.get('message')}")
 				return {
