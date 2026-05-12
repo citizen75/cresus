@@ -3,7 +3,7 @@
 from typing import Any, Dict, Optional, List
 from core.agent import Agent
 from core.flow import Flow
-from agents.exit.sub_agents import ExitConditionAgent
+from agents.exit.sub_agents import ExitConditionAgent, TrailingStopAgent
 from tools.portfolio.journal import Journal
 from tools.portfolio.orders import Orders
 
@@ -29,6 +29,7 @@ class ExitAgent(Agent):
 			context: AgentContext for shared state
 		"""
 		super().__init__(name, context)
+		self.trailing_stop_agent = TrailingStopAgent("TrailingStopAgent")
 		self.exit_condition_agent = ExitConditionAgent("ExitConditionAgent")
 
 	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -68,6 +69,12 @@ class ExitAgent(Agent):
 
 		# Create exit evaluation flow
 		exit_flow = Flow("ExitEvaluationFlow", context=self.context)
+
+		# Add trailing stop update step (runs first before condition evaluation)
+		exit_flow.add_step(
+			TrailingStopAgent("TrailingStopStep"),
+			required=False
+		)
 
 		# Add condition-based exit evaluation
 		exit_flow.add_step(

@@ -14,7 +14,6 @@ from .sub_agents import (
 	TargetAgent,
 	TimeLimitAgent,
 	LimitOrderAgent,
-	TrailingStopAgent,
 )
 
 
@@ -38,7 +37,6 @@ class TransactAgent(Agent):
 			context: AgentContext for shared state
 		"""
 		super().__init__(name, context)
-		self.trailing_stop_agent = TrailingStopAgent("TrailingStopAgent")
 		self.stop_loss_agent = StopLossAgent("StopLossAgent")
 		self.target_agent = TargetAgent("TargetAgent")
 		self.time_limit_agent = TimeLimitAgent("TimeLimitAgent")
@@ -131,11 +129,6 @@ class TransactAgent(Agent):
 		# Execute exit orders via subagents in sequence
 		exit_results = []
 
-		# 0. Update trailing stops (before checking stop losses)
-		self.trailing_stop_agent.context = self.context
-		trailing_stop_result = self.trailing_stop_agent.process({"day_data": day_data})
-		self.logger.info(f"Trailing stops updated: {trailing_stop_result.get('output', {}).get('updated', 0)} positions")
-
 		# 1. Stop loss exits
 		self.stop_loss_agent.context = self.context
 		stop_loss_result = self.stop_loss_agent.process({"day_data": day_data})
@@ -150,7 +143,7 @@ class TransactAgent(Agent):
 		else:
 			self.logger.info("Take profit is disabled in strategy, skipping target agent")
 
-		# 3. Time limit exits
+		# 3. Time limit exits (unfilled entry orders)
 		self.time_limit_agent.context = self.context
 		time_limit_result = self.time_limit_agent.process({"day_data": day_data})
 		exit_results.extend(time_limit_result.get("output", {}).get("exits", []))
