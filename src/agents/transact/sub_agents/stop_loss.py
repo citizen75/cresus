@@ -2,6 +2,7 @@
 
 from typing import Any, Dict, Optional, List
 from datetime import date as date_type
+import pandas as pd
 from core.agent import Agent
 from tools.portfolio.journal import Journal
 from tools.portfolio.orders import Orders
@@ -100,6 +101,17 @@ class StopLossAgent(Agent):
 
 				if quantity <= 0 or ticker not in effective_stop_losses:
 					continue
+
+				# Skip positions entered on the same day (prevent same-day SL exit)
+				entry_date = position.get("created_at")
+				if entry_date:
+					try:
+						entry_dt = pd.to_datetime(entry_date).date()
+						if entry_dt == trading_date:
+							self.logger.debug(f"Skipping {ticker}: entered today, no SL check on same day")
+							continue
+					except Exception as e:
+						self.logger.debug(f"Could not parse entry date for {ticker}: {e}")
 
 				# Get the pre-calculated effective stop loss
 				effective_stop_loss = effective_stop_losses[ticker]
