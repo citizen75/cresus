@@ -686,3 +686,60 @@ class TestStrategyManager:
 		weights = fixed.get("signals", {}).get("weights", {})
 		assert "existing" in weights
 		# Template wouldn't add new weights if they don't exist in strategy
+
+	def test_fix_strategy_comments_invalid_nested_keys(self, manager):
+		"""Test fix_strategy comments out invalid nested keys in parameters."""
+		strategy_data = {
+			"name": "invalid_nested_test",
+			"universe": "cac40",
+			"description": "Test",
+			"engine": "TaModel",
+			"indicators": [],
+			"watchlist": {"enabled": True, "parameters": {}},
+			"signals": {
+				"enabled": True,
+				"weights": {"custom_weight": 0.5},  # Custom weights allowed
+				"parameters": {}
+			},
+			"entry": {
+				"enabled": True,
+				"parameters": {
+					"position_size": {"formula": "1000"},
+					"invalid_param": {"formula": "bad"}
+				}
+			},
+			"order": {"enabled": True, "parameters": {"position_sizing": {"formula": "1000"}}},
+			"exit": {
+				"enabled": True,
+				"parameters": {
+					"stop_loss": {"formula": "0.95"},
+					"holding_period": {"formula": "10"},
+					"invalid_exit": {"formula": "bad"}
+				}
+			},
+			"backtest": {"initial_capital": 10000},
+		}
+
+		manager.save_strategy("invalid_nested_test", strategy_data)
+		result = manager.fix_strategy("invalid_nested_test")
+
+		# Verify invalid nested keys were reported as changes
+		changes = result.get("changes", [])
+		assert any("invalid" in c.lower() for c in changes)
+
+		# Load fixed strategy and verify invalid keys were removed from data
+		loaded = manager.load_strategy("invalid_nested_test")
+		fixed = loaded.get("data", {})
+
+		assert "invalid_param" not in fixed.get("entry", {}).get("parameters", {})
+		assert "invalid_exit" not in fixed.get("exit", {}).get("parameters", {})
+
+		# Verify they were commented in the file
+		strategy_file = manager._get_strategy_file("invalid_nested_test")
+		with open(strategy_file, 'r') as f:
+			file_content = f.read()
+
+		assert "# [entry.parameters]" in file_content
+		assert "# [exit.parameters]" in file_content
+		assert "# invalid_param:" in file_content or "#     invalid_param:" in file_content
+		assert "# invalid_exit:" in file_content or "#     invalid_exit:" in file_content

@@ -583,16 +583,39 @@ class StrategyManager:
 							strategy_data["exit"]["parameters"][param_key] = param_value
 							changes.append(f"Added exit.parameters.{param_key}")
 
-			# Identify invalid keys but keep them for now (will comment in file)
+			# Identify invalid top-level keys
 			valid_top_keys = set(template.keys())
 			invalid_keys = []
+			invalid_nested_keys = {}  # Track invalid nested keys
 			clean_data = strategy_data.copy()
+
 			for key in list(strategy_data.keys()):
 				if key not in valid_top_keys and not key.startswith("_") and not key.startswith("#"):
 					invalid_keys.append(key)
 					changes.append(f"Commented invalid key: {key}")
 					# Remove from clean data before saving
 					del clean_data[key]
+
+			# Validate nested keys within sections
+			for section_name in ["entry", "order", "exit"]:
+				if section_name in clean_data and "parameters" in clean_data[section_name]:
+					section_params = clean_data[section_name]["parameters"]
+					template_params = template.get(section_name, {}).get("parameters", {})
+					invalid_params = []
+
+					for param_key in list(section_params.keys()):
+						if param_key not in template_params:
+							invalid_params.append(param_key)
+							changes.append(f"Commented invalid nested key: {section_name}.parameters.{param_key}")
+
+					if invalid_params:
+						invalid_nested_keys[f"{section_name}.parameters"] = invalid_params
+						# Remove invalid nested keys from clean data
+						for param_key in invalid_params:
+							del section_params[param_key]
+
+			# Note: signals.weights is flexible - users can define custom weights
+			# We don't validate individual weight keys since users may use different signal names
 
 			# Save if not dry run
 			if not dry_run and changes:
@@ -603,9 +626,16 @@ class StrategyManager:
 				if original_file_path.exists():
 					with open(original_file_path, 'r') as f:
 						original_content = f.read()
-						# Extract invalid sections from original file
+						# Extract invalid top-level sections from original file
 						for invalid_key in invalid_keys:
 							original_invalid_sections += self._extract_key_section(original_content, invalid_key)
+						# Extract invalid nested keys from original file
+						for nested_path, nested_keys in invalid_nested_keys.items():
+							if original_invalid_sections and not original_invalid_sections.endswith('\n\n'):
+								original_invalid_sections += '\n'
+							original_invalid_sections += f"# [{nested_path}]\n"
+							for nested_key in nested_keys:
+								original_invalid_sections += self._extract_nested_key_section(original_content, nested_path, nested_key)
 
 				# Save clean data
 				with open(file_path, 'w') as f:
@@ -663,6 +693,74 @@ class StrategyManager:
 				else:
 					# Still in section, comment it out
 					result_lines.append(f"# {line}")
+
+		return '\n'.join(result_lines) + '\n' if result_lines else ""
+
+	def _extract_nested_key_section(self, content: str, parent_path: str, key: str) -> str:
+		"""Extract a nested YAML key and comment it out.
+
+		Args:
+			content: YAML file content
+			parent_path: Parent path (e.g., 'entry.parameters')
+			key: Key to extract and comment
+
+		Returns:
+			Commented out section string
+		"""
+		lines = content.split('\n')
+		result_lines = []
+		in_parent = False
+		in_key = False
+		parent_indent = -1
+		key_indent = -1
+		parent_parts = parent_path.split('.')
+
+		for i, line in enumerate(lines):
+			stripped = line.strip()
+
+			# Check if we're finding the parent section (first level)
+			if not in_parent and stripped.startswith(f"{parent_parts[0]}:"):
+				in_parent = True
+				parent_indent = len(line) - len(line.lstrip())
+				continue
+
+			if in_parent:
+				# Check if we're at a sibling or lower indent (parent ended)
+				if stripped and not line.startswith(' ' * (parent_indent + 1)) and not line.startswith('\t'):
+					in_parent = False
+					continue
+
+				# Look for nested parent (e.g., 'parameters' under 'entry')
+				if len(parent_parts) > 1:
+					nested_parent = parent_parts[1]
+					if stripped.startswith(f"{nested_parent}:"):
+						key_indent = len(line) - len(line.lstrip())
+
+						# Now look for the actual key within this nested parent
+						for j in range(i + 1, len(lines)):
+							nested_line = lines[j]
+							nested_stripped = nested_line.strip()
+
+							# End of nested parent section
+							if nested_stripped and not nested_line.startswith(' ' * (key_indent + 1)) and not nested_line.startswith('\t'):
+								break
+
+							# Found the key
+							if nested_stripped.startswith(f"{key}:"):
+								nested_key_indent = len(nested_line) - len(nested_line.lstrip())
+								result_lines.append(f"# {nested_line}")
+
+								# Include all sub-lines of this key
+								for k in range(j + 1, len(lines)):
+									sub_line = lines[k]
+									sub_stripped = sub_line.strip()
+
+									# End of this key's content
+									if sub_stripped and not sub_line.startswith(' ' * (nested_key_indent + 1)) and not sub_line.startswith('\t'):
+										break
+
+									result_lines.append(f"# {sub_line}")
+								break
 
 		return '\n'.join(result_lines) + '\n' if result_lines else ""
 
