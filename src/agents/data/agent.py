@@ -153,13 +153,15 @@ class DataAgent(Agent):
 
 					except Exception as e:
 						self.logger.warning(f"Failed to calculate indicators for {ticker}: {e}")
-
-				# Sort data in descending order (newest first) for historical analysis
-				# This enables shift notation: [-1] = most recent, [-2] = yesterday, etc.
-				for ticker in data_history.keys():
-					data_history[ticker] = data_history[ticker].sort_values('timestamp', ascending=False).reset_index(drop=True)
 			else:
 				self.logger.debug(f"All {len(indicators)} indicators already present in data_history, skipping recalculation")
+
+		# Always sort data in descending order (newest first) for historical analysis
+		# This enables shift notation: [-1] = most recent, [-2] = yesterday, etc.
+		# Must happen regardless of whether indicators were just calculated
+		if data_history:
+			for ticker in data_history.keys():
+				data_history[ticker] = data_history[ticker].sort_values('timestamp', ascending=False).reset_index(drop=True)
 
 		# Store data_history and indicators in context for downstream agents
 		self.context.set("data_history", data_history)
