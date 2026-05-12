@@ -10,6 +10,30 @@ from agents.data.sub_agents import DataQualityAgent, DataQuantityAgent
 class DataAgent(Agent):
 	"""Agent for managing and processing data-related tasks."""
 
+	def _find_missing_indicators(self, data_history: dict, required_indicators: list) -> list:
+		"""Find which indicators are missing across all tickers.
+
+		Args:
+			data_history: Dict of {ticker: DataFrame}
+			required_indicators: List of indicator names to check
+
+		Returns:
+			List of missing indicator names (empty if all present)
+		"""
+		if not data_history:
+			return required_indicators
+
+		# Get columns from first non-empty DataFrame
+		existing_columns = set()
+		for df in data_history.values():
+			if not df.empty:
+				existing_columns = set(df.columns)
+				break
+
+		# Find missing indicators
+		missing = [ind for ind in required_indicators if ind not in existing_columns]
+		return missing
+
 	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
 		"""Fetch data for tickers and calculate indicators.
 
@@ -88,31 +112,38 @@ class DataAgent(Agent):
 
 		# Calculate indicators on ALL tickers (whether loaded fresh or from context)
 		# This ensures complete indicator columns are available for downstream agents
+		# Skip recalculation if indicators already exist in all tickers
 		indicators_calculated = {}
 		if indicators and data_history:
-			self.logger.info(f"Calculating {len(indicators)} indicators for {len(data_history)} tickers")
-			for ticker in list(data_history.keys()):
-				ticker_data = data_history[ticker]
+			# Check if all indicators already exist in all tickers
+			missing_indicators = self._find_missing_indicators(data_history, indicators)
 
-				try:
-					# Sort in ascending order for indicator calculation
-					ticker_data_asc = ticker_data.sort_values('timestamp', ascending=True).reset_index(drop=True)
-					calculated = calculate_indicators(indicators, ticker_data_asc)
-					indicators_calculated[ticker] = calculated
+			if missing_indicators:
+				self.logger.info(f"Calculating {len(missing_indicators)} missing indicators for {len(data_history)} tickers: {missing_indicators}")
+				for ticker in list(data_history.keys()):
+					ticker_data = data_history[ticker]
 
-					# Add calculated indicators as columns to the original data
-					for indicator_name, series in calculated.items():
-						ticker_data[indicator_name] = series
+					try:
+						# Sort in ascending order for indicator calculation
+						ticker_data_asc = ticker_data.sort_values('timestamp', ascending=True).reset_index(drop=True)
+						calculated = calculate_indicators(missing_indicators, ticker_data_asc)
+						indicators_calculated[ticker] = calculated
 
-				except Exception as e:
-					self.logger.warning(f"Failed to calculate indicators for {ticker}: {e}")
+						# Add calculated indicators as columns to the original data
+						for indicator_name, series in calculated.items():
+							ticker_data[indicator_name] = series
 
-			# Sort data in descending order (newest first) for historical analysis
-			# This enables shift notation: [-1] = most recent, [-2] = yesterday, etc.
-			for ticker in data_history.keys():
-				data_history[ticker] = data_history[ticker].sort_values('timestamp', ascending=False).reset_index(drop=True)
+					except Exception as e:
+						self.logger.warning(f"Failed to calculate indicators for {ticker}: {e}")
 
-		# Store data_history in context
+				# Sort data in descending order (newest first) for historical analysis
+				# This enables shift notation: [-1] = most recent, [-2] = yesterday, etc.
+				for ticker in data_history.keys():
+					data_history[ticker] = data_history[ticker].sort_values('timestamp', ascending=False).reset_index(drop=True)
+			else:
+				self.logger.debug(f"All {len(indicators)} indicators already present in data_history, skipping recalculation")
+
+		# Store data_history and indicators in context for downstream agents
 		self.context.set("data_history", data_history)
 		if indicators_calculated:
 			self.context.set("indicators_calculated", indicators_calculated)
