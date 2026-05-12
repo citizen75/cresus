@@ -526,93 +526,112 @@ class StrategyManager:
 			# Template structure for default values
 			template = self._load_template()
 
-			# Add missing required top-level fields
-			required_fields = ["name", "universe", "description", "engine", "indicators"]
-			for field in required_fields:
-				if field not in strategy_data and field in template:
-					strategy_data[field] = template[field]
-					changes.append(f"Added missing field: {field}")
-
-			# Add missing sections with defaults
-			sections = ["watchlist", "signals", "entry", "order", "exit", "backtest"]
-			for section in sections:
-				if section not in strategy_data and section in template:
-					strategy_data[section] = template[section]
-					changes.append(f"Added missing section: {section}")
-
-			# Add missing weights and parameters to signals section
-			if "signals" in strategy_data:
-				if "weights" not in strategy_data["signals"] and "weights" in template.get("signals", {}):
-					strategy_data["signals"]["weights"] = template["signals"]["weights"]
-					changes.append("Added signals.weights section")
-				if "parameters" not in strategy_data["signals"] and "parameters" in template.get("signals", {}):
-					strategy_data["signals"]["parameters"] = template["signals"]["parameters"]
-					changes.append("Added signals.parameters section")
-
-			# Validate required sub-fields in sections
-			if "entry" in strategy_data:
-				if "parameters" not in strategy_data["entry"]:
-					strategy_data["entry"]["parameters"] = template["entry"]["parameters"]
-					changes.append("Added entry.parameters section")
-				else:
-					# Add missing sub-parameters from template
-					for param_key, param_value in template.get("entry", {}).get("parameters", {}).items():
-						if param_key not in strategy_data["entry"]["parameters"]:
-							strategy_data["entry"]["parameters"][param_key] = param_value
-							changes.append(f"Added entry.parameters.{param_key}")
-
-			if "order" in strategy_data:
-				if "parameters" not in strategy_data["order"]:
-					strategy_data["order"]["parameters"] = template["order"]["parameters"]
-					changes.append("Added order.parameters section")
-				else:
-					# Add missing sub-parameters from template
-					for param_key, param_value in template.get("order", {}).get("parameters", {}).items():
-						if param_key not in strategy_data["order"]["parameters"]:
-							strategy_data["order"]["parameters"][param_key] = param_value
-							changes.append(f"Added order.parameters.{param_key}")
-
-			if "exit" in strategy_data:
-				if "parameters" not in strategy_data["exit"]:
-					strategy_data["exit"]["parameters"] = template["exit"]["parameters"]
-					changes.append("Added exit.parameters section")
-				else:
-					# Add missing sub-parameters from template
-					for param_key, param_value in template.get("exit", {}).get("parameters", {}).items():
-						if param_key not in strategy_data["exit"]["parameters"]:
-							strategy_data["exit"]["parameters"][param_key] = param_value
-							changes.append(f"Added exit.parameters.{param_key}")
-
 			# Identify invalid top-level keys
 			valid_top_keys = set(template.keys())
 			invalid_keys = []
 			invalid_nested_keys = {}  # Track invalid nested keys
-			clean_data = strategy_data.copy()
 
-			for key in list(strategy_data.keys()):
+			# Track top-level keys from strategy not in template
+			for key in strategy_data.keys():
 				if key not in valid_top_keys and not key.startswith("_") and not key.startswith("#"):
 					invalid_keys.append(key)
 					changes.append(f"Commented invalid key: {key}")
-					# Remove from clean data before saving
-					del clean_data[key]
 
-			# Validate nested keys within sections
+			# Build clean_data strictly following template key order
+			clean_data = {}
+			for template_key in template.keys():
+				if template_key in strategy_data:
+					clean_data[template_key] = strategy_data[template_key]
+
+			# Add missing required top-level fields
+			required_fields = ["name", "universe", "description", "engine", "indicators"]
+			for field in required_fields:
+				if field not in clean_data and field in template:
+					clean_data[field] = template[field]
+					changes.append(f"Added missing field: {field}")
+
+			# Add missing sections with defaults (in template order)
+			sections = ["watchlist", "signals", "entry", "order", "exit", "backtest"]
+			for section in sections:
+				if section not in clean_data and section in template:
+					clean_data[section] = template[section].copy() if isinstance(template[section], dict) else template[section]
+					changes.append(f"Added missing section: {section}")
+
+			# Add missing weights and parameters to signals section
+			if "signals" in clean_data:
+				if "weights" not in clean_data["signals"] and "weights" in template.get("signals", {}):
+					clean_data["signals"]["weights"] = template["signals"]["weights"].copy()
+					changes.append("Added signals.weights section")
+				if "parameters" not in clean_data["signals"] and "parameters" in template.get("signals", {}):
+					clean_data["signals"]["parameters"] = template["signals"]["parameters"].copy()
+					changes.append("Added signals.parameters section")
+
+			# Validate required sub-fields in sections
+			if "entry" in clean_data:
+				if "parameters" not in clean_data["entry"]:
+					clean_data["entry"]["parameters"] = template["entry"]["parameters"].copy()
+					changes.append("Added entry.parameters section")
+				else:
+					# Add missing sub-parameters from template in template order
+					entry_params = clean_data["entry"]["parameters"]
+					for param_key, param_value in template.get("entry", {}).get("parameters", {}).items():
+						if param_key not in entry_params:
+							entry_params[param_key] = param_value
+							changes.append(f"Added entry.parameters.{param_key}")
+
+			if "order" in clean_data:
+				if "parameters" not in clean_data["order"]:
+					clean_data["order"]["parameters"] = template["order"]["parameters"].copy()
+					changes.append("Added order.parameters section")
+				else:
+					# Add missing sub-parameters from template in template order
+					order_params = clean_data["order"]["parameters"]
+					for param_key, param_value in template.get("order", {}).get("parameters", {}).items():
+						if param_key not in order_params:
+							order_params[param_key] = param_value
+							changes.append(f"Added order.parameters.{param_key}")
+
+			if "exit" in clean_data:
+				if "parameters" not in clean_data["exit"]:
+					clean_data["exit"]["parameters"] = template["exit"]["parameters"].copy()
+					changes.append("Added exit.parameters section")
+				else:
+					# Add missing sub-parameters from template in template order
+					exit_params = clean_data["exit"]["parameters"]
+					for param_key, param_value in template.get("exit", {}).get("parameters", {}).items():
+						if param_key not in exit_params:
+							exit_params[param_key] = param_value
+							changes.append(f"Added exit.parameters.{param_key}")
+
+			# Validate nested keys within sections and maintain template order
 			for section_name in ["entry", "order", "exit"]:
 				if section_name in clean_data and "parameters" in clean_data[section_name]:
 					section_params = clean_data[section_name]["parameters"]
 					template_params = template.get(section_name, {}).get("parameters", {})
 					invalid_params = []
 
+					# Identify invalid parameters
 					for param_key in list(section_params.keys()):
 						if param_key not in template_params:
 							invalid_params.append(param_key)
 							changes.append(f"Commented invalid nested key: {section_name}.parameters.{param_key}")
 
-					if invalid_params:
+					# Rebuild parameters in template order, excluding invalid ones
+					if invalid_params or template_params:
 						invalid_nested_keys[f"{section_name}.parameters"] = invalid_params
-						# Remove invalid nested keys from clean data
-						for param_key in invalid_params:
-							del section_params[param_key]
+						ordered_params = {}
+
+						# Add parameters in template order
+						for template_param in template_params.keys():
+							if template_param in section_params:
+								ordered_params[template_param] = section_params[template_param]
+
+						# Add any valid parameters not in template (at the end)
+						for param_key in section_params.keys():
+							if param_key not in template_params and param_key not in invalid_params:
+								ordered_params[param_key] = section_params[param_key]
+
+						clean_data[section_name]["parameters"] = ordered_params
 
 			# Note: signals.weights is flexible - users can define custom weights
 			# We don't validate individual weight keys since users may use different signal names
@@ -637,9 +656,15 @@ class StrategyManager:
 							for nested_key in nested_keys:
 								original_invalid_sections += self._extract_nested_key_section(original_content, nested_path, nested_key)
 
-				# Save clean data
+				# Reorder clean_data to match template key order
+				ordered_data = {}
+				for template_key in template.keys():
+					if template_key in clean_data:
+						ordered_data[template_key] = clean_data[template_key]
+
+				# Save clean data with template key order
 				with open(file_path, 'w') as f:
-					yaml.dump(clean_data, f, default_flow_style=False, sort_keys=False)
+					yaml.dump(ordered_data, f, default_flow_style=False, sort_keys=False)
 
 				# Append commented invalid sections
 				if original_invalid_sections:
