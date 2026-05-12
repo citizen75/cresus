@@ -161,74 +161,27 @@ class PreMarketFlow(Flow):
 					eo_result = entry_order_step.get("agent").process({})
 					entry_order_step["result"] = eo_result
 
-		# Extract and include watchlist data
+		# === FINAL OUTPUT: Keep only watchlist and orders ===
+
+		# Extract final watchlist
 		watchlist = self.context.get("watchlist") or []
 		result["watchlist"] = watchlist
 
-		# Include target date and indicators for display
-		result["target_date"] = target_date
-		strategy_config = self.context.get("strategy_config") or {}
-		result["indicators"] = strategy_config.get("indicators", [])
-		
-		# Include data_history for indicator value display
-		data_history = self.context.get("data_history") or {}
-		result["data_history"] = data_history
-
-		# Extract and include signals data and scores
-		signals = self.context.get("signals") or {}
-		result["signals"] = signals
-
-		ticker_scores = self.context.get("ticker_scores") or {}
-		result["ticker_scores"] = ticker_scores
-
-		# Extract sorted tickers from signals agent result
-		signals_step = self.get_step("signals")
-		if signals_step:
-			signals_result = signals_step.get("result")
-			if signals_result and signals_result.get("status") == "success":
-				output = signals_result.get("output", {})
-				sorted_tickers = output.get("sorted_tickers")
-				if sorted_tickers:
-					result["sorted_tickers"] = sorted_tickers
-				top_ticker = output.get("top_ticker")
-				top_score = output.get("top_score")
-				if top_ticker:
-					result["top_ticker"] = top_ticker
-					result["top_score"] = top_score
-
-		# Extract entry recommendations from entry step
-		entry_step = self.get_step("entry")
-		if entry_step:
-			entry_step_result = entry_step.get("result")
-			if entry_step_result and entry_step_result.get("status") == "success":
-				output = entry_step_result.get("output", {})
-				entry_recommendations = output.get("top_opportunities")
-				if entry_recommendations:
-					result["entry_recommendations"] = entry_recommendations
-
-		# Extract executable orders from entry_order step
+		# Extract final orders
 		entry_order_step = self.get_step("entry_order")
 		if entry_order_step:
 			entry_order_result = entry_order_step.get("result")
 			if entry_order_result and entry_order_result.get("status") == "success":
 				output = entry_order_result.get("output", {})
-				orders = output.get("orders")
-				if orders:
-					result["executable_orders"] = orders
-					result["orders_count"] = len(orders)
-				execution_results = output.get("execution_results")
-				if execution_results:
-					result["execution_results"] = execution_results
+				orders = output.get("orders") or []
+				result["orders"] = orders
+		else:
+			result["orders"] = []
 
-		# Extract watchlist save result from save_watchlist step
-		save_step = self.get_step("save_watchlist")
-		if save_step:
-			save_step_result = save_step.get("result")
-			if save_step_result:
-				result["watchlist_saved"] = save_step_result.get("output")
-
-		# Add strategy-specific fields to response
-		result["strategy"] = self.strategy_name
+		# === CLEANUP: Remove all intermediate context variables ===
+		# Keep only: watchlist, data_history, strategy_config (needed for other flows)
+		# Remove: signals, ticker_scores, entry_scores, timing_scores, rr_metrics, etc.
+		self._cleanup_context()
 
 		return result
 
@@ -275,6 +228,34 @@ class PreMarketFlow(Flow):
 
 		context.set("data_history", sliced_history)
 		self.logger.info(f"Sliced data_history to {date_str} for watchlist analysis")
+
+	def _cleanup_context(self) -> None:
+		"""Remove intermediate context variables, keeping only essential ones.
+
+		Removes: signals, ticker_scores, entry_scores, timing_scores, rr_metrics,
+		entry_recommendations, filtered_duplicate_items, sorted_tickers, etc.
+
+		Keeps: watchlist, data_history, strategy_config, portfolio_name, strategy_name
+		"""
+		# Variables to remove (intermediate calculations)
+		to_remove = [
+			"signals",
+			"ticker_scores",
+			"entry_scores",
+			"timing_scores",
+			"rr_metrics",
+			"entry_recommendations",
+			"filtered_duplicate_items",
+			"sorted_tickers",
+			"top_ticker",
+			"top_score",
+			"_data_sliced_for_entry",
+		]
+
+		for var in to_remove:
+			if hasattr(self.context, var):
+				delattr(self.context, var)
+				self.logger.debug(f"Removed context variable: {var}")
 
 	def _strategy_to_portfolio_name(self, strategy_name: str) -> str:
 		"""Convert strategy name to portfolio name format.
