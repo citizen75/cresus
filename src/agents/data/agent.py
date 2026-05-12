@@ -25,27 +25,19 @@ class DataAgent(Agent):
 			input_data = {}
 
 		# Check if data_history already exists in context (backtest mode)
-		# If so, skip loading and just return success
+		# Use it as-is but still ensure indicators are calculated on the full data
 		existing_data_history = self.context.get("data_history")
 		if existing_data_history:
-			self.logger.debug("data_history already in context (backtest mode), skipping DataAgent load")
-			tickers = list(existing_data_history.keys())
-			# Store tickers in context for downstream agents
-			self.context.set("tickers", tickers)
-			return {
-				"status": "success",
-				"input": input_data,
-				"output": {
-					"tickers": tickers,
-					"count": len(existing_data_history),
-					"data_fetched": len(existing_data_history),
-					"indicators": [],
-					"indicators_count": 0,
-				},
-			}
+			self.logger.debug("data_history already in context, ensuring indicators are calculated")
+			data_history = existing_data_history
+			tickers = list(data_history.keys())
+		else:
+			data_history = None
+			tickers = None
 
-		# Check for tickers in input or context
-		tickers = input_data.get("tickers") or self.context.get("tickers")
+		# If data_history not already provided, load tickers from input/context
+		if not tickers:
+			tickers = input_data.get("tickers") or self.context.get("tickers")
 
 		if not tickers:
 			self.logger.error("No tickers found in input or context")
@@ -70,48 +62,55 @@ class DataAgent(Agent):
 		if indicators:
 			register_indicators_for_formulas(indicators)
 
-		# Load cached price history for all tickers
-		# Note: Load all data - filtering by current_date happens in analysis agents
-		data_history = {}
+		# Load data if not already in context
+		if not data_history:
+			data_history = {}
+			self.logger.info(f"Loading data for {len(tickers)} tickers")
+			for ticker in tickers:
+				try:
+					# Load cached data using DataHistory
+					dh = DataHistory(ticker)
+					ticker_data = dh.get_all()
+
+					if ticker_data.empty:
+						self.logger.warning(f"No cached data available for {ticker}")
+						continue
+
+					# Remove deprecated volume_20ma column if present (replaced by volume_sma_20)
+					if 'volume_20ma' in ticker_data.columns:
+						ticker_data = ticker_data.drop(columns=['volume_20ma'])
+
+					data_history[ticker] = ticker_data
+				except Exception as e:
+					self.logger.error(f"Failed to fetch data for {ticker}: {e}")
+		else:
+			self.logger.info(f"Using data_history from context for {len(data_history)} tickers")
+
+		# Calculate indicators on ALL tickers (whether loaded fresh or from context)
+		# This ensures complete indicator columns are available for downstream agents
 		indicators_calculated = {}
-		self.logger.info(f"Loading data for {len(tickers)} tickers")
-		for ticker in tickers:
-			try:
-				# Load cached data using DataHistory
-				dh = DataHistory(ticker)
-				ticker_data = dh.get_all()
+		if indicators and data_history:
+			self.logger.info(f"Calculating {len(indicators)} indicators for {len(data_history)} tickers")
+			for ticker in list(data_history.keys()):
+				ticker_data = data_history[ticker]
 
-				if ticker_data.empty:
-					self.logger.warning(f"No cached data available for {ticker}")
-					continue
+				try:
+					# Sort in ascending order for indicator calculation
+					ticker_data_asc = ticker_data.sort_values('timestamp', ascending=True).reset_index(drop=True)
+					calculated = calculate_indicators(indicators, ticker_data_asc)
+					indicators_calculated[ticker] = calculated
 
-				# Remove deprecated volume_20ma column if present (replaced by volume_sma_20)
-				if 'volume_20ma' in ticker_data.columns:
-					ticker_data = ticker_data.drop(columns=['volume_20ma'])
+					# Add calculated indicators as columns to the original data
+					for indicator_name, series in calculated.items():
+						ticker_data[indicator_name] = series
 
-				# Calculate indicators on chronologically ordered data (ascending)
-				# This ensures time-series indicators like EMA are calculated correctly
-				if indicators:
-					try:
-						# Sort in ascending order for indicator calculation
-						ticker_data_asc = ticker_data.sort_values('timestamp', ascending=True).reset_index(drop=True)
-						calculated = calculate_indicators(indicators, ticker_data_asc)
-						indicators_calculated[ticker] = calculated
+				except Exception as e:
+					self.logger.warning(f"Failed to calculate indicators for {ticker}: {e}")
 
-						# Add calculated indicators as columns to the original data
-						for indicator_name, series in calculated.items():
-							ticker_data[indicator_name] = series
-
-					except Exception as e:
-						self.logger.warning(f"Failed to calculate indicators for {ticker}: {e}")
-
-				# Sort data in descending order (newest first) for historical analysis
-				# This enables shift notation: [-1] = most recent, [-2] = yesterday, etc.
-				ticker_data = ticker_data.sort_values('timestamp', ascending=False).reset_index(drop=True)
-
-				data_history[ticker] = ticker_data
-			except Exception as e:
-				self.logger.error(f"Failed to fetch data for {ticker}: {e}")
+			# Sort data in descending order (newest first) for historical analysis
+			# This enables shift notation: [-1] = most recent, [-2] = yesterday, etc.
+			for ticker in data_history.keys():
+				data_history[ticker] = data_history[ticker].sort_values('timestamp', ascending=False).reset_index(drop=True)
 
 		# Store data_history in context
 		self.context.set("data_history", data_history)
