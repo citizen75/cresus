@@ -199,18 +199,23 @@ class MarketOrderAgent(Agent):
 					if market_row is not None:
 						# Extract OHLCV and indicators from row (pandas Series or dict)
 						try:
-							market_metadata = {}
-							if hasattr(market_row, 'items'):
-								for key, value in market_row.items():
-									try:
-										# Try to convert to float, keep as-is if fails
-										market_metadata[key] = float(value) if pd.notna(value) else None
-									except (ValueError, TypeError):
-										market_metadata[key] = value
-							if len(market_metadata) == 0:
-								market_metadata = None
+							# Convert to dict if it's a Series
+							if isinstance(market_row, pd.Series):
+								market_metadata = market_row.to_dict()
+							elif isinstance(market_row, dict):
+								market_metadata = market_row.copy()
+							else:
+								market_metadata = dict(market_row)
+
+							# Clean up: convert NaN to None and ensure numeric values are proper floats
+							for key in list(market_metadata.keys()):
+								val = market_metadata[key]
+								if pd.isna(val):
+									market_metadata[key] = None
+								elif isinstance(val, (int, float)):
+									market_metadata[key] = float(val)
 						except Exception as e:
-							self.logger.warning(f"Error extracting market metadata for {ticker}: {e}")
+							self.logger.debug(f"Error extracting market metadata for {ticker}: {e}")
 							market_metadata = None
 
 					# Record BUY transaction in journal with stop loss and take profit
