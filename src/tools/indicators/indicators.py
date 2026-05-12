@@ -105,6 +105,9 @@ def calculate(
         DataValidator.validate_data(history_df, min_rows=2)
         history_df = DataValidator.normalize_data(history_df)
 
+    # Register needed indicators
+    register_indicators_for_formulas(formulas)
+
     # Parse formulas and group by indicator
     formula_map = {}  # Maps formula_string -> (indicator_name, params)
     indicators_to_calc = {}  # Maps indicator_name -> params (to avoid duplicates)
@@ -363,15 +366,17 @@ def _register_indicator_modules(indicator_names: set) -> None:
 			pass
 	
 	# Trend indicators
-	if any(ind in indicator_names for ind in ["ema", "sma", "adx", "dmi"]):
+	if any(ind in indicator_names for ind in ["ema", "sma", "adx", "dmi", "hama"]):
 		try:
-			from .trend import ema, sma, adx
+			from .trend import ema, sma, adx, hama
 			if "ema" in indicator_names:
 				register_indicator("ema", ema.calculate)
 			if "sma" in indicator_names:
 				register_indicator("sma", sma.calculate)
 			if "adx" in indicator_names or "dmi" in indicator_names:
 				register_indicator("adx", adx.calculate)
+			if "hama" in indicator_names:
+				register_indicator("hama", hama.calculate)
 		except ImportError:
 			pass
 	

@@ -1,9 +1,9 @@
 """
 Trend Indicators
 
-EMA, SMA, ADX
+EMA, SMA, ADX, HAMA
 """
 
-from . import ema, sma, adx
+from . import ema, sma, adx, hama
 
-__all__ = ["ema", "sma", "adx"]
+__all__ = ["ema", "sma", "adx", "hama"]

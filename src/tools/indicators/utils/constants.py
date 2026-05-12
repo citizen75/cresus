@@ -18,6 +18,7 @@ INDICATOR_PARAMS = {
     "sma": {"params": ["period"], "defaults": {"period": 20}},
     "adx": {"params": ["period"], "defaults": {"period": 14}},
     "dmi": {"params": ["period"], "defaults": {"period": 14}},
+    "hama": {"params": ["length_open", "length_close", "ema_line"], "defaults": {"length_open": 25, "length_close": 20, "ema_line": 55}},
 
     # Volatility indicators
     "atr": {"params": ["period"], "defaults": {"period": 14}},
