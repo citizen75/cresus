@@ -606,3 +606,83 @@ class TestStrategyManager:
 		assert any("entry" in issue for issue in issues)
 		assert any("order" in issue for issue in issues)
 		assert any("exit" in issue for issue in issues)
+
+	def test_fix_strategy_preserves_existing_values(self, manager):
+		"""Test fix_strategy never overwrites existing user values."""
+		strategy_data = {
+			"name": "preserve_test",
+			"universe": "nasdaq",  # Different from template cac40
+			"description": "Custom description",  # Different from template
+			"engine": "LightGbmModel",  # Different from template TaModel
+			"indicators": ["rsi_14"],  # Different from template
+			"watchlist": {"enabled": False, "parameters": {}},
+			"signals": {
+				"enabled": True,
+				"weights": {"custom_signal": 0.8},  # Custom weights
+				"parameters": {}
+			},
+			"entry": {
+				"enabled": True,
+				"parameters": {"position_size": {"formula": "2000"}}  # Custom value
+			},
+			"order": {
+				"enabled": True,
+				"parameters": {"position_sizing": {"formula": "custom_formula"}}  # Custom value
+			},
+			"exit": {
+				"enabled": True,
+				"parameters": {
+					"stop_loss": {"formula": "0.90"},  # Different from template
+					"holding_period": {"formula": "5"}  # Different from template
+				}
+			},
+			"backtest": {"initial_capital": 20000},  # Different from template
+		}
+
+		manager.save_strategy("preserve_test", strategy_data)
+		manager.fix_strategy("preserve_test")
+
+		# Load fixed strategy and verify existing values weren't replaced
+		loaded = manager.load_strategy("preserve_test")
+		fixed = loaded.get("data", {})
+
+		# Verify all custom values preserved
+		assert fixed.get("universe") == "nasdaq"
+		assert fixed.get("description") == "Custom description"
+		assert fixed.get("engine") == "LightGbmModel"
+		assert fixed.get("indicators") == ["rsi_14"]
+		assert fixed.get("signals", {}).get("weights") == {"custom_signal": 0.8}
+		assert fixed.get("order", {}).get("parameters", {}).get("position_sizing", {}).get("formula") == "custom_formula"
+		assert fixed.get("exit", {}).get("parameters", {}).get("stop_loss", {}).get("formula") == "0.90"
+		assert fixed.get("backtest", {}).get("initial_capital") == 20000
+
+	def test_fix_strategy_only_adds_missing_not_duplicates(self, manager):
+		"""Test fix_strategy doesn't duplicate existing parameters."""
+		strategy_data = {
+			"name": "no_dupes_test",
+			"universe": "cac40",
+			"description": "Test",
+			"engine": "TaModel",
+			"indicators": [],
+			"watchlist": {"enabled": True, "parameters": {}},
+			"signals": {
+				"enabled": True,
+				"weights": {"existing": 0.5},  # Has existing weights
+				"parameters": {}  # Has existing parameters (empty)
+			},
+			"entry": {"enabled": True, "parameters": {"position_size": {"formula": "1000"}}},
+			"order": {"enabled": True, "parameters": {"position_sizing": {"formula": "1000"}}},
+			"exit": {"enabled": True, "parameters": {"stop_loss": {"formula": "0.95"}, "holding_period": {"formula": "10"}}},
+			"backtest": {"initial_capital": 10000},
+		}
+
+		manager.save_strategy("no_dupes_test", strategy_data)
+		manager.fix_strategy("no_dupes_test")
+
+		loaded = manager.load_strategy("no_dupes_test")
+		fixed = loaded.get("data", {})
+
+		# Verify weights wasn't replaced (should still have only existing weights)
+		weights = fixed.get("signals", {}).get("weights", {})
+		assert "existing" in weights
+		# Template wouldn't add new weights if they don't exist in strategy
