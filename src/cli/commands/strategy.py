@@ -356,14 +356,86 @@ class StrategyCommands:
 		self.project_root = project_root
 		self.validator = StrategyValidator(project_root)
 
-	def check(self, strategy_name: str, fix: bool = False) -> Dict[str, Any]:
-		"""Check strategy configuration.
+	def check(self, strategy_name: str, fix: bool = False, template: bool = False) -> Dict[str, Any]:
+		"""Check strategy configuration for compliance with template.
 
 		Args:
 			strategy_name: Name of the strategy to check
 			fix: If True, attempt to fix issues
+			template: If True, show template structure
 
 		Returns:
 			Check result
 		"""
-		return self.validator.check_strategy(strategy_name, fix=fix)
+		if template:
+			self._show_template()
+			return {"status": "success", "message": "Template displayed"}
+
+		# Use StrategyManager's new check_strategy function
+		result = self.validator.strategy_manager.check_strategy(strategy_name)
+
+		# Display results
+		self._display_check_results(strategy_name, result)
+
+		# Fix if requested
+		if fix and result.get("issues"):
+			self._handle_fix(strategy_name)
+
+		return result
+
+	def _show_template(self):
+		"""Display the strategy template."""
+		console.print("\n[bold cyan]Strategy Template[/bold cyan]\n")
+		try:
+			template_file = self.validator.strategy_manager.project_root / "init" / "templates" / "strategy.yml"
+			if template_file.exists():
+				with open(template_file, 'r') as f:
+					content = f.read()
+				console.print(content)
+			else:
+				console.print("[yellow]Template file not found[/yellow]")
+		except Exception as e:
+			console.print(f"[red]Error loading template: {e}[/red]")
+
+	def _display_check_results(self, strategy_name: str, result: Dict[str, Any]):
+		"""Display strategy check results.
+
+		Args:
+			strategy_name: Strategy name
+			result: Check result from StrategyManager
+		"""
+		console.print(f"\n[bold cyan]Strategy Compliance Check: {strategy_name}[/bold cyan]\n")
+
+		if result.get("valid"):
+			console.print("[bold green]✓ Strategy is compliant with template[/bold green]\n")
+		else:
+			console.print(f"[bold red]✗ {result.get('issue_count', 0)} issue(s) found:[/bold red]\n")
+
+			# Display issues in a table
+			issues_table = Table(title="Issues Found", box=box.ROUNDED)
+			issues_table.add_column("Issue", style="yellow")
+
+			for issue in result.get("issues", []):
+				issues_table.add_row(issue)
+
+			console.print(issues_table)
+			console.print()
+			console.print("[cyan]Use[/cyan] [bold]--fix[/bold] [cyan]to automatically fix issues[/cyan]\n")
+
+	def _handle_fix(self, strategy_name: str):
+		"""Handle strategy fix operation.
+
+		Args:
+			strategy_name: Strategy name to fix
+		"""
+		console.print(f"\n[bold cyan]Fixing strategy: {strategy_name}[/bold cyan]\n")
+
+		result = self.validator.strategy_manager.fix_strategy(strategy_name, dry_run=False)
+
+		if result.get("status") == "success":
+			console.print("[bold green]✓ Strategy fixed[/bold green]\n")
+			for change in result.get("changes", []):
+				console.print(f"  • {change}")
+			console.print()
+		else:
+			console.print(f"[bold red]✗ Fix failed: {result.get('message')}[/bold red]\n")

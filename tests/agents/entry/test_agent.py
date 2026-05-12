@@ -324,6 +324,68 @@ class TestEntryAgent(unittest.TestCase):
 		self.assertEqual(result["status"], "success")
 		self.assertIn("recommendations", result["output"])
 
+	@patch("src.agents.entry.agent.Flow")
+	@patch("src.agents.entry.agent.PositionDuplicateFilterAgent")
+	@patch("src.agents.entry.agent.EntryFilterAgent")
+	def test_entry_filter_is_included_in_flow(self, mock_entry_filter_class, mock_dup_filter_class, mock_flow_class):
+		"""Test that EntryFilterAgent and PositionDuplicateFilterAgent are applied after recommendations are created."""
+		# Setup mock flow
+		mock_flow = MagicMock()
+		mock_flow.process.return_value = {
+			"status": "success",
+			"execution_history": []
+		}
+		mock_flow_class.return_value = mock_flow
+
+		# Setup mock filter agents
+		mock_dup_filter = MagicMock()
+		mock_dup_filter.process.return_value = {
+			"status": "success",
+			"output": {}
+		}
+		mock_dup_filter_class.return_value = mock_dup_filter
+
+		mock_entry_filter = MagicMock()
+		mock_entry_filter.process.return_value = {
+			"status": "success",
+			"output": {}
+		}
+		mock_entry_filter_class.return_value = mock_entry_filter
+
+		# Setup context with recommendations
+		watchlist = ["TICKER1", "TICKER2"]
+		self.context.set("watchlist", watchlist)
+		self.context.set("entry_scores", {"TICKER1": 75, "TICKER2": 60})
+		self.context.set("timing_scores", {"TICKER1": 70, "TICKER2": 50})
+		self.context.set("rr_metrics", {
+			"TICKER1": {
+				"rr_ratio": 1.5,
+				"entry_price": 100,
+				"stop_loss": 95,
+				"take_profit": 110,
+				"risk_pct": 5,
+				"reward_pct": 10,
+			},
+			"TICKER2": {
+				"rr_ratio": 1.0,
+				"entry_price": 100,
+				"stop_loss": 95,
+				"take_profit": 105,
+				"risk_pct": 5,
+				"reward_pct": 5,
+			}
+		})
+		self.context.set("data_history", {})
+
+		result = self.agent.process({})
+
+		self.assertEqual(result["status"], "success")
+		# Verify filter agents were instantiated and called
+		mock_dup_filter_class.assert_called_once()
+		mock_entry_filter_class.assert_called_once()
+		mock_dup_filter.process.assert_called_once()
+		mock_entry_filter.process.assert_called_once()
+
 
 if __name__ == "__main__":
 	unittest.main()

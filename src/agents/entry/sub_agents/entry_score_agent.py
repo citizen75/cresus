@@ -39,23 +39,26 @@ class EntryScoreAgent(Agent):
 				"message": "No watchlist in context"
 			}
 
+		self.logger.debug(f"[ENTRY-SCORE] Starting entry score calculation for {len(watchlist)} tickers")
+
 		# Calculate entry scores for each ticker
 		entry_scores = {}
 		scored_count = 0
+		skipped_tickers = []
 
 		for ticker in watchlist:
 			if ticker not in data_history:
-				self.logger.warning(f"No data for {ticker}, skipping entry score")
+				skipped_tickers.append(f"{ticker}(no-data)")
 				continue
 
 			df = data_history[ticker]
 			if df.empty:
-				self.logger.warning(f"Empty data for {ticker}, skipping entry score")
+				skipped_tickers.append(f"{ticker}(empty)")
 				continue
 
 			# Validate that data has at least a close column
 			if 'close' not in df.columns and 'Close' not in df.columns:
-				self.logger.warning(f"Missing 'close' column for {ticker}, skipping entry score")
+				skipped_tickers.append(f"{ticker}(no-close)")
 				continue
 
 			# Get the latest row for analysis
@@ -66,10 +69,16 @@ class EntryScoreAgent(Agent):
 			entry_scores[ticker] = score
 			scored_count += 1
 
-			self.logger.debug(f"Entry score for {ticker}: {score:.2f}")
+			self.logger.debug(f"[ENTRY-SCORE] {ticker}: {score:.1f}")
 
 		# Store scores in context
 		self.context.set("entry_scores", entry_scores)
+
+		# Log summary
+		avg_score = sum(entry_scores.values()) / len(entry_scores) if entry_scores else 0
+		self.logger.info(f"[ENTRY-SCORE] Scored {scored_count}/{len(watchlist)} tickers (skipped: {len(skipped_tickers)})")
+		self.logger.debug(f"[ENTRY-SCORE] Skipped: {skipped_tickers}")
+		self.logger.debug(f"[ENTRY-SCORE] Scores - avg: {avg_score:.1f}, min: {min(entry_scores.values()):.1f}, max: {max(entry_scores.values()):.1f}")
 
 		return {
 			"status": "success",
@@ -77,7 +86,7 @@ class EntryScoreAgent(Agent):
 			"output": {
 				"tickers_scored": scored_count,
 				"total_tickers": len(watchlist),
-				"average_score": sum(entry_scores.values()) / len(entry_scores) if entry_scores else 0,
+				"average_score": avg_score,
 				"max_score": max(entry_scores.values()) if entry_scores else 0,
 				"min_score": min(entry_scores.values()) if entry_scores else 0,
 			}

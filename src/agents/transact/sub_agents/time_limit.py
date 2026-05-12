@@ -117,16 +117,34 @@ class TimeLimitAgent(Agent):
 				if quantity <= 0:
 					continue
 
-				# Find earliest BUY transaction for this ticker
-				ticker_buys = df[
-					(df["ticker"].str.upper() == ticker.upper()) &
-					(df["operation"].str.upper() == "BUY")
-				]
+				# Find the entry date of the current open position
+				# Get all BUY and SELL transactions for this ticker
+				ticker_txns = df[df["ticker"].str.upper() == ticker.upper()].copy()
+				ticker_txns = ticker_txns.sort_values("created_at")
 
-				if ticker_buys.empty:
+				if ticker_txns.empty:
 					continue
 
-				entry_date = ticker_buys["created_at"].min()
+				# Find the most recent BUY that is part of the current open position
+				# by finding the last BUY after the last SELL (or just the last BUY if no SELL)
+				sells = ticker_txns[ticker_txns["operation"].str.upper() == "SELL"]
+				last_sell_idx = -1
+				if not sells.empty:
+					last_sell_idx = ticker_txns[ticker_txns["operation"].str.upper() == "SELL"].index[-1]
+
+				# Get the most recent BUY after the last SELL
+				buys_after_sell = ticker_txns[(ticker_txns["operation"].str.upper() == "BUY")]
+				if not buys_after_sell.empty:
+					if last_sell_idx >= 0:
+						buys_after_sell = buys_after_sell[buys_after_sell.index > last_sell_idx]
+
+					if buys_after_sell.empty:
+						continue
+
+					entry_date = buys_after_sell["created_at"].iloc[-1]  # Most recent BUY
+				else:
+					continue
+
 				if pd.isna(entry_date):
 					continue
 

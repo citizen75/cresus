@@ -1,0 +1,127 @@
+# Strategy Configuration Template
+# All strategies must follow this structure
+
+name: strategy_name
+universe: cac40  # Data source: cac40, srd, enx_large, nasdaq_100, etf_pea, etc.
+description: Brief description of strategy objectives and logic
+engine: TaModel  # Engine type: TaModel, LightGbmModel, AnomalyModel
+
+# Technical indicators to calculate and make available to formulas
+indicators:
+  - atr_14
+  - rsi_9
+  - ema_10
+  - ema_20
+  - adx_20
+
+# Watchlist configuration - which tickers to trade
+watchlist:
+  enabled: true
+  parameters:
+    tickers:
+      max_count: 15
+      description: Maximum number of tickers in the watchlist
+    volume:
+      min_volume: 500000
+      description: Minimum daily trading volume for inclusion
+    ranking:
+      metric: score
+      description: Metric to rank tickers (score, gain, etc.)
+    trend:
+      formula: close[0] > ema_10[0] and ema_10[0] > ema_20[0]
+      description: Formula to filter tickers - include only if True
+    volatility:
+      formula: atr_14[0] > close[0] * 0.012
+      description: Volatility filter formula
+
+# Signal generation configuration
+signals:
+  enabled: true
+  weights:
+    momentum: 0.5
+    trend: 0.35
+    volume_anomaly: 0.15
+    mean_reversion: 0.0
+  parameters:
+    momentum:
+      formula: macd_12_26[0] > 0.5
+      description: Momentum signal formula
+    trend:
+      formula: close[0] > ema_10[0] and ema_10[0] > ema_20[0]
+      description: Trend signal formula
+    mean_reversion:
+      formula: 'False'  # Set to 'False' to disable signal
+      description: Mean reversion signal formula
+    volume_anomaly:
+      formula: volume[0] > 1000000
+      description: Volume anomaly signal formula
+
+# Entry configuration - when and how to enter trades
+entry:
+  enabled: true
+  parameters:
+    max_daily_orders:
+      formula: 2
+      description: Maximum buy orders allowed per day
+    position_size:
+      formula: 1000 / close[0]
+      description: Number of shares to buy (can use formulas)
+    entry_filter:
+      formula: close[0] > ema_20[0] and adx_14[0] > 20
+      description: Market condition filter - entries only when True
+    extension_filter:
+      formula: (close[0] - ema_10[0]) / ema_10[0] < 0.05
+      description: Avoid chasing extended moves
+    limit_price:
+      formula: close[0] * 0.99
+      description: Limit order price (leave out for market orders)
+    regime_filter:
+      formula: close[0] > ema_20[0] and adx_20[0] > 20
+      description: Trade only in favorable market conditions
+
+order:
+  enabled: true
+  parameters:
+    position_sizing:
+      formula: 2000 / data["close"]
+      description: Fixed €2,000 per position
+    max_daily_orders:
+      formula: 3
+      description: Allow up to 3 orders per day
+    max_positions:
+      formula: 5
+      description: 5 positions max at any time
+    order_type:
+      formula: 'limit'
+      description: "limit or market"
+    fees:
+      formula: 0.001
+      description: Estimated fees as a percentage of trade value
+    slippage:
+      formula: 0.001
+      description: Estimated slippage as a percentage of trade value
+    
+# Exit configuration - how to close positions
+exit:
+  enabled: true
+  parameters:
+    stop_loss:
+      formula: close[0] - atr_14[0] * 1.3
+      description: Stop loss level - required for risk management
+    take_profit:
+      formula: close[0] + atr_14[0] * 2.6
+      description: Take profit target (set to 'False' to disable)
+    trailing_stop:
+      formula: close[0] * 0.97
+      description: Trailing stop percentage (optional)
+    holding_period:
+      formula: 12
+      description: Maximum holding period in days
+    time_stop:
+      formula: 1
+      description: Cancel unfilled entry orders after N days
+
+# Backtest configuration
+backtest:
+  initial_capital: 10000
+  description: Starting capital for backtesting

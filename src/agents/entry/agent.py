@@ -3,8 +3,13 @@
 from typing import Any, Dict, Optional
 from core.agent import Agent
 from core.flow import Flow
-from tools.portfolio import PortfolioManager
-from agents.entry.sub_agents import EntryScoreAgent, EntryTimingAgent, EntryRRAgent, EntryFilterAgent
+from agents.entry.sub_agents import (
+	EntryScoreAgent,
+	EntryTimingAgent,
+	EntryRRAgent,
+	EntryFilterAgent,
+	PositionDuplicateFilterAgent,
+)
 
 
 class EntryAgent(Agent):
@@ -49,7 +54,7 @@ class EntryAgent(Agent):
 					reverse=True
 				)
 				watchlist = [ticker for ticker, _ in sorted_by_score[:20]]
-				self.logger.debug(f"Watchlist empty, using {len(watchlist)} top signal-scored tickers for entry analysis")
+				self.logger.info(f"[ENTRY] Watchlist empty, using {len(watchlist)} top signal-scored tickers: {watchlist[:5]}{'...' if len(watchlist) > 5 else ''}")
 			else:
 				return {
 					"status": "error",
@@ -57,14 +62,16 @@ class EntryAgent(Agent):
 					"output": {},
 					"message": "No watchlist or signal-scored tickers in context"
 				}
+		else:
+			self.logger.info(f"[ENTRY] Starting entry analysis with {len(watchlist)} tickers: {watchlist[:10]}{'...' if len(watchlist) > 10 else ''}")
 
 		# Set watchlist in context for sub-agents
 		self.context.set("watchlist", watchlist)
 
-		# Create analysis flow with sub-agents
+		# Create analysis flow with sub-agents for scoring/analysis
 		entry_flow = Flow("EntryAnalysisFlow", context=self.context)
 
-		# Add sub-agents in sequence
+		# Add sub-agents in sequence for scoring and analysis
 		entry_flow.add_step(
 			EntryScoreAgent("EntryScoreStep"),
 			required=True
@@ -80,7 +87,8 @@ class EntryAgent(Agent):
 			required=False
 		)
 
-		# Execute the flow
+		# Execute the analysis flow
+		self.logger.debug("[ENTRY] Executing entry analysis flow...")
 		flow_result = entry_flow.process(input_data)
 
 		# Check flow execution
@@ -97,31 +105,55 @@ class EntryAgent(Agent):
 		timing_scores = self.context.get("timing_scores") or {}
 		rr_metrics = self.context.get("rr_metrics") or {}
 
+		self.logger.info(f"[ENTRY] After sub-agents: scored={len(entry_scores)}, timing={len(timing_scores)}, rr={len(rr_metrics)} tickers")
+		self.logger.debug(f"[ENTRY] Scored tickers: {list(entry_scores.keys())[:10]}{'...' if len(entry_scores) > 10 else ''}")
+
 		# Create composite entry recommendations
+		self.logger.debug("[ENTRY] Creating composite recommendations from sub-agent scores...")
 		recommendations = self._create_recommendations(
 			watchlist, entry_scores, timing_scores, rr_metrics
 		)
+		self.logger.info(f"[ENTRY] Created {len(recommendations)} composite recommendations")
+		self.logger.debug(f"[ENTRY] Recommendation tickers: {[r['ticker'] for r in recommendations[:10]]}{'...' if len(recommendations) > 10 else ''}")
 
-		# Filter duplicates from recommendations AFTER analysis
-		original_count = len(recommendations)
-		recommendations = self._filter_duplicate_recommendations(recommendations)
-		filtered_count = original_count - len(recommendations)
-		if filtered_count > 0:
-			self.logger.info(f"Filtered {filtered_count} duplicate positions from {original_count} recommendations")
+		# Set recommendations in context for filtering
+		self.context.set("entry_recommendations", recommendations)
+
+		# Apply filtering after recommendations are created
+		self.logger.debug("[ENTRY] Applying position duplicate filter...")
+		dup_filter = PositionDuplicateFilterAgent("PositionDuplicateFilterStep")
+		dup_filter.context = self.context
+		dup_filter_result = dup_filter.process({})
+		ctx_recs = self.context.get("entry_recommendations")
+		if ctx_recs is not None:
+			recommendations = ctx_recs
+		self.logger.debug(f"[ENTRY] After duplicate filter: {len(recommendations)} recommendations")
 
 		# Apply entry filter from strategy config
-		filter_agent = EntryFilterAgent("EntryFilterStep", context=self.context)
-		self.context.set("entry_recommendations", recommendations)
-		filter_result = filter_agent.process()
-		if filter_result.get("status") == "success":
-			filtered_recs = filter_result.get("output", {})
-			blocked = filtered_recs.get("filtered_count", 0)
-			if blocked > 0:
-				self.logger.info(f"Entry filter blocked {blocked} recommendations")
-		recommendations = self.context.get("entry_recommendations") or recommendations
+		self.logger.debug("[ENTRY] Applying entry filter from strategy...")
+		entry_filter = EntryFilterAgent("EntryFilterStep")
+		entry_filter.context = self.context
+		entry_filter_result = entry_filter.process({})
+		ctx_recs = self.context.get("entry_recommendations")
+		if ctx_recs is not None:
+			recommendations = ctx_recs
+		self.logger.debug(f"[ENTRY] After entry filter: {len(recommendations)} recommendations")
 
-		# Store in context for downstream processing
-		self.context.set("entry_recommendations", recommendations)
+		# Log final summary
+		avg_entry = sum(entry_scores.values()) / len(entry_scores) if entry_scores else 0
+		avg_timing = sum(timing_scores.values()) / len(timing_scores) if timing_scores else 0
+		avg_rr = sum(m["rr_ratio"] for m in rr_metrics.values()) / len(rr_metrics) if rr_metrics else 0
+
+		self.logger.info(f"[ENTRY] ========== ENTRY ANALYSIS SUMMARY ==========")
+		self.logger.info(f"[ENTRY] Watchlist: {len(watchlist)} tickers")
+		self.logger.info(f"[ENTRY] Entry scores: {len(entry_scores)}/{len(watchlist)} ({100*len(entry_scores)//len(watchlist) if watchlist else 0}%) - avg: {avg_entry:.1f}")
+		self.logger.info(f"[ENTRY] Timing analysis: {len(timing_scores)}/{len(watchlist)} ({100*len(timing_scores)//len(watchlist) if watchlist else 0}%) - avg: {avg_timing:.1f}")
+		self.logger.info(f"[ENTRY] Risk/Reward: {len(rr_metrics)}/{len(watchlist)} ({100*len(rr_metrics)//len(watchlist) if watchlist else 0}%) - avg RR: {avg_rr:.2f}")
+		self.logger.info(f"[ENTRY] Final recommendations: {len(recommendations)}/{len(watchlist)} ({100*len(recommendations)//len(watchlist) if watchlist else 0}%)")
+		if recommendations:
+			top_3 = [r['ticker'] for r in recommendations[:3]]
+			self.logger.info(f"[ENTRY] Top 3 opportunities: {', '.join(top_3)}")
+		self.logger.info(f"[ENTRY] ==========================================")
 
 		return {
 			"status": "success",
@@ -134,9 +166,9 @@ class EntryAgent(Agent):
 				"recommendations": len(recommendations),
 				"top_opportunities": self._get_top_opportunities(recommendations, 5),
 				"statistics": {
-					"avg_entry_score": sum(entry_scores.values()) / len(entry_scores) if entry_scores else 0,
-					"avg_timing_score": sum(timing_scores.values()) / len(timing_scores) if timing_scores else 0,
-					"avg_rr": sum(m["rr_ratio"] for m in rr_metrics.values()) / len(rr_metrics) if rr_metrics else 0,
+					"avg_entry_score": avg_entry,
+					"avg_timing_score": avg_timing,
+					"avg_rr": avg_rr,
 				}
 			},
 			"execution_history": flow_result.get("execution_history", []),
@@ -283,32 +315,4 @@ class EntryAgent(Agent):
 			}
 			for i, r in enumerate(recommendations[:count])
 		]
-
-	def _filter_duplicate_recommendations(self, recommendations: list) -> list:
-		"""Filter entry recommendations to remove tickers with existing open positions.
-
-		Args:
-			recommendations: List of entry recommendations
-
-		Returns:
-			Filtered list excluding duplicates
-		"""
-		try:
-			portfolio_name = self.context.get("portfolio_name") or "default"
-			pm = PortfolioManager(context=self.context.__dict__)
-			portfolio_details = pm.get_portfolio_details(portfolio_name)
-
-			if not portfolio_details:
-				return recommendations
-
-			# Get existing open positions (case-insensitive)
-			existing_positions = portfolio_details.get("positions", [])
-			existing_tickers = {pos["ticker"].upper() for pos in existing_positions}
-
-			# Filter recommendations
-			filtered = [r for r in recommendations if r.get("ticker", "").upper() not in existing_tickers]
-			return filtered
-		except Exception as e:
-			self.logger.error(f"Error filtering duplicate recommendations: {e}")
-			return recommendations
 

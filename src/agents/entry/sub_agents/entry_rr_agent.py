@@ -41,24 +41,28 @@ class EntryRRAgent(Agent):
 				"message": "No watchlist in context"
 			}
 
+		self.logger.debug(f"[ENTRY-RR] Calculating RR ratios for {len(watchlist)} tickers")
+
 		# Calculate RR for each ticker
 		rr_metrics = {}
 		valid_count = 0
 		avg_rr = 0
+		skipped_tickers = []
+		poor_rr_tickers = []
 
 		for ticker in watchlist:
 			if ticker not in data_history:
-				self.logger.warning(f"No data for {ticker}, skipping RR calculation")
+				skipped_tickers.append(f"{ticker}(no-data)")
 				continue
 
 			df = data_history[ticker]
 			if len(df) < 10:  # Need at least 10 days for meaningful analysis
-				self.logger.warning(f"Insufficient data ({len(df)} rows) for {ticker}, skipping RR calculation")
+				skipped_tickers.append(f"{ticker}(insuf-data:{len(df)})")
 				continue
 
 			# Validate that data has at least a close column
 			if 'close' not in df.columns and 'Close' not in df.columns:
-				self.logger.warning(f"Missing 'close' column for {ticker}, skipping RR calculation")
+				skipped_tickers.append(f"{ticker}(no-close)")
 				continue
 
 			# Calculate RR metrics
@@ -68,15 +72,25 @@ class EntryRRAgent(Agent):
 				valid_count += 1
 				avg_rr += metrics["rr_ratio"]
 
-				self.logger.debug(
-					f"RR for {ticker}: {metrics['rr_ratio']:.2f} "
-					f"(SL: {metrics['stop_loss']:.2f}, TP: {metrics['take_profit']:.2f})"
-				)
+				rr_ratio = metrics['rr_ratio']
+				quality = "excellent" if rr_ratio >= 2.0 else "good" if rr_ratio >= 1.5 else "fair"
+				self.logger.debug(f"[ENTRY-RR] {ticker}: RR {rr_ratio:.2f} ({quality})")
+			else:
+				poor_rr_tickers.append(ticker)
 
 		# Store metrics in context
 		self.context.set("rr_metrics", rr_metrics)
 
 		avg_rr = avg_rr / valid_count if valid_count > 0 else 0
+		good_count = sum(1 for m in rr_metrics.values() if m["rr_ratio"] >= 1.5)
+		excellent_count = sum(1 for m in rr_metrics.values() if m["rr_ratio"] >= 2.0)
+
+		# Log summary
+		self.logger.info(f"[ENTRY-RR] Evaluated {valid_count}/{len(watchlist)} tickers (skipped: {len(skipped_tickers)}, poor-RR: {len(poor_rr_tickers)})")
+		self.logger.debug(f"[ENTRY-RR] Skipped: {skipped_tickers}")
+		self.logger.info(f"[ENTRY-RR] RR quality: excellent={excellent_count}, good={good_count}, avg={avg_rr:.2f}")
+		if poor_rr_tickers:
+			self.logger.debug(f"[ENTRY-RR] Poor RR (<1.5): {poor_rr_tickers[:5]}{'...' if len(poor_rr_tickers) > 5 else ''}")
 
 		return {
 			"status": "success",
@@ -85,8 +99,8 @@ class EntryRRAgent(Agent):
 				"tickers_evaluated": valid_count,
 				"total_tickers": len(watchlist),
 				"average_rr": round(avg_rr, 2),
-				"good_rr_count": sum(1 for m in rr_metrics.values() if m["rr_ratio"] >= 1.5),
-				"excellent_rr_count": sum(1 for m in rr_metrics.values() if m["rr_ratio"] >= 2.0),
+				"good_rr_count": good_count,
+				"excellent_rr_count": excellent_count,
 			}
 		}
 
@@ -201,22 +215,30 @@ class EntryRRAgent(Agent):
 			
 			# If take_profit is disabled, use 1:1 RR ratio (stop_loss distance as reward target)
 			# This allows entries to be processed through order pipeline with trailing stop as sole exit
-			if take_profit_disabled or take_profit is None:
-				take_profit = current_price + risk  # 1:1 RR as placeholder for trailing stop
+			if take_profit_disabled:
+				# When disabled, set take_profit to None (don't calculate placeholder)
 				reward = risk
 				rr_ratio = 1.0
+				tp_value = None
+			elif take_profit is None:
+				# Fallback not disabled but no take_profit: use 1:1 RR
+				take_profit = current_price + risk
+				reward = risk
+				rr_ratio = 1.0
+				tp_value = round(take_profit, 4)
 			else:
 				reward = take_profit - current_price
 				if reward <= 0:
 					return None
 				rr_ratio = reward / risk
+				tp_value = round(take_profit, 4)
 
 			return {
 				"entry_price": round(current_price, 4),
 				"support_level": round(stop_loss, 4),
-				"resistance_level": round(take_profit, 4),
+				"resistance_level": round(take_profit, 4) if take_profit else None,
 				"stop_loss": round(stop_loss, 4),
-				"take_profit": round(take_profit, 4) if take_profit else None,
+				"take_profit": tp_value,
 				"risk_amount": round(risk, 4),
 				"reward_amount": round(reward, 4),
 				"rr_ratio": round(rr_ratio, 2),

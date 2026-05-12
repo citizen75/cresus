@@ -401,13 +401,13 @@ class StrategyManager:
 			}
 
 	def validate_strategy_config(self, strategy_name: str) -> Dict[str, Any]:
-		"""Validate strategy configuration completeness.
+		"""Validate strategy configuration against template schema.
 
 		Args:
 			strategy_name: Strategy name to validate
 
 		Returns:
-			Dict with validation results
+			Dict with validation results including issues and required fixes
 		"""
 		try:
 			result = self.load_strategy(strategy_name)
@@ -421,15 +421,54 @@ class StrategyManager:
 
 			strategy_data = result["data"]
 			issues = []
+			required_fields = []
+			optional_fields = []
 
-			if not strategy_data.get("name"):
-				issues.append("Missing strategy name")
+			# Required top-level fields
+			required = ["name", "universe", "description", "engine", "indicators"]
+			for field in required:
+				if not strategy_data.get(field):
+					issues.append(f"Missing required field: {field}")
+					required_fields.append(field)
 
-			if not strategy_data.get("source"):
-				issues.append("Missing source")
+			# Validate sections
+			sections = {
+				"watchlist": ["enabled", "parameters"],
+				"signals": ["enabled", "weights", "parameters"],
+				"entry": ["enabled", "parameters"],
+				"order": ["enabled", "parameters"],
+				"exit": ["enabled", "parameters"],
+				"backtest": ["initial_capital"],
+			}
 
-			if not strategy_data.get("agents"):
-				issues.append("Missing agents section")
+			for section, required_keys in sections.items():
+				if section not in strategy_data:
+					issues.append(f"Missing section: {section}")
+				else:
+					section_data = strategy_data[section]
+					for key in required_keys:
+						if key not in section_data:
+							issues.append(f"Missing {section}.{key}")
+
+			# Validate entry.parameters has required sub-keys
+			if "entry" in strategy_data and "parameters" in strategy_data["entry"]:
+				entry_params = strategy_data["entry"]["parameters"]
+				if "position_size" not in entry_params:
+					issues.append("Missing entry.parameters.position_size")
+
+			# Validate order.parameters has required sub-keys
+			if "order" in strategy_data and "parameters" in strategy_data["order"]:
+				order_params = strategy_data["order"]["parameters"]
+				if "position_sizing" not in order_params:
+					issues.append("Missing order.parameters.position_sizing")
+
+			# Validate exit.parameters has required sub-keys
+			if "exit" in strategy_data and "parameters" in strategy_data["exit"]:
+				exit_params = strategy_data["exit"]["parameters"]
+				if "stop_loss" not in exit_params:
+					issues.append("Missing exit.parameters.stop_loss (required for risk management)")
+				if "holding_period" not in exit_params:
+					issues.append("Missing exit.parameters.holding_period")
 
 			valid = len(issues) == 0
 
@@ -439,6 +478,7 @@ class StrategyManager:
 				"valid": valid,
 				"issues": issues,
 				"issue_count": len(issues),
+				"required_fields": required_fields,
 			}
 		except Exception as e:
 			return {
@@ -446,6 +486,227 @@ class StrategyManager:
 				"message": f"Validation failed: {str(e)}",
 				"error_type": type(e).__name__,
 				"valid": False,
+			}
+
+	def check_strategy(self, strategy_name: str) -> Dict[str, Any]:
+		"""Check strategy compliance with template and identify issues.
+
+		Args:
+			strategy_name: Strategy name to check
+
+		Returns:
+			Dict with detailed compliance report
+		"""
+		validation = self.validate_strategy_config(strategy_name)
+		return validation
+
+	def fix_strategy(self, strategy_name: str, dry_run: bool = False) -> Dict[str, Any]:
+		"""Fix strategy configuration by adding missing fields and fixing issues.
+
+		Adds missing required fields with default values and comments invalid keys.
+
+		Args:
+			strategy_name: Strategy name to fix
+			dry_run: If True, don't save changes, just show what would be fixed
+
+		Returns:
+			Dict with fix results
+		"""
+		try:
+			result = self.load_strategy(strategy_name)
+			if result["status"] != "success":
+				return {
+					"status": "error",
+					"message": f"Strategy not found: {strategy_name}",
+				}
+
+			strategy_data = result["data"].copy()
+			changes = []
+
+			# Template structure for default values
+			template = self._load_template()
+
+			# Add missing required top-level fields
+			required_fields = ["name", "universe", "description", "engine", "indicators"]
+			for field in required_fields:
+				if field not in strategy_data and field in template:
+					strategy_data[field] = template[field]
+					changes.append(f"Added missing field: {field}")
+
+			# Add missing sections with defaults
+			sections = ["watchlist", "signals", "entry", "order", "exit", "backtest"]
+			for section in sections:
+				if section not in strategy_data and section in template:
+					strategy_data[section] = template[section]
+					changes.append(f"Added missing section: {section}")
+
+			# Add missing weights and parameters to signals section
+			if "signals" in strategy_data:
+				if "weights" not in strategy_data["signals"] and "weights" in template.get("signals", {}):
+					strategy_data["signals"]["weights"] = template["signals"]["weights"]
+					changes.append("Added signals.weights section")
+				if "parameters" not in strategy_data["signals"] and "parameters" in template.get("signals", {}):
+					strategy_data["signals"]["parameters"] = template["signals"]["parameters"]
+					changes.append("Added signals.parameters section")
+
+			# Validate required sub-fields in sections
+			if "entry" in strategy_data:
+				if "parameters" not in strategy_data["entry"]:
+					strategy_data["entry"]["parameters"] = template["entry"]["parameters"]
+					changes.append("Added entry.parameters section")
+				else:
+					# Add missing sub-parameters from template
+					for param_key, param_value in template.get("entry", {}).get("parameters", {}).items():
+						if param_key not in strategy_data["entry"]["parameters"]:
+							strategy_data["entry"]["parameters"][param_key] = param_value
+							changes.append(f"Added entry.parameters.{param_key}")
+
+			if "order" in strategy_data:
+				if "parameters" not in strategy_data["order"]:
+					strategy_data["order"]["parameters"] = template["order"]["parameters"]
+					changes.append("Added order.parameters section")
+				else:
+					# Add missing sub-parameters from template
+					for param_key, param_value in template.get("order", {}).get("parameters", {}).items():
+						if param_key not in strategy_data["order"]["parameters"]:
+							strategy_data["order"]["parameters"][param_key] = param_value
+							changes.append(f"Added order.parameters.{param_key}")
+
+			if "exit" in strategy_data:
+				if "parameters" not in strategy_data["exit"]:
+					strategy_data["exit"]["parameters"] = template["exit"]["parameters"]
+					changes.append("Added exit.parameters section")
+				else:
+					# Add missing sub-parameters from template
+					for param_key, param_value in template.get("exit", {}).get("parameters", {}).items():
+						if param_key not in strategy_data["exit"]["parameters"]:
+							strategy_data["exit"]["parameters"][param_key] = param_value
+							changes.append(f"Added exit.parameters.{param_key}")
+
+			# Identify invalid keys but keep them for now (will comment in file)
+			valid_top_keys = set(template.keys())
+			invalid_keys = []
+			clean_data = strategy_data.copy()
+			for key in list(strategy_data.keys()):
+				if key not in valid_top_keys and not key.startswith("_") and not key.startswith("#"):
+					invalid_keys.append(key)
+					changes.append(f"Commented invalid key: {key}")
+					# Remove from clean data before saving
+					del clean_data[key]
+
+			# Save if not dry run
+			if not dry_run and changes:
+				file_path = self._get_strategy_file(strategy_name)
+				# First load original file to get invalid sections
+				original_file_path = self._get_strategy_file(strategy_name)
+				original_invalid_sections = ""
+				if original_file_path.exists():
+					with open(original_file_path, 'r') as f:
+						original_content = f.read()
+						# Extract invalid sections from original file
+						for invalid_key in invalid_keys:
+							original_invalid_sections += self._extract_key_section(original_content, invalid_key)
+
+				# Save clean data
+				with open(file_path, 'w') as f:
+					yaml.dump(clean_data, f, default_flow_style=False, sort_keys=False)
+
+				# Append commented invalid sections
+				if original_invalid_sections:
+					with open(file_path, 'a') as f:
+						f.write("\n# ===== COMMENTED OUT (INVALID KEYS) =====\n")
+						f.write(original_invalid_sections)
+
+				changes.append(f"Saved fixed strategy to {file_path}")
+
+			return {
+				"status": "success",
+				"strategy": strategy_name,
+				"changes": changes,
+				"change_count": len(changes),
+				"dry_run": dry_run,
+			}
+
+		except Exception as e:
+			return {
+				"status": "error",
+				"message": f"Fix failed: {str(e)}",
+				"error_type": type(e).__name__,
+			}
+
+	def _extract_key_section(self, content: str, key: str) -> str:
+		"""Extract a YAML key section from content and comment it out.
+
+		Args:
+			content: YAML file content
+			key: Key to extract and comment
+
+		Returns:
+			Commented out section string
+		"""
+		lines = content.split('\n')
+		result_lines = []
+		in_section = False
+		section_indent = -1
+
+		for line in lines:
+			# Check if this line starts the key section
+			if line.strip().startswith(f"{key}:"):
+				in_section = True
+				section_indent = len(line) - len(line.lstrip())
+				result_lines.append(f"# {line}")
+			elif in_section:
+				# Check if we're still in the section (based on indentation)
+				if line.strip() and not line.startswith(' ' * (section_indent + 1)) and not line.startswith('\t'):
+					# Unindented line means section ended
+					in_section = False
+				else:
+					# Still in section, comment it out
+					result_lines.append(f"# {line}")
+
+		return '\n'.join(result_lines) + '\n' if result_lines else ""
+
+	def _load_template(self) -> Dict[str, Any]:
+		"""Load the strategy template from init/templates/strategy.yml.
+
+		Returns:
+			Dict with template structure
+		"""
+		try:
+			template_file = self.project_root / "init" / "templates" / "strategy.yml"
+			if not template_file.exists():
+				# Return inline minimal template if file doesn't exist
+				return {
+					"name": "template_name",
+					"universe": "cac40",
+					"description": "Strategy description",
+					"engine": "TaModel",
+					"indicators": [],
+					"watchlist": {"enabled": True, "parameters": {}},
+					"signals": {"enabled": True, "weights": {}, "parameters": {}},
+					"entry": {"enabled": True, "parameters": {}},
+					"order": {"enabled": True, "parameters": {}},
+					"exit": {"enabled": True, "parameters": {}},
+					"backtest": {"initial_capital": 10000},
+				}
+
+			with open(template_file, 'r') as f:
+				return yaml.safe_load(f) or {}
+
+		except Exception:
+			# Return minimal template structure on error
+			return {
+				"name": "template_name",
+				"universe": "cac40",
+				"description": "Strategy description",
+				"engine": "TaModel",
+				"indicators": [],
+				"watchlist": {"enabled": True, "parameters": {}},
+				"signals": {"enabled": True, "weights": {}, "parameters": {}},
+				"entry": {"enabled": True, "parameters": {}},
+				"order": {"enabled": True, "parameters": {}},
+				"exit": {"enabled": True, "parameters": {}},
+				"backtest": {"initial_capital": 10000},
 			}
 
 

@@ -39,23 +39,26 @@ class EntryTimingAgent(Agent):
 				"message": "No watchlist in context"
 			}
 
+		self.logger.debug(f"[ENTRY-TIMING] Analyzing timing for {len(watchlist)} tickers")
+
 		# Calculate timing scores for each ticker
 		timing_scores = {}
 		scored_count = 0
+		skipped_tickers = []
 
 		for ticker in watchlist:
 			if ticker not in data_history:
-				self.logger.warning(f"No data for {ticker}, skipping timing score")
+				skipped_tickers.append(f"{ticker}(no-data)")
 				continue
 
 			df = data_history[ticker]
 			if len(df) < 5:  # Need at least 5 days for analysis
-				self.logger.warning(f"Insufficient data ({len(df)} rows) for {ticker}, skipping timing score")
+				skipped_tickers.append(f"{ticker}(insuf-data:{len(df)})")
 				continue
 
 			# Validate that data has at least a close column
 			if 'close' not in df.columns and 'Close' not in df.columns:
-				self.logger.warning(f"Missing 'close' column for {ticker}, skipping timing score")
+				skipped_tickers.append(f"{ticker}(no-close)")
 				continue
 
 			# Calculate timing score based on recent price action
@@ -63,10 +66,17 @@ class EntryTimingAgent(Agent):
 			timing_scores[ticker] = score
 			scored_count += 1
 
-			self.logger.debug(f"Timing score for {ticker}: {score:.2f}")
+			self.logger.debug(f"[ENTRY-TIMING] {ticker}: {score:.1f}")
 
 		# Store scores in context
 		self.context.set("timing_scores", timing_scores)
+
+		# Log summary
+		avg_timing = sum(timing_scores.values()) / len(timing_scores) if timing_scores else 0
+		optimal_count = sum(1 for s in timing_scores.values() if s > 70)
+		self.logger.info(f"[ENTRY-TIMING] Scored {scored_count}/{len(watchlist)} tickers (skipped: {len(skipped_tickers)}, optimal: {optimal_count})")
+		self.logger.debug(f"[ENTRY-TIMING] Skipped: {skipped_tickers}")
+		self.logger.debug(f"[ENTRY-TIMING] Timing avg: {avg_timing:.1f}")
 
 		return {
 			"status": "success",
@@ -74,8 +84,8 @@ class EntryTimingAgent(Agent):
 			"output": {
 				"tickers_scored": scored_count,
 				"total_tickers": len(watchlist),
-				"average_timing": sum(timing_scores.values()) / len(timing_scores) if timing_scores else 0,
-				"optimal_count": sum(1 for s in timing_scores.values() if s > 70),
+				"average_timing": avg_timing,
+				"optimal_count": optimal_count,
 			}
 		}
 
