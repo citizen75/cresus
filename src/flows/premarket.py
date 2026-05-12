@@ -70,17 +70,25 @@ class PreMarketFlow(Flow):
 			signals_agent = SignalsAgent("SignalsAgent", self.context)
 			self.add_step(signals_agent, step_name="signals", required=True)
 		else:
-			# Live: signals on all tickers first, then filter with signal scores
+			# Live: signals on all tickers first, then entry filter, then watchlist
 			signals_agent = SignalsAgent("SignalsAgent", self.context)
 			self.add_step(signals_agent, step_name="signals", required=True)
-			
-			# Watchlist step - filter tickers based on strategy criteria and signal scores
+
+			# Entry analysis step - apply entry_filter to ALL signal-scored tickers BEFORE watchlist
+			# This ensures entry-valid tickers survive to watchlist filtering
+			entry_agent = EntryAgent("EntryAgent", self.context)
+			self.add_step(entry_agent, step_name="entry", required=False)
+
+			# Watchlist step - filter tickers based on strategy criteria and entry validity
+			# Operates on both entry-valid tickers and other tickers to build final watchlist
 			watchlist_agent = WatchListAgent("WatchListAgent", self.context)
 			self.add_step(watchlist_agent, step_name="watchlist", required=True)
 
-		# Entry analysis step - analyze trade entry points for watchlist tickers
-		entry_agent = EntryAgent("EntryAgent", self.context)
-		self.add_step(entry_agent, step_name="entry", required=False)
+		# For backtest mode, entry was not added above, so add it here if in backtest
+		if is_backtest:
+			# Entry analysis step - analyze trade entry points for watchlist tickers (backtest)
+			entry_agent = EntryAgent("EntryAgent", self.context)
+			self.add_step(entry_agent, step_name="entry", required=False)
 
 		# Entry order step - convert entry signals to executable orders
 		entry_order_agent = EntryOrderAgent("EntryOrderAgent", self.context)
