@@ -406,10 +406,22 @@ class StrategyCommands:
 		"""
 		console.print(f"\n[bold cyan]Strategy Compliance Check: {strategy_name}[/bold cyan]\n")
 
+		# Load strategy to show indicators
+		strategy_result = self.validator.strategy_manager.load_strategy(strategy_name)
+		if strategy_result.get("status") == "success":
+			indicators = strategy_result.get("data", {}).get("indicators", [])
+			if indicators:
+				console.print(f"[cyan]Indicators ({len(indicators)}):[/cyan] {', '.join(indicators)}\n")
+
 		if result.get("valid"):
 			console.print("[bold green]✓ Strategy is compliant with template[/bold green]\n")
 		else:
 			console.print(f"[bold red]✗ {result.get('issue_count', 0)} issue(s) found:[/bold red]\n")
+
+			# Separate issues by type
+			indicator_issues = [i for i in result.get("issues", []) if "indicator" in i.lower()]
+			formula_issues = [i for i in result.get("issues", []) if "formula" in i.lower()]
+			structure_issues = [i for i in result.get("issues", []) if "indicator" not in i.lower() and "formula" not in i.lower()]
 
 			# Display issues in a table
 			issues_table = Table(title="Issues Found", box=box.ROUNDED)

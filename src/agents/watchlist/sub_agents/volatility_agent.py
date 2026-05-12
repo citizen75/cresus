@@ -151,7 +151,7 @@ class VolatilityAgent(Agent):
 					return False
 
 			# Get latest row
-			latest = ticker_data.iloc[-1]
+			latest = ticker_data.iloc[0]  # Data is sorted newest-first, so [0] is most recent
 
 			# Create data dict for formula evaluation
 			data = latest.to_dict()

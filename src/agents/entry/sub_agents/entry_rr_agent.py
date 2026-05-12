@@ -4,7 +4,7 @@ from typing import Any, Dict, Optional
 import pandas as pd
 from core.agent import Agent
 from tools.strategy.strategy import StrategyManager
-from tools.strategy.config_evaluator import ConfigEvaluator
+from tools.formula.numeric_evaluator import evaluate_numeric_formula
 
 
 class EntryRRAgent(Agent):
@@ -120,7 +120,7 @@ class EntryRRAgent(Agent):
 			Dict with RR metrics or None
 		"""
 		try:
-			latest = df.iloc[-1]
+			latest = df.iloc[0]  # Data is sorted newest-first (descending), so [0] is most recent
 			current_price = float(latest.get("close", 0))
 
 			if current_price <= 0:
@@ -160,14 +160,14 @@ class EntryRRAgent(Agent):
 			if "stop_loss" in exit_config:
 				sl_formula = exit_config["stop_loss"].get("formula")
 				if sl_formula:
-					stop_loss = ConfigEvaluator.evaluate_formula(sl_formula, data_context)
+					stop_loss = evaluate_numeric_formula(sl_formula, data_context)
 
 			# Try to evaluate take_profit formula from config
 			take_profit = None
 			if not take_profit_disabled and "take_profit" in exit_config:
 				tp_formula = exit_config["take_profit"].get("formula")
 				if tp_formula:
-					take_profit = ConfigEvaluator.evaluate_formula(tp_formula, data_context)
+					take_profit = evaluate_numeric_formula(tp_formula, data_context)
 
 			# If config formulas didn't work, use fallback support/resistance method
 			# But skip fallback if take_profit is explicitly disabled (trailing stop strategy)

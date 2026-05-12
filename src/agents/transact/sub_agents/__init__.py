@@ -5,6 +5,7 @@ from .target import TargetAgent
 from .time_limit import TimeLimitAgent
 from .limit_order import LimitOrderAgent
 from .trailing_stop import TrailingStopAgent
+from .exit_condition import ExitConditionAgent
 
 __all__ = [
     "StopLossAgent",
@@ -12,4 +13,5 @@ __all__ = [
     "TimeLimitAgent",
     "LimitOrderAgent",
     "TrailingStopAgent",
+    "ExitConditionAgent",
 ]

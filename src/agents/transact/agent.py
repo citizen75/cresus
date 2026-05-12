@@ -9,7 +9,14 @@ from tools.portfolio.orders import Orders
 from tools.portfolio.journal import Journal
 from tools.portfolio.broker import PaperBroker
 from tools.strategy import StrategyManager
-from .sub_agents import StopLossAgent, TargetAgent, TimeLimitAgent, LimitOrderAgent, TrailingStopAgent
+from .sub_agents import (
+	StopLossAgent,
+	TargetAgent,
+	TimeLimitAgent,
+	LimitOrderAgent,
+	TrailingStopAgent,
+	ExitConditionAgent,
+)
 
 
 class TransactAgent(Agent):
@@ -36,6 +43,7 @@ class TransactAgent(Agent):
 		self.target_agent = TargetAgent("TargetAgent")
 		self.time_limit_agent = TimeLimitAgent("TimeLimitAgent")
 		self.limit_agent = LimitOrderAgent("LimitOrderAgent")
+		self.exit_condition_agent = ExitConditionAgent("ExitConditionAgent")
 
 	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
 		"""Execute pending BUY orders and manage exits (stop_loss) for a specific date.
@@ -138,6 +146,15 @@ class TransactAgent(Agent):
 		self.time_limit_agent.context = self.context
 		time_limit_result = self.time_limit_agent.process({"day_data": day_data})
 		exit_results.extend(time_limit_result.get("output", {}).get("exits", []))
+
+		# 4. Exit condition exits (formula-based)
+		data_history = self.context.get("data_history") or {}
+		self.exit_condition_agent.context = self.context
+		exit_condition_result = self.exit_condition_agent.process({
+			"day_data": day_data,
+			"data_history": data_history
+		})
+		exit_results.extend(exit_condition_result.get("output", {}).get("exits", []))
 
 		buy_count = len([r for r in buy_results if r.get("status") == "filled"])
 		exit_count = len([r for r in exit_results if r.get("status") == "filled"])

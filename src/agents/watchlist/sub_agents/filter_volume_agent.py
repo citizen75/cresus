@@ -74,7 +74,7 @@ class FilterVolumeAgent(Agent):
 				# Get latest volume value
 				try:
 					if hasattr(ticker_data, 'iloc') and len(ticker_data) > 0:
-						latest_volume = ticker_data["volume"].iloc[-1].item()
+						latest_volume = ticker_data["volume"].iloc[0].item()  # [0] is most recent (newest-first)
 
 						# Determine minimum volume threshold
 						threshold = None
@@ -83,7 +83,7 @@ class FilterVolumeAgent(Agent):
 							threshold = min_volume
 						elif min_volume_ratio is not None and "volume_ma_20" in ticker_data.columns:
 							# Dynamic volume ratio threshold
-							volume_ma_20 = ticker_data["volume_ma_20"].iloc[-1].item()
+							volume_ma_20 = ticker_data["volume_ma_20"].iloc[0].item()  # [0] is most recent (newest-first)
 							threshold = volume_ma_20 * min_volume_ratio
 
 						# Apply filter if threshold is set

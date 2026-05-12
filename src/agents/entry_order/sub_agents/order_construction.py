@@ -5,7 +5,7 @@ from datetime import datetime
 import hashlib
 from core.agent import Agent
 from tools.strategy.strategy import StrategyManager
-from tools.strategy.config_evaluator import ConfigEvaluator
+from tools.formula.numeric_evaluator import evaluate_numeric_formula
 
 
 class OrderConstructionAgent(Agent):
@@ -111,7 +111,7 @@ class OrderConstructionAgent(Agent):
 						
 						# Try to evaluate the formula
 						try:
-							ts_value = ConfigEvaluator.evaluate_formula(ts_formula, data_context)
+							ts_value = evaluate_numeric_formula(ts_formula, data_context)
 							if ts_value is not None:
 								import math
 								if not math.isnan(ts_value) and not math.isinf(ts_value):
@@ -136,7 +136,7 @@ class OrderConstructionAgent(Agent):
 							holding_period = int(hp_result)
 					except (ValueError, TypeError):
 						data_context = {"close": entry_price}
-						result = ConfigEvaluator.evaluate_formula(hp_formula, data_context)
+						result = evaluate_numeric_formula(hp_formula, data_context)
 						if result:
 							import math
 							if not math.isnan(result) and not math.isinf(result):
@@ -155,7 +155,7 @@ class OrderConstructionAgent(Agent):
 						"close": entry_price,
 						"atr_14": rec.get("risk_amount", 0),
 					}
-					limit_price = ConfigEvaluator.evaluate_formula(lp_formula, data_context)
+					limit_price = evaluate_numeric_formula(lp_formula, data_context)
 					if limit_price:
 						execution_method = "limit"
 

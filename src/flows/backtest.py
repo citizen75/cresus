@@ -77,6 +77,17 @@ class BacktestFlow(Flow):
 		self.context.set("backtest_dir", str(backtest_dir))
 		self.context.set("strategy_name", strategy_name)
 
+		# Load and set strategy_config early (needed by all agents and flows)
+		from tools.strategy import StrategyManager
+		sm = StrategyManager()
+		strategy_result = sm.load_strategy(strategy_name)
+		if strategy_result.get("status") == "success":
+			strategy_config = strategy_result.get("data", {})
+			self.context.set("strategy_config", strategy_config)
+			self.logger.debug(f"Loaded strategy_config for {strategy_name}")
+		else:
+			self.logger.warning(f"Could not load strategy_config for {strategy_name}")
+
 		# Derive portfolio name from strategy if not provided
 		portfolio_name = flow_input.get("portfolio_name") or self._strategy_to_portfolio_name(strategy_name)
 		self.context.set("portfolio_name", portfolio_name)

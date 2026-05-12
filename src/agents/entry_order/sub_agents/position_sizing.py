@@ -5,7 +5,7 @@ from core.agent import Agent
 from tools.portfolio import PortfolioManager
 from tools.data import Fundamental
 from tools.strategy.strategy import StrategyManager
-from tools.strategy.config_evaluator import ConfigEvaluator
+from tools.formula.numeric_evaluator import evaluate_position_size
 
 
 class PositionSizingAgent(Agent):
@@ -123,7 +123,7 @@ class PositionSizingAgent(Agent):
 				shares = None
 				if position_size_formula:
 					data_context = {"close": current_price}
-					shares = ConfigEvaluator.evaluate_position_size(
+					shares = evaluate_position_size(
 						position_size_formula, data_context, max_shares=None
 					)
 					if shares and shares > 0:

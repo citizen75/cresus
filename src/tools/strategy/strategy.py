@@ -401,7 +401,9 @@ class StrategyManager:
 			}
 
 	def validate_strategy_config(self, strategy_name: str) -> Dict[str, Any]:
-		"""Validate strategy configuration against template schema.
+		"""Validate strategy configuration against template schema (dynamic).
+
+		Derives required structure from template instead of hardcoding field names.
 
 		Args:
 			strategy_name: Strategy name to validate
@@ -420,55 +422,21 @@ class StrategyManager:
 				}
 
 			strategy_data = result["data"]
+			template = self._load_template()
 			issues = []
-			required_fields = []
-			optional_fields = []
 
-			# Required top-level fields
-			required = ["name", "universe", "description", "engine", "indicators"]
-			for field in required:
-				if not strategy_data.get(field):
-					issues.append(f"Missing required field: {field}")
-					required_fields.append(field)
+			# Dynamically validate structure against template
+			self._validate_structure_against_template(
+				strategy_data, template, "", issues
+			)
 
-			# Validate sections
-			sections = {
-				"watchlist": ["enabled", "parameters"],
-				"signals": ["enabled", "weights", "parameters"],
-				"entry": ["enabled", "parameters"],
-				"order": ["enabled", "parameters"],
-				"exit": ["enabled", "parameters"],
-				"backtest": ["initial_capital"],
-			}
+			# Validate indicators
+			indicator_issues = self._validate_indicators(strategy_data)
+			issues.extend(indicator_issues)
 
-			for section, required_keys in sections.items():
-				if section not in strategy_data:
-					issues.append(f"Missing section: {section}")
-				else:
-					section_data = strategy_data[section]
-					for key in required_keys:
-						if key not in section_data:
-							issues.append(f"Missing {section}.{key}")
-
-			# Validate entry.parameters has required sub-keys
-			if "entry" in strategy_data and "parameters" in strategy_data["entry"]:
-				entry_params = strategy_data["entry"]["parameters"]
-				if "position_size" not in entry_params:
-					issues.append("Missing entry.parameters.position_size")
-
-			# Validate order.parameters has required sub-keys
-			if "order" in strategy_data and "parameters" in strategy_data["order"]:
-				order_params = strategy_data["order"]["parameters"]
-				if "position_sizing" not in order_params:
-					issues.append("Missing order.parameters.position_sizing")
-
-			# Validate exit.parameters has required sub-keys
-			if "exit" in strategy_data and "parameters" in strategy_data["exit"]:
-				exit_params = strategy_data["exit"]["parameters"]
-				if "stop_loss" not in exit_params:
-					issues.append("Missing exit.parameters.stop_loss (required for risk management)")
-				if "holding_period" not in exit_params:
-					issues.append("Missing exit.parameters.holding_period")
+			# Validate formulas
+			formula_issues = self._validate_formulas(strategy_data)
+			issues.extend(formula_issues)
 
 			valid = len(issues) == 0
 
@@ -478,7 +446,6 @@ class StrategyManager:
 				"valid": valid,
 				"issues": issues,
 				"issue_count": len(issues),
-				"required_fields": required_fields,
 			}
 		except Exception as e:
 			return {
@@ -487,6 +454,178 @@ class StrategyManager:
 				"error_type": type(e).__name__,
 				"valid": False,
 			}
+
+	def _validate_structure_against_template(
+		self,
+		data: Any,
+		template: Any,
+		path: str,
+		issues: List[str]
+	) -> None:
+		"""Recursively validate data structure against template.
+
+		Args:
+			data: Strategy data to validate
+			template: Template structure to validate against
+			path: Current path for error messages (e.g., "entry.parameters")
+			issues: List to accumulate issues
+		"""
+		# Both should be dicts
+		if not isinstance(data, dict) or not isinstance(template, dict):
+			return
+
+		# Check for missing fields from template
+		for template_key, template_value in template.items():
+			current_path = f"{path}.{template_key}" if path else template_key
+
+			if template_key not in data:
+				# Missing field from template
+				issues.append(f"Missing: {current_path}")
+			else:
+				# Recursively validate nested structures
+				data_value = data[template_key]
+
+				if isinstance(template_value, dict) and isinstance(data_value, dict):
+					# Both are dicts - recurse
+					self._validate_structure_against_template(
+						data_value, template_value, current_path, issues
+					)
+				elif isinstance(template_value, list) and isinstance(data_value, list):
+					# Both are lists - check if list of dicts (e.g., indicators)
+					if template_value and isinstance(template_value[0], dict):
+						# List of dicts - validate each item
+						for i, data_item in enumerate(data_value):
+							if isinstance(data_item, dict):
+								self._validate_structure_against_template(
+									data_item, template_value[0],
+									f"{current_path}[{i}]", issues
+								)
+					# For simple lists (like indicators list), just ensure it's a list
+				elif type(template_value) != type(data_value):
+					# Type mismatch (but allow some flexibility for scalar values)
+					if not isinstance(data_value, (str, int, float, bool, type(None))):
+						issues.append(f"Type mismatch at {current_path}: expected {type(template_value).__name__}, got {type(data_value).__name__}")
+
+		# Check for extra fields in data not in template
+		for data_key in data.keys():
+			if data_key not in template and not data_key.startswith("_") and not data_key.startswith("#"):
+				current_path = f"{path}.{data_key}" if path else data_key
+				issues.append(f"Unexpected field: {current_path} (not in template)")
+
+	def _build_clean_data(
+		self,
+		data: Dict[str, Any],
+		template: Dict[str, Any],
+		changes: List[str]
+	) -> Dict[str, Any]:
+		"""Build clean data by filling missing fields and removing invalid ones (dynamic).
+
+		Recursively processes data structure following template.
+
+		Args:
+			data: Strategy data
+			template: Template structure
+			changes: List to accumulate change descriptions
+
+		Returns:
+			Clean data dict following template structure
+		"""
+		clean_data = {}
+
+		# Process template keys in order
+		for template_key, template_value in template.items():
+			if template_key in data:
+				data_value = data[template_key]
+
+				if isinstance(template_value, dict) and isinstance(data_value, dict):
+					# Recursively clean nested dict
+					clean_data[template_key] = self._build_clean_data(
+						data_value, template_value, changes
+					)
+				elif isinstance(template_value, list) and isinstance(data_value, list):
+					# Keep lists as-is (don't validate individual items)
+					clean_data[template_key] = data_value
+				else:
+					# Keep scalar values
+					clean_data[template_key] = data_value
+			else:
+				# Missing field - add from template with deep copy
+				if isinstance(template_value, dict):
+					clean_data[template_key] = self._deep_copy_dict(template_value)
+					changes.append(f"Added missing: {template_key}")
+				elif isinstance(template_value, list):
+					clean_data[template_key] = template_value.copy() if template_value else []
+					changes.append(f"Added missing: {template_key}")
+				else:
+					clean_data[template_key] = template_value
+					changes.append(f"Added missing: {template_key}")
+
+		# Note: We don't add extra fields from data that aren't in template
+		# They are reported as issues during validation
+
+		return clean_data
+
+	def _deep_copy_dict(self, d: Dict[str, Any]) -> Dict[str, Any]:
+		"""Deep copy a dict, preserving structure.
+
+		Args:
+			d: Dict to copy
+
+		Returns:
+			Deep copy of dict
+		"""
+		result = {}
+		for key, value in d.items():
+			if isinstance(value, dict):
+				result[key] = self._deep_copy_dict(value)
+			elif isinstance(value, list):
+				result[key] = value.copy()
+			else:
+				result[key] = value
+		return result
+
+	def _identify_invalid_keys(
+		self,
+		data: Dict[str, Any],
+		template: Dict[str, Any],
+		path: str = ""
+	) -> tuple:
+		"""Identify keys in data that are not in template (dynamic).
+
+		Args:
+			data: Strategy data
+			template: Template structure
+			path: Current path for tracking nested keys
+
+		Returns:
+			Tuple of (invalid_top_level_keys, invalid_nested_keys_dict)
+		"""
+		invalid_top_keys = []
+		invalid_nested = {}
+
+		# Check for invalid keys at this level
+		for data_key in data.keys():
+			if data_key not in template and not data_key.startswith("_") and not data_key.startswith("#"):
+				if path:
+					# This is a nested key
+					nested_path = f"{path}.{data_key}" if path else data_key
+					if nested_path not in invalid_nested:
+						invalid_nested[nested_path] = []
+					invalid_nested[nested_path].append(data_key)
+				else:
+					# Top-level invalid key
+					invalid_top_keys.append(data_key)
+
+		# Recursively check nested dicts
+		for template_key in template.keys():
+			if isinstance(template.get(template_key), dict) and isinstance(data.get(template_key), dict):
+				current_path = f"{path}.{template_key}" if path else template_key
+				nested_invalid_top, nested_invalid_dict = self._identify_invalid_keys(
+					data[template_key], template[template_key], current_path
+				)
+				invalid_nested.update(nested_invalid_dict)
+
+		return invalid_top_keys, invalid_nested
 
 	def check_strategy(self, strategy_name: str) -> Dict[str, Any]:
 		"""Check strategy compliance with template and identify issues.
@@ -526,115 +665,23 @@ class StrategyManager:
 			# Template structure for default values
 			template = self._load_template()
 
-			# Identify invalid top-level keys
-			valid_top_keys = set(template.keys())
-			invalid_keys = []
-			invalid_nested_keys = {}  # Track invalid nested keys
-
-			# Track top-level keys from strategy not in template
-			for key in strategy_data.keys():
-				if key not in valid_top_keys and not key.startswith("_") and not key.startswith("#"):
-					invalid_keys.append(key)
-					changes.append(f"Commented invalid key: {key}")
-
-			# Build clean_data strictly following template key order
-			clean_data = {}
-			for template_key in template.keys():
-				if template_key in strategy_data:
-					clean_data[template_key] = strategy_data[template_key]
-
-			# Add missing required top-level fields
-			required_fields = ["name", "universe", "description", "engine", "indicators"]
-			for field in required_fields:
-				if field not in clean_data and field in template:
-					clean_data[field] = template[field]
-					changes.append(f"Added missing field: {field}")
-
-			# Add missing sections with defaults (in template order)
-			sections = ["watchlist", "signals", "entry", "order", "exit", "backtest"]
-			for section in sections:
-				if section not in clean_data and section in template:
-					clean_data[section] = template[section].copy() if isinstance(template[section], dict) else template[section]
-					changes.append(f"Added missing section: {section}")
-
-			# Add missing weights and parameters to signals section
-			if "signals" in clean_data:
-				if "weights" not in clean_data["signals"] and "weights" in template.get("signals", {}):
-					clean_data["signals"]["weights"] = template["signals"]["weights"].copy()
-					changes.append("Added signals.weights section")
-				if "parameters" not in clean_data["signals"] and "parameters" in template.get("signals", {}):
-					clean_data["signals"]["parameters"] = template["signals"]["parameters"].copy()
-					changes.append("Added signals.parameters section")
-
-			# Validate required sub-fields in sections
-			if "entry" in clean_data:
-				if "parameters" not in clean_data["entry"]:
-					clean_data["entry"]["parameters"] = template["entry"]["parameters"].copy()
-					changes.append("Added entry.parameters section")
-				else:
-					# Add missing sub-parameters from template in template order
-					entry_params = clean_data["entry"]["parameters"]
-					for param_key, param_value in template.get("entry", {}).get("parameters", {}).items():
-						if param_key not in entry_params:
-							entry_params[param_key] = param_value
-							changes.append(f"Added entry.parameters.{param_key}")
-
-			if "order" in clean_data:
-				if "parameters" not in clean_data["order"]:
-					clean_data["order"]["parameters"] = template["order"]["parameters"].copy()
-					changes.append("Added order.parameters section")
-				else:
-					# Add missing sub-parameters from template in template order
-					order_params = clean_data["order"]["parameters"]
-					for param_key, param_value in template.get("order", {}).get("parameters", {}).items():
-						if param_key not in order_params:
-							order_params[param_key] = param_value
-							changes.append(f"Added order.parameters.{param_key}")
-
-			if "exit" in clean_data:
-				if "parameters" not in clean_data["exit"]:
-					clean_data["exit"]["parameters"] = template["exit"]["parameters"].copy()
-					changes.append("Added exit.parameters section")
-				else:
-					# Add missing sub-parameters from template in template order
-					exit_params = clean_data["exit"]["parameters"]
-					for param_key, param_value in template.get("exit", {}).get("parameters", {}).items():
-						if param_key not in exit_params:
-							exit_params[param_key] = param_value
-							changes.append(f"Added exit.parameters.{param_key}")
-
-			# Validate nested keys within sections and maintain template order
-			for section_name in ["entry", "order", "exit"]:
-				if section_name in clean_data and "parameters" in clean_data[section_name]:
-					section_params = clean_data[section_name]["parameters"]
-					template_params = template.get(section_name, {}).get("parameters", {})
-					invalid_params = []
-
-					# Identify invalid parameters
-					for param_key in list(section_params.keys()):
-						if param_key not in template_params:
-							invalid_params.append(param_key)
-							changes.append(f"Commented invalid nested key: {section_name}.parameters.{param_key}")
-
-					# Rebuild parameters in template order, excluding invalid ones
-					if invalid_params or template_params:
-						invalid_nested_keys[f"{section_name}.parameters"] = invalid_params
-						ordered_params = {}
-
-						# Add parameters in template order
-						for template_param in template_params.keys():
-							if template_param in section_params:
-								ordered_params[template_param] = section_params[template_param]
-
-						# Add any valid parameters not in template (at the end)
-						for param_key in section_params.keys():
-							if param_key not in template_params and param_key not in invalid_params:
-								ordered_params[param_key] = section_params[param_key]
-
-						clean_data[section_name]["parameters"] = ordered_params
+			# Build clean_data by recursively processing template structure
+			clean_data = self._build_clean_data(strategy_data, template, changes)
 
 			# Note: signals.weights is flexible - users can define custom weights
 			# We don't validate individual weight keys since users may use different signal names
+
+			# Extract and add missing indicators from formulas
+			missing_indicators = self._extract_missing_indicators(clean_data)
+			if missing_indicators:
+				current_indicators = set(clean_data.get("indicators", []))
+				for indicator in missing_indicators:
+					if indicator not in current_indicators:
+						clean_data["indicators"].append(indicator)
+						changes.append(f"Added missing indicator: {indicator}")
+
+			# Identify invalid keys (dynamically from template structure)
+			invalid_keys, invalid_nested_keys = self._identify_invalid_keys(strategy_data, template)
 
 			# Save if not dry run
 			if not dry_run and changes:
@@ -788,6 +835,173 @@ class StrategyManager:
 								break
 
 		return '\n'.join(result_lines) + '\n' if result_lines else ""
+
+	def _extract_missing_indicators(self, strategy_data: Dict[str, Any]) -> List[str]:
+		"""Extract indicators referenced in formulas that aren't declared.
+
+		Args:
+			strategy_data: Strategy configuration data
+
+		Returns:
+			List of indicator names that should be added
+		"""
+		declared_indicators = set(strategy_data.get("indicators", []))
+		referenced_indicators = set()
+		ohlcv_columns = {"close", "open", "high", "low", "volume", "date", "datetime"}
+
+		def extract_formulas(section, path=""):
+			"""Recursively extract all formulas from a section."""
+			if isinstance(section, dict):
+				for key, value in section.items():
+					current_path = f"{path}.{key}" if path else key
+					if isinstance(value, str):
+						# Check if this looks like a formula
+						if any(op in value for op in ["[", "]", "+", "-", "*", "/", ">", "<", "==", "and", "or", "not"]):
+							yield current_path, value
+					else:
+						yield from extract_formulas(value, current_path)
+			elif isinstance(section, list):
+				for i, item in enumerate(section):
+					yield from extract_formulas(item, f"{path}[{i}]")
+
+		import re
+		for formula_path, formula in extract_formulas(strategy_data):
+			if not formula or formula.lower() in ["true", "false"]:
+				continue
+
+			# Extract referenced indicators (indicator_name[index])
+			indicator_pattern = r'([a-z_][a-z0-9_]*)\['
+			indicator_matches = re.findall(indicator_pattern, formula, re.IGNORECASE)
+			for ref in set(indicator_matches):  # Use set to avoid duplicates
+				# Skip built-in functions and data column references
+				if ref not in ohlcv_columns and ref not in ["data", "len", "max", "min", "round", "abs", "sum"]:
+					referenced_indicators.add(ref)
+
+		# Return indicators that are referenced but not declared
+		missing = sorted(referenced_indicators - declared_indicators)
+		return missing
+
+	def _validate_indicators(self, strategy_data: Dict[str, Any]) -> List[str]:
+		"""Validate that declared indicators are real, calculable indicators.
+
+		Args:
+			strategy_data: Strategy configuration data
+
+		Returns:
+			List of indicator validation issues
+		"""
+		issues = []
+
+		try:
+			from src.tools.indicators.indicators import list_available_indicators
+			available = set(list_available_indicators())
+		except Exception:
+			# If can't load available indicators, skip validation
+			return issues
+
+		import re
+		declared_indicators = strategy_data.get("indicators", [])
+
+		for indicator in declared_indicators:
+			# Extract base indicator name (everything before the first digit)
+			base_name = re.sub(r'_\d+.*', '', indicator)
+
+			if base_name not in available:
+				issues.append(f"Invalid indicator '{indicator}': base name '{base_name}' is not a supported indicator")
+
+		return issues
+
+	def _validate_formulas(self, strategy_data: Dict[str, Any]) -> List[str]:
+		"""Validate formulas using the DSL evaluator with real calculated indicators.
+
+		Args:
+			strategy_data: Strategy configuration data
+
+		Returns:
+			List of formula validation issues
+		"""
+		import pandas as pd
+
+		issues = []
+		defined_indicators = list(strategy_data.get("indicators", []))
+
+		# Skip these keys - they're not formulas
+		SKIP_KEYS = {"name", "description", "engine", "universe", "enabled", "metric", "order_type"}
+
+		def extract_formulas(section, path=""):
+			"""Recursively extract all formulas from a section."""
+			if isinstance(section, dict):
+				for key, value in section.items():
+					if key in SKIP_KEYS:
+						continue
+					current_path = f"{path}.{key}" if path else key
+					if isinstance(value, str):
+						# Check if this looks like a formula
+						if any(op in value for op in ["[", "]", "+", "-", "*", "/", ">", "<", "==", "and", "or", "not", "&&", "||"]):
+							yield current_path, value
+					else:
+						yield from extract_formulas(value, current_path)
+			elif isinstance(section, list):
+				for i, item in enumerate(section):
+					yield from extract_formulas(item, f"{path}[{i}]")
+
+		# Generate sample data and calculate indicators
+		try:
+			from src.tools.formula.dsl_parser import evaluate_dsl
+			from src.tools.indicators import calculate
+
+			# Create 5 days of sample OHLCV data (oldest to newest for indicator calculation)
+			sample_data = pd.DataFrame({
+				'open': [100.0, 101.0, 102.0, 101.5, 102.5],
+				'high': [102.0, 103.0, 104.0, 103.5, 104.5],
+				'low': [99.0, 100.0, 101.0, 100.5, 101.5],
+				'close': [101.0, 102.0, 103.0, 102.5, 103.5],
+				'volume': [1000000, 1100000, 1200000, 1050000, 1150000],
+			})
+
+			# Calculate indicators using the actual indicators.calculate() function
+			if defined_indicators:
+				try:
+					indicator_results = calculate(defined_indicators, sample_data)
+					# Add calculated indicators to sample data
+					for indicator_name, values in indicator_results.items():
+						sample_data[indicator_name] = values
+				except Exception as e:
+					# If calculation fails, log but don't validate
+					return []
+
+			# Reverse to newest-first for DSL parser (which expects index 0 = current/most recent)
+			sample_data = sample_data.iloc[::-1].reset_index(drop=True)
+
+			# Validate each formula
+			for formula_path, formula in extract_formulas(strategy_data):
+				if not formula or formula.lower() in ["true", "false"]:
+					continue
+
+				try:
+					# Use the DSL evaluator to validate the formula
+					evaluate_dsl(formula, sample_data)
+
+				except ValueError as e:
+					# Formula evaluation error
+					issues.append(f"Formula '{formula}' at {formula_path}: {str(e)}")
+				except KeyError as e:
+					# Missing indicator or column
+					error_msg = str(e).strip("'\"")
+					issues.append(f"Formula '{formula}' at {formula_path}: missing '{error_msg}'")
+				except SyntaxError as e:
+					issues.append(f"Formula '{formula}' at {formula_path}: syntax error - {str(e)}")
+				except Exception as e:
+					issues.append(f"Formula '{formula}' at {formula_path}: {str(e)}")
+
+		except ImportError:
+			# DSL evaluator or indicators not available, skip validation
+			pass
+		except Exception as e:
+			# Silently skip validation if we can't set up sample data
+			pass
+
+		return issues
 
 	def _load_template(self) -> Dict[str, Any]:
 		"""Load the strategy template from init/templates/strategy.yml.

@@ -104,8 +104,8 @@ class MeanReversionAgent(Agent):
 						self.logger.debug(f"Failed to calculate indicators: {e}")
 						return False
 
-			# Get latest row
-			latest = ticker_data.iloc[-1]
+			# Get latest row (data is sorted newest-first, so [0] is most recent)
+			latest = ticker_data.iloc[0]
 			data = latest.to_dict()
 
 			# Evaluate formula

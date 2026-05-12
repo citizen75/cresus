@@ -12,7 +12,9 @@ indicators:
   - rsi_9
   - ema_10
   - ema_20
+  - adx_14
   - adx_20
+  - macd_12_26
 
 # Watchlist configuration - which tickers to trade
 watchlist:
@@ -28,7 +30,7 @@ watchlist:
       metric: score
       description: Metric to rank tickers (score, gain, etc.)
     trend:
-      formula: close[0] > ema_10[0] and ema_10[0] > ema_20[0]
+      formula: close[0] > ema_10[0] && ema_10[0] > ema_20[0]
       description: Formula to filter tickers - include only if True
     volatility:
       formula: atr_14[0] > close[0] * 0.012
@@ -47,7 +49,7 @@ signals:
       formula: macd_12_26[0] > 0.5
       description: Momentum signal formula
     trend:
-      formula: close[0] > ema_10[0] and ema_10[0] > ema_20[0]
+      formula: close[0] > ema_10[0] && ema_10[0] > ema_20[0]
       description: Trend signal formula
     mean_reversion:
       formula: 'False'  # Set to 'False' to disable signal
@@ -67,7 +69,7 @@ entry:
       formula: 1000 / close[0]
       description: Number of shares to buy (can use formulas)
     entry_filter:
-      formula: close[0] > ema_20[0] and adx_14[0] > 20
+      formula: close[0] > ema_20[0] && adx_14[0] > 20
       description: Market condition filter - entries only when True
     extension_filter:
       formula: (close[0] - ema_10[0]) / ema_10[0] < 0.05
@@ -75,15 +77,12 @@ entry:
     limit_price:
       formula: close[0] * 0.99
       description: Limit order price (leave out for market orders)
-    regime_filter:
-      formula: close[0] > ema_20[0] and adx_20[0] > 20
-      description: Trade only in favorable market conditions
 
 order:
   enabled: true
   parameters:
     position_sizing:
-      formula: 2000 / data["close"]
+      formula: 2000 / close[0]
       description: Fixed €2,000 per position
     max_daily_orders:
       formula: 3
@@ -120,6 +119,9 @@ exit:
     time_stop:
       formula: 1
       description: Cancel unfilled entry orders after N days
+    condition:
+      formula: 'False'
+      description: Exit condition formula - SELL when True (e.g., sha_10_red[0] == 1)
 
 # Backtest configuration
 backtest:

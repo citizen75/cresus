@@ -62,7 +62,8 @@ class EntryScoreAgent(Agent):
 				continue
 
 			# Get the latest row for analysis
-			latest = df.iloc[-1]
+			# Data is sorted newest-first (descending), so [0] is most recent
+			latest = df.iloc[0]
 
 			# Calculate composite entry score (0-100)
 			score = self._calculate_entry_score(latest)

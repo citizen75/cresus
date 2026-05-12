@@ -68,10 +68,18 @@ class TransactFlow(Flow):
 
 		self.context.set("date", trading_date)
 		self.context.set("portfolio_name", portfolio_name)
-		
+
 		# Set strategy_name in context if provided (needed by TransactAgent for take_profit check)
 		if strategy_name:
 			self.context.set("strategy_name", strategy_name)
+			# Load and set strategy_config for exit agents (especially ExitConditionAgent)
+			from tools.strategy import StrategyManager
+			sm = StrategyManager()
+			strategy_result = sm.load_strategy(strategy_name)
+			if strategy_result.get("status") == "success":
+				strategy_config = strategy_result.get("data", {})
+				self.context.set("strategy_config", strategy_config)
+				self.logger.debug(f"Loaded strategy_config for {strategy_name}")
 
 		# Step 1: Get pending orders to determine which tickers to load
 		orders_mgr = Orders(portfolio_name, context=self.context.__dict__)

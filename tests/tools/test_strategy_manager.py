@@ -35,7 +35,13 @@ class TestStrategyManager:
 				"indicators": [],
 				"watchlist": {"enabled": True, "parameters": {}},
 				"signals": {"enabled": True, "weights": {}, "parameters": {}},
-				"entry": {"enabled": True, "parameters": {"position_size": {"formula": "1000"}}},
+				"entry": {
+					"enabled": True,
+					"parameters": {
+						"position_size": {"formula": "1000"},
+						"entry_filter": {"formula": "close[0] > ema_10[0]", "description": "Entry filter"},
+					}
+				},
 				"order": {"enabled": True, "parameters": {"position_sizing": {"formula": "1000"}}},
 				"exit": {"enabled": True, "parameters": {"stop_loss": {"formula": "0.95"}, "holding_period": {"formula": "10"}}},
 				"backtest": {"initial_capital": 10000},
@@ -607,6 +613,150 @@ class TestStrategyManager:
 		assert any("order" in issue for issue in issues)
 		assert any("exit" in issue for issue in issues)
 
+	def test_validate_strategy_checks_formula_syntax(self, manager):
+		"""Test that formula syntax errors are detected."""
+		strategy_data = {
+			"name": "formula_test",
+			"universe": "cac40",
+			"description": "Test formulas",
+			"engine": "TaModel",
+			"indicators": ["ema_20"],
+			"watchlist": {"enabled": True, "parameters": {}},
+			"signals": {"enabled": True, "weights": {}, "parameters": {}},
+			"entry": {
+				"enabled": True,
+				"parameters": {
+					"position_size": {"formula": "1000"},
+					"entry_filter": {"formula": "ema_20[0] > close[0 and rsi[0]"}  # Unmatched bracket
+				}
+			},
+			"order": {"enabled": True, "parameters": {"position_sizing": {"formula": "1000"}}},
+			"exit": {
+				"enabled": True,
+				"parameters": {
+					"stop_loss": {"formula": "close[0] - 10"},
+					"holding_period": {"formula": "10"}
+				}
+			},
+			"backtest": {"initial_capital": 10000},
+		}
+
+		manager.save_strategy("formula_test", strategy_data)
+		result = manager.validate_strategy_config("formula_test")
+
+		assert result.get("valid") is False
+		issues = result.get("issues", [])
+		formula_issues = [i for i in issues if "formula" in i.lower()]
+		assert any("bracket" in issue.lower() or "closed" in issue.lower() or "syntax" in issue.lower() for issue in formula_issues)
+
+	def test_validate_strategy_checks_undefined_indicators(self, manager):
+		"""Test that undefined indicators in formulas are detected."""
+		strategy_data = {
+			"name": "undefined_ind_test",
+			"universe": "cac40",
+			"description": "Test undefined indicators",
+			"engine": "TaModel",
+			"indicators": ["ema_20"],  # rsi_9 not defined
+			"watchlist": {"enabled": True, "parameters": {}},
+			"signals": {"enabled": True, "weights": {}, "parameters": {}},
+			"entry": {
+				"enabled": True,
+				"parameters": {
+					"position_size": {"formula": "1000"},
+					"entry_filter": {"formula": "rsi_9[0] > 50"}  # rsi_9 not in indicators
+				}
+			},
+			"order": {"enabled": True, "parameters": {"position_sizing": {"formula": "1000"}}},
+			"exit": {
+				"enabled": True,
+				"parameters": {
+					"stop_loss": {"formula": "close[0] - atr_14[0]"},  # atr_14 not defined
+					"holding_period": {"formula": "10"}
+				}
+			},
+			"backtest": {"initial_capital": 10000},
+		}
+
+		manager.save_strategy("undefined_ind_test", strategy_data)
+		result = manager.validate_strategy_config("undefined_ind_test")
+
+		assert result.get("valid") is False
+		issues = result.get("issues", [])
+		issue_str = " ".join(issues)
+		assert "rsi_9" in issue_str
+		assert "atr_14" in issue_str
+
+	def test_validate_strategy_allows_valid_formulas(self, manager):
+		"""Test that valid formulas pass validation."""
+		strategy_data = {
+			"name": "valid_formula_test",
+			"universe": "cac40",
+			"description": "Test valid formulas",
+			"engine": "TaModel",
+			"indicators": ["ema_20", "rsi_9"],
+			"watchlist": {"enabled": True, "parameters": {}},
+			"signals": {"enabled": True, "weights": {}, "parameters": {}},
+			"entry": {
+				"enabled": True,
+				"parameters": {
+					"position_size": {"formula": "1000 / close[0]"},
+					"entry_filter": {"formula": "ema_20[0] > close[0] && rsi_9[0] < 70"}
+				}
+			},
+			"order": {"enabled": True, "parameters": {"position_sizing": {"formula": "2000 / close[0]"}}},
+			"exit": {
+				"enabled": True,
+				"parameters": {
+					"stop_loss": {"formula": "close[0] - ema_20[0] * 0.02"},
+					"holding_period": {"formula": "10"}
+				}
+			},
+			"backtest": {"initial_capital": 10000},
+		}
+
+		manager.save_strategy("valid_formula_test", strategy_data)
+		result = manager.validate_strategy_config("valid_formula_test")
+
+		# Should only have no formula-related issues (other issues may exist)
+		issues = result.get("issues", [])
+		formula_issues = [i for i in issues if "formula" in i.lower()]
+		assert len(formula_issues) == 0
+
+	def test_validate_strategy_checks_undefined_columns(self, manager):
+		"""Test that undefined data columns in formulas are detected."""
+		strategy_data = {
+			"name": "undefined_col_test",
+			"universe": "cac40",
+			"description": "Test undefined columns",
+			"engine": "TaModel",
+			"indicators": [],
+			"watchlist": {"enabled": True, "parameters": {}},
+			"signals": {"enabled": True, "weights": {}, "parameters": {}},
+			"entry": {
+				"enabled": True,
+				"parameters": {
+					"position_size": {"formula": "1000"},
+					"entry_filter": {"formula": "data[\"invalid_col\"] > 100"}  # invalid_col not a valid column
+				}
+			},
+			"order": {"enabled": True, "parameters": {"position_sizing": {"formula": "1000"}}},
+			"exit": {
+				"enabled": True,
+				"parameters": {
+					"stop_loss": {"formula": "close[0]"},
+					"holding_period": {"formula": "10"}
+				}
+			},
+			"backtest": {"initial_capital": 10000},
+		}
+
+		manager.save_strategy("undefined_col_test", strategy_data)
+		result = manager.validate_strategy_config("undefined_col_test")
+
+		assert result.get("valid") is False
+		issues = result.get("issues", [])
+		assert any("invalid_col" in issue for issue in issues)
+
 	def test_fix_strategy_preserves_existing_values(self, manager):
 		"""Test fix_strategy never overwrites existing user values."""
 		strategy_data = {
@@ -650,7 +800,9 @@ class TestStrategyManager:
 		assert fixed.get("universe") == "nasdaq"
 		assert fixed.get("description") == "Custom description"
 		assert fixed.get("engine") == "LightGbmModel"
-		assert fixed.get("indicators") == ["rsi_14"]
+		# Note: ema_10 is added because it's referenced in the template's entry_filter formula
+		assert "rsi_14" in fixed.get("indicators", [])
+		assert "ema_10" in fixed.get("indicators", [])  # Added from formula reference
 		assert fixed.get("signals", {}).get("weights") == {"custom_signal": 0.8}
 		assert fixed.get("order", {}).get("parameters", {}).get("position_sizing", {}).get("formula") == "custom_formula"
 		assert fixed.get("exit", {}).get("parameters", {}).get("stop_loss", {}).get("formula") == "0.90"
@@ -743,3 +895,94 @@ class TestStrategyManager:
 		assert "# [exit.parameters]" in file_content
 		assert "# invalid_param:" in file_content or "#     invalid_param:" in file_content
 		assert "# invalid_exit:" in file_content or "#     invalid_exit:" in file_content
+
+	def test_validate_strategy_checks_indicator_validity(self, manager):
+		"""Test that validation checks if declared indicators are valid."""
+		strategy_data = {
+			"name": "test_strategy",
+			"universe": "cac40",
+			"description": "Test",
+			"engine": "TaModel",
+			"indicators": ["atr_14", "invalid_indicator_99", "ema_20"],
+			"watchlist": {"enabled": True, "parameters": {}},
+			"signals": {"enabled": True, "weights": {}, "parameters": {}},
+			"entry": {"enabled": True, "parameters": {"position_size": {"formula": "1000"}}},
+			"order": {"enabled": True, "parameters": {"position_sizing": {"formula": "1000"}}},
+			"exit": {"enabled": True, "parameters": {"stop_loss": {"formula": "0.95"}, "holding_period": {"formula": "10"}}},
+			"backtest": {"initial_capital": 10000},
+		}
+
+		manager.save_strategy("invalid_indicator_test", strategy_data)
+		result = manager.check_strategy("invalid_indicator_test")
+
+		assert not result["valid"]
+		issues = result.get("issues", [])
+		assert any("invalid_indicator" in issue.lower() for issue in issues)
+
+	def test_validate_strategy_allows_valid_indicators(self, manager):
+		"""Test that validation allows known base indicators with parameters."""
+		strategy_data = {
+			"name": "test_strategy",
+			"universe": "cac40",
+			"description": "Test",
+			"engine": "TaModel",
+			"indicators": ["atr_14", "rsi_9", "ema_10", "ema_20", "macd_12_26"],
+			"watchlist": {"enabled": True, "parameters": {}},
+			"signals": {"enabled": True, "weights": {}, "parameters": {}},
+			"entry": {"enabled": True, "parameters": {"position_size": {"formula": "1000"}}},
+			"order": {"enabled": True, "parameters": {"position_sizing": {"formula": "1000"}}},
+			"exit": {"enabled": True, "parameters": {"stop_loss": {"formula": "0.95"}, "holding_period": {"formula": "10"}}},
+			"backtest": {"initial_capital": 10000},
+		}
+
+		manager.save_strategy("valid_indicators_test", strategy_data)
+		result = manager.check_strategy("valid_indicators_test")
+
+		# Should not have indicator validation issues (may have other issues but not indicator ones)
+		issues = result.get("issues", [])
+		indicator_issues = [i for i in issues if "invalid indicator" in i.lower() or "not a supported indicator" in i.lower()]
+		assert len(indicator_issues) == 0
+
+	def test_fix_strategy_adds_missing_indicators_from_formulas(self, manager):
+		"""Test that fix_strategy adds indicators referenced in formulas."""
+		strategy_data = {
+			"name": "test_strategy",
+			"universe": "cac40",
+			"description": "Test",
+			"engine": "TaModel",
+			"indicators": ["ema_20"],  # Missing other indicators referenced in formulas
+			"watchlist": {"enabled": True, "parameters": {}},
+			"signals": {
+				"enabled": True,
+				"weights": {},
+				"parameters": {
+					"momentum": {"formula": "macd_12_26[0] > 0.5", "description": "Test"}
+				}
+			},
+			"entry": {
+				"enabled": True,
+				"parameters": {
+					"position_size": {"formula": "1000"},
+					"entry_filter": {"formula": "close[0] > ema_10[0] and adx_20[0] > 20", "description": "Test"}
+				}
+			},
+			"order": {"enabled": True, "parameters": {"position_sizing": {"formula": "1000"}}},
+			"exit": {"enabled": True, "parameters": {"stop_loss": {"formula": "0.95"}, "holding_period": {"formula": "10"}}},
+			"backtest": {"initial_capital": 10000},
+		}
+
+		manager.save_strategy("missing_indicators_test", strategy_data)
+		result = manager.fix_strategy("missing_indicators_test")
+
+		# Should have added missing indicators
+		assert any("indicator" in change.lower() for change in result.get("changes", []))
+
+		# Load fixed strategy and verify indicators were added
+		loaded = manager.load_strategy("missing_indicators_test")
+		indicators = loaded.get("data", {}).get("indicators", [])
+
+		# Should have original + macd_12_26, ema_10, adx_20
+		assert "ema_20" in indicators  # Original
+		assert "macd_12_26" in indicators  # Referenced in momentum formula
+		assert "ema_10" in indicators  # Referenced in entry_filter formula
+		assert "adx_20" in indicators  # Referenced in entry_filter formula

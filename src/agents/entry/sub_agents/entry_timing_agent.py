@@ -107,9 +107,9 @@ class EntryTimingAgent(Agent):
 		score = 50  # Base score
 
 		try:
-			# Get recent data
-			latest = df.iloc[-1]
-			prev_data = df.iloc[-5:] if len(df) >= 5 else df
+			# Get recent data (data is sorted newest-first, so [0] is most recent)
+			latest = df.iloc[0]
+			prev_data = df.iloc[:5] if len(df) >= 5 else df
 
 			# Calculate pullback from recent high
 			high_5d = prev_data["high"].max() if "high" in df.columns else prev_data.get("close", pd.Series()).max()
@@ -132,9 +132,9 @@ class EntryTimingAgent(Agent):
 
 			# Momentum analysis - check if price bouncing up
 			if len(prev_data) >= 3:
-				recent_close = float(df.iloc[-1].get("close", 0))
-				prev_close = float(df.iloc[-2].get("close", 0))
-				prev_prev_close = float(df.iloc[-3].get("close", 0))
+				recent_close = float(df.iloc[0].get("close", 0))
+				prev_close = float(df.iloc[1].get("close", 0))
+				prev_prev_close = float(df.iloc[2].get("close", 0))
 
 				if recent_close > prev_close > prev_prev_close:  # Uptrend forming
 					score += 15

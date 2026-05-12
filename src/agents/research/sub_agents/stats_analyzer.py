@@ -221,7 +221,15 @@ class PortfolioStatsAnalyzerAgent(Agent):
 		expected_holding = 12  # From momentum_cac
 		if strategy_config:
 			exit_params = strategy_config.get("exit", {}).get("parameters", {})
-			expected_holding = exit_params.get("holding_period", {}).get("formula", 12)
+			hp_formula = exit_params.get("holding_period", {}).get("formula", 12)
+			# Convert formula to numeric value
+			if isinstance(hp_formula, str):
+				try:
+					expected_holding = int(float(hp_formula))
+				except (ValueError, TypeError):
+					expected_holding = 12
+			else:
+				expected_holding = int(hp_formula) if hp_formula else 12
 
 		return {
 			"avg_win_duration_days": avg_win_duration,
