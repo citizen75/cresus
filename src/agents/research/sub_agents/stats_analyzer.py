@@ -154,7 +154,8 @@ class PortfolioStatsAnalyzerAgent(Agent):
 		expected_atr_stop = "1.3 ATR"  # From momentum_cac config
 		if strategy_config:
 			exit_params = strategy_config.get("exit", {}).get("parameters", {})
-			stop_loss = exit_params.get("stop_loss", {}).get("description", "")
+			stop_config = exit_params.get("stop", {})
+			stop_loss = stop_config.get("description", "") if isinstance(stop_config, dict) else ""
 
 		return {
 			"max_drawdown_pct": max_drawdown,

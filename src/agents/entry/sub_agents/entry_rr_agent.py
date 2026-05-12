@@ -155,12 +155,14 @@ class EntryRRAgent(Agent):
 				"low": float(latest.get("low", 0)),
 			}
 
-			# Try to evaluate stop_loss formula from config
+			# Try to evaluate stop formula from config
 			stop_loss = None
-			if "stop_loss" in exit_config:
-				sl_formula = exit_config["stop_loss"].get("formula")
-				if sl_formula:
-					stop_loss = evaluate_numeric_formula(sl_formula, data_context)
+			if "stop" in exit_config:
+				stop_config = exit_config["stop"]
+				if isinstance(stop_config, dict):
+					sl_formula = stop_config.get("formula")
+					if sl_formula:
+						stop_loss = evaluate_numeric_formula(sl_formula, data_context)
 
 			# Try to evaluate take_profit formula from config
 			take_profit = None

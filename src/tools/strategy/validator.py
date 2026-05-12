@@ -118,16 +118,27 @@ class StrategyValidator:
 				return errors
 
 			# Check required parameters
-			required_params = ["stop_loss", "take_profit"]
+			required_params = ["stop", "take_profit"]
 			for param in required_params:
 				if param not in params:
 					errors.append(f"exit.parameters missing required parameter: {param}")
 				else:
 					param_val = params[param]
-					if isinstance(param_val, dict) and "formula" not in param_val:
-						errors.append(
-							f"exit.parameters.{param} missing 'formula' key"
-						)
+					if isinstance(param_val, dict):
+						# For stop parameter, check for 'type' and 'formula'
+						if param == "stop":
+							if "type" not in param_val:
+								errors.append(
+									f"exit.parameters.{param} missing 'type' key (should be 'fix' or 'trailing')"
+								)
+							if "formula" not in param_val:
+								errors.append(
+									f"exit.parameters.{param} missing 'formula' key"
+								)
+						elif "formula" not in param_val:
+							errors.append(
+								f"exit.parameters.{param} missing 'formula' key"
+							)
 
 		return errors
 
