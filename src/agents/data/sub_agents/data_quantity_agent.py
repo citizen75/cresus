@@ -13,12 +13,12 @@ class DataQuantityAgent(Agent):
 	calculation and pattern recognition.
 	"""
 
-	def __init__(self, name: str = "DataQuantityAgent", min_days: int = 90):
+	def __init__(self, name: str = "DataQuantityAgent", min_days: int = 220):
 		"""Initialize data quantity agent.
 
 		Args:
 			name: Agent name
-			min_days: Minimum required days of history (default: 90)
+			min_days: Minimum required days of history (default: 220 for EMA_200 calculation)
 		"""
 		super().__init__(name)
 		self.min_days = min_days
