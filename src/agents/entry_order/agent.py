@@ -78,6 +78,33 @@ class EntryOrderAgent(Agent):
 				"message": "No entry recommendations in context"
 			}
 
+		# Filter entry_recommendations to only include tickers in the final watchlist
+		# This ensures we only create orders for tickers that pass both:
+		# 1. Entry filter (signal + pattern matching)
+		# 2. Watchlist filter (volume, trend, volatility criteria)
+		watchlist = self.context.get("watchlist") or []
+		if watchlist:
+			watchlist_tickers = set(t.upper() for t in watchlist)
+			filtered_recs = [
+				rec for rec in entry_recommendations
+				if rec.get("ticker", "").upper() in watchlist_tickers
+			]
+			original_count = len(entry_recommendations)
+			if len(filtered_recs) < original_count:
+				self.logger.info(f"[ENTRY-ORDER] Filtered entry recommendations from {original_count} to {len(filtered_recs)} to match watchlist")
+				filtered_out = [rec["ticker"] for rec in entry_recommendations if rec.get("ticker", "").upper() not in watchlist_tickers]
+				self.logger.debug(f"[ENTRY-ORDER] Filtered out (not in watchlist): {filtered_out}")
+			entry_recommendations = filtered_recs
+
+		if not entry_recommendations:
+			self.logger.info("[ENTRY-ORDER] No recommendations after watchlist filtering")
+			return {
+				"status": "success",
+				"input": input_data,
+				"output": {"orders": [], "orders_count": 0},
+				"message": "No entry recommendations match final watchlist"
+			}
+
 		# Ensure portfolio_name is set
 		portfolio_name = input_data.get("portfolio_name") or self.context.get("portfolio_name") or "default"
 		self.context.set("portfolio_name", portfolio_name)
@@ -85,6 +112,9 @@ class EntryOrderAgent(Agent):
 		# Ensure risk constraints are set
 		risk_constraints = input_data.get("risk_constraints") or self.context.get("risk_constraints") or {}
 		self.context.set("risk_constraints", risk_constraints)
+
+		# Update context with filtered entry_recommendations for sub-agents
+		self.context.set("entry_recommendations", entry_recommendations)
 
 		# Create order processing flow with sub-agents
 		order_flow = Flow("EntryOrderFlow", context=self.context)

@@ -44,17 +44,13 @@ class EntryAgent(Agent):
 		# Get watchlist from context, fall back to signal-scored tickers if empty
 		watchlist = self.context.get("watchlist")
 		if not watchlist:
-			# Fall back to top signal-scored tickers if watchlist is empty
+			# Fall back to all signal-scored tickers if watchlist is empty
 			ticker_scores = self.context.get("ticker_scores") or {}
 			if ticker_scores:
-				# Sort by score and take top 20
-				sorted_by_score = sorted(
-					ticker_scores.items(),
-					key=lambda x: x[1].get("score", 0),
-					reverse=True
-				)
-				watchlist = [ticker for ticker, _ in sorted_by_score[:20]]
-				self.logger.info(f"[ENTRY] Watchlist empty, using {len(watchlist)} top signal-scored tickers: {watchlist[:5]}{'...' if len(watchlist) > 5 else ''}")
+				# Use ALL signal-scored tickers, not just top 20
+				# This ensures entry_filter can evaluate reversal patterns which may have lower signal scores
+				watchlist = list(ticker_scores.keys())
+				self.logger.info(f"[ENTRY] Watchlist empty, using {len(watchlist)} signal-scored tickers: {watchlist[:5]}{'...' if len(watchlist) > 5 else ''}")
 			else:
 				return {
 					"status": "error",
