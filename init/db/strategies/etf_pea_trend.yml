@@ -8,8 +8,12 @@ indicators:
 - rsi_14
 - ema_20
 - ema_50
+- adx_14
 - adx_20
 - macd_12_26
+- sha_10
+- sha_10_red
+- sha_10_green
 watchlist:
   enabled: true
   parameters:
@@ -23,9 +27,8 @@ watchlist:
       metric: score
       description: Rank ETFs by trend strength
     trend:
-      formula: close[0] > ema_20[0] and ema_20[0] > ema_50[0] and adx_20[0] > 25
-      description: 'Trend detection: Price > EMA20 > EMA50 with strong ADX confirms
-        uptrend'
+      formula: sha_10_green[0] == 1 and adx_14[0] > 25
+      description: Trend detection using sustained green signal with strong ADX
     volatility:
       formula: atr_14[0] > close[0] * 0.015
       description: 'Volatility filter: ATR > 1.5% of price ensures adequate movement'
@@ -60,8 +63,8 @@ entry:
       formula: 3
       description: Maximum 3 buys per day to limit daily allocation
     entry_filter:
-      formula: close[0] > ema_20[0] and ema_20[0] > ema_50[0] and adx_20[0] > 25
-      description: Entry condition filter
+      formula: sha_10_green[0] == 1 and sha_10_green[-1] == 1 and sha_10_red[-2] == 1 and adx_14[0] > 25
+      description: Entry on sustained green signal with recent red reversal and strong trend
     order_type:
       formula: market
       description: Order type for entry execution
