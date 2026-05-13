@@ -1,17 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { api } from '@/services/api'
-import { usePortfolios } from '@/hooks/usePortfolio'
 
 export default function BacktestBuilder() {
   const navigate = useNavigate()
-  const { data: portfolios_data } = usePortfolios()
 
   const [strategy, setStrategy] = useState('')
   const [strategies, setStrategies] = useState<string[]>([])
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
-  const [step, setStep] = useState(1)
 
   useEffect(() => {
     // Set default date range (1 year back)
@@ -36,9 +32,8 @@ export default function BacktestBuilder() {
     setEndDate(end.toISOString().split('T')[0])
   }
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!strategy) {
-      setError('Please select a strategy')
       return
     }
 
@@ -65,9 +60,7 @@ export default function BacktestBuilder() {
           {/* Step 1: Strategy Selection */}
           <div className="bg-slate-900 rounded-lg p-8 border border-slate-800">
             <div className="flex items-center mb-6">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-                step >= 1 ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-400'
-              }`}>
+              <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold bg-purple-600 text-white">
                 1
               </div>
               <h2 className="ml-4 text-2xl font-bold text-white">Select Strategy</h2>

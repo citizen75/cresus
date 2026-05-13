@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { LineChart, Line, AreaChart, Area, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { LineChart, Line, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { useBacktestRun } from '@/hooks/usePortfolio'
 
 export default function BacktestDetail() {
@@ -30,16 +30,6 @@ export default function BacktestDetail() {
     const dd = ((point.value - maxBefore) / maxBefore) * 100
     return { ...point, drawdown: dd }
   })
-
-  // Build monthly returns data
-  const monthlyReturns = equity.reduce((acc: any, point: any) => {
-    const date = new Date(point.date)
-    const month = date.toLocaleString('en-US', { month: 'short', year: 'numeric' })
-    if (!acc[month]) {
-      acc[month] = { month, value: 0, returns: 0 }
-    }
-    return acc
-  }, {})
 
   const TABS = [
     { id: 'performance', label: 'Performance' },

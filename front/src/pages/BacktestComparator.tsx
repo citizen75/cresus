@@ -12,7 +12,7 @@ export default function BacktestComparator() {
   const { data: all_runs_data } = useBacktestRuns()
 
   const [selectedRuns, setSelectedRuns] = useState<string[]>([])
-  const [compareData, setCompareData] = useState<any[]>([])
+  const [compareData, setCompareData] = useState<Record<string, any>[]>([])
   const [loading, setLoading] = useState(false)
 
   const allRuns = all_runs_data?.backtests || []
@@ -132,7 +132,7 @@ export default function BacktestComparator() {
         <div className="bg-slate-900 rounded-lg p-6 border border-slate-800 h-fit">
           <h3 className="text-lg font-bold text-white mb-4">Available Runs</h3>
           <div className="space-y-2 max-h-96 overflow-y-auto">
-            {allRuns.slice(0, 20).map(run => {
+            {allRuns.slice(0, 20).map((run: any) => {
               const key = `${run.strategy_name}:${run.backtest_id}`
               const isSelected = selectedRuns.includes(key)
 
@@ -226,7 +226,7 @@ export default function BacktestComparator() {
                   ].map(metric => (
                     <tr key={metric.key} className="border-b border-slate-800 hover:bg-slate-800/30">
                       <td className="py-3 px-3 text-slate-400 font-semibold">{metric.label}</td>
-                      {compareData.map((run, idx) => {
+                      {compareData.map((run: any, idx: number) => {
                         const value = run.portfolio_metrics?.[metric.key] || 0
                         const isReturn = metric.key.includes('pct')
                         const formatted = typeof value === 'number'

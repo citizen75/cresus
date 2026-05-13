@@ -10,12 +10,12 @@ export default function BacktestRuns() {
   const [strategy_filter, setStrategy_filter] = useState<string>('')
   const [deleting, setDeleting] = useState<string>('')
 
-  const backtests = backtest_data?.backtests || []
+  const backtests = backtest_data?.backtests || [] as any[]
   const filteredBacktests = strategy_filter
-    ? backtests.filter(b => b.strategy_name === strategy_filter)
+    ? backtests.filter((b: any) => b.strategy_name === strategy_filter)
     : backtests
 
-  const strategies = [...new Set(backtests.map(b => b.strategy_name))]
+  const strategies: string[] = [...new Set(backtests.map((b: any) => b.strategy_name) as string[])] as string[]
 
   const handleDelete = async (strategy: string, id: string) => {
     setDeleting(`${strategy}:${id}`)
@@ -95,7 +95,7 @@ export default function BacktestRuns() {
             <p className="text-slate-500">No backtests found</p>
           </div>
         ) : (
-          filteredBacktests.map(backtest => {
+          filteredBacktests.map((backtest: any) => {
             const key = `${backtest.strategy_name}:${backtest.backtest_id}`
             const isSelected = selectedRuns.includes(key)
             const isDeleting = deleting === key
