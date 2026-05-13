@@ -1506,8 +1506,8 @@ export default function BacktestDetail() {
                               {/* Left Side */}
                               <div className="flex-1">
                                 <p className="text-white font-bold text-lg">{item.ticker}</p>
-                                <div className="flex items-end gap-2 mt-2">
-                                  <p className="text-slate-400 text-xs flex-1">{item.signals || 'No signals'}</p>
+                                <p className="text-slate-400 text-xs mt-1">{item.signals || 'No signals'}</p>
+                                <div className="flex gap-2 mt-2">
                                   <span className="px-2 py-1 rounded text-xs font-medium bg-purple-900/30 text-purple-400 whitespace-nowrap">
                                     Entry: {item.entry_score || '—'}
                                   </span>
