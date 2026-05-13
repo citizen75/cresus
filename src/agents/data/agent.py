@@ -163,6 +163,40 @@ class DataAgent(Agent):
 			for ticker in data_history.keys():
 				data_history[ticker] = data_history[ticker].sort_values('timestamp', ascending=False).reset_index(drop=True)
 
+		# PRE-SLICE DATA TO TARGET_DATE IN LIVE MODE (after loading/sorting, before filters)
+		# In backtest mode, BacktestAgent pre-slices before calling this agent
+		is_backtest = self.context.get("backtest_id") is not None
+		target_date = self.context.get("target_date")
+
+		if target_date and not is_backtest and data_history:
+			# Live mode: Slice data to target_date immediately after loading
+			# This ensures all downstream agents work with consistent date range
+			import pandas as pd
+			from datetime import date as date_type
+
+			try:
+				target_date_obj = date_type.fromisoformat(str(target_date))
+				sliced_history = {}
+				for ticker, df in data_history.items():
+					if df.empty:
+						sliced_history[ticker] = df
+						continue
+
+					if "timestamp" in df.columns:
+						timestamps = pd.to_datetime(df["timestamp"])
+					else:
+						timestamps = pd.to_datetime(df.index)
+
+					dates = timestamps.dt.date
+					mask = dates <= target_date_obj
+					sliced_history[ticker] = df[mask].copy()
+
+				data_history = sliced_history
+				self.context.set("_data_sliced_for_entry", True)
+				self.logger.info(f"Pre-sliced data_history to {target_date} in live mode")
+			except Exception as e:
+				self.logger.warning(f"Failed to pre-slice data: {e}")
+
 		# Store data_history and indicators in context for downstream agents
 		self.context.set("data_history", data_history)
 		if indicators_calculated:

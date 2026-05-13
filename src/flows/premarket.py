@@ -131,35 +131,27 @@ class PreMarketFlow(Flow):
 		self.context.set("portfolio_name", flow_input["portfolio_name"])
 		self.context.set("strategy_name", self.strategy_name)
 
-		# Store target date in context for DataAgent to filter data
+		# Store target date in context for DataAgent and pre-slicing
 		target_date = flow_input.get("date")
+		is_backtest = self.context.get("backtest_id") is not None
+
 		if target_date:
 			self.context.set("target_date", target_date)
 
 		# Execute parent flow logic
 		result = super().process(flow_input)
 
-		# After all steps complete, slice data to target_date if provided
-		# Then re-run entry and downstream agents with sliced data
-		# This ensures entry_filter evaluates on correct historical rows
-		if target_date:
-			self._set_data_history_for_date(self.context, target_date)
-			self.logger.info(f"Sliced data_history to {target_date}")
-
-			# Re-run entry step with sliced data
-			entry_step = self.get_step("entry")
-			if entry_step:
-				self.logger.debug("Re-running entry step with sliced data")
-				entry_result = entry_step.get("agent").process({})
-				entry_step["result"] = entry_result
-				self.context.set("entry_recommendations", entry_result.get("output", {}).get("top_opportunities", []))
-
-				# Re-run entry_order step with updated entry_recommendations
-				entry_order_step = self.get_step("entry_order")
-				if entry_order_step:
-					self.logger.debug("Re-running entry_order step with updated recommendations")
-					eo_result = entry_order_step.get("agent").process({})
-					entry_order_step["result"] = eo_result
+		# PRE-SLICE DATA IN LIVE MODE (after data loads, before other agents use it)
+		# Note: This check is here as safety, but slicing should happen in DataAgent for live mode
+		# In backtest mode, BacktestAgent already pre-slices before calling premarket
+		if target_date and not is_backtest:
+			# Verify data is sliced to target_date
+			data_history = self.context.get("data_history") or {}
+			if data_history and not self.context.get("_data_sliced_for_entry"):
+				# Data wasn't pre-sliced (shouldn't happen with fix), do it now
+				self._set_data_history_for_date(self.context, target_date)
+				self.logger.warning(f"Pre-slicing data to {target_date} post-execution (should pre-slice earlier)")
+				self.context.set("_data_sliced_for_entry", True)
 
 		# === FINAL OUTPUT: Watchlist and Orders ===
 		# Plus display-essential data for CLI output
