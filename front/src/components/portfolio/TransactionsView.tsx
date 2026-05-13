@@ -360,7 +360,7 @@ export default function TransactionsView({ name, filterTicker }: TransactionsVie
 
             {/* Chart Container */}
             <div className="flex-1 overflow-hidden">
-              <TradingChart timeframe="1M" title={`${chartTransaction.ticker} - Transaction Analysis`} entryDate={chartTransaction.created_at} />
+              <TradingChart timeframe="1M" title={`${chartTransaction.ticker} - Transaction Analysis`} ticker={chartTransaction.ticker} entryDate={chartTransaction.created_at} />
             </div>
 
             {/* Transaction Details */}

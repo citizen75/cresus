@@ -1,13 +1,16 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { api } from '@/services/api'
 
 interface TradingChartProps {
   timeframe: string
   title?: string
+  ticker?: string
   entryDate?: string
   exitDate?: string
 }
 
-export default function TradingChart({ timeframe, title = 'Price Chart', entryDate, exitDate }: TradingChartProps) {
+export default function TradingChart({ timeframe, title = 'Price Chart', ticker, entryDate, exitDate }: TradingChartProps) {
+  const [isLoading, setIsLoading] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<any>(null)
 
@@ -94,6 +97,7 @@ export default function TradingChart({ timeframe, title = 'Price Chart', entryDa
 
     const setupChart = async () => {
       try {
+        setIsLoading(true)
         const lwc = await import('lightweight-charts')
         const { createChart, CandlestickSeries, HistogramSeries } = lwc
 
@@ -101,7 +105,45 @@ export default function TradingChart({ timeframe, title = 'Price Chart', entryDa
           chartRef.current.remove()
         }
 
-        const { candles, volume } = generateDatasets(timeframe)
+        // Fetch real data if ticker provided, otherwise generate sample data
+        let candles: any[] = []
+        let volume: any[] = []
+
+        if (ticker) {
+          try {
+            const response = await api.getHistoricalData(ticker, 730)
+            const data = response.data || []
+
+            candles = data.map((d: any) => ({
+              time: d.timestamp.split('T')[0],
+              open: d.open,
+              high: d.high,
+              low: d.low,
+              close: d.close,
+            }))
+
+            volume = data.map((d: any) => {
+              const prevOpen = d.open
+              const color = d.close >= prevOpen ? '#26a69a' : '#ef5350'
+              return {
+                time: d.timestamp.split('T')[0],
+                value: d.volume,
+                color,
+              }
+            })
+
+            console.log(`Loaded ${candles.length} candles for ${ticker}`)
+          } catch (err) {
+            console.error('Failed to fetch historical data:', err)
+            const { candles: genCandles, volume: genVolume } = generateDatasets(timeframe)
+            candles = genCandles
+            volume = genVolume
+          }
+        } else {
+          const { candles: genCandles, volume: genVolume } = generateDatasets(timeframe)
+          candles = genCandles
+          volume = genVolume
+        }
 
         const chart = createChart(containerRef.current!, {
           layout: {
@@ -191,14 +233,16 @@ export default function TradingChart({ timeframe, title = 'Price Chart', entryDa
         }
 
         window.addEventListener('resize', handleResize)
+        setIsLoading(false)
         return () => window.removeEventListener('resize', handleResize)
       } catch (error) {
         console.error('Chart error:', error)
+        setIsLoading(false)
       }
     }
 
     setupChart()
-  }, [timeframe, entryDate, exitDate])
+  }, [timeframe, ticker, entryDate, exitDate])
 
   return (
     <div className="flex flex-col h-full">

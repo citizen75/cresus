@@ -143,6 +143,11 @@ class CresusAPI {
   async deleteBacktest(strategy: string, id: string) {
     return (await this.client.delete(`/backtests/${strategy}/${id}`)).data
   }
+
+  async getHistoricalData(ticker: string, days?: number) {
+    const params = days ? { days } : {}
+    return (await this.client.get(`/data/history/${ticker}`, { params })).data
+  }
 }
 
 export const api = new CresusAPI()
