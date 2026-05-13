@@ -66,6 +66,9 @@ class SaveWatchlistAgent(Agent):
 		# Get backtest_dir from context if available (for sandboxed backtesting)
 		backtest_dir = self.context.get("backtest_dir") if self.context else None
 
+		# Get portfolio_name from context if available (for portfolio-specific saving)
+		portfolio_name = self.context.get("portfolio_name") if self.context else None
+
 		# Collect orders from entry recommendations
 		orders = self._extract_orders_from_recommendations()
 
@@ -73,7 +76,8 @@ class SaveWatchlistAgent(Agent):
 		indicators = self._extract_indicators_from_context()
 
 		# Use WatchlistManager to handle saving
-		watchlist_manager = WatchlistManager(self.strategy_name, backtest_dir=backtest_dir)
+		# Priority: backtest_dir > portfolio_name > default
+		watchlist_manager = WatchlistManager(self.strategy_name, backtest_dir=backtest_dir, portfolio_name=portfolio_name if not backtest_dir else None)
 		save_result = watchlist_manager.process(
 			watchlist=watchlist,
 			ticker_scores=ticker_scores,

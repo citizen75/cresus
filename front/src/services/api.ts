@@ -152,6 +152,19 @@ class CresusAPI {
   async getFundamental(ticker: string) {
     return (await this.client.get(`/data/fundamental/${ticker}`)).data
   }
+
+  async getBacktestWatchlist(strategy: string, backtest_id?: string) {
+    // Load from portfolio directory (live mode) or backtest directory (legacy)
+    const endpoint = backtest_id
+      ? `/backtests/${strategy}/${backtest_id}/watchlist`
+      : `/backtests/strategy/${strategy}/watchlist`
+    return (await this.client.get(endpoint)).data
+  }
+
+  async regenerateBacktestWatchlist(strategy: string) {
+    // Run strategy in live mode
+    return (await this.client.post(`/backtests`, { strategy })).data
+  }
 }
 
 export const api = new CresusAPI()

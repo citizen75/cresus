@@ -107,6 +107,11 @@ class BacktestFlow(Flow):
 		self.context.set("strategy_config", strategy_config)
 		self.logger.info(f"Loaded and validated strategy: {strategy_name}")
 
+		# Invalidate blacklist cache to ensure fresh ticker filtering
+		from tools.universe.blacklist import _blacklist_instance as _
+		import tools.universe.blacklist as blacklist_module
+		blacklist_module._blacklist_instance = None
+
 		# Derive portfolio name from strategy if not provided
 		portfolio_name = flow_input.get("portfolio_name") or self._strategy_to_portfolio_name(strategy_name)
 		self.context.set("portfolio_name", portfolio_name)
@@ -316,9 +321,13 @@ class BacktestFlow(Flow):
 	def _strategy_to_portfolio_name(strategy_name: str) -> str:
 		"""Convert strategy name to portfolio name.
 
-		Examples:
-			"momentum_cac" → "Momentum cac"
-			"ta_nasdaq" → "Ta nasdaq"
+		Uses strategy name directly as portfolio name for consistency with
+		portfolio naming conventions (e.g., etf_pea_trend).
+
+		Args:
+			strategy_name: Strategy name
+
+		Returns:
+			Portfolio name (same as strategy name)
 		"""
-		parts = strategy_name.split("_")
-		return " ".join(p.capitalize() for p in parts)
+		return strategy_name

@@ -25,22 +25,65 @@ export default function BacktestDetail() {
   const [totalDays, setTotalDays] = useState(0)
 
   // Tab state - read from URL path param
-  const [activeTab, setActiveTab] = useState<'performance' | 'distribution' | 'transactions'>('performance')
+  const [activeTab, setActiveTab] = useState<'performance' | 'distribution' | 'transactions' | 'watchlist'>('performance')
   const [transactionSort, setTransactionSort] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'entry_date', direction: 'desc' })
   const [selectedPosition, setSelectedPosition] = useState<any>(null)
   const [selectedDistributionBin, setSelectedDistributionBin] = useState<any>(null)
   const [tickerNames, setTickerNames] = useState<{ [key: string]: string }>({})
   const [chartPosition, setChartPosition] = useState<any>(null)
+  const [watchlist, setWatchlist] = useState<any[]>([])
+  const [watchlistLoading, setWatchlistLoading] = useState(false)
+  const [watchlistError, setWatchlistError] = useState('')
 
   useEffect(() => {
-    if (tabParam && ['performance', 'distribution', 'transactions'].includes(tabParam)) {
-      setActiveTab(tabParam as 'performance' | 'distribution' | 'transactions')
+    if (tabParam && ['performance', 'distribution', 'transactions', 'watchlist'].includes(tabParam)) {
+      setActiveTab(tabParam as 'performance' | 'distribution' | 'transactions' | 'watchlist')
     }
   }, [tabParam])
 
-  const handleTabChange = (tab: 'performance' | 'distribution' | 'transactions') => {
+  const handleTabChange = (tab: 'performance' | 'distribution' | 'transactions' | 'watchlist') => {
     navigate(`/backtests/${strategy}/${runId}/${tab}`)
   }
+
+  const loadWatchlist = async () => {
+    setWatchlistLoading(true)
+    setWatchlistError('')
+    try {
+      const response = await api.getBacktestWatchlist(strategy || '', runId || '')
+      if (response.status === 'success') {
+        setWatchlist(response.data?.watchlist || [])
+      } else {
+        setWatchlistError(response.message || 'Failed to load watchlist')
+      }
+    } catch (err: any) {
+      setWatchlistError(err.message || 'Failed to load watchlist')
+    } finally {
+      setWatchlistLoading(false)
+    }
+  }
+
+  const regenerateWatchlist = async () => {
+    setWatchlistLoading(true)
+    setWatchlistError('')
+    try {
+      const response = await api.regenerateBacktestWatchlist(strategy || '', runId || '')
+      if (response.status === 'success') {
+        await loadWatchlist()
+      } else {
+        setWatchlistError(response.message || 'Failed to regenerate watchlist')
+      }
+    } catch (err: any) {
+      setWatchlistError(err.message || 'Failed to regenerate watchlist')
+    } finally {
+      setWatchlistLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'watchlist') {
+      loadWatchlist()
+    }
+  }, [activeTab, strategy, runId])
 
   // WebSocket connection for real-time updates
   const { isConnected, lastMessage } = useBacktestWebSocket({
@@ -369,6 +412,16 @@ export default function BacktestDetail() {
           }`}
         >
           Transactions
+        </button>
+        <button
+          onClick={() => handleTabChange('watchlist')}
+          className={`px-4 py-2 text-sm font-medium transition ${
+            activeTab === 'watchlist'
+              ? 'text-purple-400 border-b-2 border-purple-400'
+              : 'text-slate-400 hover:text-slate-300'
+          }`}
+        >
+          Watchlist
         </button>
       </div>
 
@@ -1126,7 +1179,17 @@ export default function BacktestDetail() {
 
             {/* Chart Container */}
             <div className="flex-1 overflow-hidden">
-              <TradingChart timeframe="1M" title={`${chartPosition.ticker} - Position Analysis`} ticker={chartPosition.ticker} entryDate={chartPosition.entry_date} exitDate={chartPosition.exit_date} />
+              {(() => {
+                try {
+                  const entryMeta = typeof chartPosition.entry_metadata === 'string' ? JSON.parse(chartPosition.entry_metadata) : chartPosition.entry_metadata
+                  const exitMeta = typeof chartPosition.exit_metadata === 'string' ? JSON.parse(chartPosition.exit_metadata) : chartPosition.exit_metadata
+                  const entryDate = entryMeta?.timestamp || chartPosition.entry_date
+                  const exitDate = exitMeta?.timestamp || chartPosition.exit_date
+                  return <TradingChart timeframe="1M" title={`${chartPosition.ticker} - Position Analysis`} ticker={chartPosition.ticker} entryDate={entryDate} exitDate={exitDate} />
+                } catch {
+                  return <TradingChart timeframe="1M" title={`${chartPosition.ticker} - Position Analysis`} ticker={chartPosition.ticker} entryDate={chartPosition.entry_date} exitDate={chartPosition.exit_date} />
+                }
+              })()}
             </div>
 
             {/* Position Details */}
@@ -1157,6 +1220,84 @@ export default function BacktestDetail() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Watchlist Tab */}
+      {activeTab === 'watchlist' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold text-white">Watchlist</h2>
+            <button
+              onClick={regenerateWatchlist}
+              disabled={watchlistLoading}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {watchlistLoading ? 'Reloading...' : 'Reload Watchlist'}
+            </button>
+          </div>
+
+          {watchlistError && (
+            <div className="p-4 bg-red-900/30 border border-red-800 rounded text-red-400 text-sm">
+              {watchlistError}
+            </div>
+          )}
+
+          {watchlistLoading && !watchlist.length && (
+            <div className="text-slate-400 py-8 text-center">Loading watchlist...</div>
+          )}
+
+          {!watchlistLoading && watchlist.length === 0 && !watchlistError && (
+            <div className="bg-slate-900/50 rounded-lg p-12 border border-slate-800 text-center text-slate-400">
+              <p>No watchlist data available. The watchlist is generated during backtest execution.</p>
+            </div>
+          )}
+
+          {watchlist.length > 0 && (
+            <div className="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-800/50 border-b border-slate-800">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-slate-400 font-medium">Ticker</th>
+                      <th className="px-4 py-3 text-left text-slate-400 font-medium">Score</th>
+                      <th className="px-4 py-3 text-left text-slate-400 font-medium">Signals</th>
+                      <th className="px-4 py-3 text-right text-slate-400 font-medium">ATR 14</th>
+                      <th className="px-4 py-3 text-right text-slate-400 font-medium">RSI 14</th>
+                      <th className="px-4 py-3 text-right text-slate-400 font-medium">EMA 20</th>
+                      <th className="px-4 py-3 text-right text-slate-400 font-medium">EMA 50</th>
+                      <th className="px-4 py-3 text-right text-slate-400 font-medium">ADX 20</th>
+                      <th className="px-4 py-3 text-right text-slate-400 font-medium">MACD 12/26</th>
+                      <th className="px-4 py-3 text-right text-slate-400 font-medium">Entry Score</th>
+                      <th className="px-4 py-3 text-right text-slate-400 font-medium">RR Ratio</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {watchlist.map((item: any) => (
+                      <tr key={item.ticker} className="border-t border-slate-800 hover:bg-slate-800/30 transition">
+                        <td className="px-4 py-3 text-white font-medium">{item.ticker}</td>
+                        <td className="px-4 py-3 text-white font-medium">{(item.signal_score || 0).toFixed(3)}</td>
+                        <td className="px-4 py-3 text-slate-300 text-xs max-w-xs">
+                          {item.signals || '—'}
+                        </td>
+                        <td className="px-4 py-3 text-right text-slate-300">{(parseFloat(item.atr_14) || 0).toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right text-slate-300">{(parseFloat(item.rsi_14) || 0).toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right text-slate-300">{(parseFloat(item.ema_20) || 0).toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right text-slate-300">{(parseFloat(item.ema_50) || 0).toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right text-slate-300">{(parseFloat(item.adx_20) || 0).toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right text-slate-300">{(parseFloat(item.macd_12_26) || 0).toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right text-slate-300">{item.entry_score || '—'}</td>
+                        <td className="px-4 py-3 text-right text-slate-300">{(parseFloat(item.rr_ratio) || 0).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="px-6 py-4 border-t border-slate-800 bg-slate-900 text-sm text-slate-400">
+                Showing {watchlist.length} ticker{watchlist.length !== 1 ? 's' : ''}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -80,58 +80,52 @@ async def get_backtest(strategy_name: str, backtest_id: str) -> Dict[str, Any]:
 
 @router.post("")
 async def run_backtest(body: Dict[str, Any]) -> Dict[str, Any]:
-	"""Run a new backtest in background.
+	"""Run strategy in live mode (PreMarketFlow).
+
+	Executes the strategy once in live mode, generating a watchlist and orders.
+	Saves watchlist to ~/.cresus/db/portfolios/{strategy}/watchlist.csv
 
 	Args:
-		body: {strategy, start_date?, end_date?, portfolio_name?}
+		body: {strategy, portfolio_name?}
 
 	Returns:
-		Backtest ID and status (backtest runs asynchronously in background)
+		Watchlist and execution results
 	"""
 	strategy = body.get("strategy")
 	if not strategy:
 		raise HTTPException(status_code=400, detail="strategy is required")
 
-	start_date = body.get("start_date")
-	end_date = body.get("end_date")
-	portfolio_name = body.get("portfolio_name")
+	portfolio_name = body.get("portfolio_name") or strategy
 
-	# Generate backtest_id first
-	from datetime import date
-	import uuid
-	backtest_id = f"{date.today().strftime('%Y%m%d_%H%M%S')}_{str(uuid.uuid4())[:8]}"
-
-	# Prepare input data, including the backtest_id for consistency with WebSocket
-	input_data = {
-		"strategy": strategy,
-		"backtest_id": backtest_id,  # Pass ID so it's consistent throughout the flow
-	}
-	if start_date:
-		input_data["start_date"] = start_date
-	if end_date:
-		input_data["end_date"] = end_date
-	if portfolio_name:
-		input_data["portfolio_name"] = portfolio_name
-
-	# Run backtest in background thread (non-blocking)
-	def run_backtest_bg():
+	# Run PreMarketFlow in live mode (non-blocking)
+	def run_premarket_bg():
 		try:
-			flow = BacktestFlow()
-			flow.process(input_data)
+			from flows.premarket import PreMarketFlow
+			flow = PreMarketFlow(strategy)
+			result = flow.process({
+				"portfolio_name": portfolio_name,
+				"save_enabled": True,
+			})
+
+			if result.get("status") != "success":
+				import logging
+				logger = logging.getLogger(__name__)
+				logger.error(f"PreMarketFlow for {strategy} failed: {result.get('message')}")
 		except Exception as e:
 			import logging
 			logger = logging.getLogger(__name__)
-			logger.error(f"Backtest {backtest_id} failed: {str(e)}", exc_info=True)
+			logger.error(f"PreMarketFlow for {strategy} failed: {str(e)}", exc_info=True)
 
-	thread = threading.Thread(target=run_backtest_bg, daemon=True)
+	thread = threading.Thread(target=run_premarket_bg, daemon=True)
 	thread.start()
 
-	# Return immediately with backtest_id so frontend can connect to WebSocket
+	# Return immediately with strategy info
 	return {
 		"status": "success",
-		"message": f"Backtest {backtest_id} started",
-		"backtest_id": backtest_id,
+		"message": f"Strategy {strategy} running in live mode",
 		"strategy_name": strategy,
+		"portfolio_name": portfolio_name,
+		"watchlist_path": f"~/.cresus/db/portfolios/{portfolio_name}/watchlist.csv",
 	}
 
 
@@ -292,3 +286,132 @@ async def delete_backtest(strategy_name: str, backtest_id: str) -> Dict[str, Any
 		raise HTTPException(status_code=400, detail=result.get("message"))
 
 	return result
+
+
+@router.get("/strategy/{strategy_name}/watchlist")
+async def get_strategy_watchlist(strategy_name: str) -> Dict[str, Any]:
+	"""Get watchlist for a strategy (from portfolio directory).
+
+	Loads watchlist from ~/.cresus/db/portfolios/{strategy_name}/watchlist.csv
+
+	Args:
+		strategy_name: Strategy name
+
+	Returns:
+		Watchlist data
+	"""
+	from pathlib import Path
+	from utils.env import get_db_root
+	import pandas as pd
+
+	db_root = get_db_root()
+	watchlist_file = db_root / "portfolios" / strategy_name / "watchlist.csv"
+
+	if not watchlist_file.exists():
+		return {
+			"status": "success",
+			"data": {"watchlist": []},
+			"message": f"No watchlist data available for strategy {strategy_name}"
+		}
+
+	try:
+		df = pd.read_csv(watchlist_file)
+		watchlist = df.to_dict('records')
+
+		return {
+			"status": "success",
+			"data": {"watchlist": watchlist}
+		}
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=f"Error loading watchlist: {str(e)}")
+
+
+@router.get("/{strategy_name}/{backtest_id}/watchlist")
+async def get_backtest_watchlist(strategy_name: str, backtest_id: str) -> Dict[str, Any]:
+	"""Get watchlist for a backtest (legacy - for backtests run in sandbox mode).
+
+	Args:
+		strategy_name: Strategy name
+		backtest_id: Backtest ID
+
+	Returns:
+		Watchlist data
+	"""
+	from pathlib import Path
+	from utils.env import get_db_root
+	import pandas as pd
+
+	db_root = get_db_root()
+	backtest_dir = db_root / "backtests" / strategy_name / backtest_id
+
+	if not backtest_dir.exists():
+		raise HTTPException(status_code=404, detail="Backtest not found")
+
+	# Look for watchlist file in backtest/watchlist subdirectory
+	watchlist_file = backtest_dir / "watchlist" / f"{strategy_name}.csv"
+
+	if not watchlist_file.exists():
+		return {
+			"status": "success",
+			"data": {"watchlist": []},
+			"message": "No watchlist data available for this backtest"
+		}
+
+	try:
+		df = pd.read_csv(watchlist_file)
+		watchlist = df.to_dict('records')
+
+		return {
+			"status": "success",
+			"data": {"watchlist": watchlist}
+		}
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=f"Error loading watchlist: {str(e)}")
+
+
+@router.post("/{strategy_name}/{backtest_id}/watchlist/regenerate")
+async def regenerate_backtest_watchlist(strategy_name: str, backtest_id: str) -> Dict[str, Any]:
+	"""Reload watchlist for a backtest (it's generated during backtest execution).
+
+	The watchlist is already saved during backtest. This endpoint reloads it from disk.
+
+	Args:
+		strategy_name: Strategy name
+		backtest_id: Backtest ID
+
+	Returns:
+		Watchlist data
+	"""
+	from pathlib import Path
+	from utils.env import get_db_root
+	import pandas as pd
+
+	db_root = get_db_root()
+	backtest_dir = db_root / "backtests" / strategy_name / backtest_id
+
+	if not backtest_dir.exists():
+		raise HTTPException(status_code=404, detail="Backtest not found")
+
+	try:
+		watchlist_file = backtest_dir / "watchlist" / f"{strategy_name}.csv"
+
+		if not watchlist_file.exists():
+			return {
+				"status": "success",
+				"data": {"watchlist": []},
+				"message": "Watchlist not available for this backtest"
+			}
+
+		df = pd.read_csv(watchlist_file)
+		watchlist = df.to_dict('records')
+
+		return {
+			"status": "success",
+			"data": {"watchlist": watchlist},
+			"message": "Watchlist loaded successfully"
+		}
+	except Exception as e:
+		import logging
+		logger = logging.getLogger(__name__)
+		logger.error(f"Error loading watchlist: {str(e)}", exc_info=True)
+		raise HTTPException(status_code=500, detail=f"Error loading watchlist: {str(e)}")

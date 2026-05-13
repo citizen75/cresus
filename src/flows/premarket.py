@@ -275,22 +275,18 @@ class PreMarketFlow(Flow):
 				self.logger.debug(f"Cleaned up context variable: {var}")
 
 	def _strategy_to_portfolio_name(self, strategy_name: str) -> str:
-		"""Convert strategy name to portfolio name format.
+		"""Convert strategy name to portfolio name.
 
-		Examples:
-			momentum_cac → Momentum cac
-			default_strategy → Default strategy
+		Uses strategy name directly as portfolio name for consistency with
+		portfolio naming conventions (e.g., etf_pea_trend).
 
 		Args:
 			strategy_name: Strategy name to convert
 
 		Returns:
-			Portfolio name with first letter capitalized and spaces instead of underscores
+			Portfolio name (same as strategy name)
 		"""
-		# Replace underscores with spaces
-		name = strategy_name.replace("_", " ")
-		# Capitalize only the first letter
-		return name[0].upper() + name[1:] if name else name
+		return strategy_name
 
 	def __repr__(self) -> str:
 		"""String representation of the flow."""
