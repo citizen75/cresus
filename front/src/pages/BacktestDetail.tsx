@@ -931,6 +931,8 @@ export default function BacktestDetail() {
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation()
+                                          console.log('Position object:', pos)
+                                          console.log('Position keys:', Object.keys(pos))
                                           setChartPosition(pos)
                                         }}
                                         className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition whitespace-nowrap"
