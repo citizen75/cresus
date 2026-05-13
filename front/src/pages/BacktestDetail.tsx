@@ -1502,12 +1502,13 @@ export default function BacktestDetail() {
                         <div key={item.ticker} className="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden hover:border-purple-600/50 transition">
                           {/* Card Header */}
                           <div className="bg-slate-800/50 border-b border-slate-800 p-4">
-                            <div className="flex items-start justify-between mb-4">
+                            <div className="flex items-start justify-between">
                               <div className="flex-1">
                                 <p className="text-white font-bold text-lg">{item.ticker}</p>
                                 <p className="text-slate-400 text-xs mt-0.5">{item.signals || 'No signals'}</p>
                               </div>
-                              <div className="text-right ml-2">
+                              <div className="text-right ml-2 flex gap-3 items-start">
+                                {/* Score and Trend */}
                                 <div className="flex flex-col items-end gap-1">
                                   <div>
                                     <p className="text-3xl font-bold text-purple-400">{(item.signal_score || 0).toFixed(2)}</p>
@@ -1527,15 +1528,17 @@ export default function BacktestDetail() {
                                     )
                                   })()}
                                 </div>
+
+                                {/* Entry and RR Badges */}
+                                <div className="flex flex-col gap-2 justify-start">
+                                  <span className="px-2 py-1 rounded text-xs font-medium bg-purple-900/30 text-purple-400 whitespace-nowrap">
+                                    Entry: {item.entry_score || '—'}
+                                  </span>
+                                  <span className="px-2 py-1 rounded text-xs font-medium bg-slate-800/30 text-slate-400 whitespace-nowrap">
+                                    RR: {(parseFloat(item.rr_ratio) || 0).toFixed(2)}
+                                  </span>
+                                </div>
                               </div>
-                            </div>
-                            <div className="flex gap-2">
-                              <span className="px-2 py-1 rounded text-xs font-medium bg-purple-900/30 text-purple-400">
-                                Entry: {item.entry_score || '—'}
-                              </span>
-                              <span className="px-2 py-1 rounded text-xs font-medium bg-slate-800/30 text-slate-400">
-                                RR: {(parseFloat(item.rr_ratio) || 0).toFixed(2)}
-                              </span>
                             </div>
                           </div>
 
