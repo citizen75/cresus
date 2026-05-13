@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { api } from '@/services/api'
 import { useBacktestRun, useBacktestDistribution } from '@/hooks/usePortfolio'
 import { useBacktestWebSocket } from '@/hooks/useBacktestWebSocket'
 import TradingChart from '@/components/TradingChart'
