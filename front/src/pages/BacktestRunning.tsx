@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { api } from '@/services/api'
+import { useBacktestWebSocket } from '@/hooks/useBacktestWebSocket'
 
 export default function BacktestRunning() {
   const [searchParams] = useSearchParams()
@@ -21,12 +22,49 @@ export default function BacktestRunning() {
   const [logs, setLogs] = useState<string[]>([])
   const [metrics, setMetrics] = useState<any>(null)
 
+  // WebSocket connection for real-time updates
+  const { isConnected, lastMessage, error: wsError } = useBacktestWebSocket({
+    backtest_id,
+    strategy_name: strategy,
+    enabled: !!backtest_id,
+  })
+
+  // Handle WebSocket messages
+  useEffect(() => {
+    if (lastMessage) {
+      if (lastMessage.type === 'daily_results') {
+        const dayNum = lastMessage.data.results?.day || '?'
+        setLogs(prev => [...prev, `Day ${dayNum}: Processed ${lastMessage.data.date}`])
+
+        // Update progress
+        setProgress(prev => ({
+          ...prev,
+          percentage: Math.min(prev.percentage + 5, 95),
+        }))
+      } else if (lastMessage.type === 'backtest_complete') {
+        setLogs(prev => [...prev, 'Backtest completed!'])
+        setMetrics(lastMessage.data.metrics)
+        setProgress({ current: 100, total: 100, percentage: 100 })
+        setStatus('completed')
+
+        // Navigate to results after 1.5s
+        setTimeout(() => {
+          navigate(`/backtests/${strategy}/${backtest_id}`)
+        }, 1500)
+      } else if (lastMessage.type === 'error') {
+        setLogs(prev => [...prev, `Error: ${lastMessage.data.error}`])
+        setError(lastMessage.data.error || 'Unknown error')
+        setStatus('error')
+      }
+    }
+  }, [lastMessage, strategy, backtest_id, navigate])
+
   // Start the backtest
   useEffect(() => {
     const runBacktest = async () => {
       try {
         setStatus('running')
-        setLogs(['Starting backtest...'])
+        setLogs(['Starting backtest...', 'Connecting to updates...'])
 
         const result = await api.runBacktest({
           strategy,
@@ -36,13 +74,7 @@ export default function BacktestRunning() {
 
         if (result.backtest_id) {
           setBacktestId(result.backtest_id)
-          setLogs(prev => [...prev, 'Backtest completed!'])
-          setMetrics(result.output?.portfolio_metrics)
-
-          // Wait a moment for the screen to update, then navigate
-          setTimeout(() => {
-            navigate(`/backtests/${strategy}/${result.backtest_id}`)
-          }, 1500)
+          setLogs(prev => [...prev, `Connected to backtest: ${result.backtest_id}`])
         } else {
           setStatus('error')
           setError('Failed to get backtest ID')
@@ -59,7 +91,7 @@ export default function BacktestRunning() {
     if (strategy && startDate && endDate) {
       runBacktest()
     }
-  }, [strategy, startDate, endDate, navigate])
+  }, [strategy, startDate, endDate])
 
   // Simulate progress (since we don't have real-time progress from backend)
   useEffect(() => {
@@ -180,6 +212,14 @@ export default function BacktestRunning() {
                 </div>
               </div>
             )}
+
+            {/* WebSocket Connection Status */}
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+              <span className="text-xs text-slate-400">
+                {isConnected ? '🔗 Connected' : '⚠️ Connecting...'}
+              </span>
+            </div>
 
             {/* Logs */}
             <div className="space-y-2">
