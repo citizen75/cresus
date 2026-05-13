@@ -190,7 +190,7 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
               day: entryDateObj.getDate()
             },
             position: 'belowBar',
-            color: '#10b981',
+            color: '#FFEB3B',
             shape: 'arrowUp',
             text: 'ENTRY',
           })
@@ -206,7 +206,7 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
               day: exitDateObj.getDate()
             },
             position: 'aboveBar',
-            color: '#ef4444',
+            color: '#FFEB3B',
             shape: 'arrowDown',
             text: 'EXIT',
           })
