@@ -49,7 +49,8 @@ export default function BacktestDetail() {
     setWatchlistLoading(true)
     setWatchlistError('')
     try {
-      const response = await api.getBacktestWatchlist(strategy || '', runId || '')
+      // Use LIVE mode: load from strategy watchlist (no backtest_id)
+      const response = await api.getBacktestWatchlist(strategy || '')
       if (response.status === 'success') {
         setWatchlist(response.data?.watchlist || [])
       } else {
@@ -66,7 +67,8 @@ export default function BacktestDetail() {
     setWatchlistLoading(true)
     setWatchlistError('')
     try {
-      const response = await api.regenerateBacktestWatchlist(strategy || '', runId || '')
+      // Run strategy in live mode to regenerate watchlist
+      const response = await api.regenerateBacktestWatchlist(strategy || '')
       if (response.status === 'success') {
         await loadWatchlist()
       } else {
