@@ -204,30 +204,35 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
         const markers: any[] = []
         if (entryDate) {
           const entryDateStr = new Date(entryDate).toISOString().substring(0, 10)
+          const markerFound = candles.some(c => c.time === entryDateStr)
+          console.log(`Entry date ${entryDateStr} found in data:`, markerFound)
+
           markers.push({
             time: entryDateStr,
             position: 'belowBar',
             color: '#10b981',
-            shape: 'arrowUp',
-            text: 'Entry',
+            shape: 'circle',
+            text: 'E',
+            size: 2,
           })
-          console.log('Entry marker:', entryDateStr)
         }
         if (exitDate) {
           const exitDateStr = new Date(exitDate).toISOString().substring(0, 10)
+          const markerFound = candles.some(c => c.time === exitDateStr)
+          console.log(`Exit date ${exitDateStr} found in data:`, markerFound)
+
           markers.push({
             time: exitDateStr,
             position: 'aboveBar',
             color: '#ef4444',
-            shape: 'arrowDown',
-            text: 'Exit',
+            shape: 'circle',
+            text: 'X',
+            size: 2,
           })
-          console.log('Exit marker:', exitDateStr)
         }
         if (markers.length > 0) {
           console.log('Chart data range:', candles[0]?.time, 'to', candles[candles.length - 1]?.time)
           console.log('Markers to set:', markers)
-          console.log('Candle dates sample:', candles.slice(0, 5).map(c => c.time), '...', candles.slice(-5).map(c => c.time))
           candlestickSeries.setMarkers(markers)
           console.log('Markers set successfully')
         }
