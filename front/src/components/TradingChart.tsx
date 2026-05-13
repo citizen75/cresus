@@ -205,7 +205,10 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
         }
         if (markers.length > 0) {
           console.log('Chart data range:', candles[0]?.time, 'to', candles[candles.length - 1]?.time)
+          console.log('Markers to set:', markers)
+          console.log('Candle dates sample:', candles.slice(0, 5).map(c => c.time), '...', candles.slice(-5).map(c => c.time))
           candlestickSeries.setMarkers(markers)
+          console.log('Markers set successfully')
         }
 
         const volumeSeries = chart.addSeries(HistogramSeries, {
