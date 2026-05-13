@@ -93,6 +93,35 @@ export default function BacktestDetail() {
     }
   }, [activeTab, strategy, runId])
 
+  // Calculate EMA helper
+  const calculateEMA = (data: any[], period: number, key: string) => {
+    const result = [...data]
+    const multiplier = 2 / (period + 1)
+
+    let ema: number | null = null
+    for (let i = 0; i < result.length; i++) {
+      if (result[i].close === undefined || result[i].close === null) continue
+
+      if (ema === null) {
+        // First EMA is SMA
+        if (i >= period - 1) {
+          let sum = 0
+          for (let j = i - period + 1; j <= i; j++) {
+            sum += result[j].close || 0
+          }
+          ema = sum / period
+          result[i][key] = ema
+        }
+      } else {
+        // Subsequent EMAs use the EMA formula
+        ema = (result[i].close - ema) * multiplier + ema
+        result[i][key] = ema
+      }
+    }
+
+    return result
+  }
+
   // Load historical data for watchlist charts
   useEffect(() => {
     if (watchlist.length === 0) return
@@ -107,12 +136,16 @@ export default function BacktestDetail() {
           if (response.ok) {
             const data = await response.json()
             if (data.data && Array.isArray(data.data)) {
-              const allData = data.data.map((point: any) => ({
+              let allData = data.data.map((point: any) => ({
                 date: point.date || new Date(point.timestamp).toISOString().split('T')[0],
                 close: point.close,
                 ema_20: point.ema_20,
                 ema_50: point.ema_50,
               }))
+
+              // Calculate missing EMAs
+              allData = calculateEMA(allData, 20, 'ema_20')
+              allData = calculateEMA(allData, 50, 'ema_50')
 
               // Take the last 90 days for display
               historicalData[item.ticker] = allData.slice(-90)
