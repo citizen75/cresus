@@ -179,6 +179,9 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
         })
 
         // Add entry/exit markers using createSeriesMarkers
+        console.log('=== MARKER DEBUG ===')
+        console.log('entryDate:', entryDate)
+        console.log('exitDate:', exitDate)
         const markers: any[] = []
 
         if (entryDate) {
