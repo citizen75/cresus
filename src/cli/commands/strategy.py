@@ -69,9 +69,13 @@ class StrategyCommands:
 		# Validate using unified validator
 		is_valid, validation_errors = self.validator.validate(strategy_data)
 
+		# Check for extra keys not in template
+		template_warnings = self._check_extra_keys(strategy_name, strategy_data, strategy_data)
+		validation_errors.extend(template_warnings)
+
 		# Apply fixes if requested
-		if fix and validation_errors:
-			is_valid, validation_errors = self._apply_fixes(strategy_name, strategy_data, validation_errors)
+		if fix and (validation_errors or template_warnings):
+			is_valid, validation_errors = self._apply_fixes(strategy_name, strategy_data, validation_errors, template_data=strategy_data)
 
 		# Display results
 		self._display_results(strategy_name, is_valid, validation_errors, fix)
@@ -112,13 +116,42 @@ class StrategyCommands:
 		console.print(issues_table)
 		console.print()
 
-	def _apply_fixes(self, strategy_name: str, strategy_data: Dict[str, Any], validation_errors: list) -> Tuple[bool, list]:
+	def _check_extra_keys(self, strategy_name: str, strategy_data: Dict[str, Any], template_data: Dict[str, Any]) -> List[str]:
+		"""Check for extra keys in strategy not present in template.
+
+		Args:
+			strategy_name: Strategy name
+			strategy_data: Strategy configuration data
+			template_data: Template configuration data
+
+		Returns:
+			List of warning messages
+		"""
+		try:
+			# Load template
+			template_file = self.project_root / "init" / "templates" / "strategy.yml"
+			if not template_file.exists():
+				return []
+
+			with open(template_file, 'r') as f:
+				template_config = yaml.safe_load(f)
+
+			# Check for extra keys
+			warnings = self.validator.validate_against_template(strategy_data, template_config)
+			return warnings
+
+		except Exception as e:
+			console.print(f"[yellow]⚠ Could not check template: {e}[/yellow]")
+			return []
+
+	def _apply_fixes(self, strategy_name: str, strategy_data: Dict[str, Any], validation_errors: list, template_data: Dict[str, Any] = None) -> Tuple[bool, list]:
 		"""Apply automatic fixes to strategy configuration.
 
 		Args:
 			strategy_name: Name of the strategy
 			strategy_data: Strategy configuration data
 			validation_errors: List of validation errors
+			template_data: Template configuration data for removing extra keys
 
 		Returns:
 			Tuple of (is_valid, remaining_errors)
@@ -128,6 +161,26 @@ class StrategyCommands:
 			console.print("[cyan]→ Adding missing engine field (TaModel)...[/cyan]")
 			strategy_data["engine"] = "TaModel"
 			validation_errors.remove("Missing required key: engine")
+
+		# Load template and remove extra keys
+		try:
+			template_file = self.project_root / "init" / "templates" / "strategy.yml"
+			if template_file.exists():
+				with open(template_file, 'r') as f:
+					template_config = yaml.safe_load(f)
+
+				# Remove extra keys
+				extra_key_errors = [e for e in validation_errors if e.startswith("Extra key not in template:")]
+				if extra_key_errors:
+					strategy_data = self._remove_extra_keys(strategy_data, template_config)
+					# Remove the extra key warnings from the list
+					for error in extra_key_errors:
+						if error in validation_errors:
+							validation_errors.remove(error)
+							console.print(f"[cyan]→ Removing {error.replace('Extra key not in template: ', '')}...[/cyan]")
+
+		except Exception as e:
+			console.print(f"[yellow]⚠ Could not process template: {e}[/yellow]")
 
 		# Save the updated strategy file
 		try:
@@ -141,12 +194,42 @@ class StrategyCommands:
 
 			# Re-validate after fixes
 			is_valid, remaining_errors = self.validator.validate(strategy_data)
-			return is_valid, remaining_errors
+
+			# Re-check for extra keys
+			extra_key_warnings = self._check_extra_keys(strategy_name, strategy_data, strategy_data)
+			remaining_errors.extend(extra_key_warnings)
+
+			return is_valid and len(extra_key_warnings) == 0, remaining_errors
 
 		except Exception as e:
 			console.print(f"[red]✗ Error saving strategy: {e}[/red]\n")
 			validation_errors.insert(0, f"Failed to save strategy: {str(e)}")
 			return False, validation_errors
+
+	def _remove_extra_keys(self, strategy_item: Any, template_item: Any) -> Any:
+		"""Recursively remove extra keys in strategy not present in template.
+
+		Args:
+			strategy_item: Current item in strategy
+			template_item: Current item in template
+
+		Returns:
+			Cleaned strategy item
+		"""
+		if not isinstance(strategy_item, dict) or not isinstance(template_item, dict):
+			return strategy_item
+
+		cleaned = {}
+		for key, value in strategy_item.items():
+			if key in template_item:
+				# If both are dicts, recursively clean nested items
+				if isinstance(value, dict) and isinstance(template_item[key], dict):
+					cleaned[key] = self._remove_extra_keys(value, template_item[key])
+				else:
+					cleaned[key] = value
+			# Skip keys not in template
+
+		return cleaned
 
 	def _show_template(self):
 		"""Display the strategy template."""

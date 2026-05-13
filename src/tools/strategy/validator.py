@@ -170,3 +170,44 @@ class StrategyValidator:
 				errors.append("Indicator name cannot be empty")
 
 		return errors
+
+	def validate_against_template(self, strategy_config: Dict[str, Any], template_config: Dict[str, Any]) -> List[str]:
+		"""Validate strategy against template structure to find extra keys.
+
+		Args:
+			strategy_config: Strategy configuration
+			template_config: Template configuration
+
+		Returns:
+			List of warning messages for extra keys
+		"""
+		warnings = []
+		self._find_extra_keys(strategy_config, template_config, "", warnings)
+		return warnings
+
+	def _find_extra_keys(self, strategy_item: Any, template_item: Any, path: str, warnings: List[str]):
+		"""Recursively find extra keys in strategy not present in template.
+
+		Args:
+			strategy_item: Current item in strategy
+			template_item: Current item in template
+			path: Current path in the structure
+			warnings: List to accumulate warning messages
+		"""
+		if not isinstance(strategy_item, dict) or not isinstance(template_item, dict):
+			return
+
+		# Check each key in strategy
+		for key in strategy_item.keys():
+			current_path = f"{path}.{key}" if path else key
+
+			# If key doesn't exist in template
+			if key not in template_item:
+				warnings.append(f"Extra key not in template: {current_path}")
+			else:
+				# Recursively check nested dictionaries
+				strategy_value = strategy_item[key]
+				template_value = template_item[key]
+
+				if isinstance(strategy_value, dict) and isinstance(template_value, dict):
+					self._find_extra_keys(strategy_value, template_value, current_path, warnings)
