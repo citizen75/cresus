@@ -10,9 +10,10 @@ interface ChartDataPoint {
 interface CardChartProps {
   data: ChartDataPoint[]
   ticker: string
+  showVariation?: boolean
 }
 
-export default function CardChart({ data, ticker }: CardChartProps) {
+export default function CardChart({ data, ticker, showVariation = true }: CardChartProps) {
   if (!data || data.length === 0) {
     return (
       <div className="p-4 h-48 bg-slate-800/20 flex items-center justify-center">
@@ -29,20 +30,22 @@ export default function CardChart({ data, ticker }: CardChartProps) {
   return (
     <div className="relative p-4 bg-slate-800/20">
       {/* Variation Badge */}
-      <div className="absolute top-4 right-4 z-10">
-        <div className={`px-3 py-1 rounded-lg backdrop-blur-sm flex items-center gap-1 ${
-          isPositive
-            ? 'bg-green-900/40 border border-green-700/50'
-            : 'bg-red-900/40 border border-red-700/50'
-        }`}>
-          <span className={`text-xs font-bold ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
-            {isPositive ? '↗' : '↘'}
-          </span>
-          <span className={`text-sm font-bold ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
-            {isPositive ? '+' : ''}{variation.toFixed(2)}%
-          </span>
+      {showVariation && (
+        <div className="absolute top-4 right-4 z-10">
+          <div className={`px-3 py-1 rounded-lg backdrop-blur-sm flex items-center gap-1 ${
+            isPositive
+              ? 'bg-green-900/40 border border-green-700/50'
+              : 'bg-red-900/40 border border-red-700/50'
+          }`}>
+            <span className={`text-xs font-bold ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
+              {isPositive ? '↗' : '↘'}
+            </span>
+            <span className={`text-sm font-bold ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
+              {isPositive ? '+' : ''}{variation.toFixed(2)}%
+            </span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Chart */}
       <div className="h-48">

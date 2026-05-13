@@ -1473,6 +1473,18 @@ export default function BacktestDetail() {
                               <div className="text-right">
                                 <p className="text-2xl font-bold text-purple-400">{(item.signal_score || 0).toFixed(2)}</p>
                                 <p className="text-slate-400 text-xs">Score</p>
+                                {watchlistHistorical[item.ticker] && watchlistHistorical[item.ticker].length > 0 && (() => {
+                                  const data = watchlistHistorical[item.ticker]
+                                  const firstPrice = data[0]?.close || 0
+                                  const lastPrice = data[data.length - 1]?.close || 0
+                                  const variation = firstPrice !== 0 ? ((lastPrice - firstPrice) / firstPrice) * 100 : 0
+                                  const isPositive = variation >= 0
+                                  return (
+                                    <div className={`mt-1 text-xs font-bold ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
+                                      {isPositive ? '↗' : '↘'} {isPositive ? '+' : ''}{variation.toFixed(2)}%
+                                    </div>
+                                  )
+                                })()}
                               </div>
                             </div>
                             <div className="flex gap-2">
@@ -1490,6 +1502,7 @@ export default function BacktestDetail() {
                             <CardChart
                               data={watchlistHistorical[item.ticker]}
                               ticker={item.ticker}
+                              showVariation={false}
                             />
                           ) : (
                             <div className="p-4 h-48 bg-slate-800/20 flex items-center justify-center">
