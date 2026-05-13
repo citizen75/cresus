@@ -11,6 +11,7 @@ interface TradingChartProps {
 
 export default function TradingChart({ timeframe, title = 'Price Chart', ticker, entryDate, exitDate }: TradingChartProps) {
   const [isLoading, setIsLoading] = useState(false)
+  const [companyName, setCompanyName] = useState<string>('')
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<any>(null)
 
@@ -91,6 +92,26 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
     const volume = generateVolumeData(candles)
     return { candles, volume }
   }
+
+  // Fetch fundamental data (company name) when ticker changes
+  useEffect(() => {
+    if (!ticker) {
+      setCompanyName('')
+      return
+    }
+
+    const fetchFundamental = async () => {
+      try {
+        const data = await api.getFundamental(ticker)
+        setCompanyName(data.name || '')
+      } catch (err) {
+        console.error('Failed to fetch fundamental data:', err)
+        setCompanyName('')
+      }
+    }
+
+    fetchFundamental()
+  }, [ticker])
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -249,7 +270,10 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
 
   return (
     <div className="flex flex-col h-full">
-      <div className="text-xs text-slate-400 px-4 py-2">{title} ({timeframe})</div>
+      <div className="px-4 py-2 border-b border-slate-800">
+        <div className="text-sm text-slate-300 font-medium">{ticker} {companyName && <span className="text-slate-400">- {companyName}</span>}</div>
+        <div className="text-xs text-slate-500 mt-1">{title} ({timeframe})</div>
+      </div>
       <div className="flex-1" ref={containerRef} />
     </div>
   )

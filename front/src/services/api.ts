@@ -148,6 +148,10 @@ class CresusAPI {
     const params = days ? { days } : {}
     return (await this.client.get(`/data/history/${ticker}`, { params })).data
   }
+
+  async getFundamental(ticker: string) {
+    return (await this.client.get(`/data/fundamental/${ticker}`)).data
+  }
 }
 
 export const api = new CresusAPI()
