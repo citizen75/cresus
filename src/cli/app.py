@@ -714,6 +714,7 @@ class CresusCLI(cmd2.Cmd):
 		  strategy create <strategy_name> [universe]   Create new strategy from template
 		  strategy delete <strategy_name>              Delete a strategy
 		  strategy duplicate <from_name> <dest_name>   Duplicate a strategy
+		  strategy edit <strategy_name> [--editor]     Edit strategy (wizard mode or $EDITOR)
 		  strategy check <strategy_name> [--fix]       Check strategy configuration and optionally fix issues
 
 		Examples:
@@ -722,6 +723,8 @@ class CresusCLI(cmd2.Cmd):
 		  strategy create my_strategy etf_pea_full
 		  strategy delete old_strategy
 		  strategy duplicate etf_pea_trend my_etf_trend
+		  strategy edit etf_pea_trend
+		  strategy edit etf_pea_trend --editor
 		  strategy check single_etf --fix
 		"""
 		if not args:
@@ -733,6 +736,7 @@ class CresusCLI(cmd2.Cmd):
 			table.add_row("strategy create <strategy> [universe]", "Create new strategy from template")
 			table.add_row("strategy delete <strategy>", "Delete a strategy")
 			table.add_row("strategy duplicate <from> <to>", "Duplicate a strategy with new name")
+			table.add_row("strategy edit <strategy> [--editor]", "Edit strategy (wizard or $EDITOR mode)")
 			table.add_row("strategy check <strategy> [--fix]", "Check and optionally fix strategy configuration")
 			console.print(table)
 			return
@@ -785,6 +789,20 @@ class CresusCLI(cmd2.Cmd):
 			except Exception as e:
 				console.print(f"[red]Error: {e}[/red]")
 
+		elif command == "edit":
+			if len(parts) < 2:
+				console.print("[red]✗ Error: strategy_name required[/red]")
+				console.print("[yellow]Usage: strategy edit <strategy_name> [--editor][/yellow]")
+				return
+
+			strategy_name = parts[1]
+			use_editor = "--editor" in parts
+
+			try:
+				self.strategy_commands.edit(strategy_name, use_editor=use_editor)
+			except Exception as e:
+				console.print(f"[red]Error: {e}[/red]")
+
 		elif command == "check":
 			if len(parts) < 2:
 				console.print("[red]Error: strategy_name required[/red]")
@@ -802,7 +820,7 @@ class CresusCLI(cmd2.Cmd):
 				console.print(f"[red]Error: {e}[/red]")
 		else:
 			console.print("[red]✗ Unknown strategy command[/red]")
-			console.print("[yellow]Available commands: list, show, create, delete, duplicate, check[/yellow]")
+			console.print("[yellow]Available commands: list, show, create, delete, duplicate, edit, check[/yellow]")
 
 	def _list_strategies(self):
 		"""List all available strategies."""
