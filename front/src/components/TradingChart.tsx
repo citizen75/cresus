@@ -200,18 +200,24 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
           },
         })
 
-        // Add entry/exit visual lines using background color
+        // Add entry/exit marks on time scale
+        console.log('=== SETTING MARKS ===')
         if (entryDate) {
           const entryDateStr = new Date(entryDate).toISOString().substring(0, 10)
-          chart.timeScale().setMarkColor(entryDateStr, '#10b981')
-          console.log('Entry marker color set at:', entryDateStr)
+          console.log('Entry date:', entryDateStr, 'in candles:', candles.some(c => c.time === entryDateStr))
+          const timeScale = chart.timeScale()
+          timeScale.setMarkColor(entryDateStr, '#10b981')
+          console.log('Entry mark set')
         }
 
         if (exitDate) {
           const exitDateStr = new Date(exitDate).toISOString().substring(0, 10)
-          chart.timeScale().setMarkColor(exitDateStr, '#ef4444')
-          console.log('Exit marker color set at:', exitDateStr)
+          console.log('Exit date:', exitDateStr, 'in candles:', candles.some(c => c.time === exitDateStr))
+          const timeScale = chart.timeScale()
+          timeScale.setMarkColor(exitDateStr, '#ef4444')
+          console.log('Exit mark set')
         }
+        console.log('=== MARKS COMPLETE ===')
 
         const volumeSeries = chart.addSeries(HistogramSeries, {
           priceFormat: { type: 'volume' },
