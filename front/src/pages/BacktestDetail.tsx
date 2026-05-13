@@ -955,9 +955,9 @@ export default function BacktestDetail() {
                           <div className="flex items-center justify-between">
                             <p className="text-sm text-slate-400">
                               {selectedDistributionBin ? (
-                                <>Filtered: <span className="text-white font-semibold">{filteredPositions?.length || 0}</span> of <span className="text-white font-semibold">{trades.filter((t: any) => t.operation === 'SELL').length}</span></>
+                                <>Filtered: <span className="text-white font-semibold">{filteredPositions?.length || 0}</span> of <span className="text-white font-semibold">{apiTrades?.length || 0}</span></>
                               ) : (
-                                <>Total Closed Positions: <span className="text-white font-semibold">{trades.filter((t: any) => t.operation === 'SELL').length}</span></>
+                                <>Total Closed Positions: <span className="text-white font-semibold">{apiTrades?.length || 0}</span></>
                               )}
                             </p>
                             {selectedDistributionBin && (
