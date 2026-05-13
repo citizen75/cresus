@@ -640,16 +640,17 @@ class StrategyManager:
 		return validation
 
 	def fix_strategy(self, strategy_name: str, dry_run: bool = False) -> Dict[str, Any]:
-		"""Fix strategy configuration by adding missing fields and fixing issues.
+		"""Fix strategy by adding missing template keys and commenting out extra keys.
 
-		Adds missing required fields with default values and comments invalid keys.
+		Errors (missing template keys in strategy): Added with default values
+		Warnings (extra keys in strategy): Moved to commented section at end
 
 		Args:
 			strategy_name: Strategy name to fix
-			dry_run: If True, don't save changes, just show what would be fixed
+			dry_run: If True, don't save, just show what would be fixed
 
 		Returns:
-			Dict with fix results
+			Dict with fix results and changes made
 		"""
 		try:
 			result = self.load_strategy(strategy_name)
@@ -657,73 +658,49 @@ class StrategyManager:
 				return {
 					"status": "error",
 					"message": f"Strategy not found: {strategy_name}",
+					"changes": [],
 				}
 
-			strategy_data = result["data"].copy()
+			strategy_data = result["data"]
+			template = self._load_template()
 			changes = []
 
-			# Template structure for default values
-			template = self._load_template()
+			# Step 1: Validate and identify errors/warnings
+			errors = []
+			warnings = []
+			self._compare_trees(strategy_data, template, "", errors, warnings)
 
-			# Build clean_data by recursively processing template structure
-			clean_data = self._build_clean_data(strategy_data, template, changes)
+			# Step 2: Build fixed data by following template structure
+			fixed_data = self._build_fixed_data(strategy_data, template, errors, changes)
 
-			# Note: signals.weights is flexible - users can define custom weights
-			# We don't validate individual weight keys since users may use different signal names
+			# Step 3: Collect extra keys to comment out
+			extra_keys_content = ""
+			if warnings:
+				extra_keys_content = self._extract_extra_keys_content(
+					strategy_data, template, strategy_name
+				)
 
-			# Extract and add missing indicators from formulas
-			missing_indicators = self._extract_missing_indicators(clean_data)
-			if missing_indicators:
-				current_indicators = set(clean_data.get("indicators", []))
-				for indicator in missing_indicators:
-					if indicator not in current_indicators:
-						clean_data["indicators"].append(indicator)
-						changes.append(f"Added missing indicator: {indicator}")
-
-			# Identify invalid keys (dynamically from template structure)
-			invalid_keys, invalid_nested_keys = self._identify_invalid_keys(strategy_data, template)
-
-			# Save if not dry run
-			if not dry_run and changes:
+			# Step 4: Save if not dry run
+			if not dry_run and (changes or warnings):
 				file_path = self._get_strategy_file(strategy_name)
-				# First load original file to get invalid sections
-				original_file_path = self._get_strategy_file(strategy_name)
-				original_invalid_sections = ""
-				if original_file_path.exists():
-					with open(original_file_path, 'r') as f:
-						original_content = f.read()
-						# Extract invalid top-level sections from original file
-						for invalid_key in invalid_keys:
-							original_invalid_sections += self._extract_key_section(original_content, invalid_key)
-						# Extract invalid nested keys from original file
-						for nested_path, nested_keys in invalid_nested_keys.items():
-							if original_invalid_sections and not original_invalid_sections.endswith('\n\n'):
-								original_invalid_sections += '\n'
-							original_invalid_sections += f"# [{nested_path}]\n"
-							for nested_key in nested_keys:
-								original_invalid_sections += self._extract_nested_key_section(original_content, nested_path, nested_key)
 
-				# Reorder clean_data to match template key order
-				ordered_data = {}
-				for template_key in template.keys():
-					if template_key in clean_data:
-						ordered_data[template_key] = clean_data[template_key]
-
-				# Save clean data with template key order
+				# Write fixed data (in template key order)
 				with open(file_path, 'w') as f:
-					yaml.dump(ordered_data, f, default_flow_style=False, sort_keys=False)
+					yaml.dump(fixed_data, f, default_flow_style=False, sort_keys=False)
 
-				# Append commented invalid sections
-				if original_invalid_sections:
+				# Append commented extra keys section if there are warnings
+				if extra_keys_content:
 					with open(file_path, 'a') as f:
-						f.write("\n# ===== COMMENTED OUT (INVALID KEYS) =====\n")
-						f.write(original_invalid_sections)
+						f.write("\n# ===== COMMENTED OUT (EXTRA KEYS) =====\n")
+						f.write(extra_keys_content)
 
 				changes.append(f"Saved fixed strategy to {file_path}")
 
 			return {
 				"status": "success",
 				"strategy": strategy_name,
+				"errors_fixed": len(errors),
+				"warnings_commented": len(warnings),
 				"changes": changes,
 				"change_count": len(changes),
 				"dry_run": dry_run,
@@ -734,7 +711,137 @@ class StrategyManager:
 				"status": "error",
 				"message": f"Fix failed: {str(e)}",
 				"error_type": type(e).__name__,
+				"changes": [],
 			}
+
+	def _build_fixed_data(
+		self,
+		strategy_data: Dict[str, Any],
+		template: Dict[str, Any],
+		errors: List[str],
+		changes: List[str]
+	) -> Dict[str, Any]:
+		"""Build fixed data by adding missing template keys and preserving order.
+
+		Args:
+			strategy_data: Strategy data to fix
+			template: Template structure to follow
+			errors: List of error messages (for tracking what was fixed)
+			changes: List to accumulate change descriptions
+
+		Returns:
+			Fixed data dict with template key order
+		"""
+		fixed = {}
+
+		# Process template keys in order
+		for template_key in template.keys():
+			if template_key in strategy_data:
+				# Key exists in strategy, recurse if both are dicts
+				strategy_value = strategy_data[template_key]
+				template_value = template[template_key]
+
+				if isinstance(template_value, dict) and isinstance(strategy_value, dict):
+					# Recursively fix nested dict
+					nested_errors = [e for e in errors if e.startswith(f"Missing template key: {template_key}.")]
+					nested_changes = []
+					fixed[template_key] = self._build_fixed_data(
+						strategy_value, template_value, nested_errors, nested_changes
+					)
+					changes.extend(nested_changes)
+				else:
+					# Copy value as-is
+					fixed[template_key] = strategy_value
+			else:
+				# Key missing from strategy - add from template (fill with default)
+				template_value = template[template_key]
+
+				if isinstance(template_value, dict):
+					fixed[template_key] = self._deep_copy_dict(template_value)
+				elif isinstance(template_value, list):
+					fixed[template_key] = template_value.copy() if template_value else []
+				else:
+					fixed[template_key] = template_value
+
+				changes.append(f"Added missing template key: {template_key}")
+
+		return fixed
+
+	def _extract_extra_keys_content(
+		self,
+		strategy_data: Dict[str, Any],
+		template: Dict[str, Any],
+		strategy_name: str
+	) -> str:
+		"""Extract and comment out extra keys not in template.
+
+		Args:
+			strategy_data: Strategy data
+			template: Template structure
+			strategy_name: Strategy name (for reference)
+
+		Returns:
+			Commented string of extra keys
+		"""
+		# Load original file to extract actual YAML content
+		file_path = self._get_strategy_file(strategy_name)
+		if not file_path.exists():
+			return ""
+
+		try:
+			with open(file_path, 'r') as f:
+				original_content = f.read()
+		except Exception:
+			return ""
+
+		extra_sections = []
+
+		# Find extra top-level keys
+		for key in strategy_data.keys():
+			if key not in template:
+				# Extract this key's section from original file
+				section = self._extract_yaml_section(original_content, key)
+				if section:
+					extra_sections.append(section)
+
+		return "".join(extra_sections)
+
+	def _extract_yaml_section(self, content: str, key: str) -> str:
+		"""Extract a YAML key section and comment it out.
+
+		Args:
+			content: YAML file content
+			key: Key to extract
+
+		Returns:
+			Commented section string
+		"""
+		lines = content.split('\n')
+		result_lines = []
+		in_section = False
+		section_indent = -1
+
+		for line in lines:
+			# Check if this line starts the key section
+			if line.strip().startswith(f"{key}:"):
+				in_section = True
+				section_indent = len(line) - len(line.lstrip())
+				result_lines.append(f"# {line}")
+			elif in_section:
+				# Check if we're still in the section (based on indentation)
+				if line.strip():
+					line_indent = len(line) - len(line.lstrip())
+					if line_indent <= section_indent:
+						# Unindented line means section ended
+						in_section = False
+					else:
+						# Still in section, comment it out
+						result_lines.append(f"# {line}")
+				else:
+					# Empty line within section
+					result_lines.append(f"# {line}")
+
+		return '\n'.join(result_lines) + '\n' if result_lines else ""
 
 	def _extract_key_section(self, content: str, key: str) -> str:
 		"""Extract a YAML key section from content and comment it out.
@@ -1017,7 +1124,6 @@ class StrategyManager:
 					"name": "template_name",
 					"universe": "cac40",
 					"description": "Strategy description",
-					"engine": "TaModel",
 					"indicators": [],
 					"watchlist": {"enabled": True, "parameters": {}},
 					"signals": {"enabled": True, "weights": {}, "parameters": {}},
@@ -1036,7 +1142,6 @@ class StrategyManager:
 				"name": "template_name",
 				"universe": "cac40",
 				"description": "Strategy description",
-				"engine": "TaModel",
 				"indicators": [],
 				"watchlist": {"enabled": True, "parameters": {}},
 				"signals": {"enabled": True, "weights": {}, "parameters": {}},
@@ -1045,6 +1150,106 @@ class StrategyManager:
 				"exit": {"enabled": True, "parameters": {}},
 				"backtest": {"initial_capital": 10000},
 			}
+
+	def validate_against_template(self, strategy_name: str) -> Dict[str, Any]:
+		"""Validate strategy against template using tree-based comparison.
+
+		Distinguishes between:
+		- Errors: Template keys missing in strategy
+		- Warnings: Strategy keys not in template
+
+		Args:
+			strategy_name: Strategy name to validate
+
+		Returns:
+			Dict with errors, warnings, and status
+		"""
+		try:
+			# Load strategy and template
+			result = self.load_strategy(strategy_name)
+			if result["status"] != "success":
+				return {
+					"status": "error",
+					"message": f"Strategy not found: {strategy_name}",
+					"errors": [],
+					"warnings": [],
+				}
+
+			strategy_data = result["data"]
+			template = self._load_template()
+
+			errors = []
+			warnings = []
+
+			# Build comparison: check for missing template keys and extra keys
+			self._compare_trees(strategy_data, template, "", errors, warnings)
+
+			return {
+				"status": "success",
+				"strategy": strategy_name,
+				"errors": errors,
+				"warnings": warnings,
+				"has_errors": len(errors) > 0,
+				"has_warnings": len(warnings) > 0,
+				"total_issues": len(errors) + len(warnings),
+			}
+
+		except Exception as e:
+			return {
+				"status": "error",
+				"message": f"Validation failed: {str(e)}",
+				"errors": [],
+				"warnings": [],
+			}
+
+	def _compare_trees(
+		self,
+		strategy_item: Any,
+		template_item: Any,
+		path: str,
+		errors: List[str],
+		warnings: List[str]
+	) -> None:
+		"""Recursively compare strategy and template trees.
+
+		Args:
+			strategy_item: Current item in strategy
+			template_item: Current item in template
+			path: Current path in structure (for error messages)
+			errors: List accumulating missing template keys
+			warnings: List accumulating extra keys in strategy
+		"""
+		if not isinstance(strategy_item, dict) or not isinstance(template_item, dict):
+			return
+
+		# Check for missing template keys in strategy
+		for template_key in template_item.keys():
+			current_path = f"{path}.{template_key}" if path else template_key
+
+			if template_key not in strategy_item:
+				errors.append(f"Missing template key: {current_path}")
+			else:
+				# Recursively compare nested structures
+				strategy_value = strategy_item[template_key]
+				template_value = template_item[template_key]
+
+				if isinstance(template_value, dict) and isinstance(strategy_value, dict):
+					self._compare_trees(strategy_value, template_value, current_path, errors, warnings)
+
+		# Check for extra keys in strategy not in template
+		for strategy_key in strategy_item.keys():
+			current_path = f"{path}.{strategy_key}" if path else strategy_key
+
+			if strategy_key not in template_item:
+				warnings.append(f"Extra key not in template: {current_path}")
+			else:
+				# Recursively compare nested structures
+				strategy_value = strategy_item[strategy_key]
+				template_value = template_item[strategy_key]
+
+				if isinstance(template_value, dict) and isinstance(strategy_value, dict):
+					# Already processed in the previous loop, but we still need to recurse for nested extras
+					pass
 
 
 def load_strategy(strategy_name: str) -> Dict[str, Any]:

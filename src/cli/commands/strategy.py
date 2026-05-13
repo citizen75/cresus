@@ -66,172 +66,75 @@ class StrategyCommands:
 		indicators = strategy_data.get("indicators", [])
 		console.print(f"[cyan]Indicators ({len(indicators)}):[/cyan] {', '.join(indicators)}\n")
 
-		# Validate using unified validator
-		is_valid, validation_errors = self.validator.validate(strategy_data)
+		# Validate using tree-based comparison
+		validation_result = self.strategy_manager.validate_against_template(strategy_name)
+		errors = validation_result.get("errors", [])
+		warnings = validation_result.get("warnings", [])
 
-		# Check for extra keys not in template
-		template_warnings = self._check_extra_keys(strategy_name, strategy_data)
-		validation_errors.extend(template_warnings)
-
-		# Update is_valid if there are any errors
-		if validation_errors:
-			is_valid = False
+		# Combine errors and warnings for display
+		all_issues = errors + warnings
 
 		# Apply fixes if requested
-		if fix and (validation_errors or template_warnings):
-			is_valid, validation_errors = self._apply_fixes(strategy_name, strategy_data, validation_errors)
+		if fix and all_issues:
+			fix_result = self.strategy_manager.fix_strategy(strategy_name, dry_run=False)
+			if fix_result.get("status") == "success":
+				console.print(f"[green]✓ Strategy fixed ({fix_result.get('change_count', 0)} changes)[/green]\n")
+				return {
+					"status": "success",
+					"strategy": strategy_name,
+					"is_valid": True,
+					"fixed": True,
+					"changes": fix_result.get("changes", [])
+				}
+			else:
+				console.print(f"[red]✗ Failed to fix strategy: {fix_result.get('message', 'Unknown error')}[/red]")
 
 		# Display results
-		self._display_results(strategy_name, is_valid, validation_errors, fix)
+		self._display_results(strategy_name, errors, warnings)
+
+		is_valid = len(errors) == 0
 
 		return {
 			"status": "success" if is_valid else "error",
 			"strategy": strategy_name,
 			"is_valid": is_valid,
-			"issues_found": len(validation_errors),
-			"validation_errors": validation_errors
+			"errors": errors,
+			"warnings": warnings,
+			"issues_found": len(all_issues)
 		}
 
-	def _display_results(self, strategy_name: str, is_valid: bool, validation_errors: list, fixed: bool = False):
-		"""Display validation results.
+	def _display_results(self, strategy_name: str, errors: list, warnings: list):
+		"""Display validation results with errors and warnings separated.
 
 		Args:
 			strategy_name: Strategy name
-			is_valid: Whether validation passed
-			validation_errors: List of error messages
-			fixed: Whether issues were fixed
+			errors: List of error messages (missing template keys)
+			warnings: List of warning messages (extra keys)
 		"""
-		if is_valid:
-			if fixed:
-				console.print("[bold green]✓ Strategy fixed and is now valid[/bold green]\n")
-			else:
-				console.print("[bold green]✓ Strategy is valid and ready to use[/bold green]\n")
+		if not errors and not warnings:
+			console.print("[bold green]✓ Strategy is valid and ready to use[/bold green]\n")
 			return
 
-		# Display errors in table
-		console.print(f"[bold red]✗ {len(validation_errors)} issue(s) found:[/bold red]\n")
+		# Display errors (missing template keys)
+		if errors:
+			console.print(f"[bold red]✗ {len(errors)} error(s) found:[/bold red]\n")
+			errors_table = Table(title="Errors (Missing Template Keys)", box=box.ROUNDED)
+			errors_table.add_column("Error", style="red")
+			for error in errors:
+				errors_table.add_row(error)
+			console.print(errors_table)
+			console.print()
 
-		issues_table = Table(title="Issues Found", box=box.ROUNDED)
-		issues_table.add_column("Issue", style="yellow")
+		# Display warnings (extra keys)
+		if warnings:
+			console.print(f"[bold yellow]⚠ {len(warnings)} warning(s) found:[/bold yellow]\n")
+			warnings_table = Table(title="Warnings (Extra Keys Not in Template)", box=box.ROUNDED)
+			warnings_table.add_column("Warning", style="yellow")
+			for warning in warnings:
+				warnings_table.add_row(warning)
+			console.print(warnings_table)
+			console.print()
 
-		for error in validation_errors:
-			issues_table.add_row(error)
-
-		console.print(issues_table)
-		console.print()
-
-	def _check_extra_keys(self, strategy_name: str, strategy_data: Dict[str, Any]) -> List[str]:
-		"""Check for extra keys in strategy not present in template.
-
-		Args:
-			strategy_name: Strategy name
-			strategy_data: Strategy configuration data
-
-		Returns:
-			List of warning messages
-		"""
-		try:
-			# Load template
-			template_file = self.project_root / "init" / "templates" / "strategy.yml"
-			if not template_file.exists():
-				return []
-
-			with open(template_file, 'r') as f:
-				template_config = yaml.safe_load(f)
-
-			# Check for extra keys
-			warnings = self.validator.validate_against_template(strategy_data, template_config)
-			return warnings
-
-		except Exception as e:
-			console.print(f"[yellow]⚠ Could not check template: {e}[/yellow]")
-			return []
-
-	def _apply_fixes(self, strategy_name: str, strategy_data: Dict[str, Any], validation_errors: list) -> Tuple[bool, list]:
-		"""Apply automatic fixes to strategy configuration.
-
-		Args:
-			strategy_name: Name of the strategy
-			strategy_data: Strategy configuration data
-			validation_errors: List of validation errors
-
-		Returns:
-			Tuple of (is_valid, remaining_errors)
-		"""
-		# Check if engine is missing and add it
-		if "Missing required key: engine" in validation_errors:
-			console.print("[cyan]→ Adding missing engine field (TaModel)...[/cyan]")
-			strategy_data["engine"] = "TaModel"
-			validation_errors.remove("Missing required key: engine")
-
-		# Load template and remove extra keys
-		try:
-			template_file = self.project_root / "init" / "templates" / "strategy.yml"
-			if template_file.exists():
-				with open(template_file, 'r') as f:
-					template_config = yaml.safe_load(f)
-
-				# Remove extra keys
-				extra_key_errors = [e for e in validation_errors if e.startswith("Extra key not in template:")]
-				if extra_key_errors:
-					strategy_data = self._remove_extra_keys(strategy_data, template_config)
-					# Remove the extra key warnings from the list
-					for error in extra_key_errors:
-						if error in validation_errors:
-							validation_errors.remove(error)
-							console.print(f"[cyan]→ Removing {error.replace('Extra key not in template: ', '')}...[/cyan]")
-
-		except Exception as e:
-			console.print(f"[yellow]⚠ Could not process template: {e}[/yellow]")
-
-		# Save the updated strategy file
-		try:
-			strategies_dir = Path.home() / ".cresus" / "db" / "strategies"
-			strategy_file = strategies_dir / f"{strategy_name}.yml"
-
-			with open(strategy_file, 'w') as f:
-				yaml.dump(strategy_data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
-
-			console.print(f"[green]✓ Strategy updated: {strategy_file}[/green]\n")
-
-			# Re-validate after fixes
-			is_valid, remaining_errors = self.validator.validate(strategy_data)
-
-			# Re-check for extra keys
-			extra_key_warnings = self._check_extra_keys(strategy_name, strategy_data)
-			remaining_errors.extend(extra_key_warnings)
-
-			return is_valid and len(extra_key_warnings) == 0, remaining_errors
-
-		except Exception as e:
-			console.print(f"[red]✗ Error saving strategy: {e}[/red]\n")
-			validation_errors.insert(0, f"Failed to save strategy: {str(e)}")
-			return False, validation_errors
-
-	def _remove_extra_keys(self, strategy_item: Any, template_item: Any) -> Any:
-		"""Recursively remove extra keys in strategy not present in template.
-
-		Args:
-			strategy_item: Current item in strategy
-			template_item: Current item in template
-
-		Returns:
-			Cleaned strategy item
-		"""
-		if not isinstance(strategy_item, dict) or not isinstance(template_item, dict):
-			return strategy_item
-
-		cleaned = {}
-		for key, value in strategy_item.items():
-			if key in template_item:
-				# If both are dicts, recursively clean nested items
-				if isinstance(value, dict) and isinstance(template_item[key], dict):
-					cleaned[key] = self._remove_extra_keys(value, template_item[key])
-				else:
-					cleaned[key] = value
-			# Skip keys not in template
-
-		return cleaned
 
 	def _show_template(self):
 		"""Display the strategy template."""
