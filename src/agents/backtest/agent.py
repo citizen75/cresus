@@ -1,5 +1,6 @@
 """BacktestAgent for orchestrating multi-phase backtesting flows."""
 
+import asyncio
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
 import uuid
@@ -103,6 +104,7 @@ class BacktestAgent(Agent):
 		self.pre_market_flow: Optional[Flow] = None
 		self.market_flow: Optional[Flow] = None
 		self.post_market_flow: Optional[Flow] = None
+		self.daily_webhook: Optional[callable] = None
 
 	def set_premarket_flow(self, flow: Flow) -> None:
 		"""Set the pre-market flow.
@@ -127,6 +129,16 @@ class BacktestAgent(Agent):
 			flow: Flow to execute in post-market phase
 		"""
 		self.post_market_flow = flow
+
+	def set_daily_webhook(self, webhook: callable) -> None:
+		"""Set webhook callback for daily results.
+
+		Webhook is called at end of each trading day with daily_results dict.
+
+		Args:
+			webhook: Async callable to invoke with daily_results
+		"""
+		self.daily_webhook = webhook
 
 	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
 		"""Execute backtest loop over trading days.
@@ -320,7 +332,34 @@ class BacktestAgent(Agent):
 			orders = Orders(portfolio_name, context=self.context.__dict__)
 			orders.flush()
 
-			backtest["daily_results"].append({"date": next_date.isoformat()})
+			daily_result = {"date": next_date.isoformat()}
+			backtest["daily_results"].append(daily_result)
+
+			# Call daily webhook if registered
+			if self.daily_webhook:
+				try:
+					webhook_data = {
+						"backtest_id": backtest_id,
+						"strategy_name": strategy_name,
+						"date": next_date.isoformat(),
+						"daily_results": daily_result,
+						"days_processed": len(backtest["daily_results"]),
+						"total_trading_days": backtest.get("total_trading_days", 0),
+					}
+
+					if asyncio.iscoroutinefunction(self.daily_webhook):
+						# Schedule async webhook to run - don't block the main loop
+						# The webhook will broadcast to WebSocket clients
+						try:
+							loop = asyncio.get_running_loop()
+							asyncio.create_task(self.daily_webhook(webhook_data))
+						except RuntimeError:
+							# No running loop, need to check if we can run one
+							pass
+					else:
+						self.daily_webhook(webhook_data)
+				except Exception as e:
+					self.logger.warning(f"Daily webhook failed: {str(e)}")
 
 		backtest["days_processed"] = len(backtest["daily_results"])
 		self.logger.info(f"Backtest completed: {backtest['days_processed']} days processed")

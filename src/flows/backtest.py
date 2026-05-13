@@ -21,6 +21,7 @@ from agents.research.agent import ResearchAgent
 from tools.portfolio import PortfolioManager
 from tools.portfolio.metrics import PortfolioMetrics
 from tools.strategy.strategy import StrategyManager
+from gateway.websockets.manager import get_websocket_manager
 from utils.env import get_db_root
 
 
@@ -130,6 +131,24 @@ class BacktestFlow(Flow):
 		# Set post-market flow (cleanup: expire pending orders, update metrics)
 		postmarket_flow = PostMarketFlow(strategy_name, context=self.context)
 		backtest_agent.set_postmarket_flow(postmarket_flow)
+
+		# Set up WebSocket webhook for real-time updates
+		ws_manager = get_websocket_manager()
+
+		async def daily_webhook(daily_data: Dict[str, Any]) -> None:
+			"""Send daily results to WebSocket clients.
+
+			Args:
+				daily_data: Daily result data from BacktestAgent
+			"""
+			await ws_manager.broadcast_daily_results(
+				backtest_id=daily_data.get("backtest_id", ""),
+				strategy_name=daily_data.get("strategy_name", ""),
+				date=daily_data.get("date", ""),
+				daily_results=daily_data.get("daily_results", {})
+			)
+
+		backtest_agent.set_daily_webhook(daily_webhook)
 
 		# Run backtest through agent
 		agent_result = backtest_agent.process({
@@ -260,6 +279,23 @@ class BacktestFlow(Flow):
 				self.logger.info(f"Copied strategy file to {dest_file}")
 		except Exception as e:
 			self.logger.warning(f"Could not copy strategy file: {e}")
+
+		# Send completion message via WebSocket
+		try:
+			import asyncio
+			ws_manager = get_websocket_manager()
+
+			async def send_completion():
+				await ws_manager.broadcast_backtest_complete(
+					backtest_id=backtest_id,
+					strategy_name=strategy_name,
+					metrics=metrics or {},
+					days_processed=backtest_output.get("days_processed", 0)
+				)
+
+			asyncio.run(send_completion())
+		except Exception as e:
+			self.logger.warning(f"Could not send WebSocket completion message: {e}")
 
 		return {
 			"status": "success",
