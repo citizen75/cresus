@@ -26,9 +26,9 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
     return { open: +open, high: +high, low: +low, close: +close, volume }
   }
 
-  const generateCandleData = (numberOfPoints = 500, referenceDate?: Date) => {
+  const generateCandleData = (numberOfPoints = 500) => {
     const data = []
-    const date = new Date(referenceDate || new Date())
+    const date = new Date()
     date.setUTCDate(date.getUTCDate() - numberOfPoints)
 
     let lastClose = 75
@@ -65,30 +65,8 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
   }
 
   const generateDatasets = (timeframe: string) => {
-    let points = 500
-    if (timeframe === '1W') points = 250
-    if (timeframe === '1M') points = 120
-    if (timeframe === '3M') points = 90
-    if (timeframe === '6M') points = 180
-    if (timeframe === '1Y') points = 52
-
-    // If markers provided, generate data around those dates
-    let referenceDate: Date | undefined
-    if (entryDate || exitDate) {
-      const targetDate = new Date(exitDate || entryDate!)
-      const futureBuffer = Math.ceil(points * 0.3)
-      referenceDate = new Date(targetDate)
-      referenceDate.setDate(referenceDate.getDate() + futureBuffer)
-      console.log('Chart data range for marker:', {
-        entryDate,
-        exitDate,
-        targetDate: targetDate.toISOString().split('T')[0],
-        referenceDate: referenceDate.toISOString().split('T')[0],
-        points,
-      })
-    }
-
-    const candles = generateCandleData(points, referenceDate)
+    // Always load 2 years of data for consistent view
+    const candles = generateCandleData(730)
     const volume = generateVolumeData(candles)
     return { candles, volume }
   }
