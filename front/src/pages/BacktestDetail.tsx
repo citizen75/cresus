@@ -729,7 +729,7 @@ export default function BacktestDetail() {
           </div>
 
           {/* Closed Positions List Section */}
-          {trades && trades.length > 0 ? (
+          {(distributionResponse?.data?.trades || distributionResponse?.trades) && (distributionResponse?.data?.trades || distributionResponse?.trades).length > 0 ? (
             <div className="grid grid-cols-12 gap-4">
               {/* Positions Table - Left Side (9 cols) */}
               <div className="col-span-9">
