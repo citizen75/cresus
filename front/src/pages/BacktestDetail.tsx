@@ -1270,36 +1270,46 @@ export default function BacktestDetail() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-2xl font-bold text-white">Strategy Watchlist</h2>
-              <p className="text-slate-400 text-sm mt-1">AI-selected stocks ranked by strategy relevance</p>
+              <p className="text-slate-400 text-sm mt-1">Stocks ranked by strategy relevance</p>
             </div>
             <button
               onClick={regenerateWatchlist}
               disabled={watchlistLoading}
               className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {watchlistLoading ? 'Regenerating...' : '🔄 Regenerate'}
+              {watchlistLoading ? 'Regenerating...' : 'Regenerate'}
             </button>
           </div>
 
           {watchlistError && (
-            <div className="p-4 bg-red-900/30 border border-red-800 rounded text-red-400 text-sm">
-              {watchlistError}
+            <div className="bg-slate-900 rounded-lg border border-red-800/30 p-6">
+              <div className="flex items-start gap-4">
+                <div className="text-red-500 text-2xl">⚠️</div>
+                <div>
+                  <h3 className="text-red-400 font-medium mb-2">Unable to load watchlist</h3>
+                  <p className="text-slate-400 text-sm">{watchlistError}</p>
+                </div>
+              </div>
             </div>
           )}
 
           {watchlistLoading && !watchlist.length && (
-            <div className="text-slate-400 py-8 text-center">Loading watchlist...</div>
+            <div className="flex items-center justify-center h-64">
+              <div className="text-slate-400">Loading watchlist...</div>
+            </div>
           )}
 
           {!watchlistLoading && watchlist.length === 0 && !watchlistError && (
-            <div className="bg-slate-900/50 rounded-lg p-12 border border-slate-800 text-center text-slate-400">
-              <p>No watchlist data available. The watchlist is generated during backtest execution.</p>
+            <div className="space-y-6">
+              <div className="bg-slate-900 rounded-lg border border-slate-800 p-12 text-center text-slate-400">
+                <p>No watchlist data available. The watchlist is generated during backtest execution.</p>
+              </div>
             </div>
           )}
 
           {watchlist.length > 0 && (
-            <>
-              {/* View Toggle & Filters */}
+            <div className="space-y-6">
+              {/* View Toggle */}
               <div className="flex items-center gap-4 flex-wrap">
                 <div className="flex items-center gap-2 bg-slate-800/30 border border-slate-700 rounded-lg p-1 w-fit">
                   <button
@@ -1329,23 +1339,24 @@ export default function BacktestDetail() {
                     📈 Charts
                   </button>
                 </div>
+              </div>
 
-                {/* Search */}
+              {/* Filters */}
+              <div className="flex items-center gap-4 flex-wrap">
                 <div className="flex-1 min-w-64 relative">
                   <input
                     type="text"
-                    placeholder="Search tickers..."
+                    placeholder="Search tickers"
                     value={watchlistSearch}
                     onChange={(e) => {
                       setWatchlistSearch(e.target.value)
                       setWatchlistCurrentPage(1)
                     }}
-                    className="w-full px-4 py-2 bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg focus:outline-none focus:border-purple-600 transition"
+                    className="w-full px-4 py-2 bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg focus:outline-none focus:border-purple-600"
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500">🔍</span>
                 </div>
 
-                {/* Sort */}
                 <select
                   value={watchlistSortBy}
                   onChange={(e) => {
@@ -1357,7 +1368,7 @@ export default function BacktestDetail() {
                   <option>Score</option>
                   <option>Entry Score</option>
                   <option>RSI 14</option>
-                  <option>ATR 14</option>
+                  <option>RR Ratio</option>
                 </select>
               </div>
 
@@ -1371,11 +1382,11 @@ export default function BacktestDetail() {
                           <th className="px-6 py-4 text-left text-slate-400 font-medium">Ticker</th>
                           <th className="px-6 py-4 text-left text-slate-400 font-medium">Score</th>
                           <th className="px-6 py-4 text-left text-slate-400 font-medium">Signals</th>
-                          <th className="px-6 py-4 text-right text-slate-400 font-medium">Entry Score</th>
-                          <th className="px-6 py-4 text-right text-slate-400 font-medium">RR Ratio</th>
-                          <th className="px-6 py-4 text-right text-slate-400 font-medium">RSI 14</th>
-                          <th className="px-6 py-4 text-right text-slate-400 font-medium">ATR 14</th>
-                          <th className="px-6 py-4 text-right text-slate-400 font-medium">ADX 20</th>
+                          <th className="px-6 py-4 text-left text-slate-400 font-medium">Entry Score</th>
+                          <th className="px-6 py-4 text-left text-slate-400 font-medium">RR Ratio</th>
+                          <th className="px-6 py-4 text-left text-slate-400 font-medium">RSI 14</th>
+                          <th className="px-6 py-4 text-left text-slate-400 font-medium">ATR 14</th>
+                          <th className="px-6 py-4 text-left text-slate-400 font-medium">Indicators</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1387,8 +1398,8 @@ export default function BacktestDetail() {
                                 return (b.entry_score || 0) - (a.entry_score || 0)
                               case 'RSI 14':
                                 return (b.rsi_14 || 0) - (a.rsi_14 || 0)
-                              case 'ATR 14':
-                                return (b.atr_14 || 0) - (a.atr_14 || 0)
+                              case 'RR Ratio':
+                                return (b.rr_ratio || 0) - (a.rr_ratio || 0)
                               default:
                                 return (b.signal_score || 0) - (a.signal_score || 0)
                             }
@@ -1404,22 +1415,30 @@ export default function BacktestDetail() {
                                       style={{ width: `${Math.min(100, (item.signal_score || 0) * 100)}%` }}
                                     ></div>
                                   </div>
-                                  <span className="text-white font-medium text-sm w-8">{(item.signal_score || 0).toFixed(2)}</span>
+                                  <span className="text-white font-medium text-sm">{(item.signal_score || 0).toFixed(2)}</span>
                                 </div>
                               </td>
-                              <td className="px-6 py-4 text-slate-300 text-xs">{item.signals || '—'}</td>
-                              <td className="px-6 py-4 text-right text-slate-300">{item.entry_score || '—'}</td>
-                              <td className="px-6 py-4 text-right text-slate-300">{(parseFloat(item.rr_ratio) || 0).toFixed(2)}</td>
-                              <td className="px-6 py-4 text-right text-slate-300">{(parseFloat(item.rsi_14) || 0).toFixed(2)}</td>
-                              <td className="px-6 py-4 text-right text-slate-300">{(parseFloat(item.atr_14) || 0).toFixed(2)}</td>
-                              <td className="px-6 py-4 text-right text-slate-300">{(parseFloat(item.adx_20) || 0).toFixed(2)}</td>
+                              <td className="px-6 py-4 text-slate-300 text-xs max-w-xs">{item.signals || '—'}</td>
+                              <td className="px-6 py-4">
+                                <span className="px-3 py-1 rounded text-xs font-medium bg-purple-900/30 text-purple-400">
+                                  {item.entry_score || '—'}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 text-white font-medium">{(parseFloat(item.rr_ratio) || 0).toFixed(2)}</td>
+                              <td className="px-6 py-4 text-white font-medium">{(parseFloat(item.rsi_14) || 0).toFixed(2)}</td>
+                              <td className="px-6 py-4 text-white font-medium">{(parseFloat(item.atr_14) || 0).toFixed(2)}</td>
+                              <td className="px-6 py-4 text-xs text-slate-400">
+                                EMA: {(parseFloat(item.ema_20) || 0).toFixed(2)} / {(parseFloat(item.ema_50) || 0).toFixed(2)}
+                              </td>
                             </tr>
                           ))}
                       </tbody>
                     </table>
                   </div>
-                  <div className="px-6 py-4 border-t border-slate-800 bg-slate-900 text-sm text-slate-400">
-                    Showing {watchlist.length} tickers
+
+                  {/* Pagination */}
+                  <div className="px-6 py-4 border-t border-slate-800 bg-slate-900 flex items-center justify-between">
+                    <p className="text-slate-400 text-sm">Showing {watchlist.length} ticker{watchlist.length !== 1 ? 's' : ''}</p>
                   </div>
                 </div>
               )}
@@ -1436,8 +1455,8 @@ export default function BacktestDetail() {
                             return (b.entry_score || 0) - (a.entry_score || 0)
                           case 'RSI 14':
                             return (b.rsi_14 || 0) - (a.rsi_14 || 0)
-                          case 'ATR 14':
-                            return (b.atr_14 || 0) - (a.atr_14 || 0)
+                          case 'RR Ratio':
+                            return (b.rr_ratio || 0) - (a.rr_ratio || 0)
                           default:
                             return (b.signal_score || 0) - (a.signal_score || 0)
                         }
@@ -1449,12 +1468,20 @@ export default function BacktestDetail() {
                             <div className="flex items-start justify-between mb-3">
                               <div>
                                 <p className="text-white font-bold text-lg">{item.ticker}</p>
-                                <p className="text-slate-400 text-xs mt-1">{item.signals || 'No signals'}</p>
+                                <p className="text-slate-400 text-xs">{item.signals || 'No signals'}</p>
                               </div>
                               <div className="text-right">
                                 <p className="text-2xl font-bold text-purple-400">{(item.signal_score || 0).toFixed(2)}</p>
                                 <p className="text-slate-400 text-xs">Score</p>
                               </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <span className="px-2 py-1 rounded text-xs font-medium bg-purple-900/30 text-purple-400">
+                                Entry: {item.entry_score || '—'}
+                              </span>
+                              <span className="px-2 py-1 rounded text-xs font-medium bg-slate-800/30 text-slate-400">
+                                RR: {(parseFloat(item.rr_ratio) || 0).toFixed(2)}
+                              </span>
                             </div>
                           </div>
 
@@ -1470,37 +1497,43 @@ export default function BacktestDetail() {
                             </div>
                           )}
 
-                          {/* Card Body */}
-                          <div className="p-4 space-y-3">
-                            {/* Entry Score & RR */}
-                            <div className="grid grid-cols-2 gap-3 text-xs">
-                              <div className="bg-slate-800/30 rounded p-2">
-                                <p className="text-slate-500 mb-1">Entry Score</p>
-                                <p className="text-white font-medium">{item.entry_score || '—'}</p>
-                              </div>
-                              <div className="bg-slate-800/30 rounded p-2">
-                                <p className="text-slate-500 mb-1">RR Ratio</p>
-                                <p className="text-white font-medium">{(parseFloat(item.rr_ratio) || 0).toFixed(2)}</p>
-                              </div>
+                          {/* Card Footer */}
+                          <div className="border-t border-slate-800 p-4 space-y-2">
+                            <div className="text-xs">
+                              <p className="text-slate-500 mb-1">Signals:</p>
+                              <p className="text-slate-300">{item.signals || 'No signals'}</p>
                             </div>
-
-                            {/* Indicators Grid */}
-                            <div className="grid grid-cols-2 gap-3 text-xs border-t border-slate-700 pt-3">
+                            <div className="flex justify-between text-xs pt-2 border-t border-slate-700">
                               <div>
-                                <p className="text-slate-500 mb-1">RSI 14</p>
+                                <p className="text-slate-500">RSI 14</p>
                                 <p className="text-white font-medium">{(parseFloat(item.rsi_14) || 0).toFixed(2)}</p>
                               </div>
                               <div>
-                                <p className="text-slate-500 mb-1">ATR 14</p>
+                                <p className="text-slate-500">ATR 14</p>
                                 <p className="text-white font-medium">{(parseFloat(item.atr_14) || 0).toFixed(2)}</p>
                               </div>
                               <div>
-                                <p className="text-slate-500 mb-1">EMA 20</p>
+                                <p className="text-slate-500">EMA 20</p>
                                 <p className="text-white font-medium">{(parseFloat(item.ema_20) || 0).toFixed(2)}</p>
                               </div>
-                              <div>
-                                <p className="text-slate-500 mb-1">ADX 20</p>
-                                <p className="text-white font-medium">{(parseFloat(item.adx_20) || 0).toFixed(2)}</p>
+                            </div>
+
+                            {/* Additional Indicators */}
+                            <div className="border-t border-slate-700 pt-2">
+                              <p className="text-slate-500 mb-2 text-xs">More Indicators</p>
+                              <div className="space-y-1 text-xs">
+                                <div className="flex justify-between">
+                                  <span className="text-slate-400">EMA 50</span>
+                                  <span className="text-white font-medium">{(parseFloat(item.ema_50) || 0).toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-slate-400">ADX 20</span>
+                                  <span className="text-white font-medium">{(parseFloat(item.adx_20) || 0).toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-slate-400">RR Ratio</span>
+                                  <span className="text-white font-medium">{(parseFloat(item.rr_ratio) || 0).toFixed(2)}</span>
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -1509,7 +1542,7 @@ export default function BacktestDetail() {
                   </div>
                 </div>
               )}
-            </>
+            </div>
           )}
         </div>
       )}
