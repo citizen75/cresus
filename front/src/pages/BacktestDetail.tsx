@@ -933,6 +933,8 @@ export default function BacktestDetail() {
                                           e.stopPropagation()
                                           console.log('Position object:', pos)
                                           console.log('Position keys:', Object.keys(pos))
+                                          console.log('entry_date:', pos.entry_date)
+                                          console.log('exit_date:', pos.exit_date)
                                           setChartPosition(pos)
                                         }}
                                         className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition whitespace-nowrap"
