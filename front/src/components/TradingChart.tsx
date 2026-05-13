@@ -103,7 +103,7 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
     const fetchFundamental = async () => {
       try {
         const data = await api.getFundamental(ticker)
-        setCompanyName(data.name || '')
+        setCompanyName(data.data?.company?.name || '')
       } catch (err) {
         console.error('Failed to fetch fundamental data:', err)
         setCompanyName('')

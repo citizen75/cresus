@@ -153,7 +153,7 @@ export default function BacktestDetail() {
         for (const ticker of uniqueTickers) {
           try {
             const response = await api.getFundamental(ticker)
-            names[ticker] = response.name || ticker
+            names[ticker] = response.data?.company?.name || ticker
           } catch (err) {
             console.error(`Failed to fetch name for ${ticker}:`, err)
             names[ticker] = ticker
