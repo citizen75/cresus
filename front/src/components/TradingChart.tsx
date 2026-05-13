@@ -3,9 +3,11 @@ import { useEffect, useRef } from 'react'
 interface TradingChartProps {
   timeframe: string
   title?: string
+  entryDate?: string
+  exitDate?: string
 }
 
-export default function TradingChart({ timeframe, title = 'Price Chart' }: TradingChartProps) {
+export default function TradingChart({ timeframe, title = 'Price Chart', entryDate, exitDate }: TradingChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<any>(null)
 
@@ -119,6 +121,32 @@ export default function TradingChart({ timeframe, title = 'Price Chart' }: Tradi
           },
         })
 
+        // Add entry/exit markers
+        const markers: any[] = []
+        if (entryDate) {
+          const entryDateStr = new Date(entryDate).toISOString().split('T')[0]
+          markers.push({
+            time: entryDateStr,
+            position: 'belowBar',
+            color: '#10b981',
+            shape: 'arrowUp',
+            text: 'Entry',
+          })
+        }
+        if (exitDate) {
+          const exitDateStr = new Date(exitDate).toISOString().split('T')[0]
+          markers.push({
+            time: exitDateStr,
+            position: 'aboveBar',
+            color: '#ef4444',
+            shape: 'arrowDown',
+            text: 'Exit',
+          })
+        }
+        if (markers.length > 0) {
+          candlestickSeries.setMarkers(markers)
+        }
+
         const volumeSeries = chart.addSeries(HistogramSeries, {
           priceFormat: { type: 'volume' },
           priceScaleId: '',
@@ -151,7 +179,7 @@ export default function TradingChart({ timeframe, title = 'Price Chart' }: Tradi
     }
 
     setupChart()
-  }, [timeframe])
+  }, [timeframe, entryDate, exitDate])
 
   return (
     <div className="flex flex-col h-full">

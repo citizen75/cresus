@@ -1175,7 +1175,7 @@ export default function BacktestDetail() {
 
             {/* Chart Container */}
             <div className="flex-1 overflow-hidden">
-              <TradingChart timeframe="1M" title={`${chartPosition.ticker} - Position Analysis`} />
+              <TradingChart timeframe="1M" title={`${chartPosition.ticker} - Position Analysis`} entryDate={chartPosition.entry_date} exitDate={chartPosition.exit_date} />
             </div>
 
             {/* Position Details */}
