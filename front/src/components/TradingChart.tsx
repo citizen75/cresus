@@ -98,7 +98,7 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
       try {
         setIsLoading(true)
         const lwc = await import('lightweight-charts')
-        const { createChart, CandlestickSeries, HistogramSeries } = lwc
+        const { createChart, CandlestickSeries, HistogramSeries, createSeriesMarkers } = lwc
 
         if (chartRef.current) {
           chartRef.current.remove()
@@ -178,46 +178,46 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
           },
         })
 
-        // Add entry/exit marks with visual indicators
-        console.log('=== SETTING MARKS ===')
-        const timeScale = chart.timeScale()
+        // Add entry/exit markers using createSeriesMarkers
+        const markers: any[] = []
 
         if (entryDate) {
-          const entryDateStr = new Date(entryDate).toISOString().substring(0, 10)
-          console.log('Entry date:', entryDateStr, 'in candles:', candles.some(c => c.time === entryDateStr))
-
-          // Add price line for entry
-          candlestickSeries.createPriceLine({
-            price: candles.find(c => c.time === entryDateStr)?.close || candles[0]?.close || 0,
+          const entryDateObj = new Date(entryDate)
+          markers.push({
+            time: {
+              year: entryDateObj.getFullYear(),
+              month: entryDateObj.getMonth() + 1,
+              day: entryDateObj.getDate()
+            },
+            position: 'belowBar',
             color: '#10b981',
-            lineWidth: 1,
-            lineStyle: 1,
-            axisLabelVisible: true,
-            title: 'ENTRY',
+            shape: 'arrowUp',
+            text: 'ENTRY',
           })
-
-          timeScale.setMarkColor(entryDateStr, '#10b981')
-          console.log('Entry mark set')
+          console.log('Entry marker added')
         }
 
         if (exitDate) {
-          const exitDateStr = new Date(exitDate).toISOString().substring(0, 10)
-          console.log('Exit date:', exitDateStr, 'in candles:', candles.some(c => c.time === exitDateStr))
-
-          // Add price line for exit
-          candlestickSeries.createPriceLine({
-            price: candles.find(c => c.time === exitDateStr)?.close || candles[candles.length - 1]?.close || 0,
+          const exitDateObj = new Date(exitDate)
+          markers.push({
+            time: {
+              year: exitDateObj.getFullYear(),
+              month: exitDateObj.getMonth() + 1,
+              day: exitDateObj.getDate()
+            },
+            position: 'aboveBar',
             color: '#ef4444',
-            lineWidth: 1,
-            lineStyle: 1,
-            axisLabelVisible: true,
-            title: 'EXIT',
+            shape: 'arrowDown',
+            text: 'EXIT',
           })
-
-          timeScale.setMarkColor(exitDateStr, '#ef4444')
-          console.log('Exit mark set')
+          console.log('Exit marker added')
         }
-        console.log('=== MARKS COMPLETE ===')
+
+        if (markers.length > 0) {
+          console.log('Setting markers:', markers)
+          createSeriesMarkers(candlestickSeries, markers)
+          console.log('Markers set successfully')
+        }
 
         const volumeSeries = chart.addSeries(HistogramSeries, {
           priceFormat: { type: 'volume' },
