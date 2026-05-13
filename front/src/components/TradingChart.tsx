@@ -178,12 +178,24 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
           },
         })
 
-        // Add entry/exit marks on time scale
+        // Add entry/exit marks with visual indicators
         console.log('=== SETTING MARKS ===')
+        const timeScale = chart.timeScale()
+
         if (entryDate) {
           const entryDateStr = new Date(entryDate).toISOString().substring(0, 10)
           console.log('Entry date:', entryDateStr, 'in candles:', candles.some(c => c.time === entryDateStr))
-          const timeScale = chart.timeScale()
+
+          // Add price line for entry
+          candlestickSeries.createPriceLine({
+            price: candles.find(c => c.time === entryDateStr)?.close || candles[0]?.close || 0,
+            color: '#10b981',
+            lineWidth: 1,
+            lineStyle: 1,
+            axisLabelVisible: true,
+            title: 'ENTRY',
+          })
+
           timeScale.setMarkColor(entryDateStr, '#10b981')
           console.log('Entry mark set')
         }
@@ -191,7 +203,17 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
         if (exitDate) {
           const exitDateStr = new Date(exitDate).toISOString().substring(0, 10)
           console.log('Exit date:', exitDateStr, 'in candles:', candles.some(c => c.time === exitDateStr))
-          const timeScale = chart.timeScale()
+
+          // Add price line for exit
+          candlestickSeries.createPriceLine({
+            price: candles.find(c => c.time === exitDateStr)?.close || candles[candles.length - 1]?.close || 0,
+            color: '#ef4444',
+            lineWidth: 1,
+            lineStyle: 1,
+            axisLabelVisible: true,
+            title: 'EXIT',
+          })
+
           timeScale.setMarkColor(exitDateStr, '#ef4444')
           console.log('Exit mark set')
         }
