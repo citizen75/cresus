@@ -202,10 +202,16 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
 
         // Add entry/exit markers
         const markers: any[] = []
+        console.log('entryDate input:', entryDate)
+        console.log('exitDate input:', exitDate)
+        console.log('Total candles loaded:', candles.length)
+        console.log('First 5 candle dates:', candles.slice(0, 5).map(c => c.time))
+        console.log('Last 5 candle dates:', candles.slice(-5).map(c => c.time))
+
         if (entryDate) {
           const entryDateStr = new Date(entryDate).toISOString().substring(0, 10)
           const markerFound = candles.some(c => c.time === entryDateStr)
-          console.log(`Entry date ${entryDateStr} found in data:`, markerFound)
+          console.log(`Entry date parsed as: "${entryDateStr}", found in data:`, markerFound)
 
           markers.push({
             time: entryDateStr,
@@ -219,7 +225,7 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
         if (exitDate) {
           const exitDateStr = new Date(exitDate).toISOString().substring(0, 10)
           const markerFound = candles.some(c => c.time === exitDateStr)
-          console.log(`Exit date ${exitDateStr} found in data:`, markerFound)
+          console.log(`Exit date parsed as: "${exitDateStr}", found in data:`, markerFound)
 
           markers.push({
             time: exitDateStr,
@@ -231,10 +237,13 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
           })
         }
         if (markers.length > 0) {
+          console.log('=== MARKER DEBUG ===')
           console.log('Chart data range:', candles[0]?.time, 'to', candles[candles.length - 1]?.time)
-          console.log('Markers to set:', markers)
+          console.log('Markers to set:', JSON.stringify(markers))
+          console.log('Calling setMarkers now...')
           candlestickSeries.setMarkers(markers)
           console.log('Markers set successfully')
+          console.log('Series marker count:', candlestickSeries.getMarkers?.()?.length || 'unknown')
         }
 
         const volumeSeries = chart.addSeries(HistogramSeries, {
