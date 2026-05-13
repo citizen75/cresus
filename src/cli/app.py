@@ -433,6 +433,105 @@ class CresusCLI(cmd2.Cmd):
 			console.print(f"[red]✗[/red] Unknown command: {cmd}")
 			console.print("Try: flow list|run")
 
+	# ==================== Backtest Commands ====================
+	def do_backtest(self, args):
+		"""Manage backtests: run|purge <strategy_name> [start_date] [end_date]"""
+		args_str = str(args).strip() if args else ""
+
+		if not args_str:
+			table = Table(title="Backtest Management Commands", box=box.ROUNDED)
+			table.add_column("Command", style="cyan")
+			table.add_column("Description")
+			table.add_row("backtest run <strategy>", "Run backtest on most recent date")
+			table.add_row("backtest run <strategy> <start_date>", "Run backtest from start_date to today")
+			table.add_row("backtest run <strategy> <start_date> <end_date>", "Run backtest for date range (YYYY-MM-DD format)")
+			table.add_row("backtest purge <strategy>", "Delete all backtest folders, keep only most recent")
+			console.print(table)
+			return
+
+		parts = args_str.split()
+		cmd = parts[0] if parts else None
+
+		if cmd == "run":
+			if len(parts) < 2:
+				console.print("[red]✗[/red] Usage: backtest run <strategy_name> [start_date] [end_date]")
+				return
+
+			strategy = parts[1]
+			start_date = parts[2] if len(parts) > 2 else None
+			end_date = parts[3] if len(parts) > 3 else None
+
+			# Build flow command arguments (run backtest <strategy> [start_date] [end_date])
+			flow_args = f"run backtest {strategy}"
+			if start_date:
+				flow_args += f" {start_date}"
+			if end_date:
+				flow_args += f" {end_date}"
+
+			# Execute as flow command
+			self.do_flow(flow_args)
+
+		elif cmd == "purge":
+			if len(parts) < 2:
+				console.print("[red]✗[/red] Usage: backtest purge <strategy_name>")
+				return
+
+			strategy = parts[1]
+			self._purge_backtest_folders(strategy)
+
+		else:
+			console.print(f"[red]✗[/red] Unknown command: {cmd}")
+			console.print("Try: backtest run|purge")
+
+	def _purge_backtest_folders(self, strategy: str):
+		"""Delete all backtest folders for a strategy, keep only the most recent."""
+		import os
+		from pathlib import Path
+		from datetime import datetime
+
+		backtest_dir = Path.home() / ".cresus" / "db" / "backtests" / strategy
+
+		if not backtest_dir.exists():
+			console.print(f"[yellow]⚠[/yellow] No backtest folders found for strategy: {strategy}")
+			return
+
+		# Get all backtest folders
+		folders = sorted([
+			d for d in backtest_dir.iterdir()
+			if d.is_dir()
+		], key=lambda x: x.stat().st_mtime, reverse=True)
+
+		if not folders:
+			console.print(f"[yellow]⚠[/yellow] No backtest folders found for strategy: {strategy}")
+			return
+
+		if len(folders) == 1:
+			console.print(f"[yellow]⚠[/yellow] Only one backtest folder exists, nothing to purge")
+			return
+
+		# Keep the most recent, delete the rest
+		to_delete = folders[1:]
+		deleted_count = 0
+		total_size = 0
+
+		console.print(f"[cyan]Purging old backtest folders for strategy: {strategy}[/cyan]")
+		console.print(f"[cyan]Keeping: {folders[0].name}[/cyan]")
+		console.print()
+
+		for folder in to_delete:
+			try:
+				import shutil
+				size = sum(f.stat().st_size for f in folder.rglob("*") if f.is_file())
+				total_size += size
+				shutil.rmtree(folder)
+				console.print(f"[green]✓[/green] Deleted: {folder.name} ({size / 1024 / 1024:.1f} MB)")
+				deleted_count += 1
+			except Exception as e:
+				console.print(f"[red]✗[/red] Failed to delete {folder.name}: {e}")
+
+		console.print()
+		console.print(f"[green]✓ Purged {deleted_count} backtest folder(s), freed {total_size / 1024 / 1024:.1f} MB[/green]")
+
 	# ==================== Data Commands ====================
 	def do_data(self, args):
 		"""Manage historical and fundamental data: fetch|list|clear|stats|show [options]"""
@@ -741,6 +840,7 @@ class CresusCLI(cmd2.Cmd):
 		categories = {
 			"🔄 Workflows": {
 				"flow": "Execute workflows (premarket|backtest|signal)",
+				"backtest": "Manage backtests (run|purge)",
 			},
 			"📊 Portfolio": {
 				"watchlist": "View strategy watchlist",
