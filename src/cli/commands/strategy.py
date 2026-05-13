@@ -1,8 +1,9 @@
 """Strategy validation commands using unified validator."""
 
 import sys
+import yaml
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Tuple, List
 
 # Add src to path
 src_path = Path(__file__).parent.parent.parent
@@ -68,8 +69,12 @@ class StrategyCommands:
 		# Validate using unified validator
 		is_valid, validation_errors = self.validator.validate(strategy_data)
 
+		# Apply fixes if requested
+		if fix and validation_errors:
+			is_valid, validation_errors = self._apply_fixes(strategy_name, strategy_data, validation_errors)
+
 		# Display results
-		self._display_results(strategy_name, is_valid, validation_errors)
+		self._display_results(strategy_name, is_valid, validation_errors, fix)
 
 		return {
 			"status": "success" if is_valid else "error",
@@ -79,16 +84,20 @@ class StrategyCommands:
 			"validation_errors": validation_errors
 		}
 
-	def _display_results(self, strategy_name: str, is_valid: bool, validation_errors: list):
+	def _display_results(self, strategy_name: str, is_valid: bool, validation_errors: list, fixed: bool = False):
 		"""Display validation results.
 
 		Args:
 			strategy_name: Strategy name
 			is_valid: Whether validation passed
 			validation_errors: List of error messages
+			fixed: Whether issues were fixed
 		"""
 		if is_valid:
-			console.print("[bold green]✓ Strategy is valid and ready to use[/bold green]\n")
+			if fixed:
+				console.print("[bold green]✓ Strategy fixed and is now valid[/bold green]\n")
+			else:
+				console.print("[bold green]✓ Strategy is valid and ready to use[/bold green]\n")
 			return
 
 		# Display errors in table
@@ -102,6 +111,42 @@ class StrategyCommands:
 
 		console.print(issues_table)
 		console.print()
+
+	def _apply_fixes(self, strategy_name: str, strategy_data: Dict[str, Any], validation_errors: list) -> Tuple[bool, list]:
+		"""Apply automatic fixes to strategy configuration.
+
+		Args:
+			strategy_name: Name of the strategy
+			strategy_data: Strategy configuration data
+			validation_errors: List of validation errors
+
+		Returns:
+			Tuple of (is_valid, remaining_errors)
+		"""
+		# Check if engine is missing and add it
+		if "Missing required key: engine" in validation_errors:
+			console.print("[cyan]→ Adding missing engine field (TaModel)...[/cyan]")
+			strategy_data["engine"] = "TaModel"
+			validation_errors.remove("Missing required key: engine")
+
+		# Save the updated strategy file
+		try:
+			strategies_dir = Path.home() / ".cresus" / "db" / "strategies"
+			strategy_file = strategies_dir / f"{strategy_name}.yml"
+
+			with open(strategy_file, 'w') as f:
+				yaml.dump(strategy_data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+
+			console.print(f"[green]✓ Strategy updated: {strategy_file}[/green]\n")
+
+			# Re-validate after fixes
+			is_valid, remaining_errors = self.validator.validate(strategy_data)
+			return is_valid, remaining_errors
+
+		except Exception as e:
+			console.print(f"[red]✗ Error saving strategy: {e}[/red]\n")
+			validation_errors.insert(0, f"Failed to save strategy: {str(e)}")
+			return False, validation_errors
 
 	def _show_template(self):
 		"""Display the strategy template."""
