@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { useBacktestRun, useBacktestDistribution } from '@/hooks/usePortfolio'
 import { useBacktestWebSocket } from '@/hooks/useBacktestWebSocket'
+import TradingChart from '@/components/TradingChart'
 
 export default function BacktestDetail() {
   const { strategy, runId, tab: tabParam } = useParams<{ strategy: string; runId: string; tab?: string }>()
@@ -24,9 +25,11 @@ export default function BacktestDetail() {
 
   // Tab state - read from URL path param
   const [activeTab, setActiveTab] = useState<'performance' | 'distribution' | 'trades' | 'transactions'>('performance')
-  const [transactionSort, setTransactionSort] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'created_at', direction: 'desc' })
+  const [transactionSort, setTransactionSort] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'entry_date', direction: 'desc' })
   const [selectedPosition, setSelectedPosition] = useState<any>(null)
   const [selectedDistributionBin, setSelectedDistributionBin] = useState<any>(null)
+  const [tickerNames, setTickerNames] = useState<{ [key: string]: string }>({})
+  const [chartPosition, setChartPosition] = useState<any>(null)
 
   useEffect(() => {
     if (tabParam && ['performance', 'distribution', 'trades', 'transactions'].includes(tabParam)) {
@@ -134,6 +137,32 @@ export default function BacktestDetail() {
   // response has { status, data }, we need the inner data object
   const backtest = response?.data
   const hasData = backtest && (backtest.equity_curve?.length > 0 || Object.keys(backtest.portfolio_metrics || {}).length > 0)
+
+  // Fetch ticker names from distribution data
+  useEffect(() => {
+    if (distributionResponse?.data?.trades) {
+      const uniqueTickers = new Set<string>()
+      distributionResponse.data.trades.forEach((trade: any) => {
+        uniqueTickers.add(trade.ticker)
+      })
+
+      const names: { [key: string]: string } = {}
+      uniqueTickers.forEach(ticker => {
+        // Try to extract company name from metadata if available, otherwise use ticker
+        const trade = distributionResponse.data.trades.find((t: any) => t.ticker === ticker)
+        if (trade?.entry_metadata) {
+          try {
+            const metadata = typeof trade.entry_metadata === 'string' ? JSON.parse(trade.entry_metadata) : trade.entry_metadata
+            // For now, just use the ticker as the name, but this can be enhanced with actual company names
+            names[ticker] = ticker
+          } catch {
+            names[ticker] = ticker
+          }
+        }
+      })
+      setTickerNames(names)
+    }
+  }, [distributionResponse])
 
   // Debug logging
   useEffect(() => {
@@ -857,6 +886,7 @@ export default function BacktestDetail() {
                                 <th className="text-left py-2 px-2 cursor-pointer hover:text-slate-400" onClick={() => setTransactionSort({ key: 'ticker', direction: transactionSort.key === 'ticker' && transactionSort.direction === 'desc' ? 'asc' : 'desc' })}>
                                   Ticker {transactionSort.key === 'ticker' && (transactionSort.direction === 'desc' ? '↓' : '↑')}
                                 </th>
+                                <th className="text-left py-2 px-2">Name</th>
                                 <th className="text-right py-2 px-2 cursor-pointer hover:text-slate-400" onClick={() => setTransactionSort({ key: 'quantity', direction: transactionSort.key === 'quantity' && transactionSort.direction === 'desc' ? 'asc' : 'desc' })}>
                                   Qty {transactionSort.key === 'quantity' && (transactionSort.direction === 'desc' ? '↓' : '↑')}
                                 </th>
@@ -884,9 +914,26 @@ export default function BacktestDetail() {
                                   let aVal: any = a[transactionSort.key]
                                   let bVal: any = b[transactionSort.key]
 
-                                  if (transactionSort.key === 'entry_date' || transactionSort.key === 'exit_date') {
-                                    aVal = new Date(aVal).getTime()
-                                    bVal = new Date(bVal).getTime()
+                                  if (transactionSort.key === 'entry_date') {
+                                    try {
+                                      const aMetadata = typeof a.entry_metadata === 'string' ? JSON.parse(a.entry_metadata) : a.entry_metadata
+                                      const bMetadata = typeof b.entry_metadata === 'string' ? JSON.parse(b.entry_metadata) : b.entry_metadata
+                                      aVal = new Date(aMetadata?.timestamp || a.entry_date).getTime()
+                                      bVal = new Date(bMetadata?.timestamp || b.entry_date).getTime()
+                                    } catch {
+                                      aVal = new Date(aVal).getTime()
+                                      bVal = new Date(bVal).getTime()
+                                    }
+                                  } else if (transactionSort.key === 'exit_date') {
+                                    try {
+                                      const aMetadata = typeof a.exit_metadata === 'string' ? JSON.parse(a.exit_metadata) : a.exit_metadata
+                                      const bMetadata = typeof b.exit_metadata === 'string' ? JSON.parse(b.exit_metadata) : b.exit_metadata
+                                      aVal = new Date(aMetadata?.timestamp || a.exit_date).getTime()
+                                      bVal = new Date(bMetadata?.timestamp || b.exit_date).getTime()
+                                    } catch {
+                                      aVal = new Date(aVal).getTime()
+                                      bVal = new Date(bVal).getTime()
+                                    }
                                   } else if (typeof aVal === 'string') {
                                     aVal = aVal.toLowerCase()
                                     bVal = bVal.toLowerCase()
@@ -902,12 +949,27 @@ export default function BacktestDetail() {
                                 return filteredPositions.length > 0 ? filteredPositions.map((pos: any) => (
                                   <tr key={pos.sortKey} onClick={() => setSelectedPosition(pos)} className={`border-b border-slate-800 cursor-pointer transition ${selectedPosition?.sortKey === pos.sortKey ? 'bg-purple-600/20' : 'hover:bg-slate-800/30'}`}>
                                     <td className="py-2 px-2 text-slate-400">
-                                      {new Date(pos.entry_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
+                                      {(() => {
+                                        try {
+                                          const entryMeta = typeof pos.entry_metadata === 'string' ? JSON.parse(pos.entry_metadata) : pos.entry_metadata
+                                          return new Date(entryMeta.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
+                                        } catch {
+                                          return pos.entry_date ? new Date(pos.entry_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : '-'
+                                        }
+                                      })()}
                                     </td>
                                     <td className="py-2 px-2 text-slate-400">
-                                      {new Date(pos.exit_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
+                                      {(() => {
+                                        try {
+                                          const exitMeta = typeof pos.exit_metadata === 'string' ? JSON.parse(pos.exit_metadata) : pos.exit_metadata
+                                          return new Date(exitMeta.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
+                                        } catch {
+                                          return pos.exit_date ? new Date(pos.exit_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : '-'
+                                        }
+                                      })()}
                                     </td>
                                     <td className="py-2 px-2 text-white font-medium">{pos.ticker}</td>
+                                    <td className="py-2 px-2 text-slate-400 text-sm">{tickerNames[pos.ticker] || '—'}</td>
                                     <td className="py-2 px-2 text-right text-white">{pos.quantity}</td>
                                     <td className="py-2 px-2 text-right text-slate-400">${pos.entry_price.toFixed(2)}</td>
                                     <td className="py-2 px-2 text-right text-slate-400">${pos.exit_price.toFixed(2)}</td>
@@ -918,6 +980,18 @@ export default function BacktestDetail() {
                                       {pos.return_pct.toFixed(2)}%
                                     </td>
                                     <td className="py-2 px-2 text-left text-slate-300">{pos.close_reason}</td>
+                                    <td className="py-2 px-2 text-center">
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          setChartPosition(pos)
+                                        }}
+                                        className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition whitespace-nowrap"
+                                        title="View price chart"
+                                      >
+                                        Chart
+                                      </button>
+                                    </td>
                                   </tr>
                                 )) : (
                                   <tr>
@@ -953,11 +1027,12 @@ export default function BacktestDetail() {
                     )
                   })()}
                 </div>
+              </div>
 
               {/* Detail Panel - Right Side (3 cols) */}
               {selectedPosition && (
-                <div className="col-span-3">
-                  <div className="bg-slate-900/50 rounded-lg p-6 border border-slate-800 shadow-lg sticky top-0">
+                <div className="col-span-3 h-fit sticky top-6">
+                  <div className="bg-slate-900/50 rounded-lg p-6 border border-slate-800 shadow-lg">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-sm font-bold text-white">POSITION INDICATORS</h3>
                       <button onClick={() => setSelectedPosition(null)} className="text-slate-500 hover:text-slate-300 text-lg">✕</button>
@@ -1058,13 +1133,80 @@ export default function BacktestDetail() {
                 </div>
               )}
             </div>
-            </div>
           ) : (
             <div className="bg-slate-900/50 rounded-lg p-6 border border-slate-800 text-center text-slate-400">
               No positions available
             </div>
           )}
         </>
+      )}
+
+      {/* Chart Overlay Modal */}
+      {chartPosition && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 rounded-lg border border-slate-800 w-full max-w-6xl h-screen max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
+              <div>
+                <h2 className="text-2xl font-bold text-white">
+                  {chartPosition.ticker} - Entry @ ${chartPosition.entry_price.toFixed(2)} | Exit @ ${chartPosition.exit_price.toFixed(2)}
+                </h2>
+                <p className="text-slate-400 text-sm mt-1">
+                  {(() => {
+                    try {
+                      const entryMeta = typeof chartPosition.entry_metadata === 'string' ? JSON.parse(chartPosition.entry_metadata) : chartPosition.entry_metadata
+                      const exitMeta = typeof chartPosition.exit_metadata === 'string' ? JSON.parse(chartPosition.exit_metadata) : chartPosition.exit_metadata
+                      const entryDate = new Date(entryMeta?.timestamp || chartPosition.entry_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                      const exitDate = new Date(exitMeta?.timestamp || chartPosition.exit_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                      return `${entryDate} → ${exitDate}`
+                    } catch {
+                      return 'Position period'
+                    }
+                  })()}
+                </p>
+              </div>
+              <button
+                onClick={() => setChartPosition(null)}
+                className="text-slate-400 hover:text-white transition text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Chart Container */}
+            <div className="flex-1 overflow-hidden">
+              <TradingChart timeframe="1M" title={`${chartPosition.ticker} - Position Analysis`} />
+            </div>
+
+            {/* Position Details */}
+            <div className="px-6 py-4 border-t border-slate-800 bg-slate-800/30 grid grid-cols-6 gap-4 text-sm">
+              <div>
+                <p className="text-slate-400 text-xs mb-1">Quantity</p>
+                <p className="text-white font-medium">{chartPosition.quantity}</p>
+              </div>
+              <div>
+                <p className="text-slate-400 text-xs mb-1">Entry Price</p>
+                <p className="text-white font-medium">${chartPosition.entry_price.toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-slate-400 text-xs mb-1">Exit Price</p>
+                <p className="text-white font-medium">${chartPosition.exit_price.toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-slate-400 text-xs mb-1">P&L</p>
+                <p className={`font-medium ${chartPosition.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>${chartPosition.pnl.toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-slate-400 text-xs mb-1">Return</p>
+                <p className={`font-medium ${chartPosition.return_pct >= 0 ? 'text-green-400' : 'text-red-400'}`}>{chartPosition.return_pct.toFixed(2)}%</p>
+              </div>
+              <div>
+                <p className="text-slate-400 text-xs mb-1">Close Reason</p>
+                <p className="text-white font-medium text-xs">{chartPosition.close_reason}</p>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

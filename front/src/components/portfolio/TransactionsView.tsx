@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '@/services/api'
+import TradingChart from '@/components/TradingChart'
 
 interface TransactionsViewProps {
   name: string
@@ -29,6 +30,7 @@ export default function TransactionsView({ name, filterTicker }: TransactionsVie
   const [editData, setEditData] = useState<any>(null)
   const [isUpdating, setIsUpdating] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [chartTransaction, setChartTransaction] = useState<Transaction | null>(null)
 
   const itemsPerPage = 10
 
@@ -233,7 +235,14 @@ export default function TransactionsView({ name, filterTicker }: TransactionsVie
                             </button>
                           </div>
                         ) : (
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 items-center">
+                            <button
+                              onClick={() => setChartTransaction(tx)}
+                              className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition whitespace-nowrap"
+                              title="View price chart"
+                            >
+                              Chart
+                            </button>
                             <button
                               onClick={() => handleEdit(tx)}
                               className="text-blue-400 hover:text-blue-300 transition text-sm"
@@ -316,6 +325,62 @@ export default function TransactionsView({ name, filterTicker }: TransactionsVie
               >
                 Delete
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Chart Overlay Modal */}
+      {chartTransaction && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 rounded-lg border border-slate-800 w-full max-w-6xl h-screen max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
+              <div>
+                <h2 className="text-2xl font-bold text-white">
+                  {chartTransaction.ticker} - {chartTransaction.operation} @ €{chartTransaction.price.toFixed(2)}
+                </h2>
+                <p className="text-slate-400 text-sm mt-1">
+                  {new Date(chartTransaction.created_at).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </p>
+              </div>
+              <button
+                onClick={() => setChartTransaction(null)}
+                className="text-slate-400 hover:text-white transition text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Chart Container */}
+            <div className="flex-1 overflow-hidden">
+              <TradingChart timeframe="1M" title={`${chartTransaction.ticker} - Transaction Analysis`} />
+            </div>
+
+            {/* Transaction Details */}
+            <div className="px-6 py-4 border-t border-slate-800 bg-slate-800/30 grid grid-cols-4 gap-4 text-sm">
+              <div>
+                <p className="text-slate-400 text-xs mb-1">Quantity</p>
+                <p className="text-white font-medium">{chartTransaction.quantity}</p>
+              </div>
+              <div>
+                <p className="text-slate-400 text-xs mb-1">Price</p>
+                <p className="text-white font-medium">€{chartTransaction.price.toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-slate-400 text-xs mb-1">Amount</p>
+                <p className="text-white font-medium">€{chartTransaction.amount.toLocaleString('de-DE', { maximumFractionDigits: 2 })}</p>
+              </div>
+              <div>
+                <p className="text-slate-400 text-xs mb-1">Fees</p>
+                <p className="text-orange-400 font-medium">€{chartTransaction.fees.toFixed(2)}</p>
+              </div>
             </div>
           </div>
         </div>

@@ -12,6 +12,7 @@ import BacktestBuilder from '@/pages/BacktestBuilder'
 import BacktestRunning from '@/pages/BacktestRunning'
 import BacktestDetail from '@/pages/BacktestDetail'
 import BacktestComparator from '@/pages/BacktestComparator'
+import Chart from '@/pages/Chart'
 
 export default function App() {
   return (
@@ -33,6 +34,7 @@ export default function App() {
           <Route path="/backtests/running" element={<BacktestRunning />} />
           <Route path="/backtests/compare" element={<Layout><BacktestComparator /></Layout>} />
           <Route path="/backtests/:strategy/:runId/:tab?" element={<Layout><BacktestDetail /></Layout>} />
+          <Route path="/chart" element={<Layout><Chart /></Layout>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

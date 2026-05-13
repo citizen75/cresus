@@ -11,6 +11,7 @@ const menuItems = [
   { icon: '🔍', label: 'Explore', path: '#' },
   { icon: '🔖', label: 'Watchlist', path: '#' },
   { icon: '⚡', label: 'Backtest', path: '/backtests' },
+  { icon: '📈', label: 'Chart', path: '/chart' },
   { icon: '🔔', label: 'Alerts', path: '#' },
   { icon: '⚙️', label: 'Settings', path: '#' },
 ]
