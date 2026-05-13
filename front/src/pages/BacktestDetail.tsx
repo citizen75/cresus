@@ -146,21 +146,23 @@ export default function BacktestDetail() {
         uniqueTickers.add(trade.ticker)
       })
 
-      const names: { [key: string]: string } = {}
-      uniqueTickers.forEach(ticker => {
-        // Try to extract company name from metadata if available, otherwise use ticker
-        const trade = distributionResponse.data.trades.find((t: any) => t.ticker === ticker)
-        if (trade?.entry_metadata) {
+      const fetchCompanyNames = async () => {
+        const names: { [key: string]: string } = {}
+
+        for (const ticker of uniqueTickers) {
           try {
-            const metadata = typeof trade.entry_metadata === 'string' ? JSON.parse(trade.entry_metadata) : trade.entry_metadata
-            // For now, just use the ticker as the name, but this can be enhanced with actual company names
-            names[ticker] = ticker
-          } catch {
+            const response = await api.getFundamental(ticker)
+            names[ticker] = response.name || ticker
+          } catch (err) {
+            console.error(`Failed to fetch name for ${ticker}:`, err)
             names[ticker] = ticker
           }
         }
-      })
-      setTickerNames(names)
+
+        setTickerNames(names)
+      }
+
+      fetchCompanyNames()
     }
   }, [distributionResponse])
 
