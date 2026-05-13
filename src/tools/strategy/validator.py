@@ -7,15 +7,17 @@ from typing import Dict, List, Any, Tuple
 
 
 class StrategyValidator:
-	"""Validate strategy configurations."""
+	"""Validate strategy configurations.
 
-	REQUIRED_TOP_LEVEL_KEYS = ["name", "description", "engine"]
-	VALID_ENGINES = ["TaModel", "LightGbmModel", "AnomalyModel"]
-	REQUIRED_SECTIONS = ["entry", "exit"]
-	OPTIONAL_SECTIONS = ["watchlist", "signals", "order", "backtest"]
+	Uses template as source of truth for required structure.
+	No hardcoded field definitions - all structure comes from template.
+	"""
 
 	def validate(self, strategy_config: Dict[str, Any]) -> Tuple[bool, List[str]]:
-		"""Validate strategy configuration.
+		"""Validate strategy configuration structure.
+
+		Basic structural validation. For full validation including template compliance,
+		use StrategyManager.validate_against_template() which uses template as source of truth.
 
 		Args:
 			strategy_config: Strategy configuration dictionary
@@ -25,125 +27,27 @@ class StrategyValidator:
 		"""
 		errors = []
 
-		# Check required top-level keys
-		for key in self.REQUIRED_TOP_LEVEL_KEYS:
-			if key not in strategy_config:
-				errors.append(f"Missing required key: {key}")
+		# Basic validation: ensure it's a dict
+		if not isinstance(strategy_config, dict):
+			errors.append("Strategy configuration must be a dictionary")
+			return False, errors
 
-		# Check engine is valid
-		if "engine" in strategy_config:
-			engine = strategy_config.get("engine")
-			if engine not in self.VALID_ENGINES:
-				errors.append(
-					f"Invalid engine '{engine}'. Must be one of: {', '.join(self.VALID_ENGINES)}"
-				)
+		# Check basic required fields that every strategy needs
+		if not strategy_config.get("name"):
+			errors.append("Missing required field: name")
 
-		# Check required sections
-		for section in self.REQUIRED_SECTIONS:
-			if section not in strategy_config:
-				errors.append(f"Missing required section: {section}")
-			elif not isinstance(strategy_config.get(section), dict):
-				errors.append(f"Section '{section}' must be a dictionary")
+		if not strategy_config.get("description"):
+			errors.append("Missing required field: description")
 
-		# Validate entry section
-		if "entry" in strategy_config:
-			entry_errors = self._validate_entry_section(strategy_config.get("entry", {}))
-			errors.extend(entry_errors)
-
-		# Validate exit section
-		if "exit" in strategy_config:
-			exit_errors = self._validate_exit_section(strategy_config.get("exit", {}))
-			errors.extend(exit_errors)
-
-		# Validate indicators exist if referenced
+		# Validate indicators if present
 		indicator_errors = self._validate_indicators(strategy_config)
 		errors.extend(indicator_errors)
 
 		return len(errors) == 0, errors
 
-	def _validate_entry_section(self, entry_config: Dict[str, Any]) -> List[str]:
-		"""Validate entry section.
-
-		Args:
-			entry_config: Entry configuration
-
-		Returns:
-			List of error messages
-		"""
-		errors = []
-
-		if not isinstance(entry_config, dict):
-			return ["entry section must be a dictionary"]
-
-		# Check if enabled and has parameters
-		if entry_config.get("enabled"):
-			params = entry_config.get("parameters", {})
-			if not isinstance(params, dict):
-				errors.append("entry.parameters must be a dictionary")
-				return errors
-
-			# Check required parameters
-			required_params = ["position_size", "order_type", "entry_filter"]
-			for param in required_params:
-				if param not in params:
-					errors.append(f"entry.parameters missing required parameter: {param}")
-				else:
-					param_val = params[param]
-					if isinstance(param_val, dict) and "formula" not in param_val:
-						errors.append(
-							f"entry.parameters.{param} missing 'formula' key"
-						)
-
-		return errors
-
-	def _validate_exit_section(self, exit_config: Dict[str, Any]) -> List[str]:
-		"""Validate exit section.
-
-		Args:
-			exit_config: Exit configuration
-
-		Returns:
-			List of error messages
-		"""
-		errors = []
-
-		if not isinstance(exit_config, dict):
-			return ["exit section must be a dictionary"]
-
-		# Check if enabled and has parameters
-		if exit_config.get("enabled"):
-			params = exit_config.get("parameters", {})
-			if not isinstance(params, dict):
-				errors.append("exit.parameters must be a dictionary")
-				return errors
-
-			# Check required parameters
-			required_params = ["stop", "take_profit"]
-			for param in required_params:
-				if param not in params:
-					errors.append(f"exit.parameters missing required parameter: {param}")
-				else:
-					param_val = params[param]
-					if isinstance(param_val, dict):
-						# For stop parameter, check for 'type' and 'formula'
-						if param == "stop":
-							if "type" not in param_val:
-								errors.append(
-									f"exit.parameters.{param} missing 'type' key (should be 'fix' or 'trailing')"
-								)
-							if "formula" not in param_val:
-								errors.append(
-									f"exit.parameters.{param} missing 'formula' key"
-								)
-						elif "formula" not in param_val:
-							errors.append(
-								f"exit.parameters.{param} missing 'formula' key"
-							)
-
-		return errors
 
 	def _validate_indicators(self, strategy_config: Dict[str, Any]) -> List[str]:
-		"""Validate that referenced indicators are defined.
+		"""Validate indicator list if present.
 
 		Args:
 			strategy_config: Strategy configuration
@@ -153,9 +57,9 @@ class StrategyValidator:
 		"""
 		errors = []
 
-		indicators = strategy_config.get("indicators", [])
-		if not indicators:
-			errors.append("No indicators defined. At least one indicator is required.")
+		indicators = strategy_config.get("indicators")
+		if indicators is None:
+			# Indicators not defined - will be caught by template validation
 			return errors
 
 		if not isinstance(indicators, list):
