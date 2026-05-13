@@ -5,6 +5,7 @@ import { api } from '@/services/api'
 import { useBacktestRun, useBacktestDistribution } from '@/hooks/usePortfolio'
 import { useBacktestWebSocket } from '@/hooks/useBacktestWebSocket'
 import TradingChart from '@/components/TradingChart'
+import CardChart from '@/components/CardChart'
 
 export default function BacktestDetail() {
   const { strategy, runId, tab: tabParam } = useParams<{ strategy: string; runId: string; tab?: string }>()
@@ -38,6 +39,7 @@ export default function BacktestDetail() {
   const [watchlistSearch, setWatchlistSearch] = useState('')
   const [watchlistSortBy, setWatchlistSortBy] = useState('Score')
   const [watchlistCurrentPage, setWatchlistCurrentPage] = useState(1)
+  const [watchlistHistorical, setWatchlistHistorical] = useState<{ [ticker: string]: any[] }>({})
 
   useEffect(() => {
     if (tabParam && ['performance', 'distribution', 'transactions', 'watchlist'].includes(tabParam)) {
@@ -90,6 +92,38 @@ export default function BacktestDetail() {
       loadWatchlist()
     }
   }, [activeTab, strategy, runId])
+
+  // Load historical data for watchlist charts
+  useEffect(() => {
+    if (watchlist.length === 0) return
+
+    const loadHistoricalData = async () => {
+      const historicalData: { [ticker: string]: any[] } = {}
+
+      for (const item of watchlist) {
+        try {
+          const response = await fetch(`/api/v1/data/history/${item.ticker}?days=90`)
+          if (response.ok) {
+            const data = await response.json()
+            if (data.data && Array.isArray(data.data)) {
+              historicalData[item.ticker] = data.data.map((point: any) => ({
+                date: point.date || new Date(point.timestamp).toISOString().split('T')[0],
+                close: point.close,
+                ema_20: point.ema_20,
+                ema_50: point.ema_50,
+              }))
+            }
+          }
+        } catch (err) {
+          console.warn(`Failed to load historical data for ${item.ticker}:`, err)
+        }
+      }
+
+      setWatchlistHistorical(historicalData)
+    }
+
+    loadHistoricalData()
+  }, [watchlist])
 
   // WebSocket connection for real-time updates
   const { isConnected, lastMessage } = useBacktestWebSocket({
@@ -1423,6 +1457,18 @@ export default function BacktestDetail() {
                               </div>
                             </div>
                           </div>
+
+                          {/* Chart */}
+                          {watchlistHistorical[item.ticker] && watchlistHistorical[item.ticker].length > 0 ? (
+                            <CardChart
+                              data={watchlistHistorical[item.ticker]}
+                              ticker={item.ticker}
+                            />
+                          ) : (
+                            <div className="p-4 h-48 bg-slate-800/20 flex items-center justify-center">
+                              <p className="text-slate-400 text-sm">Loading chart...</p>
+                            </div>
+                          )}
 
                           {/* Card Body */}
                           <div className="p-4 space-y-3">
