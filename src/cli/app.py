@@ -706,22 +706,44 @@ class CresusCLI(cmd2.Cmd):
 	# ==================== Strategy Commands ====================
 	def do_strategy(self, args):
 		"""Manage and validate strategies.
-		
+
 		Usage:
-		  strategy check <strategy_name> [--fix]    Check strategy configuration and optionally fix issues
-		
+		  strategy list                              List all available strategies
+		  strategy show <strategy_name>              Display strategy configuration (no wrapped lines)
+		  strategy check <strategy_name> [--fix]     Check strategy configuration and optionally fix issues
+
 		Examples:
+		  strategy list
+		  strategy show etf_pea_trend
 		  strategy check single_etf
 		  strategy check single_etf --fix
 		"""
 		if not args:
-			console.print("[yellow]Usage: strategy check <strategy_name> [--fix][/yellow]")
+			table = Table(title="Strategy Management Commands", box=box.ROUNDED)
+			table.add_column("Command", style="cyan")
+			table.add_column("Description")
+			table.add_row("strategy list", "List all available strategies")
+			table.add_row("strategy show <strategy>", "Display strategy configuration (no wrapped lines)")
+			table.add_row("strategy check <strategy> [--fix]", "Check and optionally fix strategy configuration")
+			console.print(table)
 			return
 
 		parts = args.split()
 		command = parts[0] if parts else None
 
-		if command == "check":
+		if command == "list":
+			self._list_strategies()
+
+		elif command == "show":
+			if len(parts) < 2:
+				console.print("[red]✗ Error: strategy_name required[/red]")
+				console.print("[yellow]Usage: strategy show <strategy_name>[/yellow]")
+				return
+
+			strategy_name = parts[1]
+			self._show_strategy(strategy_name)
+
+		elif command == "check":
 			if len(parts) < 2:
 				console.print("[red]Error: strategy_name required[/red]")
 				console.print("[yellow]Usage: strategy check <strategy_name> [--fix][/yellow]")
@@ -737,8 +759,76 @@ class CresusCLI(cmd2.Cmd):
 			except Exception as e:
 				console.print(f"[red]Error: {e}[/red]")
 		else:
-			console.print("[red]Unknown strategy command[/red]")
-			console.print("[yellow]Available commands: check[/yellow]")
+			console.print("[red]✗ Unknown strategy command[/red]")
+			console.print("[yellow]Available commands: list, show, check[/yellow]")
+
+	def _list_strategies(self):
+		"""List all available strategies."""
+		from pathlib import Path
+		import yaml
+
+		strategies_dir = Path.home() / ".cresus" / "db" / "strategies"
+
+		if not strategies_dir.exists():
+			console.print("[yellow]⚠ No strategies found[/yellow]")
+			return
+
+		strategy_files = sorted(strategies_dir.glob("*.yml"))
+
+		if not strategy_files:
+			console.print("[yellow]⚠ No strategies found[/yellow]")
+			return
+
+		table = Table(title=f"Strategies ({len(strategy_files)})", box=box.ROUNDED)
+		table.add_column("Strategy", style="cyan")
+		table.add_column("Engine")
+		table.add_column("Universe")
+		table.add_column("Description")
+
+		for strategy_file in strategy_files:
+			try:
+				with open(strategy_file, 'r') as f:
+					config = yaml.safe_load(f)
+
+				name = config.get("name", strategy_file.stem)
+				engine = config.get("engine", "N/A")
+				universe = config.get("universe", "N/A")
+				description = config.get("description", "")[:60]
+
+				table.add_row(name, engine, universe, description)
+			except Exception as e:
+				console.print(f"[yellow]⚠ Error reading {strategy_file.name}: {e}[/yellow]")
+
+		console.print(table)
+
+	def _show_strategy(self, strategy_name: str):
+		"""Display strategy configuration without line wrapping."""
+		from pathlib import Path
+		import sys
+
+		strategies_dir = Path.home() / ".cresus" / "db" / "strategies"
+		strategy_file = strategies_dir / f"{strategy_name}.yml"
+
+		if not strategy_file.exists():
+			console.print(f"[red]✗ Strategy not found: {strategy_name}[/red]")
+			return
+
+		try:
+			with open(strategy_file, 'r') as f:
+				content = f.read()
+
+			# Print header with formatting
+			console.print(f"\n[bold cyan]{strategy_name} Strategy Configuration[/bold cyan]")
+			console.print("─" * 100)
+
+			# Print raw YAML to stdout without rich formatting to avoid line wrapping
+			print(content)
+
+			# Print footer
+			console.print("─" * 100)
+
+		except Exception as e:
+			console.print(f"[red]✗ Error reading strategy: {e}[/red]")
 
 	# ==================== Info Commands ====================
 	def do_status(self, _):
