@@ -737,72 +737,58 @@ class CresusCLI(cmd2.Cmd):
 			super().do_help(args)
 			return
 
-		# Define command categories with descriptions
+		# Define command categories with short descriptions
 		categories = {
 			"🔄 Workflows": {
-				"flow": "Execute workflows (run premarket|backtest|signal, show results)",
+				"flow": "Execute workflows (premarket|backtest|signal)",
 			},
-			"📊 Portfolio & Watchlist": {
-				"watchlist": "View strategy watchlist (e.g., watchlist show momentum_cac)",
-				"orders": "View pending/executed orders (e.g., orders list momentum_cac)",
+			"📊 Portfolio": {
+				"watchlist": "View strategy watchlist",
+				"orders": "View pending/executed orders",
 			},
-			"💾 Data Management": {
-				"data": "Manage portfolio data and cache",
-				"universe": "Manage universes (list|info cac40, add|del <universe>)",
-				"blacklist": "Manage blacklist (list|add|del MOEX)",
+			"💾 Data": {
+				"data": "Manage data cache",
+				"universe": "Manage universes",
+				"blacklist": "Manage blacklist",
 			},
 			"📈 Strategy": {
-				"strategy": "Validate and manage strategies (check|calc|train|predict)",
+				"strategy": "Validate strategies (check|calc|train|predict)",
 			},
-			"⚙️  System & Services": {
-				"service": "Manage services (start|stop|status|logs api|mcp|front|all)",
-				"cron": "View scheduled cron jobs and next run times",
-				"update": "Update cresus from git",
+			"⚙️  System": {
+				"service": "Manage services (api|mcp|front|all)",
+				"cron": "View scheduled jobs",
+				"update": "Update cresus",
 				"status": "Show system status",
 			},
 			"🛠️  Utility": {
-				"init": "Initialize ~/.cresus directory structure",
-				"info": "Display system information",
-				"history": "View command history (history [clear] [num_lines])",
+				"init": "Initialize ~/.cresus",
+				"info": "System information",
+				"history": "Command history",
 				"clear": "Clear screen",
-				"motd": "Show message of the day",
-				"pwd": "Print working directory",
-				"quit": "Exit the CLI",
+				"motd": "Message of the day",
+				"pwd": "Working directory",
+				"quit": "Exit CLI",
 			},
 		}
 
-		# Print header
-		header = Panel(
-			Text("Cresus CLI Commands", justify="center", style="bold cyan"),
-			style="cyan",
-			box=box.ROUNDED,
-			expand=False
-		)
-		console.print(header)
+		# Print as compact organized table
+		console.print("[bold cyan]Cresus CLI Commands[/bold cyan]")
+		console.print()
 
-		# Print categories
+		# Print each category compactly
 		for category, commands in categories.items():
-			category_panel = Panel(
-				Text(category, style="bold magenta"),
-				style="magenta",
-				expand=False,
-				padding=(0, 1)
-			)
-			console.print(category_panel)
+			console.print(f"[bold magenta]{category}[/bold magenta]")
 
-			table = Table(box=box.SIMPLE, show_header=False)
-			table.add_column(style="cyan", width=16)
+			table = Table(box=None, show_header=False, padding=(0, 0))
+			table.add_column(style="cyan", width=14)
 			table.add_column(style="white")
 
 			for cmd, desc in commands.items():
 				table.add_row(f"  {cmd}", desc)
 
 			console.print(table)
-			console.print()
 
-		# Print footer
-		footer = Text("Use 'help <command>' for more details on a specific command", style="dim")
-		console.print(footer)
+		console.print(f"[dim]Use 'help <cmd>' for details[/dim]")
 
 	def do_quit(self, _):
 		"""Exit the CLI."""
