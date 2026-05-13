@@ -102,16 +102,20 @@ export default function BacktestDetail() {
 
       for (const item of watchlist) {
         try {
-          const response = await fetch(`/api/v1/data/history/${item.ticker}?days=90`)
+          // Load 120 days to ensure EMAs are calculated for the full 90-day display range
+          const response = await fetch(`/api/v1/data/history/${item.ticker}?days=120`)
           if (response.ok) {
             const data = await response.json()
             if (data.data && Array.isArray(data.data)) {
-              historicalData[item.ticker] = data.data.map((point: any) => ({
+              const allData = data.data.map((point: any) => ({
                 date: point.date || new Date(point.timestamp).toISOString().split('T')[0],
                 close: point.close,
                 ema_20: point.ema_20,
                 ema_50: point.ema_50,
               }))
+
+              // Take the last 90 days for display
+              historicalData[item.ticker] = allData.slice(-90)
             }
           }
         } catch (err) {
