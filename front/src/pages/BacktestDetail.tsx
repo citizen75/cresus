@@ -1465,26 +1465,31 @@ export default function BacktestDetail() {
                         <div key={item.ticker} className="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden hover:border-purple-600/50 transition">
                           {/* Card Header */}
                           <div className="bg-slate-800/50 border-b border-slate-800 p-4">
-                            <div className="flex items-start justify-between mb-3">
-                              <div>
+                            <div className="flex items-start justify-between mb-4">
+                              <div className="flex-1">
                                 <p className="text-white font-bold text-lg">{item.ticker}</p>
-                                <p className="text-slate-400 text-xs">{item.signals || 'No signals'}</p>
+                                <p className="text-slate-400 text-xs mt-0.5">{item.signals || 'No signals'}</p>
                               </div>
-                              <div className="text-right">
-                                <p className="text-2xl font-bold text-purple-400">{(item.signal_score || 0).toFixed(2)}</p>
-                                <p className="text-slate-400 text-xs">Score</p>
-                                {watchlistHistorical[item.ticker] && watchlistHistorical[item.ticker].length > 0 && (() => {
-                                  const data = watchlistHistorical[item.ticker]
-                                  const firstPrice = data[0]?.close || 0
-                                  const lastPrice = data[data.length - 1]?.close || 0
-                                  const variation = firstPrice !== 0 ? ((lastPrice - firstPrice) / firstPrice) * 100 : 0
-                                  const isPositive = variation >= 0
-                                  return (
-                                    <div className={`mt-1 text-xs font-bold ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
-                                      {isPositive ? '↗' : '↘'} {isPositive ? '+' : ''}{variation.toFixed(2)}%
-                                    </div>
-                                  )
-                                })()}
+                              <div className="text-right ml-2">
+                                <div className="flex flex-col items-end gap-1">
+                                  <div>
+                                    <p className="text-3xl font-bold text-purple-400">{(item.signal_score || 0).toFixed(2)}</p>
+                                    <p className="text-slate-400 text-xs -mt-1">Score</p>
+                                  </div>
+                                  {watchlistHistorical[item.ticker] && watchlistHistorical[item.ticker].length > 0 && (() => {
+                                    const data = watchlistHistorical[item.ticker]
+                                    const firstPrice = data[0]?.close || 0
+                                    const lastPrice = data[data.length - 1]?.close || 0
+                                    const variation = firstPrice !== 0 ? ((lastPrice - firstPrice) / firstPrice) * 100 : 0
+                                    const isPositive = variation >= 0
+                                    return (
+                                      <div className={`text-lg font-bold flex items-center gap-1 ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
+                                        <span>{isPositive ? '↗' : '↘'}</span>
+                                        <span>{isPositive ? '+' : ''}{variation.toFixed(2)}%</span>
+                                      </div>
+                                    )
+                                  })()}
+                                </div>
                               </div>
                             </div>
                             <div className="flex gap-2">
