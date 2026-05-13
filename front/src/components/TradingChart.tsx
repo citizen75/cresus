@@ -68,12 +68,20 @@ export default function TradingChart({ timeframe, title = 'Price Chart', entryDa
     if (timeframe === '6M') points = 180
     if (timeframe === '1Y') points = 52
 
-    // Calculate reference date to ensure markers fall within data range
-    let referenceDate = new Date()
+    // If markers provided, generate data around those dates
+    let referenceDate: Date | undefined
     if (entryDate || exitDate) {
-      const dateToUse = exitDate || entryDate
-      referenceDate = new Date(dateToUse)
-      referenceDate.setDate(referenceDate.getDate() + Math.ceil(points * 0.2))
+      const targetDate = new Date(exitDate || entryDate!)
+      const futureBuffer = Math.ceil(points * 0.3)
+      referenceDate = new Date(targetDate)
+      referenceDate.setDate(referenceDate.getDate() + futureBuffer)
+      console.log('Chart data range for marker:', {
+        entryDate,
+        exitDate,
+        targetDate: targetDate.toISOString().split('T')[0],
+        referenceDate: referenceDate.toISOString().split('T')[0],
+        points,
+      })
     }
 
     const candles = generateCandleData(points, referenceDate)
@@ -140,6 +148,7 @@ export default function TradingChart({ timeframe, title = 'Price Chart', entryDa
             shape: 'arrowUp',
             text: 'Entry',
           })
+          console.log('Entry marker:', entryDateStr)
         }
         if (exitDate) {
           const exitDateStr = new Date(exitDate).toISOString().split('T')[0]
@@ -150,8 +159,10 @@ export default function TradingChart({ timeframe, title = 'Price Chart', entryDa
             shape: 'arrowDown',
             text: 'Exit',
           })
+          console.log('Exit marker:', exitDateStr)
         }
         if (markers.length > 0) {
+          console.log('Chart data range:', candles[0]?.time, 'to', candles[candles.length - 1]?.time)
           candlestickSeries.setMarkers(markers)
         }
 
