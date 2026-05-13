@@ -11,8 +11,6 @@ export default function BacktestBuilder() {
   const [strategies, setStrategies] = useState<string[]>([])
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
   const [step, setStep] = useState(1)
 
   useEffect(() => {
@@ -44,26 +42,8 @@ export default function BacktestBuilder() {
       return
     }
 
-    setLoading(true)
-    setError('')
-
-    try {
-      const result = await api.runBacktest({
-        strategy,
-        start_date: startDate,
-        end_date: endDate,
-      })
-
-      if (result.backtest_id) {
-        navigate(`/backtests/${strategy}/${result.backtest_id}`)
-      } else {
-        setError('Failed to get backtest ID')
-      }
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to run backtest')
-    } finally {
-      setLoading(false)
-    }
+    // Navigate to running page which will handle the async execution
+    navigate(`/backtests/running?strategy=${strategy}&start=${startDate}&end=${endDate}`)
   }
 
   return (
@@ -81,11 +61,6 @@ export default function BacktestBuilder() {
       <div className="grid grid-cols-3 gap-8">
         {/* Form */}
         <div className="col-span-2 space-y-6">
-          {error && (
-            <div className="p-4 bg-red-900/30 border border-red-800 rounded text-red-400 text-sm">
-              {error}
-            </div>
-          )}
 
           {/* Step 1: Strategy Selection */}
           <div className="bg-slate-900 rounded-lg p-8 border border-slate-800">
@@ -180,10 +155,10 @@ export default function BacktestBuilder() {
 
             <button
               onClick={handleSubmit}
-              disabled={!strategy || !startDate || !endDate || loading}
+              disabled={!strategy || !startDate || !endDate}
               className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-violet-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-violet-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Running Backtest...' : 'Run Backtest'}
+              Run Backtest
             </button>
           </div>
         </div>
