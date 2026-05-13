@@ -34,6 +34,10 @@ export default function BacktestDetail() {
   const [watchlist, setWatchlist] = useState<any[]>([])
   const [watchlistLoading, setWatchlistLoading] = useState(false)
   const [watchlistError, setWatchlistError] = useState('')
+  const [watchlistViewMode, setWatchlistViewMode] = useState<'table' | 'charts'>('table')
+  const [watchlistSearch, setWatchlistSearch] = useState('')
+  const [watchlistSortBy, setWatchlistSortBy] = useState('Score')
+  const [watchlistCurrentPage, setWatchlistCurrentPage] = useState(1)
 
   useEffect(() => {
     if (tabParam && ['performance', 'distribution', 'transactions', 'watchlist'].includes(tabParam)) {
@@ -1227,15 +1231,19 @@ export default function BacktestDetail() {
 
       {/* Watchlist Tab */}
       {activeTab === 'watchlist' && (
-        <div className="space-y-4">
+        <div className="space-y-6">
+          {/* Header */}
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-white">Watchlist</h2>
+            <div>
+              <h2 className="text-2xl font-bold text-white">Strategy Watchlist</h2>
+              <p className="text-slate-400 text-sm mt-1">AI-selected stocks ranked by strategy relevance</p>
+            </div>
             <button
               onClick={regenerateWatchlist}
               disabled={watchlistLoading}
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {watchlistLoading ? 'Reloading...' : 'Reload Watchlist'}
+              {watchlistLoading ? 'Regenerating...' : '🔄 Regenerate'}
             </button>
           </div>
 
@@ -1256,49 +1264,206 @@ export default function BacktestDetail() {
           )}
 
           {watchlist.length > 0 && (
-            <div className="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-800/50 border-b border-slate-800">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-slate-400 font-medium">Ticker</th>
-                      <th className="px-4 py-3 text-left text-slate-400 font-medium">Score</th>
-                      <th className="px-4 py-3 text-left text-slate-400 font-medium">Signals</th>
-                      <th className="px-4 py-3 text-right text-slate-400 font-medium">ATR 14</th>
-                      <th className="px-4 py-3 text-right text-slate-400 font-medium">RSI 14</th>
-                      <th className="px-4 py-3 text-right text-slate-400 font-medium">EMA 20</th>
-                      <th className="px-4 py-3 text-right text-slate-400 font-medium">EMA 50</th>
-                      <th className="px-4 py-3 text-right text-slate-400 font-medium">ADX 20</th>
-                      <th className="px-4 py-3 text-right text-slate-400 font-medium">MACD 12/26</th>
-                      <th className="px-4 py-3 text-right text-slate-400 font-medium">Entry Score</th>
-                      <th className="px-4 py-3 text-right text-slate-400 font-medium">RR Ratio</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {watchlist.map((item: any) => (
-                      <tr key={item.ticker} className="border-t border-slate-800 hover:bg-slate-800/30 transition">
-                        <td className="px-4 py-3 text-white font-medium">{item.ticker}</td>
-                        <td className="px-4 py-3 text-white font-medium">{(item.signal_score || 0).toFixed(3)}</td>
-                        <td className="px-4 py-3 text-slate-300 text-xs max-w-xs">
-                          {item.signals || '—'}
-                        </td>
-                        <td className="px-4 py-3 text-right text-slate-300">{(parseFloat(item.atr_14) || 0).toFixed(2)}</td>
-                        <td className="px-4 py-3 text-right text-slate-300">{(parseFloat(item.rsi_14) || 0).toFixed(2)}</td>
-                        <td className="px-4 py-3 text-right text-slate-300">{(parseFloat(item.ema_20) || 0).toFixed(2)}</td>
-                        <td className="px-4 py-3 text-right text-slate-300">{(parseFloat(item.ema_50) || 0).toFixed(2)}</td>
-                        <td className="px-4 py-3 text-right text-slate-300">{(parseFloat(item.adx_20) || 0).toFixed(2)}</td>
-                        <td className="px-4 py-3 text-right text-slate-300">{(parseFloat(item.macd_12_26) || 0).toFixed(2)}</td>
-                        <td className="px-4 py-3 text-right text-slate-300">{item.entry_score || '—'}</td>
-                        <td className="px-4 py-3 text-right text-slate-300">{(parseFloat(item.rr_ratio) || 0).toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <>
+              {/* View Toggle & Filters */}
+              <div className="flex items-center gap-4 flex-wrap">
+                <div className="flex items-center gap-2 bg-slate-800/30 border border-slate-700 rounded-lg p-1 w-fit">
+                  <button
+                    onClick={() => {
+                      setWatchlistViewMode('table')
+                      setWatchlistCurrentPage(1)
+                    }}
+                    className={`px-4 py-2 rounded transition font-medium text-sm ${
+                      watchlistViewMode === 'table'
+                        ? 'bg-purple-600 text-white'
+                        : 'text-slate-400 hover:text-slate-300'
+                    }`}
+                  >
+                    📊 Table
+                  </button>
+                  <button
+                    onClick={() => {
+                      setWatchlistViewMode('charts')
+                      setWatchlistCurrentPage(1)
+                    }}
+                    className={`px-4 py-2 rounded transition font-medium text-sm ${
+                      watchlistViewMode === 'charts'
+                        ? 'bg-purple-600 text-white'
+                        : 'text-slate-400 hover:text-slate-300'
+                    }`}
+                  >
+                    📈 Charts
+                  </button>
+                </div>
+
+                {/* Search */}
+                <div className="flex-1 min-w-64 relative">
+                  <input
+                    type="text"
+                    placeholder="Search tickers..."
+                    value={watchlistSearch}
+                    onChange={(e) => {
+                      setWatchlistSearch(e.target.value)
+                      setWatchlistCurrentPage(1)
+                    }}
+                    className="w-full px-4 py-2 bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg focus:outline-none focus:border-purple-600 transition"
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500">🔍</span>
+                </div>
+
+                {/* Sort */}
+                <select
+                  value={watchlistSortBy}
+                  onChange={(e) => {
+                    setWatchlistSortBy(e.target.value)
+                    setWatchlistCurrentPage(1)
+                  }}
+                  className="px-4 py-2 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:border-slate-600 transition"
+                >
+                  <option>Score</option>
+                  <option>Entry Score</option>
+                  <option>RSI 14</option>
+                  <option>ATR 14</option>
+                </select>
               </div>
-              <div className="px-6 py-4 border-t border-slate-800 bg-slate-900 text-sm text-slate-400">
-                Showing {watchlist.length} ticker{watchlist.length !== 1 ? 's' : ''}
-              </div>
-            </div>
+
+              {/* Table View */}
+              {watchlistViewMode === 'table' && (
+                <div className="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-800/50 border-b border-slate-800">
+                        <tr>
+                          <th className="px-6 py-4 text-left text-slate-400 font-medium">Ticker</th>
+                          <th className="px-6 py-4 text-left text-slate-400 font-medium">Score</th>
+                          <th className="px-6 py-4 text-left text-slate-400 font-medium">Signals</th>
+                          <th className="px-6 py-4 text-right text-slate-400 font-medium">Entry Score</th>
+                          <th className="px-6 py-4 text-right text-slate-400 font-medium">RR Ratio</th>
+                          <th className="px-6 py-4 text-right text-slate-400 font-medium">RSI 14</th>
+                          <th className="px-6 py-4 text-right text-slate-400 font-medium">ATR 14</th>
+                          <th className="px-6 py-4 text-right text-slate-400 font-medium">ADX 20</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {watchlist
+                          .filter((item: any) => item.ticker.toLowerCase().includes(watchlistSearch.toLowerCase()))
+                          .sort((a: any, b: any) => {
+                            switch (watchlistSortBy) {
+                              case 'Entry Score':
+                                return (b.entry_score || 0) - (a.entry_score || 0)
+                              case 'RSI 14':
+                                return (b.rsi_14 || 0) - (a.rsi_14 || 0)
+                              case 'ATR 14':
+                                return (b.atr_14 || 0) - (a.atr_14 || 0)
+                              default:
+                                return (b.signal_score || 0) - (a.signal_score || 0)
+                            }
+                          })
+                          .map((item: any) => (
+                            <tr key={item.ticker} className="border-t border-slate-800 hover:bg-slate-800/30 transition">
+                              <td className="px-6 py-4 text-white font-medium">{item.ticker}</td>
+                              <td className="px-6 py-4">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-16 bg-slate-700 rounded-full h-2">
+                                    <div
+                                      className="bg-gradient-to-r from-purple-600 to-purple-500 h-2 rounded-full"
+                                      style={{ width: `${Math.min(100, (item.signal_score || 0) * 100)}%` }}
+                                    ></div>
+                                  </div>
+                                  <span className="text-white font-medium text-sm w-8">{(item.signal_score || 0).toFixed(2)}</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 text-slate-300 text-xs">{item.signals || '—'}</td>
+                              <td className="px-6 py-4 text-right text-slate-300">{item.entry_score || '—'}</td>
+                              <td className="px-6 py-4 text-right text-slate-300">{(parseFloat(item.rr_ratio) || 0).toFixed(2)}</td>
+                              <td className="px-6 py-4 text-right text-slate-300">{(parseFloat(item.rsi_14) || 0).toFixed(2)}</td>
+                              <td className="px-6 py-4 text-right text-slate-300">{(parseFloat(item.atr_14) || 0).toFixed(2)}</td>
+                              <td className="px-6 py-4 text-right text-slate-300">{(parseFloat(item.adx_20) || 0).toFixed(2)}</td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="px-6 py-4 border-t border-slate-800 bg-slate-900 text-sm text-slate-400">
+                    Showing {watchlist.length} tickers
+                  </div>
+                </div>
+              )}
+
+              {/* Charts View */}
+              {watchlistViewMode === 'charts' && (
+                <div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {watchlist
+                      .filter((item: any) => item.ticker.toLowerCase().includes(watchlistSearch.toLowerCase()))
+                      .sort((a: any, b: any) => {
+                        switch (watchlistSortBy) {
+                          case 'Entry Score':
+                            return (b.entry_score || 0) - (a.entry_score || 0)
+                          case 'RSI 14':
+                            return (b.rsi_14 || 0) - (a.rsi_14 || 0)
+                          case 'ATR 14':
+                            return (b.atr_14 || 0) - (a.atr_14 || 0)
+                          default:
+                            return (b.signal_score || 0) - (a.signal_score || 0)
+                        }
+                      })
+                      .map((item: any) => (
+                        <div key={item.ticker} className="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden hover:border-purple-600/50 transition">
+                          {/* Card Header */}
+                          <div className="bg-slate-800/50 border-b border-slate-800 p-4">
+                            <div className="flex items-start justify-between mb-3">
+                              <div>
+                                <p className="text-white font-bold text-lg">{item.ticker}</p>
+                                <p className="text-slate-400 text-xs mt-1">{item.signals || 'No signals'}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-2xl font-bold text-purple-400">{(item.signal_score || 0).toFixed(2)}</p>
+                                <p className="text-slate-400 text-xs">Score</p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Card Body */}
+                          <div className="p-4 space-y-3">
+                            {/* Entry Score & RR */}
+                            <div className="grid grid-cols-2 gap-3 text-xs">
+                              <div className="bg-slate-800/30 rounded p-2">
+                                <p className="text-slate-500 mb-1">Entry Score</p>
+                                <p className="text-white font-medium">{item.entry_score || '—'}</p>
+                              </div>
+                              <div className="bg-slate-800/30 rounded p-2">
+                                <p className="text-slate-500 mb-1">RR Ratio</p>
+                                <p className="text-white font-medium">{(parseFloat(item.rr_ratio) || 0).toFixed(2)}</p>
+                              </div>
+                            </div>
+
+                            {/* Indicators Grid */}
+                            <div className="grid grid-cols-2 gap-3 text-xs border-t border-slate-700 pt-3">
+                              <div>
+                                <p className="text-slate-500 mb-1">RSI 14</p>
+                                <p className="text-white font-medium">{(parseFloat(item.rsi_14) || 0).toFixed(2)}</p>
+                              </div>
+                              <div>
+                                <p className="text-slate-500 mb-1">ATR 14</p>
+                                <p className="text-white font-medium">{(parseFloat(item.atr_14) || 0).toFixed(2)}</p>
+                              </div>
+                              <div>
+                                <p className="text-slate-500 mb-1">EMA 20</p>
+                                <p className="text-white font-medium">{(parseFloat(item.ema_20) || 0).toFixed(2)}</p>
+                              </div>
+                              <div>
+                                <p className="text-slate-500 mb-1">ADX 20</p>
+                                <p className="text-white font-medium">{(parseFloat(item.adx_20) || 0).toFixed(2)}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
