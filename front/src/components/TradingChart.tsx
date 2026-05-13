@@ -200,42 +200,17 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
           },
         })
 
-        // Add entry/exit vertical lines using line series
-        const minPrice = Math.min(...candles.map(c => c.low))
-        const maxPrice = Math.max(...candles.map(c => c.high))
-
+        // Add entry/exit visual lines using background color
         if (entryDate) {
           const entryDateStr = new Date(entryDate).toISOString().substring(0, 10)
-          const entryLineData = [
-            { time: entryDateStr, value: minPrice },
-            { time: entryDateStr, value: maxPrice },
-          ]
-
-          const entryLineSeries = chart.addSeries(lwc.LineSeries, {
-            color: '#10b981',
-            lineWidth: 2,
-            lastValueVisible: false,
-            priceLineVisible: false,
-          })
-          entryLineSeries.setData(entryLineData)
-          console.log('Entry line added at:', entryDateStr)
+          chart.timeScale().setMarkColor(entryDateStr, '#10b981')
+          console.log('Entry marker color set at:', entryDateStr)
         }
 
         if (exitDate) {
           const exitDateStr = new Date(exitDate).toISOString().substring(0, 10)
-          const exitLineData = [
-            { time: exitDateStr, value: minPrice },
-            { time: exitDateStr, value: maxPrice },
-          ]
-
-          const exitLineSeries = chart.addSeries(lwc.LineSeries, {
-            color: '#ef4444',
-            lineWidth: 2,
-            lastValueVisible: false,
-            priceLineVisible: false,
-          })
-          exitLineSeries.setData(exitLineData)
-          console.log('Exit line added at:', exitDateStr)
+          chart.timeScale().setMarkColor(exitDateStr, '#ef4444')
+          console.log('Exit marker color set at:', exitDateStr)
         }
 
         const volumeSeries = chart.addSeries(HistogramSeries, {
