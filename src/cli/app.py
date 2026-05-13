@@ -4,6 +4,7 @@ import os
 import json
 import cmd2
 from pathlib import Path
+from typing import Optional
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
@@ -710,12 +711,15 @@ class CresusCLI(cmd2.Cmd):
 		Usage:
 		  strategy list                              List all available strategies
 		  strategy show <strategy_name>              Display strategy configuration (no wrapped lines)
+		  strategy create <strategy_name> [universe] Create new strategy from template
+		  strategy delete <strategy_name>            Delete a strategy
 		  strategy check <strategy_name> [--fix]     Check strategy configuration and optionally fix issues
 
 		Examples:
 		  strategy list
 		  strategy show etf_pea_trend
-		  strategy check single_etf
+		  strategy create my_strategy etf_pea_full
+		  strategy delete old_strategy
 		  strategy check single_etf --fix
 		"""
 		if not args:
@@ -724,6 +728,8 @@ class CresusCLI(cmd2.Cmd):
 			table.add_column("Description")
 			table.add_row("strategy list", "List all available strategies")
 			table.add_row("strategy show <strategy>", "Display strategy configuration (no wrapped lines)")
+			table.add_row("strategy create <strategy> [universe]", "Create new strategy from template")
+			table.add_row("strategy delete <strategy>", "Delete a strategy")
 			table.add_row("strategy check <strategy> [--fix]", "Check and optionally fix strategy configuration")
 			console.print(table)
 			return
@@ -743,6 +749,25 @@ class CresusCLI(cmd2.Cmd):
 			strategy_name = parts[1]
 			self._show_strategy(strategy_name)
 
+		elif command == "create":
+			if len(parts) < 2:
+				console.print("[red]✗ Error: strategy_name required[/red]")
+				console.print("[yellow]Usage: strategy create <strategy_name> [universe][/yellow]")
+				return
+
+			strategy_name = parts[1]
+			universe = parts[2] if len(parts) > 2 else None
+			self._create_strategy(strategy_name, universe)
+
+		elif command == "delete":
+			if len(parts) < 2:
+				console.print("[red]✗ Error: strategy_name required[/red]")
+				console.print("[yellow]Usage: strategy delete <strategy_name>[/yellow]")
+				return
+
+			strategy_name = parts[1]
+			self._delete_strategy(strategy_name)
+
 		elif command == "check":
 			if len(parts) < 2:
 				console.print("[red]Error: strategy_name required[/red]")
@@ -760,7 +785,7 @@ class CresusCLI(cmd2.Cmd):
 				console.print(f"[red]Error: {e}[/red]")
 		else:
 			console.print("[red]✗ Unknown strategy command[/red]")
-			console.print("[yellow]Available commands: list, show, check[/yellow]")
+			console.print("[yellow]Available commands: list, show, create, delete, check[/yellow]")
 
 	def _list_strategies(self):
 		"""List all available strategies."""
@@ -781,7 +806,6 @@ class CresusCLI(cmd2.Cmd):
 
 		table = Table(title=f"Strategies ({len(strategy_files)})", box=box.ROUNDED)
 		table.add_column("Strategy", style="cyan")
-		table.add_column("Engine")
 		table.add_column("Universe")
 		table.add_column("Description")
 
@@ -791,11 +815,10 @@ class CresusCLI(cmd2.Cmd):
 					config = yaml.safe_load(f)
 
 				name = config.get("name", strategy_file.stem)
-				engine = config.get("engine", "N/A")
 				universe = config.get("universe", "N/A")
 				description = config.get("description", "")[:60]
 
-				table.add_row(name, engine, universe, description)
+				table.add_row(name, universe, description)
 			except Exception as e:
 				console.print(f"[yellow]⚠ Error reading {strategy_file.name}: {e}[/yellow]")
 
@@ -829,6 +852,79 @@ class CresusCLI(cmd2.Cmd):
 
 		except Exception as e:
 			console.print(f"[red]✗ Error reading strategy: {e}[/red]")
+
+	def _create_strategy(self, strategy_name: str, universe: Optional[str] = None):
+		"""Create a new strategy from template."""
+		from pathlib import Path
+
+		strategies_dir = Path.home() / ".cresus" / "db" / "strategies"
+		strategy_file = strategies_dir / f"{strategy_name}.yml"
+
+		# Check if strategy already exists
+		if strategy_file.exists():
+			console.print(f"[red]✗ Strategy already exists: {strategy_name}[/red]")
+			return
+
+		# Find template file
+		template_file = self.project_root / "init" / "templates" / "strategy.yml"
+
+		if not template_file.exists():
+			console.print(f"[red]✗ Template not found: {template_file}[/red]")
+			return
+
+		try:
+			# Read template
+			with open(template_file, 'r') as f:
+				template_content = f.read()
+
+			# Replace name in template (name: strategy_name -> name: <strategy_name>)
+			new_content = template_content.replace("name: strategy_name", f"name: {strategy_name}")
+
+			# Replace universe if specified (universe: cac40 -> universe: <universe>)
+			if universe:
+				new_content = new_content.replace("universe: cac40", f"universe: {universe}")
+
+			# Create strategies directory if it doesn't exist
+			strategies_dir.mkdir(parents=True, exist_ok=True)
+
+			# Write new strategy file
+			with open(strategy_file, 'w') as f:
+				f.write(new_content)
+
+			console.print(f"[green]✓ Strategy created: {strategy_name}[/green]")
+			if universe:
+				console.print(f"[dim]  Universe: {universe}[/dim]")
+			console.print(f"[dim]  Location: {strategy_file}[/dim]")
+
+		except Exception as e:
+			console.print(f"[red]✗ Error creating strategy: {e}[/red]")
+
+	def _delete_strategy(self, strategy_name: str):
+		"""Delete a strategy with confirmation."""
+		from pathlib import Path
+
+		strategies_dir = Path.home() / ".cresus" / "db" / "strategies"
+		strategy_file = strategies_dir / f"{strategy_name}.yml"
+
+		if not strategy_file.exists():
+			console.print(f"[red]✗ Strategy not found: {strategy_name}[/red]")
+			return
+
+		try:
+			# Ask for confirmation
+			console.print(f"[yellow]⚠ About to delete strategy: {strategy_name}[/yellow]")
+			response = input("Are you sure? (yes/no): ").strip().lower()
+
+			if response != "yes":
+				console.print("[dim]Deletion cancelled[/dim]")
+				return
+
+			# Delete the file
+			strategy_file.unlink()
+			console.print(f"[green]✓ Strategy deleted: {strategy_name}[/green]")
+
+		except Exception as e:
+			console.print(f"[red]✗ Error deleting strategy: {e}[/red]")
 
 	# ==================== Info Commands ====================
 	def do_status(self, _):
