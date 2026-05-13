@@ -1058,6 +1058,7 @@ export default function BacktestDetail() {
                 </div>
               )}
             </div>
+            </div>
           ) : (
             <div className="bg-slate-900/50 rounded-lg p-6 border border-slate-800 text-center text-slate-400">
               No positions available
@@ -1065,7 +1066,6 @@ export default function BacktestDetail() {
           )}
         </>
       )}
-    </div>
     </div>
   )
 }
