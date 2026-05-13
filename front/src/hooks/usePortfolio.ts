@@ -87,3 +87,12 @@ export function useBacktestRun(strategy: string, id: string) {
     enabled: !!strategy && !!id,
   })
 }
+
+export function useBacktestMetrics(strategy: string, id: string) {
+  return useQuery({
+    queryKey: ['backtest-metrics', strategy, id],
+    queryFn: () => api.getBacktestMetrics(strategy, id),
+    staleTime: 60_000,
+    enabled: !!strategy && !!id,
+  })
+}

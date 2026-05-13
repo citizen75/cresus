@@ -2,6 +2,7 @@
 
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
+import uuid
 
 try:
 	from tqdm import tqdm
@@ -16,6 +17,9 @@ from agents.strategy.agent import StrategyAgent
 from agents.data.agent import DataAgent
 from tools.portfolio.journal import Journal
 from tools.portfolio.orders import Orders
+from tools.backtest.manager import BacktestManager
+from tools.strategy.strategy import StrategyManager
+from tools.portfolio.metrics import PortfolioMetrics
 
 
 def _parse_date(value: Any) -> Optional[date]:
@@ -156,9 +160,27 @@ class BacktestAgent(Agent):
 
 		self.logger.info(f"Backtest {strategy_name} from {start_date} to {end_date}")
 
+		# Create backtest ID and directory using BacktestManager
+		backtest_manager = BacktestManager()
+		backtest_id = f"{date.today().strftime('%Y%m%d_%H%M%S')}_{str(uuid.uuid4())[:8]}"
+		dir_result = backtest_manager.create_backtest_dir(strategy_name, backtest_id)
+
+		if dir_result.get("status") != "success":
+			return {
+				"status": "error",
+				"input": input_data,
+				"output": {},
+				"message": f"Failed to create backtest directory: {dir_result.get('message')}",
+			}
+
+		backtest_dir = dir_result.get("backtest_dir")
+		self.logger.info(f"Created backtest directory: {backtest_dir}")
+
 		# Initialize backtest context
 		backtest = {
 			"strategy_name": strategy_name,
+			"backtest_id": backtest_id,
+			"backtest_dir": backtest_dir,
 			"start_date": start_date.isoformat(),
 			"end_date": end_date.isoformat(),
 			"lookback_days": lookback_days,
@@ -166,6 +188,7 @@ class BacktestAgent(Agent):
 			"metrics": {},
 		}
 		self.context.set("backtest", backtest)
+		self.context.set("backtest_dir", backtest_dir)
 
 		# Load tickers via StrategyAgent
 		strategy_agent = StrategyAgent(f"strategy[{strategy_name}]", self.context)
@@ -301,6 +324,40 @@ class BacktestAgent(Agent):
 
 		backtest["days_processed"] = len(backtest["daily_results"])
 		self.logger.info(f"Backtest completed: {backtest['days_processed']} days processed")
+
+		# Save strategy to backtest directory
+		strategy_manager = StrategyManager()
+		strategy_result = strategy_manager.load_strategy(strategy_name)
+		if strategy_result.get("status") == "success":
+			strategy_data = strategy_result.get("data", {})
+			save_result = backtest_manager.save_strategy(strategy_name, backtest_id, strategy_data)
+			if save_result.get("status") == "success":
+				self.logger.info(f"Saved strategy to {save_result.get('file')}")
+			else:
+				self.logger.warning(f"Failed to save strategy: {save_result.get('message')}")
+		else:
+			self.logger.warning(f"Could not load strategy for saving: {strategy_result.get('message')}")
+
+		# Calculate and save metrics
+		try:
+			portfolio_name = self.context.get("portfolio_name") or "default"
+			metrics = PortfolioMetrics()
+			metrics_result = metrics.calculate_backtest_metrics(
+				portfolio_name,
+				start_date,
+				end_date,
+				100000.0  # Default initial capital
+			)
+
+			if metrics_result:
+				backtest["metrics"] = metrics_result
+				save_metrics_result = backtest_manager.save_metrics(strategy_name, backtest_id, metrics_result)
+				if save_metrics_result.get("status") == "success":
+					self.logger.info(f"Saved metrics to {save_metrics_result.get('file')}")
+				else:
+					self.logger.warning(f"Failed to save metrics: {save_metrics_result.get('message')}")
+		except Exception as e:
+			self.logger.warning(f"Could not calculate metrics: {str(e)}")
 
 		return {
 			"status": "success",

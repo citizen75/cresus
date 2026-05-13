@@ -158,6 +158,31 @@ async def compare_backtests(items: str = Query(...)) -> Dict[str, Any]:
 	return result
 
 
+@router.get("/{strategy_name}/{backtest_id}/metrics")
+async def get_backtest_metrics(strategy_name: str, backtest_id: str) -> Dict[str, Any]:
+	"""Get backtest metrics.
+
+	Args:
+		strategy_name: Strategy name
+		backtest_id: Backtest ID
+
+	Returns:
+		Backtest metrics
+	"""
+	manager = _get_backtest_manager()
+	metrics = manager.get_metrics(strategy_name, backtest_id)
+
+	if not metrics:
+		raise HTTPException(status_code=404, detail="Metrics not found")
+
+	return {
+		"status": "success",
+		"strategy_name": strategy_name,
+		"backtest_id": backtest_id,
+		"metrics": metrics,
+	}
+
+
 @router.delete("/{strategy_name}/{backtest_id}")
 async def delete_backtest(strategy_name: str, backtest_id: str) -> Dict[str, Any]:
 	"""Delete a backtest.

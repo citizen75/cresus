@@ -149,6 +149,117 @@ class BacktestManager:
 		except Exception as e:
 			return {"status": "error", "message": str(e)}
 
+	def create_backtest_dir(self, strategy_name: str, backtest_id: str) -> Dict[str, Any]:
+		"""Create backtest directory structure.
+
+		Args:
+			strategy_name: Strategy name
+			backtest_id: Backtest ID
+
+		Returns:
+			Dict with status and backtest_dir path
+		"""
+		try:
+			backtest_dir = self.backtests_dir / strategy_name / backtest_id
+			backtest_dir.mkdir(parents=True, exist_ok=True)
+
+			# Create subdirectories
+			(backtest_dir / "portfolios").mkdir(exist_ok=True)
+			(backtest_dir / "orders").mkdir(exist_ok=True)
+			(backtest_dir / "watchlist").mkdir(exist_ok=True)
+
+			return {
+				"status": "success",
+				"backtest_dir": str(backtest_dir),
+				"backtest_id": backtest_id,
+			}
+		except Exception as e:
+			return {"status": "error", "message": str(e)}
+
+	def save_strategy(self, strategy_name: str, backtest_id: str, strategy_data: Dict[str, Any]) -> Dict[str, Any]:
+		"""Save strategy YAML to backtest directory.
+
+		Args:
+			strategy_name: Strategy name
+			backtest_id: Backtest ID
+			strategy_data: Strategy configuration dict
+
+		Returns:
+			Status dict
+		"""
+		try:
+			import yaml
+
+			backtest_dir = self.backtests_dir / strategy_name / backtest_id
+			strategy_file = backtest_dir / f"{strategy_name}.yml"
+
+			with open(strategy_file, "w") as f:
+				yaml.dump(strategy_data, f, default_flow_style=False)
+
+			return {
+				"status": "success",
+				"file": str(strategy_file),
+				"size": strategy_file.stat().st_size,
+			}
+		except Exception as e:
+			return {"status": "error", "message": str(e)}
+
+	def save_metrics(self, strategy_name: str, backtest_id: str, metrics: Dict[str, Any]) -> Dict[str, Any]:
+		"""Save backtest metrics to JSON file.
+
+		Args:
+			strategy_name: Strategy name
+			backtest_id: Backtest ID
+			metrics: Metrics dict
+
+		Returns:
+			Status dict
+		"""
+		try:
+			backtest_dir = self.backtests_dir / strategy_name / backtest_id
+			metrics_file = backtest_dir / "metrics.json"
+
+			# Handle NaN values
+			metrics_clean = json.loads(
+				re.sub(r"\bNaN\b", "null", json.dumps(metrics, default=str))
+			)
+
+			with open(metrics_file, "w") as f:
+				json.dump(metrics_clean, f, indent=2)
+
+			return {
+				"status": "success",
+				"file": str(metrics_file),
+				"metrics_count": len(metrics),
+			}
+		except Exception as e:
+			return {"status": "error", "message": str(e)}
+
+	def get_metrics(self, strategy_name: str, backtest_id: str) -> Dict[str, Any]:
+		"""Load metrics from backtest.
+
+		Args:
+			strategy_name: Strategy name
+			backtest_id: Backtest ID
+
+		Returns:
+			Metrics dict or empty dict if not found
+		"""
+		backtest_dir = self.backtests_dir / strategy_name / backtest_id
+		metrics_file = backtest_dir / "metrics.json"
+
+		if not metrics_file.exists():
+			return {}
+
+		try:
+			with open(metrics_file, "r") as f:
+				text = f.read()
+				# Replace NaN with null for JSON compatibility
+				text = re.sub(r"\bNaN\b", "null", text)
+				return json.loads(text)
+		except Exception:
+			return {}
+
 	def _load_backtest_summary(self, strategy_name: str, backtest_id: str) -> Optional[Dict[str, Any]]:
 		"""Load summary data for a single backtest."""
 		backtest_dir = self.backtests_dir / strategy_name / backtest_id

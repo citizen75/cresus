@@ -132,6 +132,10 @@ class CresusAPI {
     return (await this.client.get('/backtests/compare', { params: { items: itemsStr } })).data
   }
 
+  async getBacktestMetrics(strategy: string, id: string) {
+    return (await this.client.get(`/backtests/${strategy}/${id}/metrics`)).data
+  }
+
   async deleteBacktest(strategy: string, id: string) {
     return (await this.client.delete(`/backtests/${strategy}/${id}`)).data
   }
