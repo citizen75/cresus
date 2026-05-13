@@ -212,8 +212,8 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
             position: 'belowBar',
             color: '#10b981',
             shape: 'circle',
-            text: 'E',
-            size: 2,
+            text: 'ENTRY',
+            size: 3,
           })
         }
         if (exitDate) {
@@ -226,8 +226,8 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
             position: 'aboveBar',
             color: '#ef4444',
             shape: 'circle',
-            text: 'X',
-            size: 2,
+            text: 'EXIT',
+            size: 3,
           })
         }
         if (markers.length > 0) {
