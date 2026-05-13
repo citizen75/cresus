@@ -730,6 +730,80 @@ class CresusCLI(cmd2.Cmd):
 			print(f"✗ Update error: {e}", file=sys.stderr, flush=True)
 			traceback.print_exc()
 
+	def do_help(self, args):
+		"""Show categorized help for all commands."""
+		if args:
+			# Pass specific command to parent help handler
+			super().do_help(args)
+			return
+
+		# Define command categories with descriptions
+		categories = {
+			"🔄 Workflows": {
+				"flow": "Execute workflows (run premarket|backtest|signal, show results)",
+			},
+			"📊 Portfolio & Watchlist": {
+				"watchlist": "View strategy watchlist (e.g., watchlist show momentum_cac)",
+				"orders": "View pending/executed orders (e.g., orders list momentum_cac)",
+			},
+			"💾 Data Management": {
+				"data": "Manage portfolio data and cache",
+				"universe": "Manage universes (list|info cac40, add|del <universe>)",
+				"blacklist": "Manage blacklist (list|add|del MOEX)",
+			},
+			"📈 Strategy": {
+				"strategy": "Validate and manage strategies (check|calc|train|predict)",
+			},
+			"⚙️  System & Services": {
+				"service": "Manage services (start|stop|status|logs api|mcp|front|all)",
+				"cron": "View scheduled cron jobs and next run times",
+				"update": "Update cresus from git",
+				"status": "Show system status",
+			},
+			"🛠️  Utility": {
+				"init": "Initialize ~/.cresus directory structure",
+				"info": "Display system information",
+				"history": "View command history (history [clear] [num_lines])",
+				"clear": "Clear screen",
+				"motd": "Show message of the day",
+				"pwd": "Print working directory",
+				"quit": "Exit the CLI",
+			},
+		}
+
+		# Print header
+		header = Panel(
+			Text("Cresus CLI Commands", justify="center", style="bold cyan"),
+			style="cyan",
+			box=box.ROUNDED,
+			expand=False
+		)
+		console.print(header)
+
+		# Print categories
+		for category, commands in categories.items():
+			category_panel = Panel(
+				Text(category, style="bold magenta"),
+				style="magenta",
+				expand=False,
+				padding=(0, 1)
+			)
+			console.print(category_panel)
+
+			table = Table(box=box.SIMPLE, show_header=False)
+			table.add_column(style="cyan", width=16)
+			table.add_column(style="white")
+
+			for cmd, desc in commands.items():
+				table.add_row(f"  {cmd}", desc)
+
+			console.print(table)
+			console.print()
+
+		# Print footer
+		footer = Text("Use 'help <command>' for more details on a specific command", style="dim")
+		console.print(footer)
+
 	def do_quit(self, _):
 		"""Exit the CLI."""
 		console.print("[cyan]Goodbye![/cyan]")
