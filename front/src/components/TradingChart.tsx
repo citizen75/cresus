@@ -115,7 +115,7 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
             const data = response.data || []
 
             candles = data.map((d: any) => ({
-              time: d.timestamp.split('T')[0],
+              time: d.timestamp.substring(0, 10),
               open: d.open,
               high: d.high,
               low: d.low,
@@ -126,7 +126,7 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
               const prevOpen = d.open
               const color = d.close >= prevOpen ? '#26a69a' : '#ef5350'
               return {
-                time: d.timestamp.split('T')[0],
+                time: d.timestamp.substring(0, 10),
                 value: d.volume,
                 color,
               }
@@ -182,7 +182,7 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
         // Add entry/exit markers
         const markers: any[] = []
         if (entryDate) {
-          const entryDateStr = new Date(entryDate).toISOString().split('T')[0]
+          const entryDateStr = new Date(entryDate).toISOString().substring(0, 10)
           markers.push({
             time: entryDateStr,
             position: 'belowBar',
@@ -193,7 +193,7 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
           console.log('Entry marker:', entryDateStr)
         }
         if (exitDate) {
-          const exitDateStr = new Date(exitDate).toISOString().split('T')[0]
+          const exitDateStr = new Date(exitDate).toISOString().substring(0, 10)
           markers.push({
             time: exitDateStr,
             position: 'aboveBar',
