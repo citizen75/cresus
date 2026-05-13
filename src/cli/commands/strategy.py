@@ -136,6 +136,64 @@ class StrategyCommands:
 			console.print()
 
 
+	def duplicate(self, from_strategy: str, dest_strategy: str) -> Dict[str, Any]:
+		"""Duplicate a strategy with a new name.
+
+		Args:
+			from_strategy: Source strategy name to duplicate
+			dest_strategy: Destination strategy name
+
+		Returns:
+			Result dictionary with status and message
+		"""
+		console.print(f"\n[bold cyan]Duplicating Strategy[/bold cyan]\n")
+
+		# Load source strategy
+		result = self.strategy_manager.load_strategy(from_strategy)
+		if result.get("status") != "success":
+			console.print(f"[red]✗ Source strategy not found: {from_strategy}[/red]")
+			return {
+				"status": "error",
+				"message": f"Source strategy '{from_strategy}' not found",
+			}
+
+		strategy_data = result.get("data", {})
+
+		# Check if destination already exists
+		dest_check = self.strategy_manager.load_strategy(dest_strategy)
+		if dest_check.get("status") == "success":
+			console.print(f"[yellow]⚠ Destination strategy already exists: {dest_strategy}[/yellow]")
+			console.print("[cyan]Use --force to overwrite[/cyan]")
+			return {
+				"status": "error",
+				"message": f"Destination strategy '{dest_strategy}' already exists",
+			}
+
+		# Update the strategy name in the copied data
+		strategy_data["name"] = dest_strategy
+
+		# Save the duplicated strategy
+		save_result = self.strategy_manager.save_strategy(dest_strategy, strategy_data)
+
+		if save_result.get("status") == "success":
+			console.print(f"[green]✓ Strategy duplicated successfully[/green]")
+			console.print(f"[cyan]  From:[/cyan] {from_strategy}")
+			console.print(f"[cyan]  To:  [/cyan] {dest_strategy}")
+			console.print(f"[cyan]  File:[/cyan] {save_result.get('file')}\n")
+			return {
+				"status": "success",
+				"message": f"Strategy '{from_strategy}' duplicated to '{dest_strategy}'",
+				"from": from_strategy,
+				"to": dest_strategy,
+				"file": save_result.get("file"),
+			}
+		else:
+			console.print(f"[red]✗ Failed to save duplicated strategy: {save_result.get('message')}[/red]")
+			return {
+				"status": "error",
+				"message": f"Failed to duplicate strategy: {save_result.get('message')}",
+			}
+
 	def _show_template(self):
 		"""Display the strategy template."""
 		console.print("\n[bold cyan]Strategy Template[/bold cyan]\n")

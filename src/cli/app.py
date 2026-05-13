@@ -709,17 +709,19 @@ class CresusCLI(cmd2.Cmd):
 		"""Manage and validate strategies.
 
 		Usage:
-		  strategy list                              List all available strategies
-		  strategy show <strategy_name>              Display strategy configuration (no wrapped lines)
-		  strategy create <strategy_name> [universe] Create new strategy from template
-		  strategy delete <strategy_name>            Delete a strategy
-		  strategy check <strategy_name> [--fix]     Check strategy configuration and optionally fix issues
+		  strategy list                                List all available strategies
+		  strategy show <strategy_name>                Display strategy configuration (no wrapped lines)
+		  strategy create <strategy_name> [universe]   Create new strategy from template
+		  strategy delete <strategy_name>              Delete a strategy
+		  strategy duplicate <from_name> <dest_name>   Duplicate a strategy
+		  strategy check <strategy_name> [--fix]       Check strategy configuration and optionally fix issues
 
 		Examples:
 		  strategy list
 		  strategy show etf_pea_trend
 		  strategy create my_strategy etf_pea_full
 		  strategy delete old_strategy
+		  strategy duplicate etf_pea_trend my_etf_trend
 		  strategy check single_etf --fix
 		"""
 		if not args:
@@ -730,6 +732,7 @@ class CresusCLI(cmd2.Cmd):
 			table.add_row("strategy show <strategy>", "Display strategy configuration (no wrapped lines)")
 			table.add_row("strategy create <strategy> [universe]", "Create new strategy from template")
 			table.add_row("strategy delete <strategy>", "Delete a strategy")
+			table.add_row("strategy duplicate <from> <to>", "Duplicate a strategy with new name")
 			table.add_row("strategy check <strategy> [--fix]", "Check and optionally fix strategy configuration")
 			console.print(table)
 			return
@@ -768,6 +771,20 @@ class CresusCLI(cmd2.Cmd):
 			strategy_name = parts[1]
 			self._delete_strategy(strategy_name)
 
+		elif command == "duplicate":
+			if len(parts) < 3:
+				console.print("[red]✗ Error: from_strategy and dest_strategy required[/red]")
+				console.print("[yellow]Usage: strategy duplicate <from_strategy> <dest_strategy>[/yellow]")
+				return
+
+			from_strategy = parts[1]
+			dest_strategy = parts[2]
+
+			try:
+				self.strategy_commands.duplicate(from_strategy, dest_strategy)
+			except Exception as e:
+				console.print(f"[red]Error: {e}[/red]")
+
 		elif command == "check":
 			if len(parts) < 2:
 				console.print("[red]Error: strategy_name required[/red]")
@@ -785,7 +802,7 @@ class CresusCLI(cmd2.Cmd):
 				console.print(f"[red]Error: {e}[/red]")
 		else:
 			console.print("[red]✗ Unknown strategy command[/red]")
-			console.print("[yellow]Available commands: list, show, create, delete, check[/yellow]")
+			console.print("[yellow]Available commands: list, show, create, delete, duplicate, check[/yellow]")
 
 	def _list_strategies(self):
 		"""List all available strategies."""
