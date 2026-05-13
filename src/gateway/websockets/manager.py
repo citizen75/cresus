@@ -2,7 +2,7 @@
 
 import json
 import asyncio
-from typing import Dict, Set, Any, Optional, Callable
+from typing import Dict, Set, Any, Optional, Callable, List
 from datetime import datetime
 from dataclasses import dataclass, asdict
 
@@ -45,8 +45,9 @@ class WebSocketManager:
 	def __init__(self):
 		"""Initialize WebSocket manager."""
 		self.connections: Dict[str, Set[Any]] = {}  # backtest_id -> set of websockets
-		self.webhooks: Dict[str, list[Callable]] = {}  # event_type -> list of webhooks
+		self.webhooks: Dict[str, List[Callable]] = {}  # event_type -> list of webhooks
 		self.message_queues: Dict[str, asyncio.Queue] = {}  # backtest_id -> queue
+		self._pending_messages: List[tuple] = []  # [(backtest_id, message), ...]
 
 	def register_connection(self, backtest_id: str, websocket: Any) -> None:
 		"""Register a WebSocket connection for a backtest.
@@ -118,7 +119,7 @@ class WebSocketManager:
 
 			for websocket in self.connections[backtest_id]:
 				try:
-					await websocket.send_json(message.to_json())
+					await websocket.send_json(asdict(message))
 				except Exception as e:
 					# Connection closed or error, mark for removal
 					websockets_to_remove.add(websocket)
@@ -224,7 +225,7 @@ class WebSocketManager:
 			strategy_name
 		)
 
-	def get_active_backtests(self) -> list[str]:
+	def get_active_backtests(self) -> List[str]:
 		"""Get list of active backtest IDs with connected clients.
 
 		Returns:
@@ -242,6 +243,68 @@ class WebSocketManager:
 			Number of connected clients
 		"""
 		return len(self.connections.get(backtest_id, set()))
+
+	def broadcast_daily_results_sync(
+		self,
+		backtest_id: str,
+		strategy_name: str,
+		date: str,
+		daily_results: Dict[str, Any]
+	) -> None:
+		"""Synchronous queue of daily results for broadcasting.
+
+		Adds message to pending queue to be sent by async broadcaster.
+
+		Args:
+			backtest_id: Backtest identifier
+			strategy_name: Strategy name
+			date: Trading date
+			daily_results: Daily results dict
+		"""
+		message = WebSocketMessage(
+			type="daily_results",
+			backtest_id=backtest_id,
+			strategy_name=strategy_name,
+			timestamp=datetime.utcnow().isoformat(),
+			data={
+				"date": date,
+				"results": daily_results,
+				"timestamp": datetime.utcnow().isoformat()
+			}
+		)
+
+		# Queue message to be sent later
+		self._pending_messages.append((backtest_id, message))
+
+	async def flush_pending_messages(self) -> None:
+		"""Send all pending messages (call periodically from event loop)."""
+		if not self._pending_messages:
+			return
+
+		messages_by_backtest: Dict[str, List[WebSocketMessage]] = {}
+
+		# Group messages by backtest_id
+		for backtest_id, message in self._pending_messages:
+			if backtest_id not in messages_by_backtest:
+				messages_by_backtest[backtest_id] = []
+			messages_by_backtest[backtest_id].append(message)
+
+		# Send messages for each backtest
+		for backtest_id, messages in messages_by_backtest.items():
+			if backtest_id in self.connections:
+				websockets_to_remove = set()
+				for websocket in self.connections[backtest_id]:
+					for message in messages:
+						try:
+							await websocket.send_json(asdict(message))
+						except Exception as e:
+							websockets_to_remove.add(websocket)
+
+				for ws in websockets_to_remove:
+					self.unregister_connection(backtest_id, ws)
+
+		# Clear sent messages
+		self._pending_messages.clear()
 
 
 # Global WebSocket manager instance

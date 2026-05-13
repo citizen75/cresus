@@ -111,9 +111,10 @@ class PortfolioHistory:
                 logger.warning(f"Error loading history for {ticker}: {e}")
                 continue
 
-        # Calculate daily values
+        # Calculate daily values with drawdown
         daily_history = []
         current_date = first_tx_date
+        peak_value = self.initial_capital if self.initial_capital else 0
 
         while current_date <= last_tx_date:
             # Replay all transactions up to this date (inclusive)
@@ -168,11 +169,18 @@ class PortfolioHistory:
                         positions_value += value
                         portfolio_value += value
 
+            # Track peak and calculate drawdown
+            if portfolio_value > peak_value:
+                peak_value = portfolio_value
+
+            drawdown = ((portfolio_value - peak_value) / peak_value * 100) if peak_value > 0 else 0
+
             daily_history.append({
                 "date": current_date.strftime("%Y-%m-%d"),
                 "value": round(portfolio_value, 2),
                 "positions_value": round(positions_value, 2),
                 "cash": round(cash, 2),
+                "drawdown_pct": round(drawdown, 2),
             })
 
             current_date += timedelta(days=1)

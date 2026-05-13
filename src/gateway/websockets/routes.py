@@ -2,6 +2,8 @@
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 import logging
+import json
+from dataclasses import asdict
 
 from .manager import get_websocket_manager
 
@@ -35,14 +37,26 @@ async def websocket_backtest(
 	logger.info(f"WebSocket client connected: backtest_id={backtest_id}, strategy={strategy}")
 
 	try:
-		# Keep connection alive and listen for client messages
+		# Keep connection alive, flush pending messages periodically
+		import asyncio
 		while True:
-			# Receive ping/pong or close message from client
-			data = await websocket.receive_text()
+			try:
+				# Flush any pending messages (from backtest running in background thread)
+				pending_count = len(manager._pending_messages)
+				if pending_count > 0:
+					logger.debug(f"Flushing {pending_count} pending messages for {backtest_id}")
+				await manager.flush_pending_messages()
 
-			# Handle client commands (optional)
-			if data == "ping":
-				await websocket.send_text("pong")
+				# Wait for client message with timeout
+				data = await asyncio.wait_for(websocket.receive_text(), timeout=1.0)
+
+				# Handle client commands (optional)
+				if data == "ping":
+					await websocket.send_json({"type": "pong"})
+
+			except asyncio.TimeoutError:
+				# Timeout - loop again to check for pending messages
+				continue
 
 	except WebSocketDisconnect:
 		manager.unregister_connection(backtest_id, websocket)

@@ -32,7 +32,7 @@ export default function App() {
           <Route path="/backtests/new" element={<Layout><BacktestBuilder /></Layout>} />
           <Route path="/backtests/running" element={<BacktestRunning />} />
           <Route path="/backtests/compare" element={<Layout><BacktestComparator /></Layout>} />
-          <Route path="/backtests/:strategy/:runId" element={<Layout><BacktestDetail /></Layout>} />
+          <Route path="/backtests/:strategy/:runId/:tab?" element={<Layout><BacktestDetail /></Layout>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

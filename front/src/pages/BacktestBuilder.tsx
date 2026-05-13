@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { api } from '@/services/api'
 
 export default function BacktestBuilder() {
   const navigate = useNavigate()
@@ -8,6 +9,7 @@ export default function BacktestBuilder() {
   const [strategies, setStrategies] = useState<string[]>([])
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     // Set default date range (1 year back)
@@ -32,13 +34,27 @@ export default function BacktestBuilder() {
     setEndDate(end.toISOString().split('T')[0])
   }
 
-  const handleSubmit = () => {
-    if (!strategy) {
+  const handleSubmit = async () => {
+    if (!strategy || !startDate || !endDate) {
       return
     }
 
-    // Navigate to running page which will handle the async execution
-    navigate(`/backtests/running?strategy=${strategy}&start=${startDate}&end=${endDate}`)
+    setLoading(true)
+    try {
+      const response = await api.runBacktest({
+        strategy,
+        start_date: startDate,
+        end_date: endDate,
+      })
+
+      if (response.backtest_id) {
+        // Navigate to running page with backtest_id
+        navigate(`/backtests/running?strategy=${strategy}&backtest_id=${response.backtest_id}`)
+      }
+    } catch (err) {
+      console.error('Failed to start backtest:', err)
+      setLoading(false)
+    }
   }
 
   return (
@@ -148,10 +164,10 @@ export default function BacktestBuilder() {
 
             <button
               onClick={handleSubmit}
-              disabled={!strategy || !startDate || !endDate}
+              disabled={!strategy || !startDate || !endDate || loading}
               className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-violet-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-violet-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Run Backtest
+              {loading ? 'Starting...' : 'Run Backtest'}
             </button>
           </div>
         </div>

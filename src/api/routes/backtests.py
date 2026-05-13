@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Query
 from typing import Optional, Dict, Any
 from functools import lru_cache
 import sys
+import threading
 from pathlib import Path
 
 # Add src to path for imports
@@ -14,6 +15,7 @@ if str(src_path) not in sys.path:
 from tools.backtest.manager import BacktestManager
 from flows.backtest import BacktestFlow
 from tools.strategy.strategy import StrategyManager
+from tools.portfolio.portfolio_distribution import PortfolioDistribution
 
 router = APIRouter(prefix="/backtests", tags=["backtests"])
 
@@ -78,13 +80,13 @@ async def get_backtest(strategy_name: str, backtest_id: str) -> Dict[str, Any]:
 
 @router.post("")
 async def run_backtest(body: Dict[str, Any]) -> Dict[str, Any]:
-	"""Run a new backtest.
+	"""Run a new backtest in background.
 
 	Args:
 		body: {strategy, start_date?, end_date?, portfolio_name?}
 
 	Returns:
-		Backtest run result
+		Backtest ID and status (backtest runs asynchronously in background)
 	"""
 	strategy = body.get("strategy")
 	if not strategy:
@@ -94,10 +96,16 @@ async def run_backtest(body: Dict[str, Any]) -> Dict[str, Any]:
 	end_date = body.get("end_date")
 	portfolio_name = body.get("portfolio_name")
 
-	# Run backtest
-	flow = _get_backtest_flow()
-	input_data = {"strategy": strategy}
+	# Generate backtest_id first
+	from datetime import date
+	import uuid
+	backtest_id = f"{date.today().strftime('%Y%m%d_%H%M%S')}_{str(uuid.uuid4())[:8]}"
 
+	# Prepare input data, including the backtest_id for consistency with WebSocket
+	input_data = {
+		"strategy": strategy,
+		"backtest_id": backtest_id,  # Pass ID so it's consistent throughout the flow
+	}
 	if start_date:
 		input_data["start_date"] = start_date
 	if end_date:
@@ -105,21 +113,25 @@ async def run_backtest(body: Dict[str, Any]) -> Dict[str, Any]:
 	if portfolio_name:
 		input_data["portfolio_name"] = portfolio_name
 
-	result = flow.process(input_data)
+	# Run backtest in background thread (non-blocking)
+	def run_backtest_bg():
+		try:
+			flow = BacktestFlow()
+			flow.process(input_data)
+		except Exception as e:
+			import logging
+			logger = logging.getLogger(__name__)
+			logger.error(f"Backtest {backtest_id} failed: {str(e)}", exc_info=True)
 
-	if result.get("status") != "success":
-		raise HTTPException(status_code=400, detail=result.get("message", "Backtest failed"))
+	thread = threading.Thread(target=run_backtest_bg, daemon=True)
+	thread.start()
 
-	# Extract backtest_id and return with navigation info
-	output = result.get("output", {})
-	backtest_id = output.get("backtest_id")
-
+	# Return immediately with backtest_id so frontend can connect to WebSocket
 	return {
 		"status": "success",
-		"message": result.get("message"),
+		"message": f"Backtest {backtest_id} started",
 		"backtest_id": backtest_id,
 		"strategy_name": strategy,
-		"output": output,
 	}
 
 
@@ -181,6 +193,85 @@ async def get_backtest_metrics(strategy_name: str, backtest_id: str) -> Dict[str
 		"backtest_id": backtest_id,
 		"metrics": metrics,
 	}
+
+
+@router.get("/{strategy_name}/{backtest_id}/history")
+async def get_backtest_history(strategy_name: str, backtest_id: str) -> Dict[str, Any]:
+	"""Get portfolio history with evolving metrics.
+
+	Returns daily equity curve with metrics calculated at each point in time.
+	Used for real-time updates during backtest execution.
+
+	Args:
+		strategy_name: Strategy name
+		backtest_id: Backtest ID
+
+	Returns:
+		Historical data with daily metrics
+	"""
+	manager = _get_backtest_manager()
+	result = manager.get_portfolio_history(strategy_name, backtest_id)
+
+	if result.get("status") != "success":
+		raise HTTPException(status_code=404, detail=result.get("message"))
+
+	return result
+
+
+@router.get("/{strategy_name}/{backtest_id}/distribution")
+async def get_backtest_distribution(strategy_name: str, backtest_id: str) -> Dict[str, Any]:
+	"""Get return distribution for a backtest's portfolio.
+
+	Args:
+		strategy_name: Strategy name
+		backtest_id: Backtest ID
+
+	Returns:
+		Distribution data with deciles, trade counts, and cumulative P&L
+	"""
+	try:
+		# Get the backtest manager and directory
+		manager = _get_backtest_manager()
+
+		# Get backtest directory from manager
+		from pathlib import Path
+		from utils.env import get_db_root
+		db_root = get_db_root()
+		backtest_dir = db_root / "backtests" / strategy_name / backtest_id
+
+		if not backtest_dir.exists():
+			raise HTTPException(status_code=404, detail="Backtest not found")
+
+		# Use strategy_name as the portfolio name (matching backtest behavior)
+		portfolio_name = strategy_name
+
+		# Create context for PortfolioDistribution to use backtest directory
+		context = {
+			"backtest_dir": str(backtest_dir),
+		}
+
+		# Calculate distribution for the portfolio with backtest context
+		distributor = PortfolioDistribution(portfolio_name, context=context)
+		calc_result = distributor.calculate()
+
+		if calc_result.get("status") != "success":
+			raise HTTPException(status_code=400, detail=calc_result.get("message"))
+
+		# Return in same format as other backtest endpoints
+		return {
+			"status": "success",
+			"data": {
+				"strategy_name": strategy_name,
+				"backtest_id": backtest_id,
+				"distribution": calc_result.get("distribution", []),
+				"statistics": calc_result.get("statistics", {}),
+				"trades": calc_result.get("trades", []),  # Closed trades with metadata
+			}
+		}
+	except HTTPException:
+		raise
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=f"Error calculating distribution: {str(e)}")
 
 
 @router.delete("/{strategy_name}/{backtest_id}")

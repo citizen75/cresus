@@ -21,7 +21,7 @@ export function useBacktestWebSocket(options: UseBacktestWebSocketOptions) {
   const [lastMessage, setLastMessage] = useState<BacktestMessage | null>(null)
   const [error, setError] = useState<string | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const connect = useCallback(() => {
     if (!enabled || !backtest_id) return
@@ -29,7 +29,8 @@ export function useBacktestWebSocket(options: UseBacktestWebSocketOptions) {
     try {
       const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
       const host = window.location.hostname
-      const port = window.location.port ? `:${window.location.port}` : ''
+      // Always use API port 8000, not the frontend's port
+      const port = ':8000'
       const url = `${protocol}://${host}${port}/api/v1/ws/backtest/${backtest_id}${strategy_name ? `?strategy=${strategy_name}` : ''}`
 
       const ws = new WebSocket(url)

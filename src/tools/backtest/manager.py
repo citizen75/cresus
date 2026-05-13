@@ -3,11 +3,15 @@
 import json
 import re
 import shutil
+import uuid
+import logging
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, date
 from typing import Any, Dict, List, Optional
 import pandas as pd
 from utils.env import get_db_root
+
+logger = logging.getLogger(__name__)
 
 
 class BacktestManager:
@@ -17,6 +21,7 @@ class BacktestManager:
 		"""Initialize BacktestManager."""
 		self.db_root = get_db_root()
 		self.backtests_dir = self.db_root / "backtests"
+		self.logger = logger
 
 	def list_backtests(self, strategy_name: Optional[str] = None) -> List[Dict[str, Any]]:
 		"""List all backtests, optionally filtered by strategy.
@@ -75,13 +80,46 @@ class BacktestManager:
 		if not result:
 			return {"status": "error", "message": "Failed to load backtest"}
 
-		# Load portfolios.json for metrics
+		# Load full metrics from metrics.json, or calculate from portfolio history
+		metrics_file = backtest_dir / "metrics.json"
+		if metrics_file.exists():
+			try:
+				with open(metrics_file) as f:
+					text = f.read()
+					# Replace NaN with null for JSON compatibility
+					text = re.sub(r"\bNaN\b", "null", text)
+					metrics = json.loads(text)
+					result["portfolio_metrics"] = metrics
+					# Also merge top-level metrics for backwards compatibility
+					result.update(metrics)
+			except Exception as e:
+				self.logger.warning(f"Failed to load metrics from {metrics_file}: {e}")
+		else:
+			# For older backtests without metrics.json, calculate from portfolio history
+			history_result = self.get_portfolio_history(strategy_name, backtest_id)
+			if history_result.get("status") == "success":
+				history = history_result.get("history", [])
+				if history:
+					final_point = history[-1]
+					metrics = {
+						"total_return_pct": final_point.get("return_pct", 0),
+						"max_drawdown_pct": min(h.get("drawdown_pct", 0) for h in history),
+						"sharpe_ratio": 0,  # Would need volatility calculation
+						"sortino_ratio": 0,
+						"calmar_ratio": 0,
+						"total_trades": result.get("total_trades", 0),
+						"win_rate_pct": result.get("win_rate_pct", 0),
+						"profit_factor": 0,
+					}
+					result["portfolio_metrics"] = metrics
+					result.update(metrics)
+
+		# Load portfolios.json for positions and portfolio data
 		portfolios_file = backtest_dir / "portfolios.json"
 		if portfolios_file.exists():
 			portfolios = self._load_portfolios_json(portfolios_file)
 			if portfolios and "portfolios" in portfolios:
 				portfolio_data = next(iter(portfolios["portfolios"].values()), {})
-				result["portfolio_metrics"] = portfolio_data.get("metrics", {})
 				result["positions"] = portfolio_data.get("positions", {}).get("data", [])
 
 		# Compute equity curve from journal
@@ -148,6 +186,67 @@ class BacktestManager:
 			return {"status": "success", "message": f"Deleted backtest {backtest_id}"}
 		except Exception as e:
 			return {"status": "error", "message": str(e)}
+
+	def initialize_backtest(
+		self,
+		strategy_name: str,
+		start_date: date,
+		end_date: date,
+		lookback_days: int = 365,
+		backtest_id: str = None
+	) -> Dict[str, Any]:
+		"""Initialize a new backtest run.
+
+		Generates backtest ID (if not provided), creates directory structure, and returns backtest context.
+
+		Args:
+			strategy_name: Strategy name
+			start_date: Backtest start date
+			end_date: Backtest end date
+			lookback_days: Lookback period in days
+			backtest_id: Optional pre-generated backtest ID. If not provided, generates one.
+
+		Returns:
+			Dict with status, backtest_id, backtest_dir, and context dict (or error)
+		"""
+		try:
+			# Use provided backtest_id or generate a new one
+			if not backtest_id:
+				backtest_id = f"{date.today().strftime('%Y%m%d_%H%M%S')}_{str(uuid.uuid4())[:8]}"
+
+			# Create directory
+			dir_result = self.create_backtest_dir(strategy_name, backtest_id)
+			if dir_result.get("status") != "success":
+				return {
+					"status": "error",
+					"message": f"Failed to create backtest directory: {dir_result.get('message')}",
+				}
+
+			backtest_dir = dir_result.get("backtest_dir")
+
+			# Initialize backtest context
+			backtest = {
+				"strategy_name": strategy_name,
+				"backtest_id": backtest_id,
+				"backtest_dir": backtest_dir,
+				"start_date": start_date.isoformat(),
+				"end_date": end_date.isoformat(),
+				"lookback_days": lookback_days,
+				"daily_results": [],
+				"metrics": {},
+			}
+
+			return {
+				"status": "success",
+				"backtest_id": backtest_id,
+				"backtest_dir": backtest_dir,
+				"backtest": backtest,
+			}
+		except Exception as e:
+			return {
+				"status": "error",
+				"message": f"Failed to initialize backtest: {str(e)}",
+			}
 
 	def create_backtest_dir(self, strategy_name: str, backtest_id: str) -> Dict[str, Any]:
 		"""Create backtest directory structure.
@@ -270,7 +369,28 @@ class BacktestManager:
 		# Parse created_at from backtest_id
 		created_at = self._parse_created_at(backtest_id)
 
-		# Load portfolios.json
+		# Try to load metrics from metrics.json first (new format)
+		metrics_file = backtest_dir / "metrics.json"
+		if metrics_file.exists():
+			try:
+				with open(metrics_file) as f:
+					text = f.read()
+					text = re.sub(r"\bNaN\b", "null", text)
+					metrics = json.loads(text)
+					return {
+						"backtest_id": backtest_id,
+						"strategy_name": strategy_name,
+						"created_at": created_at,
+						"total_return_pct": metrics.get("total_return_pct", 0),
+						"max_drawdown_pct": metrics.get("max_drawdown_pct", 0),
+						"sharpe_ratio": metrics.get("sharpe_ratio", 0),
+						"total_trades": metrics.get("total_trades", 0),
+						"win_rate_pct": metrics.get("win_rate_pct", 0),
+					}
+			except Exception as e:
+				logger.warning(f"Failed to load metrics.json for {backtest_id}: {e}")
+
+		# Fallback to portfolios.json (old format)
 		portfolios_file = backtest_dir / "portfolios.json"
 		if not portfolios_file.exists():
 			return None
@@ -344,14 +464,14 @@ class BacktestManager:
 			return None
 
 	def _compute_equity_curve(self, strategy_name: str, backtest_id: str) -> Optional[List[Dict[str, Any]]]:
-		"""Compute equity curve from journal CSV.
+		"""Compute equity curve from journal CSV with drawdown.
 
 		Args:
 			strategy_name: Strategy name
 			backtest_id: Backtest ID
 
 		Returns:
-			List of {date, value} dicts
+			List of {date, value, drawdown_pct} dicts
 		"""
 		backtest_dir = self.backtests_dir / strategy_name / backtest_id
 
@@ -386,6 +506,10 @@ class BacktestManager:
 			daily["cumulative_pnl"] = daily["amount"].cumsum()
 			daily["value"] = initial_capital + daily["cumulative_pnl"]
 
+			# Compute drawdown (running maximum minus current value)
+			daily["running_max"] = daily["value"].expanding().max()
+			daily["drawdown_pct"] = ((daily["value"] - daily["running_max"]) / daily["running_max"] * 100)
+
 			# Return as list of dicts
 			result = []
 			for _, row in daily.iterrows():
@@ -393,6 +517,7 @@ class BacktestManager:
 					{
 						"date": str(row["date"]),
 						"value": float(row["value"]),
+						"drawdown_pct": float(row["drawdown_pct"]),
 					}
 				)
 
@@ -433,3 +558,62 @@ class BacktestManager:
 			return trades
 		except Exception:
 			return None
+
+	def get_portfolio_history(self, strategy_name: str, backtest_id: str) -> Dict[str, Any]:
+		"""Get portfolio history with evolving metrics.
+
+		Args:
+			strategy_name: Strategy name
+			backtest_id: Backtest ID
+
+		Returns:
+			Historical data with daily equity values, returns, and drawdown
+		"""
+		backtest_dir = self.backtests_dir / strategy_name / backtest_id
+
+		if not backtest_dir.exists():
+			return {"status": "error", "message": "Backtest not found"}
+
+		# Load equity curve (already calculated by BacktestAgent)
+		equity_curve = self._compute_equity_curve(strategy_name, backtest_id)
+		if not equity_curve:
+			return {"status": "error", "message": "No equity curve data available"}
+
+		# Calculate metrics at each point in time
+		initial_capital = 100000.0
+		history = []
+		peak_value = initial_capital
+		max_drawdown = 0.0
+
+		for i, point in enumerate(equity_curve):
+			current_value = point["value"]
+
+			# Track peak (running maximum)
+			if current_value > peak_value:
+				peak_value = current_value
+
+			# Calculate cumulative return
+			cumulative_return = ((current_value - initial_capital) / initial_capital) * 100
+
+			# Calculate drawdown from peak (will be negative when below peak)
+			drawdown = ((current_value - peak_value) / peak_value) * 100 if peak_value > 0 else 0
+
+			# Track maximum drawdown (most negative value)
+			if drawdown < max_drawdown:
+				max_drawdown = drawdown
+
+			history.append({
+				"date": point["date"],
+				"value": current_value,
+				"return_pct": cumulative_return,
+				"drawdown_pct": drawdown,
+			})
+
+		return {
+			"status": "success",
+			"strategy_name": strategy_name,
+			"backtest_id": backtest_id,
+			"history": history,
+			"initial_capital": initial_capital,
+			"max_drawdown_pct": max_drawdown,
+		}

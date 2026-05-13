@@ -1,288 +1,1071 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { LineChart, Line, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
-import { useBacktestRun } from '@/hooks/usePortfolio'
+import { LineChart, Line, AreaChart, Area, BarChart, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { useBacktestRun, useBacktestDistribution } from '@/hooks/usePortfolio'
+import { useBacktestWebSocket } from '@/hooks/useBacktestWebSocket'
 
 export default function BacktestDetail() {
-  const { strategy, runId } = useParams<{ strategy: string; runId: string }>()
+  const { strategy, runId, tab: tabParam } = useParams<{ strategy: string; runId: string; tab?: string }>()
   const navigate = useNavigate()
-  const { data: response, isLoading } = useBacktestRun(strategy || '', runId || '')
-  const [activeTab, setActiveTab] = useState('performance')
+  const { data: response, isLoading, error } = useBacktestRun(strategy || '', runId || '')
 
-  if (isLoading) {
-    return <div className="text-slate-400">Loading backtest details...</div>
+  // Debug hook response
+  useEffect(() => {
+    console.log('useBacktestRun response:', { response, isLoading, error, has_data: !!response })
+  }, [response, isLoading, error])
+
+  // Real-time data tracking
+  const [isRunning, setIsRunning] = useState(false)
+  const [progress, setProgress] = useState({ current: 0, total: 0, percentage: 0 })
+  const [realtimeMetrics, setRealtimeMetrics] = useState<any>(null)
+  const [realtimeEquity, setRealtimeEquity] = useState<any[]>([])
+  const [daysProcessed, setDaysProcessed] = useState(0)
+  const [totalDays, setTotalDays] = useState(0)
+
+  // Tab state - read from URL path param
+  const [activeTab, setActiveTab] = useState<'performance' | 'distribution' | 'trades' | 'transactions'>('performance')
+  const [transactionSort, setTransactionSort] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'created_at', direction: 'desc' })
+  const [selectedPosition, setSelectedPosition] = useState<any>(null)
+  const [selectedDistributionBin, setSelectedDistributionBin] = useState<any>(null)
+
+  useEffect(() => {
+    if (tabParam && ['performance', 'distribution', 'trades', 'transactions'].includes(tabParam)) {
+      setActiveTab(tabParam as 'performance' | 'distribution' | 'trades' | 'transactions')
+    }
+  }, [tabParam])
+
+  const handleTabChange = (tab: 'performance' | 'distribution' | 'trades' | 'transactions') => {
+    navigate(`/backtests/${strategy}/${runId}/${tab}`)
   }
 
-  const backtest = response?.data
-  if (!backtest) {
-    return <div className="text-red-400">Backtest not found</div>
-  }
-
-  const metrics = backtest.portfolio_metrics || {}
-  const equity = backtest.equity_curve || []
-  const trades = backtest.trades || []
-  const positions = backtest.positions || []
-
-  // Build drawdown chart data
-  const drawdownData = equity.map((point: any, idx: number) => {
-    if (idx === 0) return { ...point, drawdown: 0 }
-    const maxBefore = Math.max(...equity.slice(0, idx + 1).map((p: any) => p.value))
-    const dd = ((point.value - maxBefore) / maxBefore) * 100
-    return { ...point, drawdown: dd }
+  // WebSocket connection for real-time updates
+  const { isConnected, lastMessage } = useBacktestWebSocket({
+    backtest_id: runId || '',
+    strategy_name: strategy || '',
+    enabled: !!runId && !!strategy,
   })
 
-  const TABS = [
-    { id: 'performance', label: 'Performance' },
-    { id: 'trades', label: 'Trades' },
-    { id: 'overview', label: 'Overview' },
-  ]
+  // Distribution data
+  const { data: distributionResponse, isLoading: distLoading, error: distError } = useBacktestDistribution(strategy || '', runId || '')
 
-  return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <Link to="/backtests" className="text-purple-400 hover:text-purple-300 text-sm mb-2 inline-block">
-            ← Back to Runs
-          </Link>
-          <h1 className="text-4xl font-bold text-white mb-1">{runId}</h1>
-          <p className="text-slate-400">{strategy} • {new Date(backtest.created_at).toLocaleDateString()}</p>
+  // Debug distribution response
+  useEffect(() => {
+    console.log('=== DISTRIBUTION DEBUG ===')
+    console.log('Strategy:', strategy)
+    console.log('RunId:', runId)
+    console.log('Hook enabled?', !!(strategy && runId))
+    console.log('Full response object:', distributionResponse)
+    console.log('Is loading:', distLoading)
+    console.log('Error:', distError)
+    if (distributionResponse) {
+      console.log('Response keys:', Object.keys(distributionResponse))
+      console.log('Response status:', distributionResponse.status)
+      console.log('Response.data:', distributionResponse.data)
+      console.log('Response.distribution:', distributionResponse.distribution)
+      console.log('Response.statistics:', distributionResponse.statistics)
+    }
+  }, [distributionResponse, distLoading, distError, strategy, runId])
+
+  // Track if backtest is running based on WebSocket connection
+  useEffect(() => {
+    if (lastMessage) {
+      if (lastMessage.type === 'backtest_complete') {
+        setIsRunning(false)
+        setProgress({ current: 100, total: 100, percentage: 100 })
+        setRealtimeMetrics(lastMessage.data.metrics)
+        setDaysProcessed(lastMessage.data.days_processed || daysProcessed)
+        setTotalDays(lastMessage.data.days_processed || daysProcessed)
+      } else if (lastMessage.type === 'daily_results') {
+        setIsRunning(true)
+        setDaysProcessed(prev => {
+          const newCount = prev + 1
+          const newPercentage = totalDays > 0 ? Math.round((newCount / totalDays) * 100) : Math.min((prev / Math.max(1, prev + 1)) * 100 + 5, 95)
+          setProgress({
+            current: newCount,
+            total: totalDays,
+            percentage: newPercentage,
+          })
+          return newCount
+        })
+      } else if (lastMessage.type === 'error') {
+        setIsRunning(false)
+      }
+    }
+  }, [lastMessage, totalDays])
+
+  // Fetch portfolio history with evolving metrics - only while running
+  useEffect(() => {
+    if (!strategy || !runId || !isRunning) return
+
+    const fetchInterval = setInterval(async () => {
+      try {
+        const historyRes = await fetch(`/api/v1/backtests/${strategy}/${runId}/history`)
+        if (historyRes.status === 200) {
+          const historyData = await historyRes.json()
+          if (historyData.status === 'success' && historyData.history) {
+            const equityCurve = historyData.history.map((h: any) => ({
+              date: h.date,
+              value: h.value,
+              drawdown_pct: h.drawdown_pct,
+            }))
+            setRealtimeEquity(equityCurve)
+
+            const latest = historyData.history[historyData.history.length - 1]
+            if (latest) {
+              setRealtimeMetrics({
+                total_return_pct: latest.return_pct,
+                max_drawdown_pct: historyData.max_drawdown_pct ?? (Math.min(...historyData.history.map((h: any) => h.drawdown_pct)) || 0),
+              })
+            }
+
+            if (historyData.history.length > 0) {
+              setDaysProcessed(historyData.history.length)
+            }
+          }
+        }
+      } catch (e) {
+        // Silently fail
+      }
+    }, 1000)
+
+    return () => clearInterval(fetchInterval)
+  }, [strategy, runId, isRunning])
+
+  // response has { status, data }, we need the inner data object
+  const backtest = response?.data
+  const hasData = backtest && (backtest.equity_curve?.length > 0 || Object.keys(backtest.portfolio_metrics || {}).length > 0)
+
+  // Debug logging
+  useEffect(() => {
+    if (backtest) {
+      console.log('Backtest data loaded:', {
+        has_portfolio_metrics: !!backtest.portfolio_metrics,
+        portfolio_metrics_keys: backtest.portfolio_metrics ? Object.keys(backtest.portfolio_metrics) : [],
+        total_return_pct: backtest.total_return_pct,
+        max_drawdown_pct: backtest.max_drawdown_pct,
+        sharpe_ratio: backtest.sharpe_ratio,
+      })
+    }
+  }, [backtest])
+
+  if (isLoading && !hasData && !isConnected) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center space-y-4">
+          <div className="flex items-center justify-center w-16 h-16 rounded-full border-4 border-slate-700 border-t-purple-600 animate-spin mx-auto" />
+          <p className="text-slate-400">Loading backtest details...</p>
         </div>
-        <button
-          onClick={() => navigate(`/backtests/compare?items=${strategy}:${runId}`)}
-          className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold transition"
-        >
-          Compare
-        </button>
       </div>
+    )
+  }
 
-      {/* Tab Navigation */}
-      <div className="border-b border-slate-800">
-        <div className="flex gap-8">
-          {TABS.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-1 py-4 font-medium text-sm transition border-b-2 whitespace-nowrap ${
-                activeTab === tab.id
-                  ? 'border-purple-600 text-white'
-                  : 'border-transparent text-slate-400 hover:text-slate-300'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+  if (!backtest && !isConnected) {
+    return (
+      <div className="text-center space-y-4 py-12">
+        <p className="text-red-400 text-lg">Backtest not found</p>
+        <Link to="/backtests" className="text-purple-400 hover:text-purple-300">← Back to Runs</Link>
+      </div>
+    )
+  }
+
+  if (!backtest && isConnected) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-baseline justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-white">{strategy}</h1>
+            <p className="text-xs text-slate-500 font-mono">{runId}</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="px-3 py-1 bg-blue-900/30 border border-blue-800 rounded text-blue-400 text-xs font-medium">
+              🔄 Running
+            </div>
+            <Link to="/backtests" className="text-slate-400 hover:text-slate-300 text-xs">
+              Back
+            </Link>
+          </div>
         </div>
-      </div>
 
-      {/* Performance Tab */}
-      {activeTab === 'performance' && (
-        <div className="space-y-8">
-          {/* Key Metrics Cards */}
-          <div className="grid grid-cols-3 gap-6">
-            <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
-              <div className="text-slate-400 text-sm mb-2">Total Return</div>
-              <div className={`text-3xl font-bold ${
-                (metrics.total_return_pct || 0) >= 0 ? 'text-green-400' : 'text-red-400'
-              }`}>
-                {(metrics.total_return_pct || 0).toFixed(2)}%
-              </div>
-            </div>
-            <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
-              <div className="text-slate-400 text-sm mb-2">Sharpe Ratio</div>
-              <div className="text-3xl font-bold text-white">{(metrics.sharpe_ratio || 0).toFixed(3)}</div>
-            </div>
-            <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
-              <div className="text-slate-400 text-sm mb-2">Max Drawdown</div>
-              <div className="text-3xl font-bold text-red-400">{(metrics.max_drawdown_pct || 0).toFixed(2)}%</div>
+        <div className="space-y-2">
+          <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden border border-slate-700">
+            <div
+              className="h-full bg-gradient-to-r from-purple-600 to-violet-600 transition-all duration-300"
+              style={{ width: `${progress.percentage}%` }}
+            />
+          </div>
+          <div className="text-center text-slate-400 text-xs">
+            {Math.round(progress.percentage)}% {daysProcessed > 0 && totalDays > 0 && `(${daysProcessed}/${totalDays})`}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-slate-800/50 rounded p-4 border border-slate-700">
+            <div className="text-slate-500 text-xs mb-1">Return</div>
+            <div className={`text-2xl font-bold ${
+              (realtimeMetrics?.total_return_pct || 0) >= 0 ? 'text-green-400' : 'text-red-400'
+            }`}>
+              {(realtimeMetrics?.total_return_pct || 0).toFixed(1)}%
             </div>
           </div>
-
-          <div className="grid grid-cols-3 gap-6">
-            <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
-              <div className="text-slate-400 text-sm mb-2">Sortino Ratio</div>
-              <div className="text-3xl font-bold text-white">{(metrics.sortino_ratio || 0).toFixed(3)}</div>
-            </div>
-            <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
-              <div className="text-slate-400 text-sm mb-2">Calmar Ratio</div>
-              <div className="text-3xl font-bold text-white">{(metrics.calmar_ratio || 0).toFixed(3)}</div>
-            </div>
-            <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
-              <div className="text-slate-400 text-sm mb-2">Profit Factor</div>
-              <div className="text-3xl font-bold text-white">{(metrics.profit_factor || 0).toFixed(2)}</div>
+          <div className="bg-slate-800/50 rounded p-4 border border-slate-700">
+            <div className="text-slate-500 text-xs mb-1">Drawdown</div>
+            <div className="text-2xl font-bold text-red-400">
+              {(realtimeMetrics?.max_drawdown_pct || 0).toFixed(1)}%
             </div>
           </div>
+          <div className="bg-slate-800/50 rounded p-4 border border-slate-700">
+            <div className="text-slate-500 text-xs mb-1">Days</div>
+            <div className="text-2xl font-bold text-white">{daysProcessed}</div>
+          </div>
+        </div>
 
-          {/* Equity Curve */}
-          <div className="bg-slate-900 rounded-lg p-8 border border-slate-800">
-            <h3 className="text-xl font-bold text-white mb-6">Equity Curve</h3>
-            <div className="h-80">
+        {realtimeEquity.length > 0 && (
+          <div className="bg-slate-900/50 rounded p-6 border border-slate-800">
+            <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={equity} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                  <XAxis dataKey="date" stroke="#94a3b8" style={{ fontSize: '12px' }} />
-                  <YAxis stroke="#94a3b8" />
-                  <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }} />
+                <LineChart data={realtimeEquity} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.2} />
+                  <XAxis dataKey="date" stroke="#94a3b8" style={{ fontSize: '11px' }} />
+                  <YAxis stroke="#94a3b8" style={{ fontSize: '11px' }} />
+                  <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '6px' }} />
                   <Line type="monotone" dataKey="value" stroke="#a78bfa" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           </div>
+        )}
+      </div>
+    )
+  }
 
-          {/* Drawdown Chart */}
-          <div className="bg-slate-900 rounded-lg p-8 border border-slate-800">
-            <h3 className="text-xl font-bold text-white mb-6">Drawdown</h3>
-            <div className="h-48">
+  // Use real-time metrics first, then portfolio_metrics, then fallback to top-level metrics from API
+  // Build metrics from available sources
+  const metrics = realtimeMetrics ||
+    (backtest?.portfolio_metrics && Object.keys(backtest.portfolio_metrics).length > 0 ? backtest.portfolio_metrics : null) ||
+    {
+      total_return_pct: backtest?.total_return_pct ?? 0,
+      sharpe_ratio: backtest?.sharpe_ratio ?? 0,
+      sortino_ratio: backtest?.sortino_ratio ?? 0,
+      max_drawdown_pct: backtest?.max_drawdown_pct ?? 0,
+      calmar_ratio: backtest?.calmar_ratio ?? 0,
+      win_rate_pct: backtest?.win_rate_pct ?? 0,
+      profit_factor: backtest?.profit_factor ?? 0,
+      total_trades: backtest?.total_trades ?? 0,
+      avg_winning_trade_pct: backtest?.avg_winning_trade_pct ?? 0,
+      avg_losing_trade_pct: backtest?.avg_losing_trade_pct ?? 0,
+      best_trade_pct: backtest?.best_trade_pct ?? 0,
+      worst_trade_pct: backtest?.worst_trade_pct ?? 0,
+    }
+  const baseEquity = realtimeEquity.length > 0 ? realtimeEquity : (backtest?.equity_curve || [])
+  const trades = backtest?.trades || []
+
+  // Ensure equity data includes drawdown
+  const equity = baseEquity.map((point: any, idx: number) => {
+    if ('drawdown_pct' in point && point.drawdown_pct !== null) {
+      return point
+    }
+    const peak = Math.max(...baseEquity.slice(0, idx + 1).map((p: any) => p.value))
+    const drawdown = ((point.value - peak) / peak) * 100
+    return { ...point, drawdown_pct: drawdown }
+  })
+
+  const MetricRow = ({ label, value, color = 'text-white' }: { label: string; value: string | number; color?: string }) => (
+    <div className="flex items-start justify-between py-3 border-b border-slate-800 last:border-b-0">
+      <span className="text-slate-400 text-sm">{label}</span>
+      <span className={`font-bold text-sm ${color}`}>{value}</span>
+    </div>
+  )
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">{strategy}</h1>
+          <p className="text-xs text-slate-500 font-mono">{runId}</p>
+        </div>
+        <div className="flex items-center gap-3">
+          {isRunning && (
+            <div className="px-3 py-1 bg-blue-900/30 border border-blue-800 rounded text-blue-400 text-xs font-medium">
+              🔄 Running
+            </div>
+          )}
+          <button
+            onClick={() => navigate(`/backtests/compare?items=${strategy}:${runId}`)}
+            className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded text-xs font-medium transition"
+          >
+            Compare
+          </button>
+          <Link to="/backtests" className="text-slate-400 hover:text-slate-300 text-xs">
+            Back
+          </Link>
+        </div>
+      </div>
+
+      {/* Progress Bar */}
+      {isRunning && (
+        <div className="space-y-2">
+          <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden border border-slate-700">
+            <div
+              className="h-full bg-gradient-to-r from-purple-600 to-violet-600 transition-all duration-300"
+              style={{ width: `${progress.percentage}%` }}
+            />
+          </div>
+          <div className="text-center text-slate-400 text-xs">
+            {Math.round(progress.percentage)}% {daysProcessed > 0 && totalDays > 0 && `(${daysProcessed}/${totalDays} days)`}
+          </div>
+        </div>
+      )}
+
+      {/* Main Tab Navigation */}
+      <div className="flex gap-1 border-b border-slate-700">
+        <button
+          onClick={() => handleTabChange('performance')}
+          className={`px-4 py-2 text-sm font-medium transition ${
+            activeTab === 'performance'
+              ? 'text-purple-400 border-b-2 border-purple-400'
+              : 'text-slate-400 hover:text-slate-300'
+          }`}
+        >
+          Performance
+        </button>
+        <button
+          onClick={() => handleTabChange('trades')}
+          className={`px-4 py-2 text-sm font-medium transition ${
+            activeTab === 'trades'
+              ? 'text-purple-400 border-b-2 border-purple-400'
+              : 'text-slate-400 hover:text-slate-300'
+          }`}
+        >
+          Trades
+        </button>
+        <button
+          onClick={() => handleTabChange('transactions')}
+          className={`px-4 py-2 text-sm font-medium transition ${
+            activeTab === 'transactions'
+              ? 'text-purple-400 border-b-2 border-purple-400'
+              : 'text-slate-400 hover:text-slate-300'
+          }`}
+        >
+          Transactions
+        </button>
+      </div>
+
+      {/* Performance Section - Only show when on performance tab */}
+      {activeTab === 'performance' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-12 gap-4">
+            {/* Charts - Left Side (9 cols) */}
+            <div className="col-span-9 space-y-4">
+          {/* Equity Curve */}
+          <div className="bg-slate-900/50 rounded-lg p-6 border border-slate-800 shadow-lg">
+            <h2 className="text-sm font-bold text-white mb-4">EQUITY CURVE</h2>
+            <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={drawdownData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                  <XAxis dataKey="date" stroke="#94a3b8" style={{ fontSize: '12px' }} />
-                  <YAxis stroke="#94a3b8" />
+                <LineChart data={equity} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.2} />
+                  <XAxis dataKey="date" stroke="#94a3b8" style={{ fontSize: '11px' }} />
+                  <YAxis stroke="#94a3b8" style={{ fontSize: '11px' }} />
                   <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }} />
-                  <Area type="monotone" dataKey="drawdown" fill="#ef4444" stroke="#dc2626" fillOpacity={0.3} />
-                </AreaChart>
+                  <Line type="monotone" dataKey="value" stroke="#a78bfa" strokeWidth={2.5} dot={false} />
+                </LineChart>
               </ResponsiveContainer>
             </div>
           </div>
 
-          {/* Trade Statistics */}
-          <div className="grid grid-cols-2 gap-6">
-            <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
-              <h3 className="text-lg font-bold text-white mb-4">Trade Statistics</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Total Trades</span>
-                  <span className="text-white font-semibold">{metrics.total_trades || 0}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Win Rate</span>
-                  <span className="text-green-400 font-semibold">{(metrics.win_rate_pct || 0).toFixed(2)}%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Avg Winning Trade</span>
-                  <span className="text-green-400 font-semibold">{(metrics.avg_winning_trade_pct || 0).toFixed(2)}%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Avg Losing Trade</span>
-                  <span className="text-red-400 font-semibold">{(metrics.avg_losing_trade_pct || 0).toFixed(2)}%</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
-              <h3 className="text-lg font-bold text-white mb-4">Risk Metrics</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Max Drawdown Duration</span>
-                  <span className="text-white font-semibold">{metrics.max_drawdown_duration_days || 0} days</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Expectancy</span>
-                  <span className="text-white font-semibold">{(metrics.expectancy_pct || 0).toFixed(2)}%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Best Trade</span>
-                  <span className="text-green-400 font-semibold">{(metrics.best_trade_pct || 0).toFixed(2)}%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Worst Trade</span>
-                  <span className="text-red-400 font-semibold">{(metrics.worst_trade_pct || 0).toFixed(2)}%</span>
-                </div>
-              </div>
+          {/* Drawdown */}
+          <div className="bg-slate-900/50 rounded-lg p-6 border border-slate-800 shadow-lg">
+            <h2 className="text-sm font-bold text-white mb-4">DRAWDOWN</h2>
+            <div className="h-40">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={equity} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.2} />
+                  <XAxis dataKey="date" stroke="#94a3b8" style={{ fontSize: '11px' }} />
+                  <YAxis stroke="#94a3b8" style={{ fontSize: '11px' }} label={{ value: '%', angle: -90, position: 'insideLeft' }} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }}
+                    formatter={(value: any) => [(value as number).toFixed(2) + '%', 'Drawdown']}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="drawdown_pct"
+                    fill="#ef4444"
+                    stroke="#dc2626"
+                    fillOpacity={0.3}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
           </div>
-        </div>
-      )}
+            </div>
 
-      {/* Trades Tab */}
-      {activeTab === 'trades' && (
-        <div className="bg-slate-900 rounded-lg p-8 border border-slate-800 overflow-x-auto">
-          <h3 className="text-xl font-bold text-white mb-6">Trade History</h3>
-          {trades.length === 0 ? (
-            <div className="text-center py-8 text-slate-500">No trades recorded</div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead className="border-b border-slate-700">
-                <tr className="text-slate-400">
-                  <th className="text-left py-3 px-3">Date</th>
-                  <th className="text-left py-3 px-3">Ticker</th>
-                  <th className="text-right py-3 px-3">Operation</th>
-                  <th className="text-right py-3 px-3">Quantity</th>
-                  <th className="text-right py-3 px-3">Price</th>
-                  <th className="text-right py-3 px-3">Amount</th>
-                  <th className="text-left py-3 px-3">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {trades.slice(0, 50).map((trade: any, idx: number) => (
-                  <tr key={idx} className="border-b border-slate-800 hover:bg-slate-800/30">
-                    <td className="py-3 px-3 text-slate-400">{new Date(trade.created_at).toLocaleDateString()}</td>
-                    <td className="py-3 px-3 text-white font-semibold">{trade.ticker}</td>
-                    <td className={`py-3 px-3 text-right font-semibold ${
-                      trade.operation === 'BUY' ? 'text-green-400' : 'text-red-400'
-                    }`}>
-                      {trade.operation}
-                    </td>
-                    <td className="py-3 px-3 text-right text-white">{trade.quantity}</td>
-                    <td className="py-3 px-3 text-right text-white">${(trade.price || 0).toFixed(2)}</td>
-                    <td className="py-3 px-3 text-right text-white">${(trade.amount || 0).toFixed(2)}</td>
-                    <td className={`py-3 px-3 text-sm ${
-                      trade.status === 'completed' ? 'text-green-400' : 'text-amber-400'
-                    }`}>
-                      {trade.status}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
-
-      {/* Overview Tab */}
-      {activeTab === 'overview' && (
-        <div className="grid grid-cols-2 gap-6">
-          <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
-            <h3 className="text-lg font-bold text-white mb-4">Backtest Info</h3>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-slate-400">Strategy</span>
-                <span className="text-white">{strategy}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Run ID</span>
-                <span className="text-white font-mono">{runId}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Created</span>
-                <span className="text-white">{new Date(backtest.created_at).toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Period</span>
-                <span className="text-white">
-                  {backtest.start_date} to {backtest.end_date}
-                </span>
-              </div>
+            {/* Metrics - Right Side (3 cols) */}
+            <div className="col-span-3">
+          <div className="bg-slate-900/50 rounded-lg p-6 border border-slate-800 shadow-lg sticky top-0">
+            <h2 className="text-sm font-bold text-white mb-4">KEY METRICS</h2>
+            <div className="space-y-0">
+              <MetricRow
+                label="Total Return"
+                value={`${(metrics.total_return_pct || 0).toFixed(2)}%`}
+                color={(metrics.total_return_pct || 0) >= 0 ? 'text-green-400' : 'text-red-400'}
+              />
+              <MetricRow
+                label="Sharpe Ratio"
+                value={`${(metrics.sharpe_ratio || 0).toFixed(2)}`}
+                color="text-purple-400"
+              />
+              <MetricRow
+                label="Sortino Ratio"
+                value={`${(metrics.sortino_ratio || 0).toFixed(2)}`}
+                color="text-purple-400"
+              />
+              <MetricRow
+                label="Max Drawdown"
+                value={`${(metrics.max_drawdown_pct || 0).toFixed(2)}%`}
+                color="text-red-400"
+              />
+              <MetricRow
+                label="Calmar Ratio"
+                value={`${(metrics.calmar_ratio || 0).toFixed(2)}`}
+              />
+              <MetricRow
+                label="Win Rate"
+                value={`${(metrics.win_rate_pct || 0).toFixed(1)}%`}
+                color="text-green-400"
+              />
+              <MetricRow
+                label="Profit Factor"
+                value={`${(metrics.profit_factor || 0).toFixed(2)}`}
+              />
+              <MetricRow
+                label="Total Trades"
+                value={metrics.total_trades || 0}
+              />
+              <MetricRow
+                label="Avg Win Trade"
+                value={`${(metrics.avg_winning_trade_pct || 0).toFixed(2)}%`}
+                color="text-green-400"
+              />
+              <MetricRow
+                label="Avg Loss Trade"
+                value={`${(metrics.avg_losing_trade_pct || 0).toFixed(2)}%`}
+                color="text-red-400"
+              />
+              <MetricRow
+                label="Best Trade"
+                value={`${(metrics.best_trade_pct || 0).toFixed(2)}%`}
+                color="text-green-400"
+              />
+              <MetricRow
+                label="Worst Trade"
+                value={`${(metrics.worst_trade_pct || 0).toFixed(2)}%`}
+                color="text-red-400"
+              />
+            </div>
+            </div>
             </div>
           </div>
 
-          <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
-            <h3 className="text-lg font-bold text-white mb-4">Current Positions</h3>
-            {positions.length === 0 ? (
-              <p className="text-slate-500 text-sm">No open positions</p>
-            ) : (
-              <div className="space-y-2 text-sm">
-                {positions.map((pos: any, idx: number) => (
-                  <div key={idx} className="flex justify-between">
-                    <span className="text-slate-400">{pos.ticker}</span>
-                    <span className="text-white">{pos.quantity} @ ${(pos.current_price || 0).toFixed(2)}</span>
+          {/* Distribution Section */}
+          <div>
+            <h2 className="text-lg font-bold text-white mb-4">RETURN DISTRIBUTION (4% STEPS)</h2>
+              {distLoading ? (
+              <div className="bg-slate-900/50 rounded-lg p-6 border border-slate-800 text-center text-slate-400">
+                Loading distribution data...
+              </div>
+            ) : distError ? (
+              <div className="bg-slate-900/50 rounded-lg p-6 border border-slate-800 text-center">
+                <p className="text-red-400 mb-2">Error loading distribution</p>
+                <p className="text-xs text-slate-400">{(distError as any)?.message}</p>
+              </div>
+            ) : distributionResponse?.status === 'success' ? (
+              <>
+                {(() => {
+                  // Handle both flat and nested response structures
+                  const distData = distributionResponse.data || distributionResponse
+                  const distStats = distData.statistics || {}
+                  const distribution = distData.distribution || []
+
+                  return (
+                    <div className="grid grid-cols-12 gap-4">
+                      {/* Distribution Chart - Left Side (9 cols) */}
+                      <div className="col-span-9">
+                      <div className="bg-slate-900/50 rounded-lg p-6 border border-slate-800 shadow-lg">
+                        <h2 className="text-sm font-bold text-white mb-4">RETURN DISTRIBUTION (4% STEPS)</h2>
+                        <div className="h-80">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <ComposedChart
+                              data={distribution}
+                              margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.2} />
+                              <XAxis dataKey="return_range" stroke="#94a3b8" style={{ fontSize: '11px' }} angle={-45} textAnchor="end" height={80} label={{ value: 'Return %', position: 'insideBottom', offset: -10 }} />
+                              <YAxis yAxisId="left" stroke="#94a3b8" style={{ fontSize: '11px' }} label={{ value: 'Frequency (Trades)', angle: -90, position: 'insideLeft' }} />
+                              <YAxis yAxisId="right" orientation="right" stroke="#94a3b8" style={{ fontSize: '11px' }} label={{ value: 'Cumulative P&L ($)', angle: 90, position: 'insideRight' }} />
+                              <Tooltip
+                                contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }}
+                                formatter={(value: any) => {
+                                  if (typeof value === 'number') {
+                                    if (Math.abs(value) > 1000) {
+                                      return `$${(value / 1000).toFixed(1)}k`
+                                    }
+                                    return `${Math.round(value)}`
+                                  }
+                                  return value
+                                }}
+                              />
+                              <Legend />
+                              <Bar yAxisId="left" dataKey="trade_count" fill="#a78bfa" name="Frequency" />
+                              <Line yAxisId="right" type="monotone" dataKey="cumulative_pnl_total" stroke="#10b981" strokeWidth={2} name="Cumulative P&L" />
+                            </ComposedChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Distribution Stats - Right Side (3 cols) */}
+                    <div className="col-span-3">
+                      <div className="bg-slate-900/50 rounded-lg p-6 border border-slate-800 shadow-lg sticky top-0">
+                        <h2 className="text-sm font-bold text-white mb-4">DISTRIBUTION STATS</h2>
+                        <div className="space-y-0">
+                          <MetricRow
+                            label="Total Trades"
+                            value={distStats.total_trades || 0}
+                          />
+                          <MetricRow
+                            label="Total P&L"
+                            value={`$${(distStats.total_pnl || 0).toFixed(0)}`}
+                            color={(distStats.total_pnl || 0) >= 0 ? 'text-green-400' : 'text-red-400'}
+                          />
+                          <MetricRow
+                            label="Win Rate"
+                            value={`${(distStats.win_rate || 0).toFixed(1)}%`}
+                            color="text-green-400"
+                          />
+                          <MetricRow
+                            label="Avg Return"
+                            value={`${(distStats.avg_return || 0).toFixed(2)}%`}
+                            color={(distStats.avg_return || 0) >= 0 ? 'text-green-400' : 'text-red-400'}
+                          />
+                          <MetricRow
+                            label="Median Return"
+                            value={`${(distStats.median_return || 0).toFixed(2)}%`}
+                            color={(distStats.median_return || 0) >= 0 ? 'text-green-400' : 'text-red-400'}
+                          />
+                          <MetricRow
+                            label="Min Return"
+                            value={`${(distStats.min_return || 0).toFixed(2)}%`}
+                            color="text-red-400"
+                          />
+                          <MetricRow
+                            label="Max Return"
+                            value={`${(distStats.max_return || 0).toFixed(2)}%`}
+                            color="text-green-400"
+                          />
+                          <MetricRow
+                            label="Std Dev"
+                            value={`${(distStats.std_return || 0).toFixed(2)}%`}
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                ))}
+                  )
+                })()}
+              </>
+            ) : (
+              <div className="bg-slate-900/50 rounded-lg p-6 border border-slate-800 text-center text-slate-400">
+                No distribution data available
               </div>
             )}
+            </div>
           </div>
-        </div>
       )}
+
+      {/* Trades Screen */}
+      {activeTab === 'trades' && (
+        <>
+          {trades.length > 0 ? (
+            <div className="bg-slate-900/50 rounded-lg p-6 border border-slate-800 shadow-lg">
+              <h3 className="text-sm font-bold text-white mb-4">RECENT TRADES</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="border-b border-slate-700">
+                    <tr className="text-slate-500">
+                      <th className="text-left py-2 px-2">Date</th>
+                      <th className="text-left py-2 px-2">Ticker</th>
+                      <th className="text-right py-2 px-2">Op</th>
+                      <th className="text-right py-2 px-2">Qty</th>
+                      <th className="text-right py-2 px-2">Price</th>
+                      <th className="text-right py-2 px-2">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {trades.slice(0, 10).map((trade: any, idx: number) => (
+                      <tr key={idx} className="border-b border-slate-800 hover:bg-slate-800/20">
+                        <td className="py-2 px-2 text-slate-400">{new Date(trade.created_at).toLocaleDateString()}</td>
+                        <td className="py-2 px-2 text-white font-medium">{trade.ticker}</td>
+                        <td className={`py-2 px-2 text-right font-bold ${
+                          trade.operation === 'BUY' ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                          {trade.operation === 'BUY' ? 'B' : 'S'}
+                        </td>
+                        <td className="py-2 px-2 text-right text-white">{trade.quantity}</td>
+                        <td className="py-2 px-2 text-right text-white">${(trade.price || 0).toFixed(0)}</td>
+                        <td className="py-2 px-2 text-right text-white">${(trade.amount || 0).toFixed(0)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-slate-900/50 rounded-lg p-6 border border-slate-800 text-center text-slate-400">
+              No trades available
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Transactions Tab */}
+      {activeTab === 'transactions' && (
+        <>
+          {/* Distribution Section */}
+          <div className="space-y-4 mb-6">
+            <div>
+              <h2 className="text-lg font-bold text-white mb-4">RETURN DISTRIBUTION (4% STEPS)</h2>
+              {distLoading ? (
+                  <div className="bg-slate-900/50 rounded-lg p-6 border border-slate-800 text-center text-slate-400">
+                    Loading distribution data...
+                  </div>
+                ) : distError ? (
+                  <div className="bg-slate-900/50 rounded-lg p-6 border border-slate-800 text-center">
+                    <p className="text-red-400 mb-2">Error loading distribution</p>
+                    <p className="text-xs text-slate-400">{(distError as any)?.message}</p>
+                  </div>
+                ) : distributionResponse?.status === 'success' ? (
+                  <>
+                    {(() => {
+                      // Handle both flat and nested response structures
+                      const distData = distributionResponse.data || distributionResponse
+                      const distStats = distData.statistics || {}
+                      const distribution = distData.distribution || []
+
+                      return (
+                        <div className="grid grid-cols-12 gap-4">
+                          {/* Distribution Chart - Left Side (9 cols) */}
+                          <div className="col-span-9">
+                            <div className="bg-slate-900/50 rounded-lg p-6 border border-slate-800 shadow-lg">
+                              <div className="h-80">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <ComposedChart
+                                    data={distribution}
+                                    margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
+                                  >
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.2} />
+                                    <XAxis dataKey="return_range" stroke="#94a3b8" style={{ fontSize: '11px' }} angle={-45} textAnchor="end" height={80} label={{ value: 'Return %', position: 'insideBottom', offset: -10 }} />
+                                    <YAxis yAxisId="left" stroke="#94a3b8" style={{ fontSize: '11px' }} label={{ value: 'Frequency (Trades)', angle: -90, position: 'insideLeft' }} />
+                                    <YAxis yAxisId="right" orientation="right" stroke="#94a3b8" style={{ fontSize: '11px' }} label={{ value: 'Cumulative P&L ($)', angle: 90, position: 'insideRight' }} />
+                                    <Tooltip
+                                      contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }}
+                                      formatter={(value: any) => {
+                                        if (typeof value === 'number') {
+                                          if (Math.abs(value) > 1000) {
+                                            return `$${(value / 1000).toFixed(1)}k`
+                                          }
+                                          return `${Math.round(value)}`
+                                        }
+                                        return value
+                                      }}
+                                    />
+                                    <Legend />
+                                    <Bar
+                                      yAxisId="left"
+                                      dataKey="trade_count"
+                                      fill="#a78bfa"
+                                      name="Frequency"
+                                      onClick={(data: any) => setSelectedDistributionBin(data)}
+                                      style={{ cursor: 'pointer' }}
+                                    />
+                                    <Line yAxisId="right" type="monotone" dataKey="cumulative_pnl_total" stroke="#10b981" strokeWidth={2} name="Cumulative P&L" />
+                                  </ComposedChart>
+                                </ResponsiveContainer>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Distribution Stats - Right Side (3 cols) */}
+                          <div className="col-span-3">
+                            <div className="bg-slate-900/50 rounded-lg p-6 border border-slate-800 shadow-lg sticky top-0">
+                              <h2 className="text-sm font-bold text-white mb-4">DISTRIBUTION STATS</h2>
+                              <div className="space-y-0">
+                                <MetricRow
+                                  label="Total Trades"
+                                  value={distStats.total_trades || 0}
+                                />
+                                <MetricRow
+                                  label="Total P&L"
+                                  value={`$${(distStats.total_pnl || 0).toFixed(0)}`}
+                                  color={(distStats.total_pnl || 0) >= 0 ? 'text-green-400' : 'text-red-400'}
+                                />
+                                <MetricRow
+                                  label="Win Rate"
+                                  value={`${(distStats.win_rate || 0).toFixed(1)}%`}
+                                  color="text-green-400"
+                                />
+                                <MetricRow
+                                  label="Avg Return"
+                                  value={`${(distStats.avg_return || 0).toFixed(2)}%`}
+                                  color={(distStats.avg_return || 0) >= 0 ? 'text-green-400' : 'text-red-400'}
+                                />
+                                <MetricRow
+                                  label="Median Return"
+                                  value={`${(distStats.median_return || 0).toFixed(2)}%`}
+                                  color={(distStats.median_return || 0) >= 0 ? 'text-green-400' : 'text-red-400'}
+                                />
+                                <MetricRow
+                                  label="Min Return"
+                                  value={`${(distStats.min_return || 0).toFixed(2)}%`}
+                                  color="text-red-400"
+                                />
+                                <MetricRow
+                                  label="Max Return"
+                                  value={`${(distStats.max_return || 0).toFixed(2)}%`}
+                                  color="text-green-400"
+                                />
+                                <MetricRow
+                                  label="Std Dev"
+                                  value={`${(distStats.std_return || 0).toFixed(2)}%`}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </>
+                ) : (
+                  <div className="bg-slate-900/50 rounded-lg p-6 border border-slate-800 text-center text-slate-400">
+                    No distribution data available
+                  </div>
+                )}
+            </div>
+          </div>
+
+          {/* Closed Positions List Section */}
+          {trades && trades.length > 0 ? (
+            <div className="grid grid-cols-12 gap-4">
+              {/* Positions Table - Left Side (9 cols) */}
+              <div className="col-span-9">
+                <div className="bg-slate-900/50 rounded-lg p-6 border border-slate-800 shadow-lg">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-bold text-white">CLOSED POSITIONS</h3>
+                    {selectedDistributionBin && (
+                      <div className="text-xs bg-purple-600/20 border border-purple-600/50 text-purple-300 px-3 py-1 rounded">
+                        Showing {selectedDistributionBin.return_range}
+                      </div>
+                    )}
+                  </div>
+                  {(() => {
+                    // Calculate positions outside table for use in footer too
+                    const distData = distributionResponse?.data || distributionResponse
+                    const apiTrades = distData?.trades || []
+
+                    let positions: any[] = []
+
+                    if (apiTrades.length > 0) {
+                      positions = apiTrades.map((trade: any, idx: number) => ({
+                        entry_date: trade.entry_date,
+                        exit_date: trade.exit_date,
+                        ticker: trade.ticker,
+                        quantity: trade.quantity,
+                        entry_price: trade.entry_price || (trade.cost_basis / trade.quantity),
+                        exit_price: 0,
+                        pnl: trade.pnl,
+                        return_pct: trade.return_pct,
+                        close_reason: trade.return_pct >= 5 ? '✅ Target' : trade.return_pct <= -2 ? '⛔ Stop Loss' : 'Sold',
+                        entry_metadata: trade.entry_metadata,
+                        exit_metadata: trade.exit_metadata,
+                        sortKey: idx
+                      })).map((pos: any) => ({
+                        ...pos,
+                        exit_price: pos.entry_price + (pos.pnl / pos.quantity)
+                      }))
+                    } else {
+                      let buys: any = {}
+                      trades.forEach((trade: any) => {
+                        if (trade.operation === 'BUY') {
+                          if (!buys[trade.ticker]) buys[trade.ticker] = []
+                          buys[trade.ticker].push({
+                            date: trade.created_at,
+                            quantity: trade.quantity,
+                            price: trade.price,
+                            fees: trade.fees || 0,
+                            metadata: trade.metadata || ''
+                          })
+                        } else if (trade.operation === 'SELL' && buys[trade.ticker] && buys[trade.ticker].length > 0) {
+                          let remainingQty = trade.quantity
+                          while (remainingQty > 0 && buys[trade.ticker].length > 0) {
+                            const buy = buys[trade.ticker].shift()
+                            const matchedQty = Math.min(remainingQty, buy.quantity)
+                            const grossPnL = matchedQty * (trade.price - buy.price)
+                            const buyFeesPortion = buy.fees * (matchedQty / buy.quantity)
+                            const sellFeesPortion = (trade.fees || 0) * (matchedQty / trade.quantity)
+                            const netPnL = grossPnL - buyFeesPortion - sellFeesPortion
+                            const costBasis = matchedQty * buy.price + buyFeesPortion
+                            const returnPct = costBasis !== 0 ? (netPnL / costBasis) * 100 : 0
+                            positions.push({
+                              entry_date: buy.date,
+                              exit_date: trade.created_at,
+                              ticker: trade.ticker,
+                              quantity: matchedQty,
+                              entry_price: buy.price,
+                              exit_price: trade.price,
+                              pnl: netPnL,
+                              return_pct: returnPct,
+                              close_reason: returnPct >= 5 ? '✅ Target' : returnPct <= -2 ? '⛔ Stop Loss' : 'Sold',
+                              entry_metadata: buy.metadata,
+                              exit_metadata: trade.metadata || '',
+                              sortKey: positions.length
+                            })
+                            remainingQty -= matchedQty
+                          }
+                        }
+                      })
+                    }
+
+                    // Filter by selected distribution bin
+                    const filteredPositions = selectedDistributionBin
+                      ? positions.filter((pos: any) =>
+                          pos.return_pct >= selectedDistributionBin.return_min &&
+                          pos.return_pct <= selectedDistributionBin.return_max
+                        )
+                      : positions
+
+                    return (
+                      <>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead className="border-b border-slate-700">
+                              <tr className="text-slate-500">
+                                <th className="text-left py-2 px-2 cursor-pointer hover:text-slate-400" onClick={() => setTransactionSort({ key: 'entry_date', direction: transactionSort.direction === 'desc' ? 'asc' : 'desc' })}>
+                                  Entry Date {transactionSort.key === 'entry_date' && (transactionSort.direction === 'desc' ? '↓' : '↑')}
+                                </th>
+                                <th className="text-left py-2 px-2 cursor-pointer hover:text-slate-400" onClick={() => setTransactionSort({ key: 'exit_date', direction: transactionSort.direction === 'desc' ? 'asc' : 'desc' })}>
+                                  Exit Date {transactionSort.key === 'exit_date' && (transactionSort.direction === 'desc' ? '↓' : '↑')}
+                                </th>
+                                <th className="text-left py-2 px-2 cursor-pointer hover:text-slate-400" onClick={() => setTransactionSort({ key: 'ticker', direction: transactionSort.key === 'ticker' && transactionSort.direction === 'desc' ? 'asc' : 'desc' })}>
+                                  Ticker {transactionSort.key === 'ticker' && (transactionSort.direction === 'desc' ? '↓' : '↑')}
+                                </th>
+                                <th className="text-right py-2 px-2 cursor-pointer hover:text-slate-400" onClick={() => setTransactionSort({ key: 'quantity', direction: transactionSort.key === 'quantity' && transactionSort.direction === 'desc' ? 'asc' : 'desc' })}>
+                                  Qty {transactionSort.key === 'quantity' && (transactionSort.direction === 'desc' ? '↓' : '↑')}
+                                </th>
+                                <th className="text-right py-2 px-2 cursor-pointer hover:text-slate-400" onClick={() => setTransactionSort({ key: 'entry_price', direction: transactionSort.key === 'entry_price' && transactionSort.direction === 'desc' ? 'asc' : 'desc' })}>
+                                  Entry {transactionSort.key === 'entry_price' && (transactionSort.direction === 'desc' ? '↓' : '↑')}
+                                </th>
+                                <th className="text-right py-2 px-2 cursor-pointer hover:text-slate-400" onClick={() => setTransactionSort({ key: 'exit_price', direction: transactionSort.key === 'exit_price' && transactionSort.direction === 'desc' ? 'asc' : 'desc' })}>
+                                  Exit {transactionSort.key === 'exit_price' && (transactionSort.direction === 'desc' ? '↓' : '↑')}
+                                </th>
+                                <th className="text-right py-2 px-2 cursor-pointer hover:text-slate-400" onClick={() => setTransactionSort({ key: 'pnl', direction: transactionSort.key === 'pnl' && transactionSort.direction === 'desc' ? 'asc' : 'desc' })}>
+                                  P&L $ {transactionSort.key === 'pnl' && (transactionSort.direction === 'desc' ? '↓' : '↑')}
+                                </th>
+                                <th className="text-right py-2 px-2 cursor-pointer hover:text-slate-400" onClick={() => setTransactionSort({ key: 'return_pct', direction: transactionSort.key === 'return_pct' && transactionSort.direction === 'desc' ? 'asc' : 'desc' })}>
+                                  Return % {transactionSort.key === 'return_pct' && (transactionSort.direction === 'desc' ? '↓' : '↑')}
+                                </th>
+                                <th className="text-left py-2 px-2 cursor-pointer hover:text-slate-400" onClick={() => setTransactionSort({ key: 'close_reason', direction: transactionSort.key === 'close_reason' && transactionSort.direction === 'desc' ? 'asc' : 'desc' })}>
+                                  Close Reason {transactionSort.key === 'close_reason' && (transactionSort.direction === 'desc' ? '↓' : '↑')}
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(() => {
+                                // Sort positions
+                                filteredPositions.sort((a: any, b: any) => {
+                                  let aVal: any = a[transactionSort.key]
+                                  let bVal: any = b[transactionSort.key]
+
+                                  if (transactionSort.key === 'entry_date' || transactionSort.key === 'exit_date') {
+                                    aVal = new Date(aVal).getTime()
+                                    bVal = new Date(bVal).getTime()
+                                  } else if (typeof aVal === 'string') {
+                                    aVal = aVal.toLowerCase()
+                                    bVal = bVal.toLowerCase()
+                                  }
+
+                                  if (transactionSort.direction === 'asc') {
+                                    return aVal > bVal ? 1 : aVal < bVal ? -1 : 0
+                                  } else {
+                                    return aVal < bVal ? 1 : aVal > bVal ? -1 : 0
+                                  }
+                                })
+
+                                return filteredPositions.length > 0 ? filteredPositions.map((pos: any) => (
+                                  <tr key={pos.sortKey} onClick={() => setSelectedPosition(pos)} className={`border-b border-slate-800 cursor-pointer transition ${selectedPosition?.sortKey === pos.sortKey ? 'bg-purple-600/20' : 'hover:bg-slate-800/30'}`}>
+                                    <td className="py-2 px-2 text-slate-400">
+                                      {new Date(pos.entry_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
+                                    </td>
+                                    <td className="py-2 px-2 text-slate-400">
+                                      {new Date(pos.exit_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
+                                    </td>
+                                    <td className="py-2 px-2 text-white font-medium">{pos.ticker}</td>
+                                    <td className="py-2 px-2 text-right text-white">{pos.quantity}</td>
+                                    <td className="py-2 px-2 text-right text-slate-400">${pos.entry_price.toFixed(2)}</td>
+                                    <td className="py-2 px-2 text-right text-slate-400">${pos.exit_price.toFixed(2)}</td>
+                                    <td className={`py-2 px-2 text-right font-bold ${pos.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                      ${pos.pnl.toFixed(2)}
+                                    </td>
+                                    <td className={`py-2 px-2 text-right font-bold ${pos.return_pct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                      {pos.return_pct.toFixed(2)}%
+                                    </td>
+                                    <td className="py-2 px-2 text-left text-slate-300">{pos.close_reason}</td>
+                                  </tr>
+                                )) : (
+                                  <tr>
+                                    <td colSpan={9} className="py-4 text-center text-slate-400">
+                                      {selectedDistributionBin ? `No positions in ${selectedDistributionBin.return_range} range` : 'No closed positions yet'}
+                                    </td>
+                                  </tr>
+                                )
+                              })()}
+                            </tbody>
+                          </table>
+                        </div>
+                        <div className="mt-4 pt-4 border-t border-slate-700">
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm text-slate-400">
+                              {selectedDistributionBin ? (
+                                <>Filtered: <span className="text-white font-semibold">{filteredPositions?.length || 0}</span> of <span className="text-white font-semibold">{trades.filter((t: any) => t.operation === 'SELL').length}</span></>
+                              ) : (
+                                <>Total Closed Positions: <span className="text-white font-semibold">{trades.filter((t: any) => t.operation === 'SELL').length}</span></>
+                              )}
+                            </p>
+                            {selectedDistributionBin && (
+                              <button
+                                onClick={() => setSelectedDistributionBin(null)}
+                                className="text-xs text-slate-400 hover:text-slate-300 px-2 py-1 rounded border border-slate-600 hover:border-slate-500 transition"
+                              >
+                                Clear filter
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    )
+                  })()}
+                </div>
+
+              {/* Detail Panel - Right Side (3 cols) */}
+              {selectedPosition && (
+                <div className="col-span-3">
+                  <div className="bg-slate-900/50 rounded-lg p-6 border border-slate-800 shadow-lg sticky top-0">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-sm font-bold text-white">POSITION INDICATORS</h3>
+                      <button onClick={() => setSelectedPosition(null)} className="text-slate-500 hover:text-slate-300 text-lg">✕</button>
+                    </div>
+
+                    <div className="space-y-4">
+                      {/* Entry Indicators */}
+                      {selectedPosition.entry_metadata && (
+                        <div>
+                          <div className="text-xs text-slate-500 uppercase tracking-wide mb-2">📈 Entry Indicators</div>
+                          <div className="bg-slate-800/30 rounded p-3 max-h-80 overflow-y-auto">
+                            {(() => {
+                              try {
+                                const data = typeof selectedPosition.entry_metadata === 'string'
+                                  ? JSON.parse(selectedPosition.entry_metadata)
+                                  : selectedPosition.entry_metadata
+
+                                // Separate OHLCV and indicators
+                                const ohlcv = ['timestamp', 'open', 'high', 'low', 'close', 'volume', 'ticker']
+                                const indicators = Object.entries(data)
+                                  .filter(([k]) => !ohlcv.includes(k))
+                                  .sort(([a], [b]) => a.localeCompare(b))
+
+                                return (
+                                  <div className="space-y-3 text-xs">
+                                    {data.timestamp && (
+                                      <div className="pb-2 border-b border-slate-700">
+                                        <div className="text-slate-400">{new Date(data.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
+                                      </div>
+                                    )}
+                                    <div className="grid grid-cols-2 gap-2">
+                                      {indicators.map(([key, value]: [string, any]) => (
+                                        <div key={key} className="flex justify-between">
+                                          <span className="text-slate-400">{key}</span>
+                                          <span className="text-slate-200 font-mono">{typeof value === 'number' ? value.toFixed(2) : value}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )
+                              } catch (e) {
+                                return <div className="text-slate-300 text-xs whitespace-pre-wrap">{selectedPosition.entry_metadata}</div>
+                              }
+                            })()}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Exit Indicators */}
+                      {selectedPosition.exit_metadata && (
+                        <div>
+                          <div className="text-xs text-slate-500 uppercase tracking-wide mb-2">📉 Exit Indicators</div>
+                          <div className="bg-slate-800/30 rounded p-3 max-h-80 overflow-y-auto">
+                            {(() => {
+                              try {
+                                const data = typeof selectedPosition.exit_metadata === 'string'
+                                  ? JSON.parse(selectedPosition.exit_metadata)
+                                  : selectedPosition.exit_metadata
+
+                                // Separate OHLCV and indicators
+                                const ohlcv = ['timestamp', 'open', 'high', 'low', 'close', 'volume', 'ticker']
+                                const indicators = Object.entries(data)
+                                  .filter(([k]) => !ohlcv.includes(k))
+                                  .sort(([a], [b]) => a.localeCompare(b))
+
+                                return (
+                                  <div className="space-y-3 text-xs">
+                                    {data.timestamp && (
+                                      <div className="pb-2 border-b border-slate-700">
+                                        <div className="text-slate-400">{new Date(data.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
+                                      </div>
+                                    )}
+                                    <div className="grid grid-cols-2 gap-2">
+                                      {indicators.map(([key, value]: [string, any]) => (
+                                        <div key={key} className="flex justify-between">
+                                          <span className="text-slate-400">{key}</span>
+                                          <span className="text-slate-200 font-mono">{typeof value === 'number' ? value.toFixed(2) : value}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )
+                              } catch (e) {
+                                return <div className="text-slate-300 text-xs whitespace-pre-wrap">{selectedPosition.exit_metadata}</div>
+                              }
+                            })()}
+                          </div>
+                        </div>
+                      )}
+
+                      {!selectedPosition.entry_metadata && !selectedPosition.exit_metadata && (
+                        <div className="text-center text-slate-400 text-sm py-8">
+                          No indicators available for this position
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="bg-slate-900/50 rounded-lg p-6 border border-slate-800 text-center text-slate-400">
+              No positions available
+            </div>
+          )}
+        </>
+      )}
+    </div>
     </div>
   )
 }
