@@ -874,14 +874,14 @@ Sortino Ratio                                  {sortino:.6f}"""
 				side_color = "green" if side == "BUY" else "red"
 				shares = order.get("shares", 0)
 				entry_price = order.get("entry_price", 0)
-				stop_loss = order.get("stop_loss", 0)
-				take_profit = order.get("take_profit", 0)
-				risk_reward = order.get("risk_reward", 0)
+				stop_loss = order.get("stop_loss")
+				take_profit = order.get("take_profit")
+				risk_reward = order.get("risk_reward")
 
-				# Format stop loss and take profit
-				stop_str = f"${stop_loss:.2f}" if stop_loss > 0 else "-"
-				tp_str = f"${take_profit:.2f}" if take_profit > 0 else "-"
-				rr_str = f"{risk_reward:.2f}x" if risk_reward > 0 else "-"
+				# Format stop loss and take profit (handle None values)
+				stop_str = f"${stop_loss:.2f}" if stop_loss and stop_loss > 0 else "-"
+				tp_str = f"${take_profit:.2f}" if take_profit and take_profit > 0 else "-"
+				rr_str = f"{risk_reward:.2f}x" if risk_reward and risk_reward > 0 else "-"
 
 				table.add_row(
 					ticker,
