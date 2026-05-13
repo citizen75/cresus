@@ -25,7 +25,7 @@ export default function BacktestDetail() {
   const [totalDays, setTotalDays] = useState(0)
 
   // Tab state - read from URL path param
-  const [activeTab, setActiveTab] = useState<'performance' | 'distribution' | 'trades' | 'transactions'>('performance')
+  const [activeTab, setActiveTab] = useState<'performance' | 'distribution' | 'transactions'>('performance')
   const [transactionSort, setTransactionSort] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'entry_date', direction: 'desc' })
   const [selectedPosition, setSelectedPosition] = useState<any>(null)
   const [selectedDistributionBin, setSelectedDistributionBin] = useState<any>(null)
@@ -33,12 +33,12 @@ export default function BacktestDetail() {
   const [chartPosition, setChartPosition] = useState<any>(null)
 
   useEffect(() => {
-    if (tabParam && ['performance', 'distribution', 'trades', 'transactions'].includes(tabParam)) {
-      setActiveTab(tabParam as 'performance' | 'distribution' | 'trades' | 'transactions')
+    if (tabParam && ['performance', 'distribution', 'transactions'].includes(tabParam)) {
+      setActiveTab(tabParam as 'performance' | 'distribution' | 'transactions')
     }
   }, [tabParam])
 
-  const handleTabChange = (tab: 'performance' | 'distribution' | 'trades' | 'transactions') => {
+  const handleTabChange = (tab: 'performance' | 'distribution' | 'transactions') => {
     navigate(`/backtests/${strategy}/${runId}/${tab}`)
   }
 
@@ -289,7 +289,6 @@ export default function BacktestDetail() {
       worst_trade_pct: backtest?.worst_trade_pct ?? 0,
     }
   const baseEquity = realtimeEquity.length > 0 ? realtimeEquity : (backtest?.equity_curve || [])
-  const trades = backtest?.trades || []
 
   // Ensure equity data includes drawdown
   const equity = baseEquity.map((point: any, idx: number) => {
@@ -360,16 +359,6 @@ export default function BacktestDetail() {
           }`}
         >
           Performance
-        </button>
-        <button
-          onClick={() => handleTabChange('trades')}
-          className={`px-4 py-2 text-sm font-medium transition ${
-            activeTab === 'trades'
-              ? 'text-purple-400 border-b-2 border-purple-400'
-              : 'text-slate-400 hover:text-slate-300'
-          }`}
-        >
-          Trades
         </button>
         <button
           onClick={() => handleTabChange('transactions')}
@@ -612,51 +601,6 @@ export default function BacktestDetail() {
             )}
             </div>
           </div>
-      )}
-
-      {/* Trades Screen */}
-      {activeTab === 'trades' && (
-        <>
-          {trades.length > 0 ? (
-            <div className="bg-slate-900/50 rounded-lg p-6 border border-slate-800 shadow-lg">
-              <h3 className="text-sm font-bold text-white mb-4">RECENT TRADES</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead className="border-b border-slate-700">
-                    <tr className="text-slate-500">
-                      <th className="text-left py-2 px-2">Date</th>
-                      <th className="text-left py-2 px-2">Ticker</th>
-                      <th className="text-right py-2 px-2">Op</th>
-                      <th className="text-right py-2 px-2">Qty</th>
-                      <th className="text-right py-2 px-2">Price</th>
-                      <th className="text-right py-2 px-2">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {trades.slice(0, 10).map((trade: any, idx: number) => (
-                      <tr key={idx} className="border-b border-slate-800 hover:bg-slate-800/20">
-                        <td className="py-2 px-2 text-slate-400">{new Date(trade.created_at).toLocaleDateString()}</td>
-                        <td className="py-2 px-2 text-white font-medium">{trade.ticker}</td>
-                        <td className={`py-2 px-2 text-right font-bold ${
-                          trade.operation === 'BUY' ? 'text-green-400' : 'text-red-400'
-                        }`}>
-                          {trade.operation === 'BUY' ? 'B' : 'S'}
-                        </td>
-                        <td className="py-2 px-2 text-right text-white">{trade.quantity}</td>
-                        <td className="py-2 px-2 text-right text-white">${(trade.price || 0).toFixed(0)}</td>
-                        <td className="py-2 px-2 text-right text-white">${(trade.amount || 0).toFixed(0)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ) : (
-            <div className="bg-slate-900/50 rounded-lg p-6 border border-slate-800 text-center text-slate-400">
-              No trades available
-            </div>
-          )}
-        </>
       )}
 
       {/* Transactions Tab */}
