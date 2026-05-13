@@ -161,13 +161,33 @@ class PreMarketFlow(Flow):
 					eo_result = entry_order_step.get("agent").process({})
 					entry_order_step["result"] = eo_result
 
-		# === FINAL OUTPUT: Keep only watchlist and orders ===
+		# === FINAL OUTPUT: Watchlist and Orders ===
+		# Plus display-essential data for CLI output
 
 		# Extract final watchlist
 		watchlist = self.context.get("watchlist") or []
 		result["watchlist"] = watchlist
 
-		# Extract final orders
+		# Extract strategy name (needed for CLI display header)
+		result["strategy"] = self.strategy_name
+
+		# Extract ticker scores (needed for CLI display table)
+		ticker_scores = self.context.get("ticker_scores") or {}
+		result["ticker_scores"] = ticker_scores
+
+		# Extract indicators (needed for CLI display header and columns)
+		strategy_config = self.context.get("strategy_config") or {}
+		result["indicators"] = strategy_config.get("indicators", [])
+
+		# Extract data_history (needed for CLI display indicator values)
+		data_history = self.context.get("data_history") or {}
+		result["data_history"] = data_history
+
+		# Extract target date (needed for CLI display header)
+		if target_date:
+			result["target_date"] = target_date
+
+		# Extract final orders - renamed from executable_orders for clarity
 		entry_order_step = self.get_step("entry_order")
 		if entry_order_step:
 			entry_order_result = entry_order_step.get("result")
@@ -175,12 +195,17 @@ class PreMarketFlow(Flow):
 				output = entry_order_result.get("output", {})
 				orders = output.get("orders") or []
 				result["orders"] = orders
+				# Also keep executable_orders for backward compatibility with CLI
+				result["executable_orders"] = orders
+				result["orders_count"] = len(orders)
 		else:
 			result["orders"] = []
+			result["executable_orders"] = []
+			result["orders_count"] = 0
 
-		# === CLEANUP: Remove all intermediate context variables ===
-		# Keep only: watchlist, data_history, strategy_config (needed for other flows)
-		# Remove: signals, ticker_scores, entry_scores, timing_scores, rr_metrics, etc.
+		# === CLEANUP: Remove unnecessary intermediate context variables ===
+		# Remove: signals, entry_scores, timing_scores, rr_metrics, etc.
+		# Keep: data_history, strategy_config, watchlist (needed for other flows)
 		self._cleanup_context()
 
 		return result
@@ -232,30 +257,30 @@ class PreMarketFlow(Flow):
 	def _cleanup_context(self) -> None:
 		"""Remove intermediate context variables, keeping only essential ones.
 
-		Removes: signals, ticker_scores, entry_scores, timing_scores, rr_metrics,
+		Removes: signals, entry_scores, timing_scores, rr_metrics,
 		entry_recommendations, filtered_duplicate_items, sorted_tickers, etc.
 
-		Keeps: watchlist, data_history, strategy_config, portfolio_name, strategy_name
+		Keeps: watchlist, data_history, strategy_config, ticker_scores
+		(needed for CLI display and downstream flows)
 		"""
-		# Variables to remove (intermediate calculations)
+		# Variables to remove (intermediate calculations not needed in final output)
 		to_remove = [
-			"signals",
-			"ticker_scores",
-			"entry_scores",
-			"timing_scores",
-			"rr_metrics",
-			"entry_recommendations",
-			"filtered_duplicate_items",
-			"sorted_tickers",
-			"top_ticker",
-			"top_score",
-			"_data_sliced_for_entry",
+			"signals",  # Signal details (not needed for display)
+			"entry_scores",  # Entry signal scores (intermediate)
+			"timing_scores",  # Timing analysis scores (intermediate)
+			"rr_metrics",  # Risk/reward metrics (intermediate)
+			"entry_recommendations",  # Raw entry recommendations (superseded by orders)
+			"filtered_duplicate_items",  # Duplicate filter details (intermediate)
+			"sorted_tickers",  # Sorted ticker details (superseded by watchlist)
+			"top_ticker",  # Top ticker (not critical for final output)
+			"top_score",  # Top score (not critical for final output)
+			"_data_sliced_for_entry",  # Internal flag
 		]
 
 		for var in to_remove:
 			if hasattr(self.context, var):
 				delattr(self.context, var)
-				self.logger.debug(f"Removed context variable: {var}")
+				self.logger.debug(f"Cleaned up context variable: {var}")
 
 	def _strategy_to_portfolio_name(self, strategy_name: str) -> str:
 		"""Convert strategy name to portfolio name format.
