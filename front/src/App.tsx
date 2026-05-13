@@ -7,6 +7,10 @@ import Portfolios from '@/pages/Portfolios'
 import PortfolioDetail from '@/pages/PortfolioDetail'
 import HoldingsPage from '@/pages/HoldingsPage'
 import TransactionsPage from '@/pages/TransactionsPage'
+import BacktestRuns from '@/pages/BacktestRuns'
+import BacktestBuilder from '@/pages/BacktestBuilder'
+import BacktestDetail from '@/pages/BacktestDetail'
+import BacktestComparator from '@/pages/BacktestComparator'
 
 export default function App() {
   return (
@@ -23,6 +27,10 @@ export default function App() {
           <Route path="/portfolios/:name/holdings" element={<Layout><HoldingsPage /></Layout>} />
           <Route path="/portfolios/:name/holdings/transactions" element={<Layout><TransactionsPage /></Layout>} />
           <Route path="/portfolios/:name/transactions" element={<Layout><TransactionsPage /></Layout>} />
+          <Route path="/backtests" element={<Layout><BacktestRuns /></Layout>} />
+          <Route path="/backtests/new" element={<Layout><BacktestBuilder /></Layout>} />
+          <Route path="/backtests/compare" element={<Layout><BacktestComparator /></Layout>} />
+          <Route path="/backtests/:strategy/:runId" element={<Layout><BacktestDetail /></Layout>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

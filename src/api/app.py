@@ -29,6 +29,7 @@ def create_app() -> FastAPI:
     from api.routes.watchlist import router as watchlist_router
     from api.routes.data import router as data_router
     from api.routes.strategies import router as strategies_router
+    from api.routes.backtests import router as backtests_router
 
     app.include_router(health_router, prefix="/api/v1")
     app.include_router(portfolios_router, prefix="/api/v1")
@@ -36,5 +37,6 @@ def create_app() -> FastAPI:
     app.include_router(watchlist_router, prefix="/api/v1")
     app.include_router(data_router, prefix="/api/v1")
     app.include_router(strategies_router, prefix="/api/v1")
+    app.include_router(backtests_router, prefix="/api/v1")
 
     return app

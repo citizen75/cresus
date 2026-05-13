@@ -70,3 +70,20 @@ export function useCurrentPrices(name: string) {
     refetchInterval: 60_000, // Refetch every minute
   })
 }
+
+export function useBacktestRuns(strategy?: string) {
+  return useQuery({
+    queryKey: ['backtest-runs', strategy],
+    queryFn: () => api.listBacktests(strategy),
+    staleTime: 30_000,
+  })
+}
+
+export function useBacktestRun(strategy: string, id: string) {
+  return useQuery({
+    queryKey: ['backtest-run', strategy, id],
+    queryFn: () => api.getBacktest(strategy, id),
+    staleTime: 60_000,
+    enabled: !!strategy && !!id,
+  })
+}

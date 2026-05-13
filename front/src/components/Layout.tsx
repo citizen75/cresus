@@ -10,7 +10,7 @@ const menuItems = [
   { icon: '📊', label: 'Insights', path: '#' },
   { icon: '🔍', label: 'Explore', path: '#' },
   { icon: '🔖', label: 'Watchlist', path: '#' },
-  { icon: '⚡', label: 'Simulator', path: '#' },
+  { icon: '⚡', label: 'Backtest', path: '/backtests' },
   { icon: '🔔', label: 'Alerts', path: '#' },
   { icon: '⚙️', label: 'Settings', path: '#' },
 ]
@@ -38,7 +38,9 @@ export default function Layout({ children }: LayoutProps) {
         {/* Navigation */}
         <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto">
           {menuItems.map((item, index) => {
-            const isActive = location.pathname === item.path
+            const isActive = item.path === '/'
+              ? location.pathname === item.path
+              : location.pathname === item.path || location.pathname.startsWith(item.path + '/')
             return (
               <Link
                 key={`${item.label}-${index}`}

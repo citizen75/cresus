@@ -108,6 +108,33 @@ class CresusAPI {
   async deleteTransaction(portfolioName: string, transactionId: string) {
     return (await this.client.delete(`/portfolios/${portfolioName}/transactions/${transactionId}`)).data
   }
+
+  async listBacktests(strategy?: string) {
+    const params = strategy ? { strategy } : {}
+    return (await this.client.get('/backtests', { params })).data
+  }
+
+  async getBacktest(strategy: string, id: string) {
+    return (await this.client.get(`/backtests/${strategy}/${id}`)).data
+  }
+
+  async runBacktest(data: {
+    strategy: string
+    start_date?: string
+    end_date?: string
+    portfolio_name?: string
+  }) {
+    return (await this.client.post('/backtests', data)).data
+  }
+
+  async compareBacktests(items: string[]) {
+    const itemsStr = items.join(',')
+    return (await this.client.get('/backtests/compare', { params: { items: itemsStr } })).data
+  }
+
+  async deleteBacktest(strategy: string, id: string) {
+    return (await this.client.delete(`/backtests/${strategy}/${id}`)).data
+  }
 }
 
 export const api = new CresusAPI()

@@ -1,6 +1,6 @@
 servers:
   api:
-    host: "${API_HOST:0.0.0.0}"     # Set via API_HOST env var
+    host: "${API_HOST:127.0.0.1}"     # Set via API_HOST env var
     port: "${API_PORT:8000}"         # Set via API_PORT env var
     log_file: "logs/api.log"
   gateway:
