@@ -88,14 +88,18 @@ def simplify_formula(formula: str, for_dataframe: bool = False) -> str:
 
 def is_dsl_formula(formula: str) -> bool:
 	"""Check if formula uses DSL syntax.
-	
+
 	Args:
 		formula: Formula string to check
-		
+
 	Returns:
-		True if formula contains DSL notation (indicator[n])
+		True if formula contains DSL notation (indicator[n]) or DSL operators (&&, ||, !, comparisons)
 	"""
-	return bool(re.search(DSL_PATTERN, formula))
+	# Check for shift notation or DSL operators
+	has_shift_notation = bool(re.search(DSL_PATTERN, formula))
+	# DSL operators: logical (&&, ||, !), comparisons (==, !=, <, >, <=, >=), arithmetic in compound expressions
+	has_dsl_operators = bool(re.search(r'(&&|\|\||!(?!=)|!=|<=|>=|==|[<>])', formula))
+	return has_shift_notation or has_dsl_operators
 
 
 def convert_formulas_in_dict(data: Dict) -> Dict:

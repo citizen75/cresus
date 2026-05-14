@@ -209,16 +209,18 @@ class Parser:
                 indicator = match.group(1)
                 shift = int(match.group(2))
                 return Indicator(indicator, shift)
-        
+
         # Number
         if token.type == 'NUMBER':
             self.consume('NUMBER')
             return Literal(float(token.value))
-        
-        # Variable name (column reference)
+
+        # Variable name (column reference) - treat as indicator with implicit [0] shift
         if token.type == 'NAME':
+            name = token.value
             self.consume('NAME')
-            return Variable(token.value)
+            # Treat bare names as indicators with [0] shift (current bar)
+            return Indicator(name, 0)
         
         raise SyntaxError(f"Unexpected token: {token}")
 
