@@ -226,12 +226,13 @@ class StrategyManager:
 		"""List all available strategies.
 
 		Supports both YAML and JSON file formats.
+		Deduplicates by strategy name, preferring YAML over JSON.
 
 		Returns:
 			Dict with list of strategy names and metadata
 		"""
 		try:
-			strategies_info = []
+			strategies_dict = {}  # Use dict to deduplicate by name, YAML takes priority
 
 			if not self.strategies_dir.exists():
 				return {
@@ -241,31 +242,47 @@ class StrategyManager:
 					"directory": str(self.strategies_dir),
 				}
 
-			# Get both YAML and JSON strategy files
-			strategy_files = sorted(
-				list(self.strategies_dir.glob("*.yml")) +
-				list(self.strategies_dir.glob("*.json"))
-			)
+			# Get YAML files first (preferred), then JSON
+			yml_files = sorted(self.strategies_dir.glob("*.yml"))
+			json_files = sorted(self.strategies_dir.glob("*.json"))
 
-			for strategy_file in strategy_files:
+			# Process YAML files first so they take priority
+			for strategy_file in yml_files:
 				try:
 					with open(strategy_file, "r") as f:
-						# Load YAML or JSON based on file extension
-						if strategy_file.suffix.lower() == ".yml":
-							strategy_data = yaml.safe_load(f)
-						else:
-							strategy_data = json.load(f)
-
-					strategies_info.append({
-						"name": strategy_data.get("name"),
-						"description": strategy_data.get("description", "No description"),
-						"source": strategy_data.get("source"),
-						"file": strategy_file.name,
-						"modified": strategy_file.stat().st_mtime,
-					})
+						strategy_data = yaml.safe_load(f)
+						name = strategy_data.get("name")
+						if name:  # Only add if name exists
+							strategies_dict[name] = {
+								"name": name,
+								"description": strategy_data.get("description", "No description"),
+								"source": strategy_data.get("source"),
+								"file": strategy_file.name,
+								"modified": strategy_file.stat().st_mtime,
+							}
 				except Exception:
 					# Skip files that can't be parsed
 					continue
+
+			# Process JSON files, but don't override existing YAML entries
+			for strategy_file in json_files:
+				try:
+					with open(strategy_file, "r") as f:
+						strategy_data = json.load(f)
+						name = strategy_data.get("name")
+						if name and name not in strategies_dict:  # Only add if name doesn't exist
+							strategies_dict[name] = {
+								"name": name,
+								"description": strategy_data.get("description", "No description"),
+								"source": strategy_data.get("source"),
+								"file": strategy_file.name,
+								"modified": strategy_file.stat().st_mtime,
+							}
+				except Exception:
+					# Skip files that can't be parsed
+					continue
+
+			strategies_info = list(strategies_dict.values())
 
 			return {
 				"status": "success",
