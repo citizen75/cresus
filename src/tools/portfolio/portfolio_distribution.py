@@ -57,7 +57,8 @@ class PortfolioDistribution:
             quantity = float(row.get("quantity", 0))
             price = float(row.get("price", 0))
             fees = float(row.get("fees", 0))
-            date = row.get("date", "")
+            created_at = row.get("created_at", "")
+            exit_date = row.get("exit_date", "") or row.get("status_at", "")
             metadata = row.get("metadata", "")
 
             if operation == "BUY":
@@ -67,7 +68,7 @@ class PortfolioDistribution:
                     "price": price,
                     "quantity": quantity,
                     "fees": fees,
-                    "date": date,
+                    "date": created_at,
                     "metadata": metadata,
                 })
             elif operation == "SELL" and ticker in positions:
@@ -101,7 +102,7 @@ class PortfolioDistribution:
                         "pnl": net_pnl,
                         "return_pct": return_pct,
                         "entry_date": buy["date"],
-                        "exit_date": date,
+                        "exit_date": exit_date,
                         "entry_metadata": buy["metadata"],
                         "exit_metadata": metadata,
                     })
