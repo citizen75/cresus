@@ -184,3 +184,25 @@ async def duplicate_strategy(name: str, new_name: Optional[str] = Query(None)):
 	except Exception as e:
 		raise HTTPException(status_code=500, detail=f"Failed to duplicate strategy: {str(e)}")
 
+
+@router.delete("/{name}")
+async def delete_strategy(name: str):
+	"""Delete a strategy by name.
+
+	Permanently removes the strategy YAML file.
+	"""
+	strategies_dir = _get_strategies_dir()
+	strategy_path = strategies_dir / f"{name}.yml"
+
+	if not strategy_path.exists():
+		raise HTTPException(status_code=404, detail=f"Strategy '{name}' not found")
+
+	try:
+		strategy_path.unlink()
+		return {
+			"status": "success",
+			"message": f"Strategy '{name}' deleted successfully"
+		}
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=f"Failed to delete strategy: {str(e)}")
+

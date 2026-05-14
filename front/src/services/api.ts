@@ -55,6 +55,10 @@ class CresusAPI {
     return (await this.client.post(`/strategies/${name}/duplicate`, {}, { params })).data
   }
 
+  async deleteStrategy(name: string) {
+    return (await this.client.delete(`/strategies/${name}`)).data
+  }
+
   async getPortfolioDetails(name: string) {
     return (await this.client.get(`/portfolios/${name}`)).data
   }
