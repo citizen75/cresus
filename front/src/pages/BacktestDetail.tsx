@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { LineChart, Line, AreaChart, Area, BarChart, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { LineChart, Line, AreaChart, Area, ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { api } from '@/services/api'
 import { useBacktestRun, useBacktestDistribution } from '@/hooks/usePortfolio'
 import { useBacktestWebSocket } from '@/hooks/useBacktestWebSocket'
@@ -30,6 +30,7 @@ export default function BacktestDetail() {
   const [transactionSort, setTransactionSort] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'entry_date', direction: 'desc' })
   const [selectedPosition, setSelectedPosition] = useState<any>(null)
   const [selectedDistributionBin, setSelectedDistributionBin] = useState<any>(null)
+  const [positionFilters, setPositionFilters] = useState({ ticker: '', closeReason: 'all' })
   const [tickerNames, setTickerNames] = useState<{ [key: string]: string }>({})
   const [chartPosition, setChartPosition] = useState<any>(null)
   const [watchlist, setWatchlist] = useState<any[]>([])
@@ -899,7 +900,8 @@ export default function BacktestDetail() {
                       }))
                     } else {
                       let buys: any = {}
-                      trades.forEach((trade: any) => {
+                      const closedTrades = response?.data?.closed_trades || []
+                      closedTrades.forEach((trade: any) => {
                         if (trade.operation === 'BUY') {
                           if (!buys[trade.ticker]) buys[trade.ticker] = []
                           buys[trade.ticker].push({
@@ -941,15 +943,69 @@ export default function BacktestDetail() {
                     }
 
                     // Filter by selected distribution bin
-                    const filteredPositions = selectedDistributionBin
+                    let filteredPositions = selectedDistributionBin
                       ? positions.filter((pos: any) =>
                           pos.return_pct >= selectedDistributionBin.return_min &&
                           pos.return_pct <= selectedDistributionBin.return_max
                         )
                       : positions
 
+                    // Apply ticker filter
+                    if (positionFilters.ticker) {
+                      filteredPositions = filteredPositions.filter((pos: any) =>
+                        pos.ticker.toUpperCase().includes(positionFilters.ticker.toUpperCase())
+                      )
+                    }
+
+                    // Apply close reason filter
+                    if (positionFilters.closeReason !== 'all') {
+                      filteredPositions = filteredPositions.filter((pos: any) => {
+                        if (positionFilters.closeReason === 'winners') return pos.return_pct >= 0
+                        if (positionFilters.closeReason === 'losers') return pos.return_pct < 0
+                        if (positionFilters.closeReason === 'target') return pos.close_reason.includes('Target')
+                        if (positionFilters.closeReason === 'stoploss') return pos.close_reason.includes('Stop Loss')
+                        return true
+                      })
+                    }
+
                     return (
                       <>
+                        {/* Filter Bar */}
+                        <div className="bg-slate-800/30 p-4 rounded-lg border border-slate-700/50 mb-4 flex gap-3 items-center flex-wrap">
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs font-semibold text-slate-400">TICKER:</label>
+                            <input
+                              type="text"
+                              placeholder="Filter by ticker..."
+                              value={positionFilters.ticker}
+                              onChange={(e) => setPositionFilters({ ...positionFilters, ticker: e.target.value })}
+                              className="px-3 py-1 text-xs bg-slate-900 border border-slate-600 text-white rounded hover:border-slate-500 focus:border-blue-500 focus:outline-none"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs font-semibold text-slate-400">OUTCOME:</label>
+                            <select
+                              value={positionFilters.closeReason}
+                              onChange={(e) => setPositionFilters({ ...positionFilters, closeReason: e.target.value })}
+                              className="px-3 py-1 text-xs bg-slate-900 border border-slate-600 text-white rounded hover:border-slate-500 focus:border-blue-500 focus:outline-none"
+                            >
+                              <option value="all">All</option>
+                              <option value="winners">Winners</option>
+                              <option value="losers">Losers</option>
+                              <option value="target">✅ Target</option>
+                              <option value="stoploss">⛔ Stop Loss</option>
+                            </select>
+                          </div>
+                          {(positionFilters.ticker || positionFilters.closeReason !== 'all') && (
+                            <button
+                              onClick={() => setPositionFilters({ ticker: '', closeReason: 'all' })}
+                              className="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 rounded transition ml-auto"
+                            >
+                              Clear Filters
+                            </button>
+                          )}
+                        </div>
+
                         <div className="overflow-x-auto">
                           <table className="w-full text-xs">
                             <thead className="border-b border-slate-700">
