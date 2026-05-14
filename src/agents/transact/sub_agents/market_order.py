@@ -88,11 +88,14 @@ class MarketOrderAgent(Agent):
 	def _get_market_orders(self, orders_mgr: Orders) -> Any:
 		"""Get pending market orders from queue.
 
+		Excludes linked SL/TP orders (SELL orders with linked_order=true in metadata).
+		These are executed separately only when price reaches the SL/TP level.
+
 		Args:
 			orders_mgr: Orders manager
 
 		Returns:
-			DataFrame of pending market orders
+			DataFrame of pending market orders (BUY orders and immediate SELL orders only)
 		"""
 		pending = orders_mgr.get_pending_orders()
 		if pending.empty:
@@ -100,11 +103,47 @@ class MarketOrderAgent(Agent):
 
 		# Filter for market orders (execution_method=market or not set)
 		if "execution_method" in pending.columns:
-			# Include market orders and orders without explicit execution_method
-			return pending[pending["execution_method"].isin(["market", None])]
+			market_orders = pending[pending["execution_method"].isin(["market", None])]
 		else:
 			# No execution_method column, return all pending orders
-			return pending
+			market_orders = pending
+
+		# Exclude SELL SL/TP orders (linked orders that execute only when price hits level)
+		# These should be handled by StopLossAgent and TargetAgent, not MarketOrderAgent
+		if "metadata" in market_orders.columns and "operation" in market_orders.columns:
+			# Filter out SELL orders with linked_order=true in metadata
+			import json
+			filtered_orders = []
+			for _, order in market_orders.iterrows():
+				operation = str(order.get("operation", "BUY")).upper()
+
+				# BUY orders always pass through
+				if operation == "BUY":
+					filtered_orders.append(order)
+					continue
+
+				# For SELL orders, check if they're linked SL/TP orders
+				# If linked_order=true, skip (handle in StopLossAgent/TargetAgent)
+				# If linked_order=false or not set, include (exit condition SELL orders)
+				try:
+					metadata_str = order.get("metadata", "")
+					if metadata_str:
+						metadata = json.loads(metadata_str) if isinstance(metadata_str, str) else metadata_str
+						if metadata.get("linked_order"):
+							# Skip linked SL/TP orders - they're handled separately
+							continue
+				except (json.JSONDecodeError, TypeError):
+					pass
+
+				# Include non-linked SELL orders (exit conditions)
+				filtered_orders.append(order)
+
+			if filtered_orders:
+				return pd.DataFrame(filtered_orders)
+			else:
+				return pd.DataFrame()
+
+		return market_orders
 
 	def _execute_market_orders(
 		self,
@@ -129,7 +168,7 @@ class MarketOrderAgent(Agent):
 			List of execution results
 		"""
 		execution_results = []
-		broker = PaperBroker()
+		broker = self._get_broker_with_positions(journal)
 
 		if market_orders.empty:
 			return execution_results
@@ -239,6 +278,10 @@ class MarketOrderAgent(Agent):
 						metadata=market_metadata
 					)
 
+					# NOTE: SL/TP management is handled by StopLossAgent and TargetAgent
+					# which read the position from Journal and execute when price is hit.
+					# No separate orders needed in Orders table.
+
 					self.logger.info(
 						f"MARKET BUY {result.filled_quantity} {ticker} @ {result.filled_price:.2f} "
 						f"[SL: {stop_loss}]"
@@ -251,6 +294,49 @@ class MarketOrderAgent(Agent):
 			self.logger.error(f"Error executing market orders: {e}")
 
 		return execution_results
+
+	def _get_broker_with_positions(self, journal: Journal) -> Any:
+		"""Create a broker initialized with current positions from journal.
+
+		Args:
+			journal: Journal with transaction history
+
+		Returns:
+			PaperBroker with positions loaded from journal
+		"""
+		broker = PaperBroker()
+
+		# Load BUY transactions from journal to reconstruct positions
+		journal_df = journal.load_df()
+		if not journal_df.empty:
+			buy_transactions = journal_df[journal_df["operation"].str.upper() == "BUY"]
+
+			positions_dict = {}
+			for ticker in buy_transactions["ticker"].unique():
+				ticker_buys = buy_transactions[buy_transactions["ticker"] == ticker]
+				total_quantity = 0
+				weighted_price = 0
+
+				for _, transaction in ticker_buys.iterrows():
+					qty = float(transaction.get("quantity", 0))
+					price = float(transaction.get("price", 0))
+					total_quantity += qty
+					weighted_price += qty * price
+
+				if total_quantity > 0:
+					positions_dict[ticker] = {
+						"ticker": ticker,
+						"quantity": int(total_quantity),
+						"entry_price": weighted_price / total_quantity,
+						"current_price": weighted_price / total_quantity,
+						"stop_loss": None,
+						"target_price": None,
+						"strategy_id": "transact",
+					}
+
+			broker.positions = positions_dict
+
+		return broker
 
 	def _get_market_price(self, ticker: str, day_data: Dict[str, Any]) -> Optional[float]:
 		"""Get closing price for ticker from day data.

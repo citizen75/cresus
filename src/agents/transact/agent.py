@@ -189,27 +189,38 @@ class TransactAgent(Agent):
 			List of sell execution results
 		"""
 		execution_results = []
-		broker = PaperBroker()
-		pending_orders = orders_mgr.get_pending_orders()
+		broker = self._get_broker_with_positions(journal)
+		# Use get_active_orders() to skip expired orders (trading_date used as current_date)
+		active_orders = orders_mgr.get_active_orders(current_date=trading_date)
 
-		if pending_orders.empty:
+		if active_orders.empty:
 			return execution_results
 
-		# Filter for SELL orders only (marked in metadata with order_type="SELL")
-		sell_orders = []
-		for _, order_row in pending_orders.iterrows():
-			try:
-				import json
-				metadata = order_row.get("metadata", "")
-				if metadata:
-					metadata_dict = json.loads(metadata) if isinstance(metadata, str) else metadata
-					if metadata_dict.get("order_type") == "SELL":
-						sell_orders.append((_, order_row))
-			except (json.JSONDecodeError, TypeError):
-				pass
+		# Filter for SELL orders only (operation == "SELL")
+		if "operation" in active_orders.columns:
+			sell_orders_df = active_orders[active_orders["operation"].str.upper() == "SELL"]
+		else:
+			# Fallback for backward compatibility: check metadata
+			sell_orders_df = active_orders.copy()
+			sell_orders = []
+			for _, order_row in active_orders.iterrows():
+				try:
+					metadata = order_row.get("metadata", "")
+					if metadata:
+						metadata_dict = json.loads(metadata) if isinstance(metadata, str) else metadata
+						if metadata_dict.get("order_type") == "SELL":
+							sell_orders.append(order_row)
+				except (json.JSONDecodeError, TypeError):
+					pass
+			if sell_orders:
+				sell_orders_df = active_orders.loc[active_orders.index.isin([s.name for s in sell_orders])]
+			else:
+				sell_orders_df = active_orders.iloc[0:0]  # Empty DataFrame with same schema
 
-		if not sell_orders:
+		if sell_orders_df.empty:
 			return execution_results
+
+		sell_orders = [(idx, row) for idx, row in sell_orders_df.iterrows()]
 
 		try:
 			for _, order_row in sell_orders:
@@ -463,6 +474,60 @@ class TransactAgent(Agent):
 			self.logger.error(f"Error executing BUY orders: {e}")
 
 		return execution_results
+
+	def _get_broker_with_positions(self, journal: Journal) -> PaperBroker:
+		"""Create a broker initialized with current positions from journal.
+
+		Reads executed BUY transactions from journal to reconstruct current positions,
+		so SELL orders can be executed against real positions rather than the broker's
+		empty in-memory state.
+
+		Args:
+			journal: Journal with transaction history
+
+		Returns:
+			PaperBroker with positions loaded from journal
+		"""
+		broker = PaperBroker()
+
+		try:
+			# Load BUY transactions from journal to reconstruct positions
+			journal_df = journal.load_df()
+			if not journal_df.empty and "operation" in journal_df.columns:
+				# Filter for BUY transactions
+				buy_transactions = journal_df[journal_df["operation"].str.upper() == "BUY"]
+
+				if not buy_transactions.empty:
+					# Group by ticker and calculate current position
+					positions_dict = {}
+					for ticker in buy_transactions["ticker"].unique():
+						ticker_buys = buy_transactions[buy_transactions["ticker"] == ticker]
+						total_quantity = 0
+						weighted_price = 0
+
+						for _, transaction in ticker_buys.iterrows():
+							qty = float(transaction.get("quantity", 0))
+							price = float(transaction.get("price", 0))
+							total_quantity += qty
+							weighted_price += qty * price
+
+						if total_quantity > 0:
+							positions_dict[ticker] = {
+								"ticker": ticker,
+								"quantity": int(total_quantity),
+								"entry_price": weighted_price / total_quantity,
+								"current_price": weighted_price / total_quantity,
+								"stop_loss": None,
+								"target_price": None,
+								"strategy_id": "transact",
+							}
+
+					# Load positions into broker
+					broker.positions = positions_dict
+		except Exception as e:
+			self.logger.debug(f"Could not load positions from journal: {e}")
+
+		return broker
 
 	def _get_market_price(self, ticker: str, day_data: Dict[str, Any]) -> Optional[float]:
 		"""Get closing price for ticker from day data.

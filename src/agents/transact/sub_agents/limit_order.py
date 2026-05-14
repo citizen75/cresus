@@ -127,7 +127,7 @@ class LimitOrderAgent(Agent):
 			List of execution results
 		"""
 		execution_results = []
-		broker = PaperBroker()
+		broker = self._get_broker_with_positions(journal)
 
 		if limit_orders.empty:
 			return execution_results
@@ -258,6 +258,9 @@ class LimitOrderAgent(Agent):
 						metadata=market_metadata
 					)
 
+					# NOTE: SL/TP management is handled by StopLossAgent and TargetAgent
+					# which read the position from Journal and execute when price is hit.
+
 					self.logger.info(
 						f"LIMIT BUY {result.filled_quantity} {ticker} @ {result.filled_price:.2f} "
 						f"(limit {limit_price:.2f}) [SL: {stop_loss}]"
@@ -298,6 +301,49 @@ class LimitOrderAgent(Agent):
 			return float(close_price) if close_price is not None else None
 		except (ValueError, AttributeError):
 			return None
+
+	def _get_broker_with_positions(self, journal: Journal) -> Any:
+		"""Create a broker initialized with current positions from journal.
+
+		Args:
+			journal: Journal with transaction history
+
+		Returns:
+			PaperBroker with positions loaded from journal
+		"""
+		broker = PaperBroker()
+
+		# Load BUY transactions from journal to reconstruct positions
+		journal_df = journal.load_df()
+		if not journal_df.empty:
+			buy_transactions = journal_df[journal_df["operation"].str.upper() == "BUY"]
+
+			positions_dict = {}
+			for ticker in buy_transactions["ticker"].unique():
+				ticker_buys = buy_transactions[buy_transactions["ticker"] == ticker]
+				total_quantity = 0
+				weighted_price = 0
+
+				for _, transaction in ticker_buys.iterrows():
+					qty = float(transaction.get("quantity", 0))
+					price = float(transaction.get("price", 0))
+					total_quantity += qty
+					weighted_price += qty * price
+
+				if total_quantity > 0:
+					positions_dict[ticker] = {
+						"ticker": ticker,
+						"quantity": int(total_quantity),
+						"entry_price": weighted_price / total_quantity,
+						"current_price": weighted_price / total_quantity,
+						"stop_loss": None,
+						"target_price": None,
+						"strategy_id": "transact",
+					}
+
+			broker.positions = positions_dict
+
+		return broker
 
 	def _get_market_data(self, ticker: str, day_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 		"""Get full market data row for ticker from day data.
