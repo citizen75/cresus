@@ -294,7 +294,7 @@ class TransactAgent(Agent):
 							self.logger.debug(f"Error extracting market metadata for {ticker}: {e}")
 							market_metadata = None
 
-					# Record SELL transaction in journal
+					# Record SELL transaction in journal with explicit status_at (exit_date)
 					journal.add_transaction(
 						operation="SELL",
 						ticker=ticker,
@@ -303,6 +303,7 @@ class TransactAgent(Agent):
 						fees=0,
 						notes=f"Order {order_id[:8]} executed",
 						created_at=f"{trading_date.isoformat()}T14:00:00.000000",
+						status_at=f"{trading_date.isoformat()}T14:00:00.000000",
 						exit_type=exit_type,
 						metadata=market_metadata
 					)
