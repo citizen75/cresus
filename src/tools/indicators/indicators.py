@@ -293,10 +293,12 @@ def _register_all_indicators():
 
     try:
         # Support/Resistance indicators
-        from .support import levels, pivots
+        from .support import levels, pivots, extremes
         register_indicator("support", levels.calculate)
         register_indicator("resistance", levels.calculate)
         register_indicator("pivot", pivots.calculate)
+        register_indicator("lowest", extremes.calculate_lowest)
+        register_indicator("highest", extremes.calculate_highest)
     except ImportError:
         pass
 
@@ -417,15 +419,19 @@ def _register_indicator_modules(indicator_names: set) -> None:
 			pass
 	
 	# Support/Resistance indicators
-	if any(ind in indicator_names for ind in ["support", "resistance", "pivot"]):
+	if any(ind in indicator_names for ind in ["support", "resistance", "pivot", "lowest", "highest"]):
 		try:
-			from .support import levels, pivots
+			from .support import levels, pivots, extremes
 			if "support" in indicator_names:
 				register_indicator("support", levels.calculate)
 			if "resistance" in indicator_names:
 				register_indicator("resistance", levels.calculate)
 			if "pivot" in indicator_names:
 				register_indicator("pivot", pivots.calculate)
+			if "lowest" in indicator_names:
+				register_indicator("lowest", extremes.calculate_lowest)
+			if "highest" in indicator_names:
+				register_indicator("highest", extremes.calculate_highest)
 		except ImportError:
 			pass
 	

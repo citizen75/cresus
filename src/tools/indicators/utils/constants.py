@@ -40,6 +40,8 @@ INDICATOR_PARAMS = {
     "support": {"params": ["period"], "defaults": {"period": 14}},
     "resistance": {"params": ["period"], "defaults": {"period": 14}},
     "pivot": {"params": ["method"], "defaults": {"method": "classic"}},
+    "lowest": {"params": ["period"], "defaults": {"period": 14}},
+    "highest": {"params": ["period"], "defaults": {"period": 14}},
 
     # Change indicators
     "chgpct": {"params": ["period"], "defaults": {"period": 1}},

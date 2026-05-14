@@ -1,9 +1,9 @@
 """
 Support/Resistance Indicators
 
-Support/Resistance Levels, Pivot Points
+Support/Resistance Levels, Pivot Points, Extremes (Lowest/Highest)
 """
 
-from . import levels, pivots
+from . import levels, pivots, extremes
 
-__all__ = ["levels", "pivots"]
+__all__ = ["levels", "pivots", "extremes"]
