@@ -621,7 +621,7 @@ class BacktestManager:
 			backtest_id: Backtest ID
 
 		Returns:
-			List of trade dicts
+			List of trade dicts with status_at renamed to exit_date
 		"""
 		backtest_dir = self.backtests_dir / strategy_name / backtest_id
 
@@ -638,6 +638,9 @@ class BacktestManager:
 
 		try:
 			df = pd.read_csv(journal_file)
+			# Rename status_at to exit_date for frontend compatibility
+			if "status_at" in df.columns:
+				df = df.rename(columns={"status_at": "exit_date"})
 			# Convert to list of dicts
 			trades = df.to_dict(orient="records")
 			return trades
