@@ -171,8 +171,8 @@ class OrdersAgent(Agent):
 					f"expiration_date {expiration_date}, today {trading_date}"
 				)
 
-				# Expire if today > expiration_date
-				if trading_date > expiration_date:
+				# Expire if today >= expiration_date
+				if trading_date >= expiration_date:
 					orders_mgr.update_order_status(order_id, "expired")
 
 					expired_results.append({
