@@ -85,18 +85,20 @@ class OrdersAgent(Agent):
 		trading_date: Any,
 		time_stop: int = 1
 	) -> List[Dict[str, Any]]:
-		"""Expire pending orders that have exceeded time_stop duration.
+		"""Expire pending orders that have exceeded their expiration_date.
 
 		Rules:
-		- Pending orders created today are kept (may execute today if limit met, or expire tomorrow)
-		- Pending orders older than time_stop days are expired
+		- BUY orders: expire after 1 calendar day (default)
+		- SELL orders (exit conditions): expire after 1 calendar day (default)
+		- SELL orders (linked SL/TP): expire after 365 days
+		- Pending orders with expiration_date <= trading_date are expired
 		- Already executed orders are left unchanged
 		- Already cancelled/expired orders are left unchanged
 
 		Args:
 			orders_mgr: Orders manager
 			trading_date: Current trading date
-			time_stop: Number of days before unfilled order expires (default: 1)
+			time_stop: (deprecated, kept for backward compatibility)
 
 		Returns:
 			List of expired order results
@@ -125,48 +127,67 @@ class OrdersAgent(Agent):
 				)
 				return expired_results
 
-			# Parse created_at timestamps and check age
+			# Check expiration_date for each pending order
 			for _, order in pending_orders.iterrows():
 				order_id = str(order.get("id", ""))
 				ticker = str(order.get("ticker", ""))
 				quantity = int(order.get("quantity", 0))
-				created_at_str = str(order.get("created_at", ""))
+				expiration_date_str = str(order.get("expiration_date", ""))
+				operation = str(order.get("operation", "BUY")).upper()
 
-				# Parse creation date
-				try:
-					created_datetime = datetime.fromisoformat(created_at_str)
-					created_date = created_datetime.date()
-				except (ValueError, AttributeError):
-					self.logger.error(f"Could not parse created_at for order {order_id}: {created_at_str}")
+				if not expiration_date_str:
+					# Fallback: if no expiration_date, use old time_stop logic
+					created_at_str = str(order.get("created_at", ""))
+					try:
+						created_datetime = datetime.fromisoformat(created_at_str)
+						created_date = created_datetime.date()
+						age_days = (trading_date - created_date).days
+						if age_days >= time_stop:
+							orders_mgr.update_order_status(order_id, "expired")
+							expired_results.append({
+								"order_id": order_id,
+								"ticker": ticker,
+								"quantity": quantity,
+								"status": "expired",
+								"reason": f"{time_stop}-day time_stop exceeded (fallback)",
+							})
+							self.logger.info(
+								f"EXPIRED {operation} {ticker} x {quantity} order {order_id} (fallback)"
+							)
+					except (ValueError, AttributeError):
+						self.logger.debug(f"Could not parse dates for order {order_id}")
 					continue
 
-				# Calculate age in days
-				age_days = (trading_date - created_date).days
+				# Parse expiration_date
+				try:
+					expiration_datetime = datetime.fromisoformat(expiration_date_str)
+					expiration_date = expiration_datetime.date()
+				except (ValueError, AttributeError):
+					self.logger.error(f"Could not parse expiration_date for order {order_id}: {expiration_date_str}")
+					continue
 
 				self.logger.debug(
-					f"Order {order_id} ({ticker} x {quantity}): created {created_date}, "
-					f"age {age_days} days, time_stop {time_stop} days"
+					f"Order {order_id} ({operation} {ticker} x {quantity}): "
+					f"expiration_date {expiration_date}, today {trading_date}"
 				)
 
-				# Expire if order age >= time_stop
-				# Same-day orders (age == 0) are kept for same-day execution
-				if age_days >= time_stop:
+				# Expire if today > expiration_date
+				if trading_date > expiration_date:
 					orders_mgr.update_order_status(order_id, "expired")
 
 					expired_results.append({
 						"order_id": order_id,
 						"ticker": ticker,
 						"quantity": quantity,
-						"created_date": created_date.isoformat(),
-						"age_days": age_days,
-						"time_stop": time_stop,
+						"operation": operation,
+						"expiration_date": expiration_date.isoformat(),
 						"status": "expired",
-						"reason": f"{time_stop}-day time_stop exceeded",
+						"reason": f"Order expired (expiration_date {expiration_date} < {trading_date})",
 					})
 
 					self.logger.info(
-						f"EXPIRED {ticker} x {quantity} order {order_id} "
-						f"(age {age_days} days >= {time_stop}-day time_stop)"
+						f"EXPIRED {operation} {ticker} x {quantity} order {order_id} "
+						f"(expiration {expiration_date} < {trading_date})"
 					)
 
 		except Exception as e:

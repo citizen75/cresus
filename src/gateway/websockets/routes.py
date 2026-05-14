@@ -34,7 +34,7 @@ async def websocket_backtest(
 	await websocket.accept()
 	manager.register_connection(backtest_id, websocket)
 
-	logger.info(f"WebSocket client connected: backtest_id={backtest_id}, strategy={strategy}")
+	logger.debug(f"WebSocket client connected: backtest_id={backtest_id}, strategy={strategy}")
 
 	try:
 		# Keep connection alive, flush pending messages periodically
@@ -60,7 +60,7 @@ async def websocket_backtest(
 
 	except WebSocketDisconnect:
 		manager.unregister_connection(backtest_id, websocket)
-		logger.info(f"WebSocket client disconnected: backtest_id={backtest_id}")
+		logger.debug(f"WebSocket client disconnected: backtest_id={backtest_id}")
 
 	except Exception as e:
 		manager.unregister_connection(backtest_id, websocket)

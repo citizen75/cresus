@@ -197,6 +197,42 @@ class PortfolioManager:
         with open(portfolio_json, 'w') as f:
             json.dump(metadata, f, indent=2)
 
+    def update_portfolio(self, name: str, updates: Dict[str, Any]) -> Dict[str, Any]:
+        """Update portfolio configuration."""
+        try:
+            # Load current metadata
+            metadata = self._get_portfolio_metadata(name)
+
+            # Update only provided fields
+            allowed_fields = {"portfolio_type", "currency", "description", "initial_capital", "strategy"}
+            field_mapping = {
+                "portfolio_type": "type",  # Map API field to metadata field
+                "currency": "currency",
+                "description": "description",
+                "initial_capital": "initial_capital",
+                "strategy": "strategy",
+            }
+
+            for api_field, value in updates.items():
+                if api_field in allowed_fields and value is not None:
+                    metadata_field = field_mapping[api_field]
+                    metadata[metadata_field] = value
+
+            # Save updated metadata
+            self._save_portfolio_metadata(name, metadata)
+
+            logger.info(f"Updated portfolio '{name}' with: {updates}")
+
+            return {
+                "status": "success",
+                "message": f"Portfolio '{name}' updated",
+                "portfolio": metadata,
+            }
+
+        except Exception as e:
+            logger.error(f"Error updating portfolio: {e}")
+            return {"status": "error", "message": str(e)}
+
     def delete_portfolio(self, name: str) -> Dict[str, Any]:
         """Delete a portfolio folder and its contents."""
         try:
@@ -224,7 +260,10 @@ class PortfolioManager:
             return {"status": "error", "message": str(e)}
 
     def get_portfolio_details(self, name: str) -> Optional[Dict[str, Any]]:
-        """Get portfolio with positions."""
+        """Get portfolio with positions and metadata."""
+        # Load metadata
+        metadata = self._get_portfolio_metadata(name)
+
         journal = Journal(name, context=self.context)
         df = journal.load_df()
 
@@ -250,6 +289,12 @@ class PortfolioManager:
         completed = df[df["status"] == "completed"] if not df.empty else pd.DataFrame()
         return {
             "name": name,
+            "portfolio_type": metadata.get("type", "paper"),
+            "currency": metadata.get("currency", "EUR"),
+            "description": metadata.get("description", ""),
+            "initial_capital": metadata.get("initial_capital", 100000.0),
+            "created_at": metadata.get("created_at"),
+            "strategy": metadata.get("strategy", name),  # Default to portfolio name if not set
             "num_positions": len(positions),
             "num_trades": len(completed),
             "positions": positions,

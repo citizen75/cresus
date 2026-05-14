@@ -100,9 +100,8 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
     const loadWatchlist = async () => {
       try {
         setLoading(true)
-        const strategyName = name.toLowerCase().replace(/\s+/g, '_')
         const baseUrl = getApiBaseUrl()
-        const apiUrl = `${baseUrl}/api/v1/watchlists/${strategyName}`
+        const apiUrl = `${baseUrl}/api/v1/backtests/strategy/${name}/watchlist`
 
         const response = await fetch(apiUrl, {
           headers: {
@@ -112,19 +111,19 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
 
         if (!response.ok) {
           if (response.status === 404) {
-            throw new Error(`Watchlist '${name}' not found. Make sure the strategy has been executed to generate watchlist data.`)
+            throw new Error(`Watchlist '${name}' not found. Make sure you've run the strategy in live mode to generate watchlist data.`)
           }
           throw new Error(`API error: ${response.status}`)
         }
 
         const data = await response.json()
 
-        if (!data.watchlist || data.watchlist.length === 0) {
+        if (!data.data?.watchlist || data.data.watchlist.length === 0) {
           throw new Error('No watchlist data available for this strategy')
         }
 
         // Transform API data to table format
-        const transformedWatchlist: WatchlistItem[] = data.watchlist.map((item: any, index: number) => ({
+        const transformedWatchlist: WatchlistItem[] = data.data.watchlist.map((item: any, index: number) => ({
           rank: index + 1,
           stock: item.ticker.replace('.PA', '').toUpperCase(),
           companyName: COMPANY_NAMES[item.ticker],
@@ -209,14 +208,25 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
   // Load historical data for charts
   const loadHistoricalData = async (tickers: string[], selectedPeriod: string = '1Y') => {
     try {
-      const strategyName = name.toLowerCase().replace(/\s+/g, '_')
       const baseUrl = getApiBaseUrl()
       const historical: HistoricalData = {}
+
+      // Map period to days
+      const daysMap: { [key: string]: number } = {
+        '1W': 7,
+        '1M': 30,
+        '3M': 90,
+        '6M': 180,
+        'YTD': 365,
+        '1Y': 365,
+        'All': 1000,
+      }
+      const days = daysMap[selectedPeriod] || 365
 
       for (const ticker of tickers) {
         try {
           const response = await fetch(
-            `${baseUrl}/api/v1/watchlists/${strategyName}/historical/${ticker}?period=${selectedPeriod}`
+            `${baseUrl}/api/v1/data/history/${ticker}?days=${days}`
           )
 
           if (response.ok) {

@@ -34,6 +34,27 @@ class CresusAPI {
     return (await this.client.get('/portfolios')).data
   }
 
+  async listStrategies() {
+    return (await this.client.get('/strategies')).data
+  }
+
+  async listUniverses() {
+    return (await this.client.get('/data/universes')).data
+  }
+
+  async getStrategy(name: string) {
+    return (await this.client.get(`/strategies/${name}`)).data
+  }
+
+  async updateStrategy(name: string, data: any) {
+    return (await this.client.put(`/strategies/${name}`, data)).data
+  }
+
+  async duplicateStrategy(name: string, newName?: string) {
+    const params = newName ? { new_name: newName } : {}
+    return (await this.client.post(`/strategies/${name}/duplicate`, {}, { params })).data
+  }
+
   async getPortfolioDetails(name: string) {
     return (await this.client.get(`/portfolios/${name}`)).data
   }
@@ -70,6 +91,15 @@ class CresusAPI {
     return (await this.client.post('/portfolios', data)).data
   }
 
+  async updatePortfolio(name: string, data: {
+    portfolio_type?: string
+    currency?: string
+    description?: string
+    initial_capital?: number
+  }) {
+    return (await this.client.put(`/portfolios/${name}`, data)).data
+  }
+
   async deletePortfolio(name: string) {
     return (await this.client.delete(`/portfolios/${name}`)).data
   }
@@ -88,6 +118,10 @@ class CresusAPI {
 
   async getCurrentPrices(name: string) {
     return (await this.client.get(`/portfolios/${name}/current-prices`)).data
+  }
+
+  async getPortfolioWatchlist(name: string, limit: number = 50) {
+    return (await this.client.get(`/portfolios/${name}/watchlist`, { params: { limit } })).data
   }
 
   async getTransactions(portfolioName: string, ticker?: string) {

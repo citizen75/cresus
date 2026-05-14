@@ -5,8 +5,19 @@ from typing import Optional
 import pandas as pd
 
 from tools.data import DataHistory, Fundamental
+from tools.universe import Universe
 
 router = APIRouter(prefix="/data", tags=["data"])
+
+
+@router.get("/universes")
+async def list_universes():
+	"""List all available universes."""
+	try:
+		universes = Universe.list_universes()
+		return {"universes": universes}
+	except Exception as e:
+		raise HTTPException(500, f"Error listing universes: {str(e)}")
 
 
 @router.get("/history")

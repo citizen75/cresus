@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getApiBaseUrl } from '@/services/api'
+import { getApiBaseUrl, api } from '@/services/api'
 
 interface StrategyBuilderProps {
   name: string
@@ -50,17 +50,31 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
   const [exitForm, setExitForm] = useState<any>(null)
   const [watchlistForm, setWatchlistForm] = useState<any>(null)
   const [signalsForm, setSignalsForm] = useState<any>(null)
+  const [editingBasic, setEditingBasic] = useState(false)
+  const [basicForm, setBasicForm] = useState<any>(null)
+  const [universes, setUniverses] = useState<string[]>([])
+  const [loadingUniverses, setLoadingUniverses] = useState(false)
 
   useEffect(() => {
     const fetchStrategy = async () => {
       try {
         const baseUrl = getApiBaseUrl()
-        const response = await fetch(`${baseUrl}/api/v1/strategies/${name}`)
-        if (!response.ok) {
-          throw new Error(`Failed to fetch strategy: ${response.statusText}`)
+
+        // First, fetch portfolio details to get the strategy name
+        const portfolioResponse = await fetch(`${baseUrl}/api/v1/portfolios/${name}`)
+        if (!portfolioResponse.ok) {
+          throw new Error(`Failed to fetch portfolio: ${portfolioResponse.statusText}`)
         }
-        const data = await response.json()
-        setStrategy(data.strategy)
+        const portfolioData = await portfolioResponse.json()
+        const strategyName = portfolioData.strategy || name
+
+        // Then fetch the strategy using the strategy name
+        const strategyResponse = await fetch(`${baseUrl}/api/v1/strategies/${strategyName}`)
+        if (!strategyResponse.ok) {
+          throw new Error(`Failed to fetch strategy: ${strategyResponse.statusText}`)
+        }
+        const strategyData = await strategyResponse.json()
+        setStrategy(strategyData.strategy)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
       } finally {
@@ -71,11 +85,51 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
     fetchStrategy()
   }, [name])
 
+  const handleEditBasic = async () => {
+    if (!strategy) return
+    setBasicForm({
+      universe: strategy.universe,
+      description: strategy.description,
+    })
+    setEditingBasic(true)
+
+    // Fetch universes list
+    setLoadingUniverses(true)
+    try {
+      const data = await api.listUniverses()
+      setUniverses(data.universes || [])
+    } catch (err) {
+      console.error('Failed to load universes:', err)
+    } finally {
+      setLoadingUniverses(false)
+    }
+  }
+
+  const handleSaveBasic = async () => {
+    if (!basicForm) return
+
+    const updates: any = {}
+    if (basicForm.universe !== strategy?.universe) {
+      updates.universe = basicForm.universe
+    }
+    if (basicForm.description !== strategy?.description) {
+      updates.description = basicForm.description
+    }
+
+    if (Object.keys(updates).length === 0) {
+      setEditingBasic(false)
+      return
+    }
+
+    await saveStrategy(updates)
+    setEditingBasic(false)
+  }
+
   const saveStrategy = async (updates: any) => {
     if (!strategy) return
-    
+
     setIsSaving(true)
-    
+
     try {
       const baseUrl = getApiBaseUrl()
       const response = await fetch(`${baseUrl}/api/v1/strategies/${name}`, {
@@ -85,7 +139,7 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
         },
         body: JSON.stringify(updates),
       })
-      
+
       if (!response.ok) {
         throw new Error(`Failed to update strategy: ${response.statusText}`)
       }
@@ -170,253 +224,98 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
       </div>
 
       {/* Strategy Info Cards */}
-      <div className="grid grid-cols-5 gap-6">
-        {/* Universe */}
-        <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
-          <h3 className="text-white font-bold mb-4">Universe</h3>
-          <div className="space-y-3">
-            <div className="bg-slate-800/50 rounded p-3">
-              <p className="text-slate-400 text-xs uppercase mb-1">Universe</p>
-              <p className="text-white font-medium text-sm capitalize">{strategy.universe.replace(/_/g, ' ')}</p>
-            </div>
-            <div className="bg-slate-800/50 rounded p-3">
-              <p className="text-slate-400 text-xs uppercase mb-1">Engine</p>
-              <p className="text-white font-medium text-sm">{strategy.engine}</p>
-            </div>
-          </div>
-          <button className="w-full mt-4 px-4 py-2 text-purple-400 hover:text-purple-300 text-sm font-medium transition">
-            Edit universe
-          </button>
-        </div>
-
-        {/* Entry Conditions */}
-        <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-white font-bold">Entry</h3>
-            <button
-              onClick={() => {
-                if (editingEntry) {
-                  handleSaveEntry()
-                } else {
-                  setEntryForm({
-                    enabled: strategy.entry?.enabled || false,
-                    parameters: JSON.parse(JSON.stringify(strategy.entry?.parameters || {}))
-                  })
-                  setEditingEntry(true)
-                }
-              }}
-              disabled={isSaving}
-              className="text-purple-400 hover:text-purple-300 text-sm font-medium disabled:opacity-50"
-            >
-              {editingEntry ? (isSaving ? 'Saving...' : 'Done') : 'Edit'}
-            </button>
-          </div>
-
-          {editingEntry ? (
-            // Edit Form
-            <div className="space-y-3">
-              <div>
-                <label className="text-slate-400 text-xs uppercase block mb-1">Position Size Formula</label>
-                <textarea
-                  defaultValue={strategy.entry?.parameters?.position_size?.formula || ''}
-                  onChange={(e) => {
-                    setEntryForm({
-                      ...entryForm,
-                      parameters: {
-                        ...entryForm?.parameters,
-                        position_size: {
-                          formula: e.target.value,
-                          description: entryForm?.parameters?.position_size?.description || ''
-                        }
-                      }
-                    })
-                  }}
-                  className="w-full bg-slate-800 border border-slate-700 text-white px-2 py-1 rounded text-xs font-mono h-16"
-                />
-              </div>
-            </div>
-          ) : (
-            // Display View
-            strategy.entry?.enabled ? (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 p-2 bg-green-900/20 rounded border border-green-800/50">
-                  <span className="w-2 h-2 bg-green-400 rounded-full"></span>
-                  <span className="text-green-400 text-xs font-medium">Enabled</span>
+      <div className="grid grid-cols-4 gap-6">
+        {/* Left Sidebar: Universe & Indicators */}
+        <div className="space-y-6">
+          {/* Universe */}
+          <div className="bg-slate-900 rounded-lg p-4 border border-slate-800">
+            <h3 className="text-white font-bold mb-2 text-sm">Universe</h3>
+            {editingBasic ? (
+              <div className="space-y-2">
+                <div>
+                  <p className="text-slate-400 text-xs uppercase mb-1">Universe</p>
+                  {loadingUniverses ? (
+                    <div className="w-full bg-slate-800 border border-slate-700 text-slate-400 rounded px-2 py-1 text-xs">
+                      Loading...
+                    </div>
+                  ) : (
+                    <select
+                      value={basicForm?.universe || ''}
+                      onChange={(e) => setBasicForm({ ...basicForm, universe: e.target.value })}
+                      className="w-full bg-slate-800 border border-slate-700 text-white rounded px-2 py-1 text-xs focus:border-purple-500 focus:outline-none"
+                    >
+                      <option value="">Select a universe</option>
+                      {universes.map((u) => (
+                        <option key={u} value={u}>
+                          {u}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
-                {strategy.entry.parameters?.position_size && (
-                  <div className="text-slate-300 text-xs bg-slate-800/30 p-2 rounded font-mono break-all">
-                    {strategy.entry.parameters.position_size.formula}
-                  </div>
-                )}
+                <div>
+                  <p className="text-slate-400 text-xs uppercase mb-1">Description</p>
+                  <textarea
+                    value={basicForm?.description || ''}
+                    onChange={(e) => setBasicForm({ ...basicForm, description: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 text-white rounded px-2 py-1 text-xs focus:border-purple-500 focus:outline-none h-16 resize-none"
+                  />
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={handleSaveBasic}
+                    disabled={isSaving}
+                    className="flex-1 px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium rounded transition disabled:opacity-50"
+                  >
+                    {isSaving ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    onClick={() => setEditingBasic(false)}
+                    className="flex-1 px-2 py-1 bg-slate-800 hover:bg-slate-700 text-white text-xs font-medium rounded transition"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             ) : (
-              <div className="text-slate-400 text-sm">Not configured</div>
-            )
-          )}
-        </div>
-
-        {/* Exit Conditions */}
-        <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-white font-bold">Exit</h3>
-            <button
-              onClick={() => {
-                if (editingExit) {
-                  handleSaveExit()
-                } else {
-                  setExitForm({
-                    enabled: strategy.exit?.enabled || false,
-                    parameters: JSON.parse(JSON.stringify(strategy.exit?.parameters || {}))
-                  })
-                  setEditingExit(true)
-                }
-              }}
-              disabled={isSaving}
-              className="text-purple-400 hover:text-purple-300 text-sm font-medium disabled:opacity-50"
-            >
-              {editingExit ? (isSaving ? 'Saving...' : 'Done') : 'Edit'}
-            </button>
-          </div>
-
-          {editingExit ? (
-            // Edit Form
-            <div className="space-y-3">
-              <div>
-                <label className="text-slate-400 text-xs uppercase block mb-1">Stop Loss</label>
-                <textarea
-                  defaultValue={strategy.exit?.parameters?.stop_loss?.formula || ''}
-                  onChange={(e) => {
-                    setExitForm({
-                      ...exitForm,
-                      parameters: {
-                        ...exitForm?.parameters,
-                        stop_loss: {
-                          formula: e.target.value,
-                          description: exitForm?.parameters?.stop_loss?.description || ''
-                        }
-                      }
-                    })
-                  }}
-                  className="w-full bg-slate-800 border border-slate-700 text-white px-2 py-1 rounded text-xs font-mono h-12"
-                />
-              </div>
-              <div>
-                <label className="text-slate-400 text-xs uppercase block mb-1">Take Profit</label>
-                <textarea
-                  defaultValue={strategy.exit?.parameters?.take_profit?.formula || ''}
-                  onChange={(e) => {
-                    setExitForm({
-                      ...exitForm,
-                      parameters: {
-                        ...exitForm?.parameters,
-                        take_profit: {
-                          formula: e.target.value,
-                          description: exitForm?.parameters?.take_profit?.description || ''
-                        }
-                      }
-                    })
-                  }}
-                  className="w-full bg-slate-800 border border-slate-700 text-white px-2 py-1 rounded text-xs font-mono h-12"
-                />
-              </div>
-              <div>
-                <label className="text-slate-400 text-xs uppercase block mb-1">Trailing Stop</label>
-                <textarea
-                  defaultValue={strategy.exit?.parameters?.trailing_stop?.formula || ''}
-                  onChange={(e) => {
-                    setExitForm({
-                      ...exitForm,
-                      parameters: {
-                        ...exitForm?.parameters,
-                        trailing_stop: {
-                          formula: e.target.value,
-                          description: exitForm?.parameters?.trailing_stop?.description || ''
-                        }
-                      }
-                    })
-                  }}
-                  className="w-full bg-slate-800 border border-slate-700 text-white px-2 py-1 rounded text-xs font-mono h-12"
-                />
-              </div>
-              <div>
-                <label className="text-slate-400 text-xs uppercase block mb-1">Holding Period</label>
-                <input
-                  type="number"
-                  defaultValue={strategy.exit?.parameters?.holding_period?.formula || 15}
-                  onChange={(e) => {
-                    setExitForm({
-                      ...exitForm,
-                      parameters: {
-                        ...exitForm?.parameters,
-                        holding_period: {
-                          formula: e.target.value,
-                          description: exitForm?.parameters?.holding_period?.description || ''
-                        }
-                      }
-                    })
-                  }}
-                  className="w-full bg-slate-800 border border-slate-700 text-white px-2 py-1 rounded text-xs"
-                />
-              </div>
-            </div>
-          ) : (
-            // Display View
-            strategy.exit?.enabled ? (
-              <div className="space-y-2 text-xs">
-                <div className="flex items-center gap-2 p-2 bg-red-900/20 rounded border border-red-800/50">
-                  <span className="w-2 h-2 bg-red-400 rounded-full"></span>
-                  <span className="text-red-400 font-medium">Stop Loss</span>
+              <>
+                <div className="space-y-2">
+                  <div className="bg-slate-800/50 rounded p-2">
+                    <p className="text-slate-400 text-xs uppercase mb-0.5">Universe</p>
+                    <p className="text-white font-medium text-xs capitalize">{strategy.universe.replace(/_/g, ' ')}</p>
+                  </div>
+                  <div className="bg-slate-800/50 rounded p-2">
+                    <p className="text-slate-400 text-xs uppercase mb-0.5">Engine</p>
+                    <p className="text-white font-medium text-xs">{strategy.engine}</p>
+                  </div>
                 </div>
-                {strategy.exit.parameters?.stop_loss && (
-                  <div className="text-slate-300 bg-slate-800/30 p-2 rounded font-mono break-all">
-                    {strategy.exit.parameters.stop_loss.formula}
-                  </div>
-                )}
-                {strategy.exit.parameters?.take_profit && (
-                  <div>
-                    <span className="text-slate-400">Take Profit:</span>
-                    <div className="text-slate-300 bg-slate-800/30 p-2 rounded font-mono break-all">
-                      {strategy.exit.parameters.take_profit.formula}
-                    </div>
-                  </div>
-                )}
-                {strategy.exit.parameters?.trailing_stop && (
-                  <div>
-                    <span className="text-slate-400">Trailing Stop:</span>
-                    <div className="text-slate-300 bg-slate-800/30 p-2 rounded font-mono break-all">
-                      {strategy.exit.parameters.trailing_stop.formula}
-                    </div>
-                  </div>
-                )}
-                {strategy.exit.parameters?.holding_period && (
-                  <div>
-                    <span className="text-slate-400">Holding Period:</span>
-                    <div className="text-slate-300 bg-slate-800/30 p-2 rounded">
-                      {strategy.exit.parameters.holding_period.formula} days
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-slate-400 text-sm">Not configured</div>
-            )
-          )}
-        </div>
-
-        {/* Indicators */}
-        <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
-          <h3 className="text-white font-bold mb-4">Indicators</h3>
-          <div className="space-y-2">
-            {strategy.indicators?.map((indicator) => (
-              <div key={indicator} className="flex items-center gap-2 p-2 bg-blue-900/20 rounded border border-blue-800/50">
-                <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
-                <span className="text-blue-400 text-xs font-medium">{indicator}</span>
-              </div>
-            ))}
+                <button
+                  onClick={handleEditBasic}
+                  className="w-full mt-2 px-2 py-1 text-purple-400 hover:text-purple-300 text-xs font-medium transition"
+                >
+                  Edit
+                </button>
+              </>
+            )}
           </div>
-          <button className="w-full mt-4 px-4 py-2 text-purple-400 hover:text-purple-300 text-sm font-medium transition">
-            Manage indicators
-          </button>
+
+          {/* Indicators */}
+          <div className="bg-slate-900 rounded-lg p-4 border border-slate-800">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-white font-bold text-sm">Indicators</h3>
+              <button className="text-purple-400 hover:text-purple-300 text-xs font-medium transition">
+                Manage
+              </button>
+            </div>
+            <div className="space-y-2">
+              {strategy.indicators?.map((indicator) => (
+                <div key={indicator} className="flex items-center gap-2 p-2 bg-blue-900/20 rounded border border-blue-800/50">
+                  <span className="w-1.5 h-1.5 bg-blue-400 rounded-full"></span>
+                  <span className="text-blue-400 text-xs font-medium">{indicator}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Watchlist Config */}
@@ -554,6 +453,204 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
             </div>
           )}
         </div>
+
+        {/* Entry Conditions */}
+        <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-white font-bold">Entry</h3>
+            <button
+              onClick={() => {
+                if (editingEntry) {
+                  handleSaveEntry()
+                } else {
+                  setEntryForm({
+                    enabled: strategy.entry?.enabled || false,
+                    parameters: JSON.parse(JSON.stringify(strategy.entry?.parameters || {}))
+                  })
+                  setEditingEntry(true)
+                }
+              }}
+              disabled={isSaving}
+              className="text-purple-400 hover:text-purple-300 text-sm font-medium disabled:opacity-50"
+            >
+              {editingEntry ? (isSaving ? 'Saving...' : 'Done') : 'Edit'}
+            </button>
+          </div>
+
+          {editingEntry ? (
+            // Edit Form
+            <div className="space-y-4">
+              {strategy.entry?.parameters && Object.entries(strategy.entry.parameters).map(([key, value]: [string, any]) => (
+                <div key={key}>
+                  <label className="text-slate-400 text-xs uppercase block mb-1 capitalize">{key.replace(/_/g, ' ')}</label>
+                  {typeof value === 'object' && value.formula !== undefined ? (
+                    <>
+                      <textarea
+                        defaultValue={value.formula || ''}
+                        onChange={(e) => {
+                          setEntryForm({
+                            ...entryForm,
+                            parameters: {
+                              ...entryForm?.parameters,
+                              [key]: {
+                                ...value,
+                                formula: e.target.value
+                              }
+                            }
+                          })
+                        }}
+                        className="w-full bg-slate-800 border border-slate-700 text-white px-2 py-1 rounded text-xs font-mono h-12"
+                      />
+                      {value.type && (
+                        <div className="mt-1 text-xs text-slate-500">Type: {value.type}</div>
+                      )}
+                    </>
+                  ) : (
+                    <input
+                      type="text"
+                      defaultValue={value || ''}
+                      onChange={(e) => {
+                        setEntryForm({
+                          ...entryForm,
+                          parameters: {
+                            ...entryForm?.parameters,
+                            [key]: e.target.value
+                          }
+                        })
+                      }}
+                      className="w-full bg-slate-800 border border-slate-700 text-white px-2 py-1 rounded text-xs"
+                    />
+                  )}
+                  {typeof value === 'object' && value.description && (
+                    <p className="text-slate-500 text-xs mt-1">{value.description}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            // Display View
+            strategy.entry?.enabled ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 p-2 bg-green-900/20 rounded border border-green-800/50">
+                  <span className="w-2 h-2 bg-green-400 rounded-full"></span>
+                  <span className="text-green-400 text-xs font-medium">Enabled</span>
+                </div>
+                {strategy.entry.parameters && Object.entries(strategy.entry.parameters).map(([key, value]: [string, any]) => (
+                  <div key={key}>
+                    <p className="text-slate-400 text-xs uppercase mb-1 capitalize">{key.replace(/_/g, ' ')}</p>
+                    <div className="text-slate-300 text-xs bg-slate-800/30 p-2 rounded font-mono break-all">
+                      {typeof value === 'object' ? value.formula : value}
+                    </div>
+                    {typeof value === 'object' && value.description && (
+                      <p className="text-slate-500 text-xs mt-1">{value.description}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-slate-400 text-sm">Not configured</div>
+            )
+          )}
+        </div>
+
+        {/* Exit Conditions */}
+        <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-white font-bold">Exit</h3>
+            <button
+              onClick={() => {
+                if (editingExit) {
+                  handleSaveExit()
+                } else {
+                  setExitForm({
+                    enabled: strategy.exit?.enabled || false,
+                    parameters: JSON.parse(JSON.stringify(strategy.exit?.parameters || {}))
+                  })
+                  setEditingExit(true)
+                }
+              }}
+              disabled={isSaving}
+              className="text-purple-400 hover:text-purple-300 text-sm font-medium disabled:opacity-50"
+            >
+              {editingExit ? (isSaving ? 'Saving...' : 'Done') : 'Edit'}
+            </button>
+          </div>
+
+          {editingExit ? (
+            // Edit Form
+            <div className="space-y-4">
+              {strategy.exit?.parameters && Object.entries(strategy.exit.parameters).map(([key, value]: [string, any]) => (
+                <div key={key}>
+                  <label className="text-slate-400 text-xs uppercase block mb-1 capitalize">{key.replace(/_/g, ' ')}</label>
+                  {typeof value === 'object' && value.formula !== undefined ? (
+                    <>
+                      <textarea
+                        defaultValue={value.formula || ''}
+                        onChange={(e) => {
+                          setExitForm({
+                            ...exitForm,
+                            parameters: {
+                              ...exitForm?.parameters,
+                              [key]: {
+                                ...value,
+                                formula: e.target.value
+                              }
+                            }
+                          })
+                        }}
+                        className="w-full bg-slate-800 border border-slate-700 text-white px-2 py-1 rounded text-xs font-mono h-12"
+                      />
+                      {value.type && (
+                        <div className="mt-1 text-xs text-slate-500">Type: {value.type}</div>
+                      )}
+                    </>
+                  ) : (
+                    <input
+                      type="text"
+                      defaultValue={value || ''}
+                      onChange={(e) => {
+                        setExitForm({
+                          ...exitForm,
+                          parameters: {
+                            ...exitForm?.parameters,
+                            [key]: e.target.value
+                          }
+                        })
+                      }}
+                      className="w-full bg-slate-800 border border-slate-700 text-white px-2 py-1 rounded text-xs"
+                    />
+                  )}
+                  {typeof value === 'object' && value.description && (
+                    <p className="text-slate-500 text-xs mt-1">{value.description}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            // Display View
+            strategy.exit?.enabled ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 p-2 bg-red-900/20 rounded border border-red-800/50">
+                  <span className="w-2 h-2 bg-red-400 rounded-full"></span>
+                  <span className="text-red-400 font-medium">Exit Rules</span>
+                </div>
+                {strategy.exit.parameters && Object.entries(strategy.exit.parameters).map(([key, value]: [string, any]) => (
+                  <div key={key}>
+                    <p className="text-slate-400 text-xs uppercase mb-1 capitalize">{key.replace(/_/g, ' ')}</p>
+                    <div className="text-slate-300 text-xs bg-slate-800/30 p-2 rounded font-mono break-all">
+                      {typeof value === 'object' ? value.formula : value}
+                    </div>
+                    {typeof value === 'object' && value.description && (
+                      <p className="text-slate-500 text-xs mt-1">{value.description}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-slate-400 text-sm">Not configured</div>
+            )
+          )}
+        </div>
       </div>
 
       {/* Signals Configuration */}
@@ -621,11 +718,21 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
             </div>
           ) : (
             // Display View
-            <div className="grid grid-cols-4 gap-4">
+            <div className="space-y-4">
               {Object.entries(strategy.signals.weights).map(([key, value]) => (
-                <div key={key} className="bg-slate-800/50 rounded p-4">
-                  <p className="text-slate-400 text-xs uppercase mb-2 capitalize">{key.replace(/_/g, ' ')}</p>
-                  <p className="text-white font-bold text-2xl">{(value * 100).toFixed(0)}%</p>
+                <div key={key} className="bg-slate-800/50 rounded p-4 border border-slate-700/50">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-white font-semibold capitalize">{key.replace(/_/g, ' ')}</p>
+                    <p className="text-purple-400 font-bold text-lg">{(value * 100).toFixed(0)}%</p>
+                  </div>
+                  {strategy.signals.parameters?.[key]?.description && (
+                    <p className="text-slate-400 text-xs mb-2">{strategy.signals.parameters[key].description}</p>
+                  )}
+                  {strategy.signals.parameters?.[key]?.formula && (
+                    <div className="bg-slate-900/50 rounded p-2 font-mono text-xs text-slate-300 break-all">
+                      {strategy.signals.parameters[key].formula}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

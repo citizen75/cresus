@@ -6,13 +6,10 @@ from functools import lru_cache
 from typing import Dict, Any, Optional
 from datetime import datetime
 import pandas as pd
-import json
-import os
-from pathlib import Path
 
 from tools.portfolio.manager import PortfolioManager
 from tools.portfolio.metrics import PortfolioMetrics
-from utils.env import get_db_root
+from tools.watchlist.watchlist_manager import WatchlistManager
 
 
 class CreatePortfolioRequest(BaseModel):
@@ -21,6 +18,14 @@ class CreatePortfolioRequest(BaseModel):
     initial_capital: Optional[float] = 100000.0
     currency: str = "EUR"
     description: str = ""
+
+
+class UpdatePortfolioRequest(BaseModel):
+    portfolio_type: Optional[str] = None
+    currency: Optional[str] = None
+    description: Optional[str] = None
+    initial_capital: Optional[float] = None
+    strategy: Optional[str] = None
 
 
 @lru_cache(maxsize=1)
@@ -36,48 +41,17 @@ def _get_metrics() -> PortfolioMetrics:
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
 
 
-def _get_portfolios_json_path() -> Path:
-    """Get path to portfolios.json file."""
-    return get_db_root() / "portfolios.json"
-
-
-def _load_portfolios_from_json() -> Dict[str, Any]:
-    """Load portfolios from db/local/portfolios.json."""
-    json_path = _get_portfolios_json_path()
-    
-    if not json_path.exists():
-        return {}
-    
-    try:
-        with open(json_path, 'r') as f:
-            data = json.load(f)
-        return data
-    except Exception as e:
-        print(f"Error loading portfolios.json: {e}")
-        return {}
-
-
 @router.get("")
 async def list_portfolios():
-    """List all portfolios from db/local/portfolios.json."""
-    data = _load_portfolios_from_json()
-    portfolios_dict = data.get("portfolios", {})
-    
-    # Convert dict to list format for API
-    portfolios_list = []
-    for name, portfolio_data in portfolios_dict.items():
-        portfolios_list.append({
-            "name": name,
-            "type": portfolio_data.get("type", "paper"),
-            "currency": portfolio_data.get("currency", "EUR"),
-            "description": portfolio_data.get("description", ""),
-            "initial_capital": portfolio_data.get("initial_capital", 0),
-            "cash": portfolio_data.get("metrics", {}).get("cash", 0),
-            "positions_count": portfolio_data.get("positions", {}).get("count", 0),
-            "updated_at": portfolio_data.get("updated_at", ""),
-        })
-    
-    return {"portfolios": portfolios_list}
+    """List all portfolios by scanning folder structure."""
+    pm = _get_portfolio_manager()
+    portfolios = pm.list_portfolios()
+
+    return {
+        "status": "success",
+        "portfolios": portfolios,
+        "total": len(portfolios),
+    }
 
 
 @router.get("/cache/all")
@@ -104,6 +78,28 @@ async def create_portfolio(req: CreatePortfolioRequest):
     )
     if result.get("status") == "error":
         raise HTTPException(400, result.get("message", "Failed to create portfolio"))
+    return result
+
+
+@router.put("/{name}")
+async def update_portfolio(name: str, req: UpdatePortfolioRequest):
+    """Update portfolio configuration."""
+    pm = _get_portfolio_manager()
+
+    # Prepare update data (only include provided fields)
+    update_data = {}
+    if req.portfolio_type is not None:
+        update_data["portfolio_type"] = req.portfolio_type
+    if req.currency is not None:
+        update_data["currency"] = req.currency
+    if req.description is not None:
+        update_data["description"] = req.description
+    if req.initial_capital is not None:
+        update_data["initial_capital"] = req.initial_capital
+
+    result = pm.update_portfolio(name, update_data)
+    if result.get("status") == "error":
+        raise HTTPException(400, result.get("message", "Failed to update portfolio"))
     return result
 
 
@@ -366,36 +362,30 @@ async def get_portfolio_strategy(name: str):
 
 @router.get("/{name}/watchlist")
 async def get_portfolio_watchlist(name: str, limit: int = 50):
-    """Get AI-selected watchlist for portfolio."""
+    """Get watchlist for portfolio from its associated strategy."""
     pm = _get_portfolio_manager()
     details = pm.get_portfolio_details(name)
     if not details:
         raise HTTPException(404, f"Portfolio '{name}' not found")
+
+    # Get the strategy name (defaults to portfolio name if not explicitly set)
+    strategy_name = details.get("strategy", name)
+
+    # Load watchlist from the portfolio directory using WatchlistManager
+    # The portfolio_name parameter tells WatchlistManager to look in db/portfolios/{name}/watchlist.csv
+    wm = WatchlistManager(strategy_name, portfolio_name=name)
+    df = wm.load()
+
+    watchlist = []
+    if df is not None and len(df) > 0:
+        # Convert to list of dicts, limit to requested amount
+        watchlist = df.head(limit).to_dict('records')
+
     return {
         "name": name,
-        "watchlist": [
-            {
-                "rank": 1,
-                "stock": "NVIDIA",
-                "ticker": "NVDA",
-                "ai_score": 94,
-                "match_quality": "Excellent",
-                "update_potential": "98%",
-                "risk_score": "High",
-                "key_drivers": "Earnings momentum, AI demand, Data center growth",
-            },
-            {
-                "rank": 2,
-                "stock": "TSMC",
-                "ticker": "TSM",
-                "ai_score": 92,
-                "match_quality": "Excellent",
-                "update_potential": "82%",
-                "risk_score": "Medium",
-                "key_drivers": "AI chip supplier, Capacity expansion",
-            },
-        ],
-        "total_stocks": limit,
+        "strategy": strategy_name,
+        "watchlist": watchlist,
+        "total_stocks": len(watchlist),
     }
 
 

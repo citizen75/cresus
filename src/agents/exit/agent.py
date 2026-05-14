@@ -1,10 +1,12 @@
 """Exit agent for evaluating exit conditions."""
 
 from typing import Any, Dict, Optional, List
+import json
 from core.agent import Agent
 from core.flow import Flow
 from agents.exit.sub_agents import ExitConditionAgent, TrailingStopAgent, StopLossAgent
 from tools.portfolio.journal import Journal
+from tools.portfolio.orders import Orders
 
 
 class ExitAgent(Agent):
@@ -33,16 +35,16 @@ class ExitAgent(Agent):
 		self.exit_condition_agent = ExitConditionAgent("ExitConditionAgent")
 
 	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-		"""Evaluate exit conditions and update context.
+		"""Evaluate exit conditions and save SELL orders.
 
-		Evaluates all exit conditions for open positions and stores results
-		in context. Does not create or save orders - TransactAgent handles execution.
+		Evaluates all exit conditions for open positions and saves generated
+		SELL orders to the Orders table for TransactAgent to execute.
 
 		Args:
 			input_data: Input data (optional, uses context)
 
 		Returns:
-			Response dictionary with evaluation status
+			Response dictionary with saved order count
 		"""
 		if input_data is None:
 			input_data = {}
@@ -85,6 +87,7 @@ class ExitAgent(Agent):
 		# Add condition-based exit evaluation
 		exit_flow.add_step(
 			ExitConditionAgent("ExitConditionStep"),
+			step_name="exit_condition",
 			required=False
 		)
 
@@ -97,10 +100,66 @@ class ExitAgent(Agent):
 		if flow_result.get("status") != "success":
 			self.logger.warning(f"Exit evaluation flow failed: {flow_result.get('message', 'Unknown error')}")
 
-		self.logger.info(f"[EXIT] Exit evaluation complete")
+		# Save SELL orders from ExitConditionAgent results
+		orders_saved = 0
+		try:
+			# Extract ExitConditionAgent results from flow steps
+			exit_condition_result = None
+			for step in exit_flow.steps:
+				if step.get("name") == "exit_condition":
+					exit_condition_result = step.get("result", {})
+					break
+
+			if exit_condition_result and exit_condition_result.get("status") == "success":
+				exit_orders = exit_condition_result.get("output", {}).get("exit_orders", [])
+
+				if exit_orders:
+					orders_mgr = Orders(portfolio_name, context=self.context.__dict__)
+					trading_date = self.context.get("date")
+
+					for exit_order in exit_orders:
+						ticker = exit_order.get("ticker")
+						quantity = exit_order.get("quantity")
+						exit_price = exit_order.get("exit_price")
+						exit_type = exit_order.get("exit_type", "condition")
+
+						# Create metadata for SELL order
+						metadata = {
+							"exit_type": exit_type,
+							"formula": exit_order.get("metadata", {}).get("formula", ""),
+							"reason": "exit_condition_met"
+						}
+
+						# Format created_at timestamp
+						created_at = None
+						if trading_date:
+							from datetime import datetime
+							if isinstance(trading_date, str):
+								created_at = f"{trading_date}T14:00:00.000000"
+							else:
+								created_at = f"{trading_date.isoformat()}T14:00:00.000000"
+
+						orders_mgr.add_order(
+							ticker=ticker,
+							quantity=int(quantity),
+							entry_price=float(exit_price),
+							execution_method="market",
+							operation="SELL",
+							metadata=metadata,
+							created_at=created_at,
+							replace_same_day=False
+						)
+						orders_saved += 1
+						self.logger.info(f"Saved SELL order: {quantity} {ticker} @ {exit_price:.2f} ({exit_type})")
+
+					orders_mgr.flush()
+		except Exception as e:
+			self.logger.error(f"Error saving exit orders: {e}")
+
+		self.logger.info(f"[EXIT] Exit evaluation complete - saved {orders_saved} SELL orders")
 
 		return {
 			"status": "success",
-			"output": {},
-			"message": "Exit conditions evaluated, results in context",
+			"output": {"orders_saved": orders_saved},
+			"message": f"Exit conditions evaluated and {orders_saved} SELL orders saved",
 		}

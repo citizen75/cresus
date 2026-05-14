@@ -4,6 +4,7 @@ import StrategyBuilder from '@/components/portfolio/StrategyBuilder'
 import AIWatchlist from '@/components/portfolio/AIWatchlist'
 import OrdersView from '@/components/portfolio/OrdersView'
 import PortfolioBacktest from '@/components/portfolio/PortfolioBacktest'
+import PortfolioSettings from '@/components/portfolio/PortfolioSettings'
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
@@ -13,6 +14,7 @@ const TABS = [
   { id: 'backtest', label: 'Backtest' },
   { id: 'holdings', label: 'Holdings' },
   { id: 'activity', label: 'Activity' },
+  { id: 'settings', label: 'Settings' },
 ]
 
 export default function PortfolioDetail() {
@@ -29,7 +31,8 @@ export default function PortfolioDetail() {
     if (location.pathname.includes('/orders')) return 'orders'
     if (location.pathname.includes('/holdings')) return 'holdings'
     if (location.pathname.includes('/transactions')) return 'activity'
-    
+    if (location.pathname.includes('/settings')) return 'settings'
+
     // Default to overview if no tab path segment found
     return 'overview'
   }
@@ -52,6 +55,8 @@ export default function PortfolioDetail() {
       navigate(`/portfolios/${encodeURIComponent(name)}/holdings`)
     } else if (tabId === 'activity') {
       navigate(`/portfolios/${encodeURIComponent(name)}/transactions`)
+    } else if (tabId === 'settings') {
+      navigate(`/portfolios/${encodeURIComponent(name)}/settings`)
     }
   }
 
@@ -122,6 +127,7 @@ export default function PortfolioDetail() {
         {activeTab === 'watchlist' && <AIWatchlist name={name} />}
         {activeTab === 'orders' && <OrdersView name={name} />}
         {activeTab === 'backtest' && <PortfolioBacktest name={name} />}
+        {activeTab === 'settings' && <PortfolioSettings name={name} />}
         {activeTab === 'activity' && <div className="text-slate-400 py-12 text-center">Activity tab - Coming soon</div>}
       </div>
     </div>

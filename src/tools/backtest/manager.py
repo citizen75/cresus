@@ -125,6 +125,28 @@ class BacktestManager:
 		# Compute equity curve from journal
 		equity_curve = self._compute_equity_curve(strategy_name, backtest_id)
 		if equity_curve:
+			# Add final value from metrics if available and different from last transaction date
+			metrics = result.get("portfolio_metrics", {})
+			end_value = metrics.get("end_value")
+			end_date = metrics.get("end_date")
+
+			if end_value and end_date and equity_curve:
+				last_point_date = equity_curve[-1].get("date")
+				# Only add final point if it's on a different date than the last transaction
+				if last_point_date and last_point_date < end_date:
+					# Parse end_date (may be "2025-12-15 00:00:00" format)
+					end_date_str = end_date.split()[0] if isinstance(end_date, str) else str(end_date)
+
+					# Calculate final drawdown from peak
+					peak = max(p["value"] for p in equity_curve)
+					final_drawdown = ((float(end_value) - peak) / peak * 100) if peak > 0 else 0.0
+
+					equity_curve.append({
+						"date": end_date_str,
+						"value": float(end_value),
+						"drawdown_pct": final_drawdown,
+					})
+
 			result["equity_curve"] = equity_curve
 
 		# Load trades from journal CSV
@@ -475,6 +497,19 @@ class BacktestManager:
 		"""
 		backtest_dir = self.backtests_dir / strategy_name / backtest_id
 
+		# Load initial capital from metrics.json if available
+		initial_capital = 10000.0  # default
+		metrics_file = backtest_dir / "metrics.json"
+		if metrics_file.exists():
+			try:
+				with open(metrics_file) as f:
+					text = f.read()
+					text = re.sub(r"\bNaN\b", "null", text)
+					metrics = json.loads(text)
+					initial_capital = metrics.get("start_value", 10000.0)
+			except Exception:
+				pass
+
 		# Find journal CSV
 		portfolios_dir = backtest_dir / "portfolios"
 		if not portfolios_dir.exists():
@@ -491,39 +526,89 @@ class BacktestManager:
 
 			# Parse dates
 			df["created_at"] = pd.to_datetime(df["created_at"])
+			df = df.sort_values("created_at")
 
-			# Group by date and compute cumulative PnL
-			daily = df.groupby(df["created_at"].dt.date).agg(
-				{
-					"amount": "sum",  # Net amount (positive = profit, negative = loss)
-				}
-			).reset_index()
+			# Calculate equity by tracking:
+			# 1. Cash (initial capital - buys + sells)
+			# 2. Position costs and sales
+			# 3. Realized P&L on closed positions
+			daily_equity = []
+			peak_equity = initial_capital
 
-			daily.rename(columns={"created_at": "date"}, inplace=True)
+			# Get unique dates (trading days only - when transactions occurred)
+			trading_dates = sorted(df["created_at"].dt.date.unique())
 
-			# Compute cumulative value (starting from 100000)
-			initial_capital = 100000.0
-			daily["cumulative_pnl"] = daily["amount"].cumsum()
-			daily["value"] = initial_capital + daily["cumulative_pnl"]
+			# Pre-calculate cumulative sums for efficiency
+			cumulative_buys = {}
+			cumulative_sells = {}
+			for date in trading_dates:
+				buys_mask = (df["created_at"].dt.date <= date) & (df["operation"] == "BUY")
+				sells_mask = (df["created_at"].dt.date <= date) & (df["operation"] == "SELL")
+				cumulative_buys[date] = df.loc[buys_mask, "amount"].sum()
+				cumulative_sells[date] = df.loc[sells_mask, "amount"].sum()
 
-			# Compute drawdown (running maximum minus current value)
-			daily["running_max"] = daily["value"].expanding().max()
-			daily["drawdown_pct"] = ((daily["value"] - daily["running_max"]) / daily["running_max"] * 100)
+			# Track state across dates
+			positions = {}  # ticker -> {qty, cost}
+			total_realized_pnl = 0.0
 
-			# Return as list of dicts
-			result = []
-			for _, row in daily.iterrows():
-				result.append(
-					{
-						"date": str(row["date"]),
-						"value": float(row["value"]),
-						"drawdown_pct": float(row["drawdown_pct"]),
-					}
-				)
+			for trade_date in trading_dates:
+				# Get transactions for this date
+				day_txns = df[df["created_at"].dt.date == trade_date]
 
-			return result
+				# Process each transaction for the day
+				for _, txn in day_txns.iterrows():
+					ticker = str(txn["ticker"]).upper()
+					operation = str(txn["operation"]).upper()
+					qty = int(txn["quantity"])
+					price = float(txn["price"])
+					amount = float(txn["amount"])
 
-		except Exception:
+					if operation == "BUY":
+						if ticker not in positions:
+							positions[ticker] = {"qty": 0, "cost": 0.0}
+						positions[ticker]["qty"] += qty
+						positions[ticker]["cost"] += amount
+					elif operation == "SELL":
+						if ticker in positions and positions[ticker]["qty"] > 0:
+							# Calculate realized P&L for this sale
+							avg_cost = positions[ticker]["cost"] / positions[ticker]["qty"] if positions[ticker]["qty"] > 0 else 0
+							realized_pnl = (price - avg_cost) * qty
+							total_realized_pnl += realized_pnl
+
+							# Update position
+							positions[ticker]["qty"] -= qty
+							positions[ticker]["cost"] -= qty * avg_cost
+
+							# Clean up closed positions
+							if positions[ticker]["qty"] <= 0:
+								positions[ticker]["qty"] = 0
+								positions[ticker]["cost"] = 0.0
+
+				# Calculate current equity using pre-calculated sums
+				cash = initial_capital - cumulative_buys[trade_date] + cumulative_sells[trade_date]
+
+				# Position value = cost of open positions
+				position_value = sum(pos["cost"] for pos in positions.values())
+
+				# Total equity = cash + position_value + realized_pnl
+				equity = cash + position_value + total_realized_pnl
+
+				# Track peak for drawdown
+				if equity > peak_equity:
+					peak_equity = equity
+
+				drawdown_pct = ((equity - peak_equity) / peak_equity * 100) if peak_equity > 0 else 0.0
+
+				daily_equity.append({
+					"date": str(trade_date),
+					"value": equity,
+					"drawdown_pct": drawdown_pct,
+				})
+
+			return daily_equity
+
+		except Exception as e:
+			self.logger.debug(f"Error computing equity curve: {e}")
 			return None
 
 	def _load_journal_trades(

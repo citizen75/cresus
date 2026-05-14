@@ -80,53 +80,100 @@ async def get_backtest(strategy_name: str, backtest_id: str) -> Dict[str, Any]:
 
 @router.post("")
 async def run_backtest(body: Dict[str, Any]) -> Dict[str, Any]:
-	"""Run strategy in live mode (PreMarketFlow).
+	"""Run a backtest or live mode execution.
 
-	Executes the strategy once in live mode, generating a watchlist and orders.
-	Saves watchlist to ~/.cresus/db/portfolios/{strategy}/watchlist.csv
+	If start_date and end_date provided: runs historical backtest via BacktestFlow
+	Otherwise: runs live mode (PreMarketFlow) for current watchlist generation
 
 	Args:
-		body: {strategy, portfolio_name?}
+		body: {
+			strategy (required),
+			start_date? (YYYY-MM-DD),
+			end_date? (YYYY-MM-DD),
+			portfolio_name?
+		}
 
 	Returns:
-		Watchlist and execution results
+		backtest_id and status for historical backtest, or watchlist_path for live mode
 	"""
+	import uuid
+	from datetime import datetime
+
 	strategy = body.get("strategy")
 	if not strategy:
 		raise HTTPException(status_code=400, detail="strategy is required")
 
+	start_date = body.get("start_date")
+	end_date = body.get("end_date")
 	portfolio_name = body.get("portfolio_name") or strategy
 
-	# Run PreMarketFlow in live mode (non-blocking)
-	def run_premarket_bg():
-		try:
-			from flows.premarket import PreMarketFlow
-			flow = PreMarketFlow(strategy)
-			result = flow.process({
-				"portfolio_name": portfolio_name,
-				"save_enabled": True,
-			})
+	# Determine if this is a historical backtest or live mode
+	if start_date and end_date:
+		# Historical backtest
+		backtest_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{str(uuid.uuid4())[:8]}"
 
-			if result.get("status") != "success":
+		def run_backtest_bg():
+			try:
+				flow = _get_backtest_flow()
+				result = flow.process({
+					"strategy": strategy,
+					"start_date": start_date,
+					"end_date": end_date,
+					"portfolio_name": portfolio_name,
+					"backtest_id": backtest_id,
+				})
+
+				if result.get("status") != "success":
+					import logging
+					logger = logging.getLogger(__name__)
+					logger.error(f"BacktestFlow for {strategy} failed: {result.get('message')}")
+			except Exception as e:
 				import logging
 				logger = logging.getLogger(__name__)
-				logger.error(f"PreMarketFlow for {strategy} failed: {result.get('message')}")
-		except Exception as e:
-			import logging
-			logger = logging.getLogger(__name__)
-			logger.error(f"PreMarketFlow for {strategy} failed: {str(e)}", exc_info=True)
+				logger.error(f"BacktestFlow for {strategy} failed: {str(e)}", exc_info=True)
 
-	thread = threading.Thread(target=run_premarket_bg, daemon=True)
-	thread.start()
+		thread = threading.Thread(target=run_backtest_bg, daemon=True)
+		thread.start()
 
-	# Return immediately with strategy info
-	return {
-		"status": "success",
-		"message": f"Strategy {strategy} running in live mode",
-		"strategy_name": strategy,
-		"portfolio_name": portfolio_name,
-		"watchlist_path": f"~/.cresus/db/portfolios/{portfolio_name}/watchlist.csv",
-	}
+		return {
+			"status": "success",
+			"message": f"Backtest {backtest_id} started for {strategy}",
+			"backtest_id": backtest_id,
+			"strategy": strategy,
+			"start_date": start_date,
+			"end_date": end_date,
+		}
+	else:
+		# Live mode (PreMarketFlow)
+		def run_premarket_bg():
+			try:
+				from flows.premarket import PreMarketFlow
+				flow = PreMarketFlow(strategy)
+				result = flow.process({
+					"portfolio_name": portfolio_name,
+					"save_enabled": True,
+				})
+
+				if result.get("status") != "success":
+					import logging
+					logger = logging.getLogger(__name__)
+					logger.error(f"PreMarketFlow for {strategy} failed: {result.get('message')}")
+			except Exception as e:
+				import logging
+				logger = logging.getLogger(__name__)
+				logger.error(f"PreMarketFlow for {strategy} failed: {str(e)}", exc_info=True)
+
+		thread = threading.Thread(target=run_premarket_bg, daemon=True)
+		thread.start()
+
+		# Return immediately with strategy info
+		return {
+			"status": "success",
+			"message": f"Strategy {strategy} running in live mode",
+			"strategy_name": strategy,
+			"portfolio_name": portfolio_name,
+			"watchlist_path": f"~/.cresus/db/portfolios/{portfolio_name}/watchlist.csv",
+		}
 
 
 @router.get("/compare")

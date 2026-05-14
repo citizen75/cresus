@@ -21,10 +21,16 @@ export default function BacktestBuilder() {
   }, [])
 
   useEffect(() => {
-    // Load strategies list from portfolios if available
-    // For now, use a hardcoded list from user's typical strategies
-    // In a real app, you'd fetch from /strategies API
-    setStrategies(['etf_pea_trend', 'etf_pea_momentum', 'cac_pullback'])
+    const loadStrategies = async () => {
+      try {
+        const data = await api.listStrategies()
+        const strategyNames = data.strategies?.map((s: any) => s.name) || []
+        setStrategies(strategyNames)
+      } catch (err) {
+        console.error('Failed to load strategies:', err)
+      }
+    }
+    loadStrategies()
   }, [])
 
   const handleQuickDate = (years: number) => {

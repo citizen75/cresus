@@ -8,6 +8,8 @@ export default function BacktestRunning() {
 
   const strategy = searchParams.get('strategy') || ''
   const backtest_id = searchParams.get('backtest_id') || ''
+  const startDate = searchParams.get('startDate') || ''
+  const endDate = searchParams.get('endDate') || ''
 
   const [status, setStatus] = useState('initializing')
   const [progress, setProgress] = useState({

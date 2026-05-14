@@ -1,7 +1,7 @@
 """Trading orders with pending/executable order tracking."""
 
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, date as date_type
 from typing import Dict, Any, Optional, List
 import pandas as pd
 import os
@@ -15,7 +15,7 @@ class Orders:
     BASE_COLUMNS = [
         "id", "created_at", "ticker", "quantity", "entry_price", "limit_price",
         "stop_loss", "take_profit", "trailing_stop_distance", "execution_method", "scale_count",
-        "risk_amount", "risk_reward", "status", "metadata"
+        "risk_amount", "risk_reward", "status", "operation", "expiration_date", "metadata"
     ]
 
     def __init__(self, name: str = "default", context: Optional[Dict[str, Any]] = None):
@@ -103,7 +103,9 @@ class Orders:
                   risk_amount: Optional[float] = None, risk_reward: Optional[float] = None,
                   metadata: Optional[Dict[str, Any]] = None,
                   replace_same_day: bool = True,
-                  created_at: Optional[str] = None) -> str:
+                  created_at: Optional[str] = None,
+                  operation: str = "BUY",
+                  expiration_date: Optional[str] = None) -> str:
         """Add a new order to orders file.
 
         Args:
@@ -121,6 +123,11 @@ class Orders:
             metadata: Additional order metadata (strategy, entry_score, etc)
             replace_same_day: If True, cancel previous pending orders for same ticker on same day
             created_at: Order creation timestamp (optional, default: now)
+            operation: Order type - "BUY" or "SELL" (default: "BUY")
+            expiration_date: Order expiration date (ISO format, optional)
+              - BUY: defaults to created_at + 1 day
+              - SELL: defaults to created_at + 1 day
+              - Linked SL/TP: caller should set to execution_date + 365 days
 
         Returns:
             Order ID
@@ -137,10 +144,20 @@ class Orders:
             self._cancel_same_day_orders(ticker, df)
             df = self.load_df()  # Reload after cancellation
 
+        from datetime import timedelta
+
         order_id = str(uuid.uuid4())[:8]
         now = created_at or datetime.now().isoformat()
 
         metadata_json = json.dumps(metadata) if metadata else ""
+
+        # Calculate expiration date if not provided
+        if expiration_date is None:
+            # Default: 1 calendar day for all orders (BUY, SELL, etc.)
+            # For linked SL/TP orders, caller should explicitly pass execution_date + 365 days
+            created_dt = datetime.fromisoformat(now)
+            expiration_dt = created_dt + timedelta(days=1)
+            expiration_date = expiration_dt.isoformat()
 
         new_row = {
             "id": order_id,
@@ -157,6 +174,8 @@ class Orders:
             "risk_amount": float(risk_amount) if risk_amount is not None else None,
             "risk_reward": float(risk_reward) if risk_reward is not None else None,
             "status": "pending",
+            "operation": operation.upper(),
+            "expiration_date": expiration_date,
             "metadata": metadata_json,
         }
 
@@ -203,12 +222,77 @@ class Orders:
 
         return cancelled_count
 
+    def is_order_expired(self, order_id: str, current_date: Optional[date_type] = None) -> bool:
+        """Check if an order has expired.
+
+        Args:
+            order_id: Order ID to check
+            current_date: Current date (default: today)
+
+        Returns:
+            True if order has expired, False otherwise
+        """
+        if current_date is None:
+            current_date = datetime.now().date()
+
+        df = self.load_df()
+        if df.empty:
+            return False
+
+        order_row = df[df["id"] == order_id]
+        if order_row.empty:
+            return False
+
+        expiration_str = order_row.iloc[0].get("expiration_date")
+        if not expiration_str:
+            return False
+
+        try:
+            expiration_date = datetime.fromisoformat(str(expiration_str)).date()
+            return current_date > expiration_date
+        except (ValueError, TypeError):
+            return False
+
     def get_pending_orders(self) -> pd.DataFrame:
         """Get all pending orders."""
         df = self.load_df()
         if df.empty:
             return pd.DataFrame()
         return df[df["status"].str.upper() == "PENDING"].copy()
+
+    def get_active_orders(self, current_date: Optional[date_type] = None) -> pd.DataFrame:
+        """Get pending orders that have not expired.
+
+        Args:
+            current_date: Current date (default: today)
+
+        Returns:
+            DataFrame of active (non-expired) pending orders
+        """
+        if current_date is None:
+            current_date = datetime.now().date()
+
+        pending = self.get_pending_orders()
+        if pending.empty:
+            return pending
+
+        # Filter out expired orders
+        active_orders = []
+        for _, row in pending.iterrows():
+            expiration_str = row.get("expiration_date")
+            if expiration_str:
+                try:
+                    expiration_date = datetime.fromisoformat(str(expiration_str)).date()
+                    if current_date <= expiration_date:
+                        active_orders.append(row)
+                except (ValueError, TypeError):
+                    active_orders.append(row)
+            else:
+                active_orders.append(row)
+
+        if not active_orders:
+            return pd.DataFrame()
+        return pd.DataFrame(active_orders)
 
     def get_all_orders(self) -> pd.DataFrame:
         """Get all orders (pending, executed, cancelled)."""
@@ -284,7 +368,9 @@ class Orders:
                 "risk_amount": float(row.get("risk_amount")) if pd.notna(row.get("risk_amount")) else None,
                 "risk_reward": float(row.get("risk_reward")) if pd.notna(row.get("risk_reward")) else None,
                 "status": str(row.get("status", "pending")).lower(),
+                "operation": str(row.get("operation", "BUY")).upper(),
                 "created_at": str(row.get("created_at", "")),
+                "expiration_date": str(row.get("expiration_date", "")),
                 "metadata": metadata,
             }
             orders.append(order)
