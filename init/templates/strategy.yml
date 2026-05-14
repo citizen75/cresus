@@ -70,9 +70,6 @@ entry:
     entry_filter:
       formula: close[0] > ema_20[0] && adx_14[0] > 20
       description: Market condition filter - entries only when True
-    extension_filter:
-      formula: (close[0] - ema_10[0]) / ema_10[0] < 0.05
-      description: Avoid chasing extended moves
     order_type:
       formula: limit
       description: "limit or market - determines how entry orders are executed"
