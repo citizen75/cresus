@@ -172,13 +172,19 @@ class Parser:
         return left
     
     def parse_unary(self) -> 'ASTNode':
-        """Parse unary operations (NOT)."""
+        """Parse unary operations (NOT and unary minus)."""
         token = self.current_token()
         if token and token.type == 'NOT':
             self.consume('NOT')
             expr = self.parse_unary()
             return UnaryOp('!', expr)
-        
+
+        # Handle unary minus (e.g., -0.5 or -variable)
+        if token and token.type == 'MINUS':
+            self.consume('MINUS')
+            expr = self.parse_unary()
+            return UnaryOp('-', expr)
+
         return self.parse_primary()
     
     def parse_primary(self) -> 'ASTNode':
@@ -387,9 +393,14 @@ class UnaryOp(ASTNode):
     
     def evaluate(self, data: Union[dict, pd.DataFrame]) -> Any:
         val = self.expr.evaluate(data)
-        
+
         if self.op == '!':
             return not bool(val)
+        elif self.op == '-':
+            # Handle Series
+            if isinstance(val, pd.Series):
+                return (-val).iloc[0]
+            return -val
         else:
             raise ValueError(f"Unknown unary operator: {self.op}")
 
