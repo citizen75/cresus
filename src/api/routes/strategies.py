@@ -189,20 +189,39 @@ async def duplicate_strategy(name: str, new_name: Optional[str] = Query(None)):
 async def delete_strategy(name: str):
 	"""Delete a strategy by name.
 
-	Permanently removes the strategy YAML file.
+	Permanently removes the strategy YAML/JSON file.
+	Uses StrategyManager to ensure correct path handling.
 	"""
-	strategies_dir = _get_strategies_dir()
-	strategy_path = strategies_dir / f"{name}.yml"
+	strategy_manager = StrategyManager()
 
-	if not strategy_path.exists():
-		raise HTTPException(status_code=404, detail=f"Strategy '{name}' not found")
+	# Try to load the strategy to verify it exists
+	load_result = strategy_manager.load_strategy(name)
+	if load_result.get("status") != "success":
+		raise HTTPException(status_code=404, detail=load_result.get("message"))
 
 	try:
-		strategy_path.unlink()
+		# Delete both .yml and .json files if they exist
+		strategies_dir = strategy_manager.strategies_dir
+		yml_path = strategies_dir / f"{name}.yml"
+		json_path = strategies_dir / f"{name}.json"
+
+		deleted = False
+		if yml_path.exists():
+			yml_path.unlink()
+			deleted = True
+		if json_path.exists():
+			json_path.unlink()
+			deleted = True
+
+		if not deleted:
+			raise HTTPException(status_code=404, detail=f"Strategy '{name}' file not found")
+
 		return {
 			"status": "success",
 			"message": f"Strategy '{name}' deleted successfully"
 		}
+	except HTTPException:
+		raise
 	except Exception as e:
 		raise HTTPException(status_code=500, detail=f"Failed to delete strategy: {str(e)}")
 
