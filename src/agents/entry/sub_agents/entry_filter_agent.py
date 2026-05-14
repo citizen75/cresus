@@ -143,6 +143,7 @@ class EntryFilterAgent(Agent):
 						blocked_count += 1
 				except Exception as e:
 					error_msg = str(e)
+					available_cols = list(last_5_days.columns)
 					# Check if this is a syntax error in the formula
 					if "unexpected token" in error_msg.lower() or "syntax error" in error_msg.lower():
 						# Could be syntax error OR missing column - check if it's a known column
@@ -150,24 +151,20 @@ class EntryFilterAgent(Agent):
 						token_match = re.search(r"Token\(INDICATOR, '([a-z_][a-z0-9_]*)\[(-?\d+)\]'\)", error_msg)
 						if token_match:
 							indicator_name = token_match.group(1)
-							available_cols = list(last_5_days.columns)
 
 							# Check if column exists
 							if indicator_name in available_cols:
-								error_msg = f"Formula syntax error in '{entry_filter_formula}'. Check for missing operators (and, or, &&, ||) between expressions."
+								error_msg = f"Formula syntax error in '{entry_filter_formula}': {error_msg}. Check for missing operators (and, or, &&, ||) between expressions."
 							else:
 								error_msg = f"Missing indicator '{indicator_name}' in formula '{entry_filter_formula}'. Available columns: {available_cols}"
 						else:
-							available_cols = list(last_5_days.columns)
-							error_msg = f"Formula syntax error: {error_msg}. Available columns: {available_cols}"
+							error_msg = f"Formula syntax error in '{entry_filter_formula}': {error_msg}. Available columns: {available_cols}"
 					elif "not found" in error_msg.lower():
 						# Missing indicator error
-						available_cols = list(last_5_days.columns)
-						error_msg = f"Formula evaluation error: {error_msg}. Available columns: {available_cols}"
+						error_msg = f"Formula evaluation error in '{entry_filter_formula}': {error_msg}. Available columns: {available_cols}"
 					else:
 						# Other errors
-						available_cols = list(last_5_days.columns)
-						error_msg = f"Formula evaluation failed: {error_msg}. Available columns: {available_cols}"
+						error_msg = f"Formula evaluation failed in '{entry_filter_formula}': {error_msg}. Available columns: {available_cols}"
 
 					self.logger.error(f"Entry filter evaluation error for {ticker}: {error_msg}")
 					error_tickers.append(f"{ticker} ({error_msg})")
