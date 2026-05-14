@@ -94,6 +94,15 @@ class EntryFilterAgent(Agent):
 			self.logger.info(f"[ENTRY-FILTER] Applying filter to {len(entry_recommendations)} recommendations")
 			self.logger.debug(f"[ENTRY-FILTER] Formula: {entry_filter_formula}")
 
+			# Normalize formula: convert AND/OR to &&/||
+			import re
+			normalized_formula = entry_filter_formula
+			normalized_formula = re.sub(r'\bAND\b', '&&', normalized_formula, flags=re.IGNORECASE)
+			normalized_formula = re.sub(r'\bOR\b', '||', normalized_formula, flags=re.IGNORECASE)
+			normalized_formula = re.sub(r'\bNOT\b', '!', normalized_formula, flags=re.IGNORECASE)
+			if normalized_formula != entry_filter_formula:
+				self.logger.debug(f"[ENTRY-FILTER] Normalized formula: {normalized_formula}")
+
 			# Apply filter to recommendations
 			filtered_recommendations = []
 			blocked_count = 0
@@ -131,9 +140,9 @@ class EntryFilterAgent(Agent):
 							row = last_5_days.iloc[i]
 							self.logger.debug(f"[ENTRY-FILTER] {ticker}[{i}]: sha_10_red={row.get('sha_10_red')}, sha_10_green={row.get('sha_10_green')}")
 
-				# Evaluate entry_filter formula
+				# Evaluate entry_filter formula (using normalized formula with && and || operators)
 				try:
-					passes_filter = evaluate(entry_filter_formula, last_5_days)
+					passes_filter = evaluate(normalized_formula, last_5_days)
 					if passes_filter:
 						self.logger.debug(f"[ENTRY-FILTER] {ticker}: PASS")
 						passed_tickers.append(ticker)
@@ -154,17 +163,17 @@ class EntryFilterAgent(Agent):
 
 							# Check if column exists
 							if indicator_name in available_cols:
-								error_msg = f"Formula syntax error in '{entry_filter_formula}': {error_msg}. Check for missing operators (and, or, &&, ||) between expressions."
+								error_msg = f"Formula syntax error in '{normalized_formula}': {error_msg}. Check for missing operators (&&, ||) between expressions."
 							else:
-								error_msg = f"Missing indicator '{indicator_name}' in formula '{entry_filter_formula}'. Available columns: {available_cols}"
+								error_msg = f"Missing indicator '{indicator_name}' in formula '{normalized_formula}'. Available columns: {available_cols}"
 						else:
-							error_msg = f"Formula syntax error in '{entry_filter_formula}': {error_msg}. Available columns: {available_cols}"
+							error_msg = f"Formula syntax error in '{normalized_formula}': {error_msg}. Available columns: {available_cols}"
 					elif "not found" in error_msg.lower():
 						# Missing indicator error
-						error_msg = f"Formula evaluation error in '{entry_filter_formula}': {error_msg}. Available columns: {available_cols}"
+						error_msg = f"Formula evaluation error in '{normalized_formula}': {error_msg}. Available columns: {available_cols}"
 					else:
 						# Other errors
-						error_msg = f"Formula evaluation failed in '{entry_filter_formula}': {error_msg}. Available columns: {available_cols}"
+						error_msg = f"Formula evaluation failed in '{normalized_formula}': {error_msg}. Available columns: {available_cols}"
 
 					self.logger.error(f"Entry filter evaluation error for {ticker}: {error_msg}")
 					error_tickers.append(f"{ticker} ({error_msg})")
