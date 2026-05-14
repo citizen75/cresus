@@ -260,7 +260,21 @@ class BacktestAgent(Agent):
 
 		# Main backtest loop: pre_market → [increment] → market → post_market
 		portfolio_name = self.context.get("portfolio_name") or "default"
+
+		# Include last trading day if we have data for the next day to execute trades
 		trading_days_to_process = trading_days[:-1]
+
+		# Check if we can process the final day (need data for next day)
+		if len(trading_days) > 0:
+			last_day = trading_days[-1]
+			# Look for any data after the last day
+			future_dates = [d for d in day_data_cache.keys() if d > last_day]
+			if future_dates:
+				# Add the first future date as a synthetic next_date
+				next_available_date = min(future_dates)
+				trading_days.append(next_available_date)
+				trading_days_to_process = trading_days[:-1]
+				self.logger.info(f"Including final trading day {last_day} (using {next_available_date} for execution)")
 
 		# Use progress bar if tqdm is available
 		iterator = tqdm(enumerate(trading_days_to_process), total=len(trading_days_to_process), desc="Backtest Progress") if HAS_TQDM else enumerate(trading_days_to_process)
