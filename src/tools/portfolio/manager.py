@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List
 import os
 import yaml
+import json
 import pandas as pd
 from loguru import logger
 
@@ -48,26 +49,62 @@ class PortfolioManager:
         self.cache = PortfolioCache(context=self.context)
 
     def list_portfolios(self) -> List[Dict[str, Any]]:
-        """List all portfolios with metrics."""
+        """List all portfolios by scanning folders in portfolios directory."""
         portfolios = []
-        if self.config_path.exists():
-            config = yaml.safe_load(self.config_path.read_text())
-            for p in config.get("portfolios", []):
-                name = p.get("name")
-                journal = Journal(name, context=self.context)
-                df = journal.load_df()
-                open_pos = journal.get_open_positions()
-                completed = df[df["status"] == "completed"]
-                portfolios.append({
-                    "name": name,
-                    "type": p.get("type", "paper"),
-                    "currency": p.get("currency", "EUR"),
-                    "description": p.get("description", ""),
-                    "num_positions": len(open_pos),
-                    "num_trades": len(completed),
-                    "total_return_pct": 0.0,
-                    "total_gain": 0.0,
-                })
+
+        # Ensure portfolios directory exists
+        self.portfolios_dir.mkdir(parents=True, exist_ok=True)
+
+        # Scan all folders in portfolios directory
+        for portfolio_folder in self.portfolios_dir.iterdir():
+            if not portfolio_folder.is_dir():
+                continue
+
+            portfolio_name = portfolio_folder.name
+            portfolio_json = portfolio_folder / "portfolio.json"
+
+            # Load portfolio metadata from portfolio.json
+            if portfolio_json.exists():
+                try:
+                    with open(portfolio_json, 'r') as f:
+                        metadata = json.load(f)
+                except Exception as e:
+                    logger.warning(f"Failed to load portfolio.json for {portfolio_name}: {e}")
+                    metadata = {
+                        "name": portfolio_name,
+                        "type": "paper",
+                        "currency": "EUR",
+                        "description": "",
+                        "initial_capital": 100000.0,
+                    }
+            else:
+                # Default metadata if portfolio.json doesn't exist
+                metadata = {
+                    "name": portfolio_name,
+                    "type": "paper",
+                    "currency": "EUR",
+                    "description": "",
+                    "initial_capital": 100000.0,
+                }
+
+            # Get journal stats
+            journal = Journal(portfolio_name, context=self.context)
+            df = journal.load_df()
+            open_pos = journal.get_open_positions()
+            completed = df[df["status"] == "completed"] if not df.empty else pd.DataFrame()
+
+            portfolios.append({
+                "name": metadata.get("name", portfolio_name),
+                "type": metadata.get("type", "paper"),
+                "currency": metadata.get("currency", "EUR"),
+                "description": metadata.get("description", ""),
+                "initial_capital": metadata.get("initial_capital", 100000.0),
+                "num_positions": len(open_pos),
+                "num_trades": len(completed),
+                "total_return_pct": metadata.get("total_return_pct", 0.0),
+                "total_gain": metadata.get("total_gain", 0.0),
+            })
+
         return portfolios
 
     def create_portfolio(
@@ -78,40 +115,38 @@ class PortfolioManager:
         description: str = "",
         initial_capital: float = 100000.0,
     ) -> Dict[str, Any]:
-        """Create a new portfolio with default strategy."""
+        """Create a new portfolio folder with portfolio.json metadata."""
         try:
+            # Create portfolio folder
+            portfolio_dir = self.portfolios_dir / name
+            portfolio_dir.mkdir(parents=True, exist_ok=True)
+
             # Check if portfolio already exists
-            if self.config_path.exists():
-                config = yaml.safe_load(self.config_path.read_text())
-                if config:
-                    for p in config.get("portfolios", []):
-                        if p.get("name") == name:
-                            return {"status": "error", "message": f"Portfolio '{name}' already exists"}
+            portfolio_json = portfolio_dir / "portfolio.json"
+            if portfolio_json.exists():
+                return {"status": "error", "message": f"Portfolio '{name}' already exists"}
+
+            # Create portfolio.json with metadata
+            portfolio_metadata = {
+                "name": name,
+                "type": portfolio_type,
+                "currency": currency,
+                "description": description,
+                "initial_capital": initial_capital,
+                "created_at": pd.Timestamp.now().isoformat(),
+                "total_return_pct": 0.0,
+                "total_gain": 0.0,
+            }
+
+            with open(portfolio_json, 'w') as f:
+                json.dump(portfolio_metadata, f, indent=2)
 
             # Create journal file
             journal = Journal(name, context=self.context)
             if not journal.filepath.exists():
                 journal._ensure_base_structure()
 
-            # Add to config
-            if not self.config_path.exists():
-                config = {"portfolios": []}
-            else:
-                config = yaml.safe_load(self.config_path.read_text()) or {"portfolios": []}
-
-            config["portfolios"].append({
-                "name": name,
-                "type": portfolio_type,
-                "currency": currency,
-                "description": description,
-                "initial_capital": initial_capital,
-            })
-
-            self.config_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.config_path, "w") as f:
-                yaml.dump(config, f)
-
-            logger.info(f"Created portfolio '{name}'")
+            logger.info(f"Created portfolio '{name}' with metadata in {portfolio_json}")
 
             # Update cache for new portfolio
             self.update_portfolio_cache(name)
@@ -123,6 +158,7 @@ class PortfolioManager:
                     "type": portfolio_type,
                     "currency": currency,
                     "description": description,
+                    "initial_capital": initial_capital,
                     "num_positions": 0,
                     "num_trades": 0,
                     "num_closed": 0,
@@ -133,18 +169,45 @@ class PortfolioManager:
             logger.error(f"Error creating portfolio: {e}")
             return {"status": "error", "message": str(e)}
 
+    def _get_portfolio_metadata(self, name: str) -> Dict[str, Any]:
+        """Load portfolio metadata from portfolio.json file."""
+        portfolio_json = self.portfolios_dir / name / "portfolio.json"
+
+        if portfolio_json.exists():
+            try:
+                with open(portfolio_json, 'r') as f:
+                    return json.load(f)
+            except Exception as e:
+                logger.warning(f"Failed to load portfolio.json for {name}: {e}")
+
+        # Return default metadata if file doesn't exist
+        return {
+            "name": name,
+            "type": "paper",
+            "currency": "EUR",
+            "description": "",
+            "initial_capital": 100000.0,
+        }
+
+    def _save_portfolio_metadata(self, name: str, metadata: Dict[str, Any]) -> None:
+        """Save portfolio metadata to portfolio.json file."""
+        portfolio_json = self.portfolios_dir / name / "portfolio.json"
+        portfolio_json.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(portfolio_json, 'w') as f:
+            json.dump(metadata, f, indent=2)
+
     def delete_portfolio(self, name: str) -> Dict[str, Any]:
-        """Delete a portfolio."""
+        """Delete a portfolio folder and its contents."""
         try:
-            # Remove from config
-            if self.config_path.exists():
-                config = yaml.safe_load(self.config_path.read_text()) or {"portfolios": []}
-                config["portfolios"] = [p for p in config.get("portfolios", []) if p.get("name") != name]
+            # Delete portfolio folder
+            portfolio_dir = self.portfolios_dir / name
+            if portfolio_dir.exists():
+                import shutil
+                shutil.rmtree(portfolio_dir)
+                logger.info(f"Deleted portfolio folder: {portfolio_dir}")
 
-                with open(self.config_path, "w") as f:
-                    yaml.dump(config, f)
-
-            # Delete journal file
+            # Delete journal file (if outside portfolio folder)
             journal = Journal(name, context=self.context)
             if journal.filepath.exists():
                 journal.filepath.unlink()
@@ -241,14 +304,9 @@ class PortfolioManager:
 
     def get_portfolio_cash(self, name: str) -> float:
         """Calculate available cash balance."""
-        # Get initial capital from config
-        initial_capital = 100000.0
-        if self.config_path.exists():
-            config = yaml.safe_load(self.config_path.read_text())
-            for p in config.get("portfolios", []):
-                if p.get("name") == name:
-                    initial_capital = float(p.get("initial_capital", 100000.0))
-                    break
+        # Get initial capital from portfolio metadata
+        metadata = self._get_portfolio_metadata(name)
+        initial_capital = float(metadata.get("initial_capital", 100000.0))
 
         # Calculate cash from transactions
         journal = Journal(name, context=self.context)
@@ -275,7 +333,7 @@ class PortfolioManager:
         return round(cash, 2)
 
     def update_portfolio_cache(self, name: str) -> None:
-        """Update portfolio cache with latest metrics."""
+        """Update portfolio cache and portfolio.json metadata with latest metrics."""
         details = self.get_portfolio_details(name)
         perf = self.get_portfolio_performance(name)
         cash = self.get_portfolio_cash(name)
@@ -283,14 +341,8 @@ class PortfolioManager:
         if not details or not perf:
             return
 
-        # Get portfolio config
-        portfolio_config = {}
-        if self.config_path.exists():
-            config = yaml.safe_load(self.config_path.read_text())
-            for p in config.get("portfolios", []):
-                if p.get("name") == name:
-                    portfolio_config = p
-                    break
+        # Get current portfolio metadata
+        metadata = self._get_portfolio_metadata(name)
 
         # Build cache entry
         total_value = details.get("total_value", 0)
@@ -299,10 +351,10 @@ class PortfolioManager:
 
         cache_entry = {
             "name": name,
-            "type": portfolio_config.get("type", "paper"),
-            "currency": portfolio_config.get("currency", "EUR"),
-            "description": portfolio_config.get("description", ""),
-            "initial_capital": float(portfolio_config.get("initial_capital", 100000.0)),
+            "type": metadata.get("type", "paper"),
+            "currency": metadata.get("currency", "EUR"),
+            "description": metadata.get("description", ""),
+            "initial_capital": float(metadata.get("initial_capital", 100000.0)),
             "positions": {
                 "count": details.get("num_positions", 0),
                 "data": positions,
@@ -318,6 +370,18 @@ class PortfolioManager:
             },
         }
 
+        # Update portfolio.json metadata with latest metrics
+        metadata.update({
+            "total_positions_value": round(total_value, 2),
+            "cash": round(cash, 2),
+            "total_portfolio_value": round(total_portfolio_value, 2),
+            "num_positions": details.get("num_positions", 0),
+            "num_trades": perf.get("num_trades", 0),
+            "updated_at": pd.Timestamp.now().isoformat(),
+        })
+        self._save_portfolio_metadata(name, metadata)
+
+        # Update cache
         self.cache.update_portfolio(name, cache_entry)
 
     def get_portfolio_summary(self, name: str) -> Optional[Dict[str, Any]]:
@@ -344,14 +408,9 @@ class PortfolioManager:
 
         Replays journal transactions to compute daily portfolio value including cash.
         """
-        # Get initial capital
-        initial_capital = 100000.0
-        if self.config_path.exists():
-            config = yaml.safe_load(self.config_path.read_text())
-            for p in config.get("portfolios", []):
-                if p.get("name") == name:
-                    initial_capital = float(p.get("initial_capital", 100000.0))
-                    break
+        # Get initial capital from portfolio metadata
+        metadata = self._get_portfolio_metadata(name)
+        initial_capital = float(metadata.get("initial_capital", 100000.0))
 
         # Use PortfolioHistory to calculate
         ph = PortfolioHistory(name, initial_capital)
