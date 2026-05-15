@@ -143,10 +143,35 @@ def calculate_smooth(
     sha_low_ema = ha_low.ewm(span=period, adjust=False).mean()
     sha_close = ha_close.ewm(span=period, adjust=False).mean()
 
-    # Constrain wicks to maintain valid candlestick geometry
-    # High must be >= max(open, close), Low must be <= min(open, close)
+    # Ensure basic geometric validity
     sha_high = pd.concat([sha_open, sha_high_ema, sha_close], axis=1).max(axis=1)
     sha_low = pd.concat([sha_open, sha_low_ema, sha_close], axis=1).min(axis=1)
+
+    # Prevent inverted wicks: wicks should follow the candle body direction
+    # Bullish candle (close > open): Low should not go below Open (no bottom wick below body)
+    # Bearish candle (close < open): High should not go above Open (no top wick above body)
+    is_bullish = sha_close > sha_open
+    is_bearish = sha_close < sha_open
+
+    sha_low_fixed = sha_low.copy()
+    sha_high_fixed = sha_high.copy()
+
+    # For bullish candles: ensure low >= open (remove inverted bottom wick)
+    sha_low_fixed = pd.Series(
+        [max(sha_low.iloc[i], sha_open.iloc[i]) if is_bullish.iloc[i] else sha_low.iloc[i]
+         for i in range(len(sha_low))],
+        index=sha_low.index
+    )
+
+    # For bearish candles: ensure high <= open (remove inverted top wick)
+    sha_high_fixed = pd.Series(
+        [min(sha_high.iloc[i], sha_open.iloc[i]) if is_bearish.iloc[i] else sha_high.iloc[i]
+         for i in range(len(sha_high))],
+        index=sha_high.index
+    )
+
+    sha_high = sha_high_fixed
+    sha_low = sha_low_fixed
 
     # Calculate color indicators
     sha_green = pd.Series((sha_close > sha_open).astype(int), index=sha_close.index)
