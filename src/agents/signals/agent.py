@@ -79,9 +79,10 @@ class SignalsAgent(Agent):
 					"strength": step_output.get("strength", 0),
 				}
 
-		# Get tickers from watchlist (if available) or fall back to all tickers
-		all_tickers = self.context.get("watchlist") or self.context.get("tickers") or []
-		self.logger.info(f"Analyzing signals for {len(all_tickers)} ticker(s)")
+		# Get tickers from watchlist only - do NOT fall back to all tickers
+		# Signals should only be calculated on the current watchlist
+		all_tickers = self.context.get("watchlist") or []
+		self.logger.info(f"Analyzing signals for {len(all_tickers)} ticker(s) from watchlist")
 		ticker_scores = {}
 		for ticker in all_tickers:
 			score = 0.0
