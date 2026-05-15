@@ -124,6 +124,15 @@ async def get_ticker_history(
 		# Calculate indicator if requested
 		if indicator:
 			try:
+				# Normalize column names to lowercase for indicator calculation
+				df_normalized = df.copy()
+				column_mapping = {}
+				for col in df_normalized.columns:
+					col_lower = col.lower()
+					if col_lower in ['open', 'high', 'low', 'close', 'volume']:
+						column_mapping[col] = col_lower
+				df_normalized = df_normalized.rename(columns=column_mapping)
+
 				indicator_lower = indicator.lower()
 
 				# Expand multi-component indicators (sha, bb, macd, etc)
@@ -156,10 +165,10 @@ async def get_ticker_history(
 						f"{indicator_lower}_minus",
 					]
 
-				# Calculate indicator using DSL formula
-				indicator_results = calculate_indicators(indicators_to_calculate, df)
+				# Calculate indicator using DSL formula on normalized dataframe
+				indicator_results = calculate_indicators(indicators_to_calculate, df_normalized)
 
-				# Merge indicator columns into dataframe
+				# Merge indicator columns into original dataframe
 				for col_name, col_data in indicator_results.items():
 					df[col_name] = col_data
 			except Exception as e:
