@@ -538,26 +538,18 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
         {companyName && <div className="text-sm text-slate-400">{companyName}</div>}
       </div>
       <div className="flex-1 flex flex-col min-h-0 relative">
-        <div className="flex-grow relative" ref={containerRef}>
-          {/* Legend */}
-          <div className="absolute top-4 left-4 z-10 bg-slate-900/90 border border-slate-700 rounded-lg p-3 backdrop-blur-sm">
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-800/50 px-2 py-1 rounded transition">
-                <input
-                  type="checkbox"
-                  checked={showSHA10}
-                  onChange={(e) => setShowSHA10(e.target.checked)}
-                  className="w-4 h-4 accent-purple-600"
-                />
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-white rounded-sm"></div>
-                  <div className="w-3 h-3 bg-purple-600 rounded-sm"></div>
-                  <span className="text-sm text-slate-300 font-medium">SHA_10</span>
-                </div>
-              </label>
-            </div>
+        <div className="flex-grow" ref={containerRef} />
+        {/* Legend Overlay */}
+        <button
+          onClick={() => setShowSHA10(!showSHA10)}
+          className="absolute top-4 left-4 z-50 bg-slate-900/90 border border-slate-700 rounded-lg px-4 py-2 backdrop-blur-sm hover:bg-slate-800/90 hover:border-slate-600 transition flex items-center gap-2 cursor-pointer"
+        >
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 bg-white rounded-sm"></div>
+            <div className="w-2.5 h-2.5 bg-purple-600 rounded-sm"></div>
           </div>
-        </div>
+          <span className="text-sm font-medium text-slate-300">SHA_10 {showSHA10 ? '◀' : '▶'}</span>
+        </button>
         {selectedIndicators.size > 0 && (
           <div className="flex-shrink-0 overflow-hidden">
             <IndicatorsPanel chartData={chartData} selectedIndicators={selectedIndicators} visibleWindow={visibleWindow} chartsRef={indicatorChartsRef} />
