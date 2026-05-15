@@ -6,6 +6,7 @@ import pandas as pd
 
 from tools.data import DataHistory, Fundamental
 from tools.universe import Universe
+from tools.indicators import calculate as calculate_indicators
 
 router = APIRouter(prefix="/data", tags=["data"])
 
@@ -91,20 +92,22 @@ async def get_history_by_query(
 async def get_ticker_history(
     ticker: str,
     days: Optional[int] = 365,
-    columns: Optional[str] = None
+    columns: Optional[str] = None,
+    indicator: Optional[str] = None
 ):
-	"""Get historical OHLCV data for a ticker.
+	"""Get historical OHLCV data for a ticker with optional indicators.
 
-	Returns historical price data from cache.
+	Returns historical price data from cache, optionally with calculated indicators.
 
 	Args:
 		ticker: Stock ticker symbol (e.g., AAPL, STMPA.PA)
 		days: Number of days of history to return (default 365)
 		columns: Comma-separated list of columns to return (default: all)
 				 Available: timestamp, open, high, low, close, volume
+		indicator: Indicator to calculate and include (e.g., sha_10, ema_20, rsi_14)
 
 	Returns:
-		Historical data with OHLCV values
+		Historical data with OHLCV values and optional indicator columns
 	"""
 	try:
 		# Load historical data
@@ -117,6 +120,50 @@ async def get_ticker_history(
 		# Filter to last N days
 		if days and days > 0:
 			df = df.tail(days)
+
+		# Calculate indicator if requested
+		if indicator:
+			try:
+				indicator_lower = indicator.lower()
+
+				# Expand multi-component indicators (sha, bb, macd, etc)
+				# to include all components needed for candlestick or other visualizations
+				indicators_to_calculate = [indicator_lower]
+
+				# For candlestick indicators, include OHLC components
+				if indicator_lower.startswith('sha'):
+					indicators_to_calculate = [
+						f"{indicator_lower}_open",
+						f"{indicator_lower}_high",
+						f"{indicator_lower}_low",
+						f"{indicator_lower}_close",
+					]
+				elif indicator_lower.startswith('bb'):  # Bollinger Bands
+					indicators_to_calculate = [
+						f"{indicator_lower}_upper",
+						f"{indicator_lower}_middle",
+						f"{indicator_lower}_lower",
+					]
+				elif indicator_lower.startswith('macd'):  # MACD
+					indicators_to_calculate = [
+						f"{indicator_lower}_line",
+						f"{indicator_lower}_signal",
+						f"{indicator_lower}_histogram",
+					]
+				elif indicator_lower.startswith('dmi'):  # DMI
+					indicators_to_calculate = [
+						f"{indicator_lower}_plus",
+						f"{indicator_lower}_minus",
+					]
+
+				# Calculate indicator using DSL formula
+				indicator_results = calculate_indicators(indicators_to_calculate, df)
+
+				# Merge indicator columns into dataframe
+				for col_name, col_data in indicator_results.items():
+					df[col_name] = col_data
+			except Exception as e:
+				raise HTTPException(400, f"Error calculating indicator '{indicator}': {str(e)}")
 
 		# Select specific columns if requested
 		if columns:
@@ -138,13 +185,14 @@ async def get_ticker_history(
 				elif col in ['open', 'high', 'low', 'close']:
 					record[col] = float(value)
 				else:
-					record[col] = str(value)
+					record[col] = float(value) if isinstance(value, (int, float)) else str(value)
 			records.append(record)
 
 		return {
 			"ticker": ticker,
 			"count": len(records),
 			"days": days,
+			"indicator": indicator,
 			"data": records,
 		}
 

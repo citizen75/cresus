@@ -24,6 +24,54 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
 
   const randomNumber = (min: number, max: number) => Math.random() * (max - min) + min
 
+  const calculateSHA = (data: any[], period: number = 10) => {
+    // Calculate Heikin Ashi candlesticks
+    const ha: any[] = []
+    let prevHaOpen = data[0].open
+    let prevHaClose = (data[0].open + data[0].high + data[0].low + data[0].close) / 4
+
+    for (let i = 0; i < data.length; i++) {
+      const candle = data[i]
+      const haClose = (candle.open + candle.high + candle.low + candle.close) / 4
+      const haOpen = (prevHaOpen + prevHaClose) / 2
+      const haHigh = Math.max(candle.high, haOpen, haClose)
+      const haLow = Math.min(candle.low, haOpen, haClose)
+
+      ha.push({ haOpen, haHigh, haLow, haClose, time: candle.time })
+      prevHaOpen = haOpen
+      prevHaClose = haClose
+    }
+
+    // Apply EMA smoothing
+    const smoothHA: any[] = []
+    const k = 2 / (period + 1)
+
+    // Initialize EMA with first value
+    let emaOpen = ha[0].haOpen
+    let emaHigh = ha[0].haHigh
+    let emaLow = ha[0].haLow
+    let emaClose = ha[0].haClose
+
+    for (let i = 0; i < ha.length; i++) {
+      if (i > 0) {
+        emaOpen = ha[i].haOpen * k + emaOpen * (1 - k)
+        emaHigh = ha[i].haHigh * k + emaHigh * (1 - k)
+        emaLow = ha[i].haLow * k + emaLow * (1 - k)
+        emaClose = ha[i].haClose * k + emaClose * (1 - k)
+      }
+
+      smoothHA.push({
+        time: ha[i].time,
+        open: emaOpen,
+        high: emaHigh,
+        low: emaLow,
+        close: emaClose,
+      })
+    }
+
+    return smoothHA
+  }
+
   const calculateMACD = (data: any[]): { line: (number | null)[]; signal: (number | null)[]; histogram: (number | null)[] } => {
     const ema12 = calculateEMA(data, 12)
     const ema26 = calculateEMA(data, 26)
@@ -265,6 +313,24 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
 
         candlestickSeries.setData(candles)
         candlestickSeries.priceScale().applyOptions({
+          scaleMargins: {
+            top: 0.05,
+            bottom: 0.15,
+          },
+        })
+
+        // Add SHA_10 Candlesticks (semi-transparent overlay)
+        const shaCandlesticks = calculateSHA(candles, 10)
+        const shaSeries = chart.addSeries(CandlestickSeries, {
+          upColor: 'rgba(147, 112, 219, 0.6)',  // Purple
+          downColor: 'rgba(220, 20, 60, 0.6)',  // Crimson
+          borderVisible: false,
+          wickUpColor: 'rgba(147, 112, 219, 0.6)',
+          wickDownColor: 'rgba(220, 20, 60, 0.6)',
+        }, 0)
+
+        shaSeries.setData(shaCandlesticks)
+        shaSeries.priceScale().applyOptions({
           scaleMargins: {
             top: 0.05,
             bottom: 0.15,
