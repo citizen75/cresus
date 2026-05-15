@@ -273,11 +273,11 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
 
         // Pane 0: Candlesticks + Volume + EMAs
         const candlestickSeries = chart.addSeries(CandlestickSeries, {
-          upColor: '#ffffff',
-          downColor: '#9333ea',
+          upColor: '#10b981',
+          downColor: '#ef4444',
           borderVisible: false,
-          wickUpColor: '#ffffff',
-          wickDownColor: '#9333ea',
+          wickUpColor: '#10b981',
+          wickDownColor: '#ef4444',
         }, 0)
 
         candlestickSeries.setData(candles)
@@ -454,11 +454,11 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
       }
 
       const shaSeries = chartRef.current.addSeries(CandlestickSeries, {
-        upColor: 'rgba(147, 112, 219, 0.6)',  // Purple
-        downColor: 'rgba(220, 20, 60, 0.6)',  // Crimson
+        upColor: '#ffffff',
+        downColor: '#9333ea',
         borderVisible: false,
-        wickUpColor: 'rgba(147, 112, 219, 0.6)',
-        wickDownColor: 'rgba(220, 20, 60, 0.6)',
+        wickUpColor: '#ffffff',
+        wickDownColor: '#9333ea',
       }, 0)
 
       shaSeries.setData(shaCandles)
