@@ -232,7 +232,6 @@ export default function BacktestRuns() {
                         {backtest.start_date && backtest.end_date ? (
                           <div className="flex flex-col gap-0.5">
                             <span>{new Date(backtest.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}</span>
-                            <span className="text-slate-500">to</span>
                             <span>{new Date(backtest.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}</span>
                           </div>
                         ) : (
