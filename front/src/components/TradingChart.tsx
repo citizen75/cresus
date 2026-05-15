@@ -533,10 +533,6 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
 
   return (
     <div className="flex flex-col h-full">
-      <div className="bg-slate-900 border-b border-slate-800 px-6 py-3 flex-shrink-0">
-        <div className="text-white font-bold text-lg">{ticker}</div>
-        {companyName && <div className="text-sm text-slate-400">{companyName}</div>}
-      </div>
       <div className="flex-1 flex flex-col min-h-0 relative">
         <div className="flex-grow" ref={containerRef} />
         {/* Legend Overlay */}
