@@ -188,13 +188,15 @@ def calculate_smooth(
         index=sha_close.index
     )
 
+    # Include period in key names for proper formula reference
+    period_suffix = f"_{period}" if period else ""
     return {
-        "sha_open": sha_open,
-        "sha_high": sha_high,
-        "sha_low": sha_low,
-        "sha_close": sha_close,
-        "sha_green": sha_green,
-        "sha_red": sha_red,
-        "sha_bullish": sha_bullish,
-        "sha": sha_close,  # Default to close
+        f"sha{period_suffix}_open": sha_open,
+        f"sha{period_suffix}_high": sha_high,
+        f"sha{period_suffix}_low": sha_low,
+        f"sha{period_suffix}_close": sha_close,
+        f"sha{period_suffix}_green": sha_green,
+        f"sha{period_suffix}_red": sha_red,
+        f"sha{period_suffix}_bullish": sha_bullish,
+        f"sha{period_suffix}": sha_close,  # Default to close
     }
