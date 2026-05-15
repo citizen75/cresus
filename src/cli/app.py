@@ -455,19 +455,32 @@ class CresusCLI(cmd2.Cmd):
 
 		if cmd == "run":
 			if len(parts) < 2:
-				console.print("[red]✗[/red] Usage: backtest run <strategy_name> [start_date] [end_date]")
+				console.print("[red]✗[/red] Usage: backtest run <strategy_name> [start_date] [end_date] [-v|-vv|-vvv]")
 				return
 
 			strategy = parts[1]
-			start_date = parts[2] if len(parts) > 2 else None
-			end_date = parts[3] if len(parts) > 3 else None
+			start_date = None
+			end_date = None
+			verbose_flags = ""
 
-			# Build flow command arguments (run backtest <strategy> [start_date] [end_date])
+			# Extract dates and verbose flags
+			for i, part in enumerate(parts[2:], start=2):
+				if part in ["-v", "-vv", "-vvv"]:
+					verbose_flags = part
+				elif not part.startswith("-"):
+					if start_date is None:
+						start_date = part
+					elif end_date is None:
+						end_date = part
+
+			# Build flow command arguments (run backtest <strategy> [start_date] [end_date] [verbose_flags])
 			flow_args = f"run backtest {strategy}"
 			if start_date:
 				flow_args += f" {start_date}"
 			if end_date:
 				flow_args += f" {end_date}"
+			if verbose_flags:
+				flow_args += f" {verbose_flags}"
 
 			# Execute as flow command
 			self.do_flow(flow_args)
