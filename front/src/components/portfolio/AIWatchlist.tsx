@@ -80,7 +80,7 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
   const [historicalData, setHistoricalData] = useState<HistoricalData>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('cards')
   const [sector, setSector] = useState('All sectors')
   const [country, setCountry] = useState('All countries')
   const [searchTerm, setSearchTerm] = useState('')
