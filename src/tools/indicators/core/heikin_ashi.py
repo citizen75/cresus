@@ -137,11 +137,16 @@ def calculate_smooth(
     ha_low = ha_dict["ha_low"]
     ha_close = ha_dict["ha_close"]
     
-    # Apply EMA smoothing
+    # Apply EMA smoothing to all components
     sha_open = ha_open.ewm(span=period, adjust=False).mean()
-    sha_high = ha_high.ewm(span=period, adjust=False).mean()
-    sha_low = ha_low.ewm(span=period, adjust=False).mean()
+    sha_high_ema = ha_high.ewm(span=period, adjust=False).mean()
+    sha_low_ema = ha_low.ewm(span=period, adjust=False).mean()
     sha_close = ha_close.ewm(span=period, adjust=False).mean()
+
+    # Constrain wicks to maintain valid candlestick geometry
+    # High must be >= max(open, close), Low must be <= min(open, close)
+    sha_high = pd.concat([sha_open, sha_high_ema, sha_close], axis=1).max(axis=1)
+    sha_low = pd.concat([sha_open, sha_low_ema, sha_close], axis=1).min(axis=1)
 
     # Calculate color indicators
     sha_green = pd.Series((sha_close > sha_open).astype(int), index=sha_close.index)
