@@ -151,11 +151,13 @@ class DataAgent(Agent):
 						calculated = calculate_indicators(missing_indicators, ticker_data_asc)
 						indicators_calculated[ticker] = calculated
 
-						# Add calculated indicators back to ascending data, then update the data_history with ascending order
+						# Add calculated indicators back to ascending data
 						for indicator_name, series in calculated.items():
 							ticker_data_asc[indicator_name] = series
 
-						# Replace data_history entry with ascending-ordered data (will be sorted descending later)
+						# RESET SORT ORDER: Sort back to descending (newest first) immediately after calculation
+						# This ensures all data_history entries are in consistent descending order
+						ticker_data_asc = ticker_data_asc.sort_values('timestamp', ascending=False).reset_index(drop=True)
 						data_history[ticker] = ticker_data_asc
 
 					except Exception as e:
