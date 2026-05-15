@@ -17,60 +17,13 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
   const [isLoading, setIsLoading] = useState(false)
   const [companyName, setCompanyName] = useState<string>('')
   const [chartData, setChartData] = useState<any[]>([])
+  const [shaCandles, setShaCandles] = useState<any[]>([])
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<any>(null)
   const indicatorChartsRef = useRef<{ rsi?: any; macd?: any; mainChart?: any }>({})
   const lastCursorPosRef = useRef<any>(null)
 
   const randomNumber = (min: number, max: number) => Math.random() * (max - min) + min
-
-  const calculateSHA = (data: any[], period: number = 10) => {
-    // Calculate Heikin Ashi candlesticks
-    const ha: any[] = []
-    let prevHaOpen = data[0].open
-    let prevHaClose = (data[0].open + data[0].high + data[0].low + data[0].close) / 4
-
-    for (let i = 0; i < data.length; i++) {
-      const candle = data[i]
-      const haClose = (candle.open + candle.high + candle.low + candle.close) / 4
-      const haOpen = (prevHaOpen + prevHaClose) / 2
-      const haHigh = Math.max(candle.high, haOpen, haClose)
-      const haLow = Math.min(candle.low, haOpen, haClose)
-
-      ha.push({ haOpen, haHigh, haLow, haClose, time: candle.time })
-      prevHaOpen = haOpen
-      prevHaClose = haClose
-    }
-
-    // Apply EMA smoothing
-    const smoothHA: any[] = []
-    const k = 2 / (period + 1)
-
-    // Initialize EMA with first value
-    let emaOpen = ha[0].haOpen
-    let emaHigh = ha[0].haHigh
-    let emaLow = ha[0].haLow
-    let emaClose = ha[0].haClose
-
-    for (let i = 0; i < ha.length; i++) {
-      if (i > 0) {
-        emaOpen = ha[i].haOpen * k + emaOpen * (1 - k)
-        emaHigh = ha[i].haHigh * k + emaHigh * (1 - k)
-        emaLow = ha[i].haLow * k + emaLow * (1 - k)
-        emaClose = ha[i].haClose * k + emaClose * (1 - k)
-      }
-
-      smoothHA.push({
-        time: ha[i].time,
-        open: emaOpen,
-        high: emaHigh,
-        low: emaLow,
-        close: emaClose,
-      })
-    }
-
-    return smoothHA
-  }
 
   const calculateMACD = (data: any[]): { line: (number | null)[]; signal: (number | null)[]; histogram: (number | null)[] } => {
     const ema12 = calculateEMA(data, 12)
@@ -233,8 +186,9 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
 
         if (ticker) {
           try {
-            const response = await api.getHistoricalData(ticker, 730)
-            // Response has structure: { ticker, count, days, data: [...records] }
+            // Fetch historical data with SHA_10 indicator
+            const response = await api.getHistoricalData(ticker, 730, { indicator: 'sha_10' } as any)
+            // Response has structure: { ticker, count, days, indicator, data: [...records] }
             const data = (response as any).data || []
 
             if (data.length === 0) {
@@ -249,6 +203,17 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
               close: parseFloat(d.close),
             }))
 
+            // Extract SHA candlestick data if available
+            const shaData = data
+              .filter((d: any) => d.sha_10_open && d.sha_10_high && d.sha_10_low && d.sha_10_close)
+              .map((d: any) => ({
+                time: d.timestamp.substring(0, 10),
+                open: parseFloat(d.sha_10_open),
+                high: parseFloat(d.sha_10_high),
+                low: parseFloat(d.sha_10_low),
+                close: parseFloat(d.sha_10_close),
+              }))
+
             volume = data.map((d: any) => {
               const color = parseFloat(d.close) >= parseFloat(d.open) ? '#26a69a' : '#ef5350'
               return {
@@ -258,8 +223,9 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
               }
             })
 
-            console.log(`Loaded ${candles.length} candles for ${ticker}`)
+            console.log(`Loaded ${candles.length} candles for ${ticker} (SHA_10: ${shaData.length})`)
             setChartData(candles)
+            setShaCandles(shaData)
           } catch (err) {
             console.error('Failed to fetch historical data:', err)
             const { candles: genCandles, volume: genVolume } = generateDatasets(timeframe)
@@ -313,24 +279,6 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
 
         candlestickSeries.setData(candles)
         candlestickSeries.priceScale().applyOptions({
-          scaleMargins: {
-            top: 0.05,
-            bottom: 0.15,
-          },
-        })
-
-        // Add SHA_10 Candlesticks (semi-transparent overlay)
-        const shaCandlesticks = calculateSHA(candles, 10)
-        const shaSeries = chart.addSeries(CandlestickSeries, {
-          upColor: 'rgba(147, 112, 219, 0.6)',  // Purple
-          downColor: 'rgba(220, 20, 60, 0.6)',  // Crimson
-          borderVisible: false,
-          wickUpColor: 'rgba(147, 112, 219, 0.6)',
-          wickDownColor: 'rgba(220, 20, 60, 0.6)',
-        }, 0)
-
-        shaSeries.setData(shaCandlesticks)
-        shaSeries.priceScale().applyOptions({
           scaleMargins: {
             top: 0.05,
             bottom: 0.15,
@@ -489,6 +437,34 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
       }
     }
   }, [timeframe, ticker, entryDate, exitDate])
+
+  // Add SHA candlesticks series when data becomes available
+  useEffect(() => {
+    if (!chartRef.current || !shaCandles || shaCandles.length === 0) return
+
+    try {
+      const lwc = await import('lightweight-charts')
+      const { CandlestickSeries } = lwc
+
+      const shaSeries = chartRef.current.addSeries(CandlestickSeries, {
+        upColor: 'rgba(147, 112, 219, 0.6)',  // Purple
+        downColor: 'rgba(220, 20, 60, 0.6)',  // Crimson
+        borderVisible: false,
+        wickUpColor: 'rgba(147, 112, 219, 0.6)',
+        wickDownColor: 'rgba(220, 20, 60, 0.6)',
+      }, 0)
+
+      shaSeries.setData(shaCandles)
+      shaSeries.priceScale().applyOptions({
+        scaleMargins: {
+          top: 0.05,
+          bottom: 0.15,
+        },
+      })
+    } catch (err) {
+      console.error('Error adding SHA candlesticks:', err)
+    }
+  }, [shaCandles])
 
   // Set visible range based on visibleWindow
   useEffect(() => {

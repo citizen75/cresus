@@ -182,8 +182,11 @@ class CresusAPI {
     return (await this.client.delete(`/backtests/${strategy}/${id}`)).data
   }
 
-  async getHistoricalData(ticker: string, days?: number) {
-    const params = days ? { days } : {}
+  async getHistoricalData(ticker: string, days?: number, options?: { indicator?: string }) {
+    const params: any = days ? { days } : {}
+    if (options?.indicator) {
+      params.indicator = options.indicator
+    }
     return (await this.client.get(`/data/history/${ticker}`, { params })).data
   }
 
