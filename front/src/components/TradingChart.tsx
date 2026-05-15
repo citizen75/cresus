@@ -268,6 +268,9 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
         // Store main chart reference for indicator charts to sync back
         indicatorChartsRef.current.mainChart = chart
 
+        // Store series constructor for later use (e.g., adding SHA candlesticks)
+        ;(chartRef.current as any).CandlestickSeries = CandlestickSeries
+
         // Pane 0: Candlesticks + Volume + EMAs
         const candlestickSeries = chart.addSeries(CandlestickSeries, {
           upColor: '#10b981',
@@ -443,8 +446,12 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
     if (!chartRef.current || !shaCandles || shaCandles.length === 0) return
 
     try {
-      const lwc = await import('lightweight-charts')
-      const { CandlestickSeries } = lwc
+      const CandlestickSeries = (chartRef.current as any).CandlestickSeries
+
+      if (!CandlestickSeries) {
+        console.warn('CandlestickSeries not available')
+        return
+      }
 
       const shaSeries = chartRef.current.addSeries(CandlestickSeries, {
         upColor: 'rgba(147, 112, 219, 0.6)',  // Purple
