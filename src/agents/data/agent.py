@@ -142,14 +142,21 @@ class DataAgent(Agent):
 					ticker_data = data_history[ticker]
 
 					try:
-						# Sort in ascending order for indicator calculation
+						# CRITICAL: Sort in ascending order (oldest first) for indicator calculation
+						# Indicators like EMA, SHA require data in chronological order
 						ticker_data_asc = ticker_data.sort_values('timestamp', ascending=True).reset_index(drop=True)
+						self.logger.debug(f"{ticker}: Calculating indicators on {len(ticker_data_asc)} rows (oldest={ticker_data_asc.iloc[0]['timestamp']}, newest={ticker_data_asc.iloc[-1]['timestamp']})")
+
+						# Calculate indicators on ascending data
 						calculated = calculate_indicators(missing_indicators, ticker_data_asc)
 						indicators_calculated[ticker] = calculated
 
-						# Add calculated indicators as columns to the original data
+						# Add calculated indicators back to ascending data, then update the data_history with ascending order
 						for indicator_name, series in calculated.items():
-							ticker_data[indicator_name] = series
+							ticker_data_asc[indicator_name] = series
+
+						# Replace data_history entry with ascending-ordered data (will be sorted descending later)
+						data_history[ticker] = ticker_data_asc
 
 					except Exception as e:
 						self.logger.warning(f"Failed to calculate indicators for {ticker}: {e}")
