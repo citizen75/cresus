@@ -146,6 +146,7 @@ export default function BacktestRuns() {
                   <th className="px-4 py-3 text-right">Drawdown</th>
                   <th className="px-4 py-3 text-right">Win Rate</th>
                   <th className="px-4 py-3 text-right">Trades</th>
+                  <th className="px-4 py-3 text-right">Period</th>
                   <th className="px-4 py-3 text-right">Date</th>
                   <th className="w-12 px-4 py-3"></th>
                 </tr>
@@ -228,11 +229,31 @@ export default function BacktestRuns() {
                       </td>
 
                       <td className="px-4 py-3 text-right text-slate-400 text-xs">
-                        {new Date(backtest.created_at).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: '2-digit'
-                        })}
+                        {backtest.start_date && backtest.end_date ? (
+                          <div className="flex flex-col gap-0.5">
+                            <span>{new Date(backtest.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}</span>
+                            <span className="text-slate-500">to</span>
+                            <span>{new Date(backtest.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}</span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-500">—</span>
+                        )}
+                      </td>
+
+                      <td className="px-4 py-3 text-right text-slate-400 text-xs">
+                        <div className="flex flex-col gap-0.5">
+                          <span>{new Date(backtest.created_at).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: '2-digit'
+                          })}</span>
+                          <span className="text-slate-500">{new Date(backtest.created_at).toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                            hour12: false
+                          })}</span>
+                        </div>
                       </td>
 
                       <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
