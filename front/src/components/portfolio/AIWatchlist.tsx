@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import CardChart from '@/components/CardChart'
+import TradingChart from '@/components/TradingChart'
 import Spinner from '@/components/Spinner'
 import { getApiBaseUrl } from '@/services/api'
 
@@ -87,6 +88,7 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
   const [sortBy, setSortBy] = useState('AI Score')
   const [currentPage, setCurrentPage] = useState(1)
   const [period, setPeriod] = useState('1Y')
+  const [chartTicker, setChartTicker] = useState<string | null>(null)
 
   // Reload historical data when period changes
   useEffect(() => {
@@ -423,6 +425,7 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
                   <th className="px-6 py-4 text-left text-slate-400 font-medium">Target</th>
                   <th className="px-6 py-4 text-left text-slate-400 font-medium">Analyst Rating</th>
                   <th className="px-6 py-4 text-left text-slate-400 font-medium">Key drivers</th>
+                  <th className="px-6 py-4 text-center text-slate-400 font-medium">Chart</th>
                 </tr>
               </thead>
               <tbody>
@@ -505,6 +508,15 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
                       ) : '—'}
                     </td>
                     <td className="px-6 py-4 text-slate-400 text-xs max-w-xs">{item.drivers}</td>
+                    <td className="px-6 py-4 text-center">
+                      <button
+                        onClick={() => setChartTicker(item.ticker)}
+                        className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded transition text-sm font-medium"
+                        title="View chart"
+                      >
+                        📈
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -593,6 +605,14 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
 
                 {/* Card Footer */}
                 <div className="border-t border-slate-800 p-4 space-y-2">
+                  <div className="flex gap-2 mb-4">
+                    <button
+                      onClick={() => setChartTicker(item.ticker)}
+                      className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm font-medium transition"
+                    >
+                      📈 View Chart
+                    </button>
+                  </div>
                   <div className="text-xs">
                     <p className="text-slate-500 mb-1">Signals:</p>
                     <p className="text-slate-300">{item.drivers}</p>
@@ -690,6 +710,31 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
             >
               →
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Chart Modal */}
+      {chartTicker && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 rounded-lg border border-slate-800 w-full max-w-6xl h-screen max-h-[90vh] flex flex-col overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 p-6">
+              <h3 className="text-xl font-bold text-white">
+                {watchlist.find(w => w.ticker === chartTicker)?.companyName || chartTicker} Chart
+              </h3>
+              <button
+                onClick={() => setChartTicker(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Chart Container */}
+            <div className="flex-1 overflow-auto">
+              <TradingChart ticker={chartTicker} />
+            </div>
           </div>
         </div>
       )}
