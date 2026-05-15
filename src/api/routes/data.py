@@ -124,8 +124,11 @@ async def get_ticker_history(
 		# Calculate indicator if requested
 		if indicator:
 			try:
+				# Sort in ascending order (oldest first) for indicator calculation
+				df_for_calc = df.sort_values('timestamp', ascending=True).reset_index(drop=True)
+
 				# Normalize column names to lowercase for indicator calculation
-				df_normalized = df.copy()
+				df_normalized = df_for_calc.copy()
 				column_mapping = {}
 				for col in df_normalized.columns:
 					col_lower = col.lower()
@@ -168,9 +171,12 @@ async def get_ticker_history(
 				# Calculate indicator using DSL formula on normalized dataframe
 				indicator_results = calculate_indicators(indicators_to_calculate, df_normalized)
 
-				# Merge indicator columns into original dataframe
+				# Create a mapping of timestamp -> indicator values for proper merging
 				for col_name, col_data in indicator_results.items():
-					df[col_name] = col_data
+					# Create a dictionary mapping timestamp to value
+					ts_value_map = dict(zip(df_for_calc['timestamp'], col_data))
+					# Apply values to original df using timestamp lookup
+					df[col_name] = df['timestamp'].map(ts_value_map)
 			except Exception as e:
 				raise HTTPException(400, f"Error calculating indicator '{indicator}': {str(e)}")
 
