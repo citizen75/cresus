@@ -147,6 +147,14 @@ def calculate_smooth(
     sha_green = pd.Series((sha_close > sha_open).astype(int), index=sha_close.index)
     sha_red = pd.Series((sha_close < sha_open).astype(int), index=sha_close.index)
 
+    # Calculate bullish indicator: open equals low AND close > open (strong buying pressure)
+    # Use a small tolerance for floating point comparison
+    tolerance = 1e-9
+    sha_bullish = pd.Series(
+        ((sha_close > sha_open) & (abs(sha_open - sha_low) < tolerance)).astype(int),
+        index=sha_close.index
+    )
+
     return {
         "sha_open": sha_open,
         "sha_high": sha_high,
@@ -154,5 +162,6 @@ def calculate_smooth(
         "sha_close": sha_close,
         "sha_green": sha_green,
         "sha_red": sha_red,
+        "sha_bullish": sha_bullish,
         "sha": sha_close,  # Default to close
     }
