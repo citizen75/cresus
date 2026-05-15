@@ -28,7 +28,7 @@ class FormulaParser:
         'line', 'signal', 'histogram',  # MACD
         'plus', 'minus',  # DMI
         'open', 'high', 'low', 'close',  # Heikin Ashi, Smooth Heikin Ashi, HAMA
-        'green', 'red',  # Color indicators
+        'green', 'red', 'bullish',  # Color and pattern indicators
         'trend',  # HAMA trend line
     }
 
