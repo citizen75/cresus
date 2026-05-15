@@ -93,12 +93,15 @@ def is_dsl_formula(formula: str) -> bool:
 		formula: Formula string to check
 
 	Returns:
-		True if formula contains DSL notation (indicator[n]) or DSL operators (&&, ||, !, comparisons)
+		True if formula contains DSL notation (indicator[n]) or DSL operators (&&, ||, !)
 	"""
-	# Check for shift notation or DSL operators
+	# Check for shift notation (indicator[n])
 	has_shift_notation = bool(re.search(DSL_PATTERN, formula))
-	# DSL operators: logical (&&, ||, !), comparisons (==, !=, <, >, <=, >=), arithmetic in compound expressions
-	has_dsl_operators = bool(re.search(r'(&&|\|\||!(?!=)|!=|<=|>=|==|[<>])', formula))
+
+	# Check for DSL-specific operators: && (and), || (or), ! (not)
+	# These are DSL operators. Traditional pandas would use 'and', 'or', 'not'
+	has_dsl_operators = bool(re.search(r'(&&|\|\||!(?!=))', formula))
+
 	return has_shift_notation or has_dsl_operators
 
 
