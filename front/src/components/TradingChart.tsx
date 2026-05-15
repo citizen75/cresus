@@ -18,8 +18,10 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
   const [companyName, setCompanyName] = useState<string>('')
   const [chartData, setChartData] = useState<any[]>([])
   const [shaCandles, setShaCandles] = useState<any[]>([])
+  const [showSHA10, setShowSHA10] = useState(true)
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<any>(null)
+  const shaSeriesRef = useRef<any>(null)
   const indicatorChartsRef = useRef<{ rsi?: any; macd?: any; mainChart?: any }>({})
   const lastCursorPosRef = useRef<any>(null)
 
@@ -459,8 +461,10 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
         borderVisible: false,
         wickUpColor: '#ffffff',
         wickDownColor: '#9333ea',
+        visible: showSHA10,
       }, 0)
 
+      shaSeriesRef.current = shaSeries
       shaSeries.setData(shaCandles)
       shaSeries.priceScale().applyOptions({
         scaleMargins: {
@@ -472,6 +476,13 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
       console.error('Error adding SHA candlesticks:', err)
     }
   }, [shaCandles])
+
+  // Toggle SHA series visibility
+  useEffect(() => {
+    if (shaSeriesRef.current) {
+      shaSeriesRef.current.applyOptions({ visible: showSHA10 })
+    }
+  }, [showSHA10])
 
   // Set visible range based on visibleWindow
   useEffect(() => {
@@ -526,8 +537,27 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
         <div className="text-white font-bold text-lg">{ticker}</div>
         {companyName && <div className="text-sm text-slate-400">{companyName}</div>}
       </div>
-      <div className="flex-1 flex flex-col min-h-0">
-        <div className="flex-grow" ref={containerRef} />
+      <div className="flex-1 flex flex-col min-h-0 relative">
+        <div className="flex-grow relative" ref={containerRef}>
+          {/* Legend */}
+          <div className="absolute top-4 left-4 z-10 bg-slate-900/90 border border-slate-700 rounded-lg p-3 backdrop-blur-sm">
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-800/50 px-2 py-1 rounded transition">
+                <input
+                  type="checkbox"
+                  checked={showSHA10}
+                  onChange={(e) => setShowSHA10(e.target.checked)}
+                  className="w-4 h-4 accent-purple-600"
+                />
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-white rounded-sm"></div>
+                  <div className="w-3 h-3 bg-purple-600 rounded-sm"></div>
+                  <span className="text-sm text-slate-300 font-medium">SHA_10</span>
+                </div>
+              </label>
+            </div>
+          </div>
+        </div>
         {selectedIndicators.size > 0 && (
           <div className="flex-shrink-0 overflow-hidden">
             <IndicatorsPanel chartData={chartData} selectedIndicators={selectedIndicators} visibleWindow={visibleWindow} chartsRef={indicatorChartsRef} />
