@@ -28,10 +28,9 @@ export function useBacktestWebSocket(options: UseBacktestWebSocketOptions) {
 
     try {
       const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-      const host = window.location.hostname
-      // Always use API port 8000, not the frontend's port
-      const port = ':8000'
-      const url = `${protocol}://${host}${port}/api/v1/ws/backtest/${backtest_id}${strategy_name ? `?strategy=${strategy_name}` : ''}`
+      const apiHost = import.meta.env.VITE_API_HOST || window.location.hostname
+      const apiPort = import.meta.env.VITE_API_PORT || '8000'
+      const url = `${protocol}://${apiHost}:${apiPort}/api/v1/ws/backtest/${backtest_id}${strategy_name ? `?strategy=${strategy_name}` : ''}`
 
       const ws = new WebSocket(url)
 
