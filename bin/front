@@ -6,7 +6,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 export CRESUS_PROJECT_ROOT="$PROJECT_ROOT"
-export VITE_API_URL="http://localhost:8000"
+
+# Load .cresus/.env if it exists
+if [ -f "$HOME/.cresus/.env" ]; then
+    # Source only API_HOST, API_PORT, FRONT_PORT
+    export $(grep -E '^(API_HOST|API_PORT|FRONT_PORT)=' "$HOME/.cresus/.env" | xargs)
+fi
 
 cd "$PROJECT_ROOT/front"
 
