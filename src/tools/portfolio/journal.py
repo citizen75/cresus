@@ -18,7 +18,6 @@ class Journal:
     ]
 
     def __init__(self, name: str = "default", context: Optional[Dict[str, Any]] = None):
-        project_root = Path(os.environ.get("CRESUS_PROJECT_ROOT", os.getcwd()))
         # Normalize portfolio name to lowercase snake_case
         normalized_name = self._normalize_name(name)
 
@@ -36,8 +35,9 @@ class Journal:
             # Use sandboxed backtest directory
             self.filepath = Path(backtest_dir) / "portfolios" / f"{normalized_name}_journal.csv"
         else:
-            # Use normal directory
-            self.filepath = project_root / "db" / "local" / "portfolios" / f"{normalized_name}_journal.csv"
+            # Use ~/.cresus/db/portfolios/{portfolio_name}/ directory
+            cresus_home = Path.home() / ".cresus"
+            self.filepath = cresus_home / "db" / "portfolios" / normalized_name / f"{normalized_name}_journal.csv"
 
         self.filepath.parent.mkdir(parents=True, exist_ok=True)
         self.name = normalized_name
@@ -79,13 +79,15 @@ class Journal:
         return df
 
     def save(self, df: pd.DataFrame) -> None:
-        """Save DataFrame to cache, mark as dirty (deferred disk write)."""
-        # Update context cache
-        if self.context is not None:
+        """Save DataFrame to cache/disk."""
+        # Always write to disk immediately if no context
+        if self.context is None:
+            df.to_csv(self.filepath, index=False, quoting=1, quotechar='"')  # QUOTE_ALL
+        else:
+            # Update context cache and mark for deferred flush
             self.context[self.cache_key] = df.copy()
-            # Mark cache as dirty - flush() will write to disk
             self.context[self.dirty_key] = True
-    
+
     def flush(self) -> None:
         """Flush dirty cache to disk. Call at end of each day or at backtest end."""
         if self.context and self.cache_key in self.context:

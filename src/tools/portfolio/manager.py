@@ -494,6 +494,8 @@ class PortfolioManager:
                 notes=notes,
                 created_at=created_at
             )
+            # Flush to disk immediately (don't wait for context flush)
+            journal.flush()
             # Update cache after successful transaction
             self.update_portfolio_cache(portfolio_name)
             return {
