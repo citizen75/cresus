@@ -33,11 +33,11 @@ class Journal:
 
         if backtest_dir:
             # Use sandboxed backtest directory
-            self.filepath = Path(backtest_dir) / "portfolios" / f"{normalized_name}_journal.csv"
+            self.filepath = Path(backtest_dir) / "portfolios" / normalized_name / "journal.csv"
         else:
-            # Use ~/.cresus/db/portfolios/{portfolio_name}/ directory
+            # Use ~/.cresus/db/portfolios/{portfolio_name}/journal.csv
             cresus_home = Path.home() / ".cresus"
-            self.filepath = cresus_home / "db" / "portfolios" / normalized_name / f"{normalized_name}_journal.csv"
+            self.filepath = cresus_home / "db" / "portfolios" / normalized_name / "journal.csv"
 
         self.filepath.parent.mkdir(parents=True, exist_ok=True)
         self.name = normalized_name
