@@ -100,12 +100,19 @@ class TrendAgent(Agent):
 				self.logger.debug(f"Added indicators to strategy config: {added_indicators}")
 
 		# Analyze trend for each ticker in watchlist
-		trending_watchlist = []
-		for ticker in watchlist:
+		trending_watchlist = {}
+		pass_count = 0
+		fail_count = 0
+		for ticker in list(watchlist.keys()):
 			if ticker in data_history:
 				ticker_data = data_history[ticker]
 				if self._matches_trend_formula(ticker_data, trend_formula):
-					trending_watchlist.append(ticker)
+					trending_watchlist[ticker] = watchlist[ticker]
+					pass_count += 1
+					self.logger.info(f"[TREND] {ticker}: PASS")
+				else:
+					fail_count += 1
+					self.logger.info(f"[TREND] {ticker}: FAIL")
 
 		removed_count = len(watchlist) - len(trending_watchlist)
 		self.context.set("watchlist", trending_watchlist)
@@ -123,15 +130,11 @@ class TrendAgent(Agent):
 	def _matches_trend_formula(self, ticker_data: Any, formula: str) -> bool:
 		"""Evaluate trend formula on latest row of ticker data.
 
-		Extracts required indicators from formula and calculates them,
-		then evaluates the formula on the latest row.
-
-		Formula is a Python expression using 'data' dict notation.
-		Example: "data['close'] > data['ema_20'] and data['ema_20'] > data['ema_50']"
+		Supports both traditional 'data[col]' notation and DSL shift notation like 'col[0]', 'col[-1]'.
 
 		Args:
 			ticker_data: Price history DataFrame
-			formula: Python expression to evaluate
+			formula: Python expression to evaluate (e.g., "sha_10_bullish[0] == 1")
 
 		Returns:
 			True if formula evaluates to True on latest row
@@ -140,27 +143,22 @@ class TrendAgent(Agent):
 			if not hasattr(ticker_data, 'iloc') or len(ticker_data) == 0:
 				return False
 
-			# Extract indicator names from formula (e.g., ema_20, adx_14)
-			indicators = self._extract_indicators(formula)
+			# Get last 5 bars for shift notation support (data is sorted newest-first)
+			last_5_days = ticker_data.iloc[:5].copy() if len(ticker_data) >= 5 else ticker_data.copy()
 
-			# Check that all required indicators are available (calculated by DataAgent)
-			if indicators:
-				missing_indicators = [ind for ind in indicators if ind not in ticker_data.columns]
-				if missing_indicators:
-					self.logger.error(f"Missing indicators {missing_indicators} not pre-calculated by DataAgent for formula: {formula}")
-					return False
+			# Debug: show data timestamps
+			if 'timestamp' in last_5_days.columns:
+				timestamps = list(last_5_days['timestamp'].iloc[:3].values)
+				sha_bullish_vals = list(last_5_days['sha_10_bullish'].iloc[:3].values) if 'sha_10_bullish' in last_5_days.columns else []
+				self.logger.debug(f"[TREND] Data timestamps: {timestamps}, sha_10_bullish: {sha_bullish_vals}")
 
-			# Get latest row
-			latest = ticker_data.iloc[0]  # Data is sorted newest-first, so [0] is most recent
-
-			# Create data dict for formula evaluation
-			data = latest.to_dict()
-
-			# Evaluate formula safely using pandas eval
-			return evaluate(formula, data)
+			# Evaluate formula on DataFrame (supports shift notation like [0], [-1])
+			result = evaluate(formula, last_5_days)
+			self.logger.debug(f"[TREND] Formula '{formula}' evaluated to {result}")
+			return result
 
 		except Exception as e:
-			self.logger.debug(f"Error evaluating trend formula: {e}")
+			self.logger.info(f"[TREND] Error evaluating trend formula '{formula}': {e}")
 			return False
 
 	def _extract_indicators(self, formula: str) -> List[str]:

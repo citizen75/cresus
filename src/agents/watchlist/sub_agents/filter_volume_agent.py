@@ -67,8 +67,8 @@ class FilterVolumeAgent(Agent):
 			min_volume_ratio = volume_config.get("min_volume_ratio", 0.5)
 
 		# Filter watchlist by latest volume from data_history
-		filtered_watchlist = []
-		for ticker in watchlist:
+		filtered_watchlist = {}
+		for ticker in list(watchlist.keys()):
 			if ticker in data_history:
 				ticker_data = data_history[ticker]
 				# Get latest volume value
@@ -88,10 +88,10 @@ class FilterVolumeAgent(Agent):
 
 						# Apply filter if threshold is set
 						if threshold is not None and latest_volume >= threshold:
-							filtered_watchlist.append(ticker)
+							filtered_watchlist[ticker] = watchlist[ticker]
 						elif threshold is None:
 							# No threshold means pass all
-							filtered_watchlist.append(ticker)
+							filtered_watchlist[ticker] = watchlist[ticker]
 					else:
 						continue
 				except (ValueError, TypeError, AttributeError):

@@ -40,6 +40,7 @@ class OrderConstructionAgent(Agent):
 
 		validated_orders = self.context.get("validated_orders") or []
 		entry_recommendations = self.context.get("entry_recommendations") or []
+		data_history = self.context.get("data_history") or {}
 
 		if not validated_orders:
 			return {
@@ -105,11 +106,21 @@ class OrderConstructionAgent(Agent):
 					if isinstance(stop_config, dict) and "formula" in stop_config:
 						stop_formula = stop_config.get("formula")
 						if stop_formula:
-							# Build evaluation context with entry price
+							# Build evaluation context with entry price and price data from history
 							data_context = {
 								"close": entry_price,
 								"entry": entry_price,
 							}
+
+							# Add high/low/atr from data_history if available
+							if ticker and ticker in data_history:
+								df = data_history[ticker]
+								if len(df) > 0:
+									latest = df.iloc[0]
+									data_context["high"] = float(latest.get("high", entry_price))
+									data_context["low"] = float(latest.get("low", entry_price))
+									data_context["atr_14"] = float(latest.get("atr_14", 0))
+									data_context["atr_20"] = float(latest.get("atr_20", 0))
 
 							# Try to evaluate the formula
 							try:

@@ -5,11 +5,116 @@ from core.agent import Agent
 from core.flow import Flow
 from agents.entry.sub_agents import (
 	EntryScoreAgent,
+	ScoreFilterAgent,
 	EntryTimingAgent,
 	EntryRRAgent,
 	EntryFilterAgent,
 	PositionDuplicateFilterAgent,
 )
+
+
+class CompositeRecommendationAgent(Agent):
+	"""Create composite recommendations from entry/timing/RR scores."""
+
+	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+		"""Merge scores into watchlist dict as composite recommendations.
+
+		Args:
+			input_data: Input data (not used)
+
+		Returns:
+			Response with watchlist updated with scores
+		"""
+		if input_data is None:
+			input_data = {}
+
+		# Get scores from context
+		entry_scores = self.context.get("entry_scores") or {}
+		timing_scores = self.context.get("timing_scores") or {}
+		rr_metrics = self.context.get("rr_metrics") or {}
+		watchlist = self.context.get("watchlist") or {}
+
+		# Merge scores into watchlist dict (watchlist now contains all recommendation data)
+		merged_watchlist = self._merge_scores_into_watchlist(
+			watchlist, entry_scores, timing_scores, rr_metrics
+		)
+
+		# Update watchlist in context with merged data (entry_recommendations concept is retired)
+		self.context.set("watchlist", merged_watchlist)
+		self.logger.info(f"[ENTRY] Merged scores into {len(merged_watchlist)} tickers in watchlist")
+
+		return {
+			"status": "success",
+			"input": input_data,
+			"output": {"merged_count": len(merged_watchlist)},
+		}
+
+	def _merge_scores_into_watchlist(self, watchlist, entry_scores, timing_scores, rr_metrics):
+		"""Merge entry/timing/rr scores into watchlist dict values."""
+		merged = {}
+
+		for ticker in list(watchlist.keys()):
+			entry_score = entry_scores.get(ticker, 0)
+			timing_score = timing_scores.get(ticker, 0)
+			rr_data = rr_metrics.get(ticker)
+
+			# Skip tickers with no scores
+			if entry_score == 0 and timing_score == 0 and not rr_data:
+				continue
+
+			composite_score = self._calculate_composite_score(
+				entry_score, timing_score, rr_data
+			)
+
+			# Merge all data into watchlist[ticker]
+			ticker_data = watchlist[ticker].copy()
+			ticker_data.update({
+				"composite_score": round(composite_score, 2),
+				"entry_score": round(entry_score, 2),
+				"timing_score": round(timing_score, 2),
+				"rr_ratio": rr_data["rr_ratio"] if rr_data else None,
+				"entry_price": rr_data["entry_price"] if rr_data else None,
+				"stop_loss": rr_data["stop_loss"] if rr_data else None,
+				"take_profit": rr_data["take_profit"] if rr_data else None,
+				"risk_pct": rr_data["risk_pct"] if rr_data else None,
+				"reward_pct": rr_data["reward_pct"] if rr_data else None,
+				"recommendation": self._get_recommendation_level(composite_score),
+			})
+			merged[ticker] = ticker_data
+
+		# Sort by composite_score descending and rebuild as dict
+		sorted_merged = dict(sorted(
+			merged.items(),
+			key=lambda x: x[1].get("composite_score", 0),
+			reverse=True
+		))
+		return sorted_merged
+
+	def _calculate_composite_score(self, entry_score, timing_score, rr_data):
+		"""Calculate weighted composite score."""
+		score = 0
+		score += entry_score * 0.4
+		score += timing_score * 0.35
+		if rr_data and rr_data.get("rr_ratio", 0) > 0:
+			rr = rr_data["rr_ratio"]
+			rr_score = min(100, 50 + (rr - 1) * 25)
+			score += rr_score * 0.25
+		else:
+			score += 50 * 0.25
+		return min(100, max(0, score))
+
+	def _get_recommendation_level(self, score):
+		"""Get recommendation level based on score."""
+		if score >= 80:
+			return "STRONG BUY"
+		elif score >= 65:
+			return "BUY"
+		elif score >= 50:
+			return "HOLD"
+		elif score >= 35:
+			return "WAIT"
+		else:
+			return "SKIP"
 
 
 class EntryAgent(Agent):
@@ -49,8 +154,9 @@ class EntryAgent(Agent):
 			if ticker_scores:
 				# Use ALL signal-scored tickers, not just top 20
 				# This ensures entry_filter can evaluate reversal patterns which may have lower signal scores
-				watchlist = list(ticker_scores.keys())
-				self.logger.info(f"[ENTRY] Watchlist empty, using {len(watchlist)} signal-scored tickers: {watchlist[:5]}{'...' if len(watchlist) > 5 else ''}")
+				watchlist = {t: {} for t in ticker_scores.keys()}
+				ticker_list = list(watchlist.keys())
+				self.logger.info(f"[ENTRY] Watchlist empty, using {len(watchlist)} signal-scored tickers: {ticker_list[:5]}{'...' if len(watchlist) > 5 else ''}")
 			else:
 				return {
 					"status": "error",
@@ -59,31 +165,61 @@ class EntryAgent(Agent):
 					"message": "No watchlist or signal-scored tickers in context"
 				}
 		else:
-			self.logger.info(f"[ENTRY] Starting entry analysis with {len(watchlist)} tickers: {watchlist[:10]}{'...' if len(watchlist) > 10 else ''}")
+			ticker_list = list(watchlist.keys())
+			self.logger.info(f"[ENTRY] Starting entry analysis with {len(watchlist)} tickers: {ticker_list[:10]}{'...' if len(watchlist) > 10 else ''}")
 
 		# Set watchlist in context for sub-agents
 		self.context.set("watchlist", watchlist)
 
-		# Create analysis flow with sub-agents for scoring/analysis
+		#print(f"[ENTRY-0] {self.context.get('current_date')}")
+		#print(f"[ENTRY-0] Watchlist: {len(watchlist)} tickers")
+
+		# Create unified entry flow with all steps: scoring → recommendations → filtering
 		entry_flow = Flow("EntryAnalysisFlow", context=self.context)
 
-		# Add sub-agents in sequence for scoring and analysis
+		# Step 1: Entry scoring
 		entry_flow.add_step(
 			EntryScoreAgent("EntryScoreStep"),
 			required=True
 		)
 
+		# Step 2: Filter by minimum entry score threshold
+		entry_flow.add_step(
+			ScoreFilterAgent("ScoreFilterStep"),
+			required=False
+		)
+
+		# Step 3: Entry timing analysis
 		entry_flow.add_step(
 			EntryTimingAgent("EntryTimingStep"),
 			required=False
 		)
 
+		# Step 4: Risk/reward analysis
 		entry_flow.add_step(
 			EntryRRAgent("EntryRRStep"),
 			required=False
 		)
 
-		# Execute the analysis flow
+		# Step 5: Create composite recommendations from scores
+		entry_flow.add_step(
+			CompositeRecommendationAgent("CompositeRecommendationStep"),
+			required=True
+		)
+
+		# Step 6: Filter duplicate positions
+		entry_flow.add_step(
+			PositionDuplicateFilterAgent("PositionDuplicateFilterStep"),
+			required=False
+		)
+
+		# Step 7: Apply entry filter formula
+		entry_flow.add_step(
+			EntryFilterAgent("EntryFilterStep"),
+			required=False
+		)
+
+		# Execute the complete entry analysis flow
 		self.logger.debug("[ENTRY] Executing entry analysis flow...")
 		flow_result = entry_flow.process(input_data)
 
@@ -96,49 +232,19 @@ class EntryAgent(Agent):
 				"message": f"Entry analysis flow failed: {flow_result.get('message', 'Unknown error')}"
 			}
 
-		# Compile results from sub-agents
-		entry_scores = self.context.get("entry_scores") or {}
-		timing_scores = self.context.get("timing_scores") or {}
-		rr_metrics = self.context.get("rr_metrics") or {}
-
-		self.logger.info(f"[ENTRY] After sub-agents: scored={len(entry_scores)}, timing={len(timing_scores)}, rr={len(rr_metrics)} tickers")
-		self.logger.debug(f"[ENTRY] Scored tickers: {list(entry_scores.keys())[:10]}{'...' if len(entry_scores) > 10 else ''}")
-
-		# Create composite entry recommendations
-		self.logger.debug("[ENTRY] Creating composite recommendations from sub-agent scores...")
-		recommendations = self._create_recommendations(
-			watchlist, entry_scores, timing_scores, rr_metrics
-		)
-		self.logger.info(f"[ENTRY] Created {len(recommendations)} composite recommendations")
-		self.logger.debug(f"[ENTRY] Recommendation tickers: {[r['ticker'] for r in recommendations[:10]]}{'...' if len(recommendations) > 10 else ''}")
-
-		# Set recommendations in context for filtering
-		self.context.set("entry_recommendations", recommendations)
-
-		# Apply filtering after recommendations are created
-		self.logger.debug("[ENTRY] Applying position duplicate filter...")
-		dup_filter = PositionDuplicateFilterAgent("PositionDuplicateFilterStep")
-		dup_filter.context = self.context
-		dup_filter_result = dup_filter.process({})
-		ctx_recs = self.context.get("entry_recommendations")
-		if ctx_recs is not None:
-			recommendations = ctx_recs
-		self.logger.debug(f"[ENTRY] After duplicate filter: {len(recommendations)} recommendations")
-
-		# Apply entry filter from strategy config
-		self.logger.debug("[ENTRY] Applying entry filter from strategy...")
-		entry_filter = EntryFilterAgent("EntryFilterStep")
-		entry_filter.context = self.context
-		entry_filter_result = entry_filter.process({})
-		ctx_recs = self.context.get("entry_recommendations")
-		if ctx_recs is not None:
-			recommendations = ctx_recs
-		self.logger.debug(f"[ENTRY] After entry filter: {len(recommendations)} recommendations")
+		watchlist = self.context.get("watchlist") or {}
+		# Extract scores from merged watchlist dict (now single source of truth)
+		entry_scores = {t: d.get("entry_score", 0) for t, d in watchlist.items()}
+		timing_scores = {t: d.get("timing_score", 0) for t, d in watchlist.items()}
+		rr_metrics = {t: {"rr_ratio": d.get("rr_ratio", 0)} for t, d in watchlist.items()}
+		recommendations = list(watchlist.keys())  # All tickers in merged watchlist are recommendations
 
 		# Log final summary
 		avg_entry = sum(entry_scores.values()) / len(entry_scores) if entry_scores else 0
 		avg_timing = sum(timing_scores.values()) / len(timing_scores) if timing_scores else 0
 		avg_rr = sum(m["rr_ratio"] for m in rr_metrics.values()) / len(rr_metrics) if rr_metrics else 0
+
+		#print(f"[ENTRY-1] Watchlist: {len(watchlist)} tickers")
 
 		self.logger.info(f"[ENTRY] ========== ENTRY ANALYSIS SUMMARY ==========")
 		self.logger.info(f"[ENTRY] Watchlist: {len(watchlist)} tickers")
@@ -147,7 +253,7 @@ class EntryAgent(Agent):
 		self.logger.info(f"[ENTRY] Risk/Reward: {len(rr_metrics)}/{len(watchlist)} ({100*len(rr_metrics)//len(watchlist) if watchlist else 0}%) - avg RR: {avg_rr:.2f}")
 		self.logger.info(f"[ENTRY] Final recommendations: {len(recommendations)}/{len(watchlist)} ({100*len(recommendations)//len(watchlist) if watchlist else 0}%)")
 		if recommendations:
-			top_3 = [r['ticker'] for r in recommendations[:3]]
+			top_3 = [t for t in recommendations[:3]]
 			self.logger.info(f"[ENTRY] Top 3 opportunities: {', '.join(top_3)}")
 		self.logger.info(f"[ENTRY] ==========================================")
 
@@ -160,7 +266,7 @@ class EntryAgent(Agent):
 				"with_timing": len(timing_scores),
 				"with_rr": len(rr_metrics),
 				"recommendations": len(recommendations),
-				"top_opportunities": self._get_top_opportunities(recommendations, 5),
+				"top_opportunities": self._get_top_opportunities(watchlist, 5),
 				"statistics": {
 					"avg_entry_score": avg_entry,
 					"avg_timing_score": avg_timing,
@@ -169,65 +275,6 @@ class EntryAgent(Agent):
 			},
 			"execution_history": flow_result.get("execution_history", []),
 		}
-
-	def _create_recommendations(
-		self,
-		watchlist: list,
-		entry_scores: Dict[str, float],
-		timing_scores: Dict[str, float],
-		rr_metrics: Dict[str, Dict[str, float]]
-	) -> list:
-		"""Create composite entry recommendations.
-
-		Combines all analysis into actionable recommendations sorted by
-		overall attractiveness.
-
-		Args:
-			watchlist: List of tickers
-			entry_scores: Dict of ticker -> entry score
-			timing_scores: Dict of ticker -> timing score
-			rr_metrics: Dict of ticker -> RR metrics
-
-		Returns:
-			Sorted list of recommendations
-		"""
-		recommendations = []
-
-		for ticker in watchlist:
-			# Gather available metrics for this ticker
-			entry_score = entry_scores.get(ticker, 0)
-			timing_score = timing_scores.get(ticker, 0)
-			rr_data = rr_metrics.get(ticker)
-
-			# Skip if no scores available
-			if entry_score == 0 and timing_score == 0 and not rr_data:
-				continue
-
-			# Calculate composite score
-			composite_score = self._calculate_composite_score(
-				entry_score, timing_score, rr_data
-			)
-
-			recommendation = {
-				"ticker": ticker,
-				"composite_score": round(composite_score, 2),
-				"entry_score": round(entry_score, 2),
-				"timing_score": round(timing_score, 2),
-				"rr_ratio": rr_data["rr_ratio"] if rr_data else None,
-				"entry_price": rr_data["entry_price"] if rr_data else None,
-				"stop_loss": rr_data["stop_loss"] if rr_data else None,
-				"take_profit": rr_data["take_profit"] if rr_data else None,
-				"risk_pct": rr_data["risk_pct"] if rr_data else None,
-				"reward_pct": rr_data["reward_pct"] if rr_data else None,
-				"recommendation": self._get_recommendation_level(composite_score),
-			}
-
-			recommendations.append(recommendation)
-
-		# Sort by composite score descending
-		recommendations.sort(key=lambda x: x["composite_score"], reverse=True)
-
-		return recommendations
 
 	def _calculate_composite_score(
 		self,
@@ -291,24 +338,24 @@ class EntryAgent(Agent):
 		else:
 			return "SKIP"
 
-	def _get_top_opportunities(self, recommendations: list, count: int = 5) -> list:
-		"""Get top N opportunities from recommendations.
+	def _get_top_opportunities(self, watchlist: dict, count: int = 5) -> list:
+		"""Get top N opportunities from watchlist (already sorted by composite_score).
 
 		Args:
-			recommendations: Sorted recommendations
+			watchlist: Watchlist dict with merged scores (already sorted descending by composite_score)
 			count: Number of top opportunities to return
 
 		Returns:
-			List of top N recommendations
+			List of top N recommendations with scores
 		"""
 		return [
 			{
 				"rank": i + 1,
-				"ticker": r["ticker"],
-				"score": r["composite_score"],
-				"recommendation": r["recommendation"],
-				"rr_ratio": r["rr_ratio"],
+				"ticker": ticker,
+				"score": data.get("composite_score", 0),
+				"recommendation": data.get("recommendation", "HOLD"),
+				"rr_ratio": data.get("rr_ratio"),
 			}
-			for i, r in enumerate(recommendations[:count])
+			for i, (ticker, data) in enumerate(list(watchlist.items())[:count])
 		]
 

@@ -35,7 +35,14 @@ def evaluate_numeric_formula(formula: str, data: Union[Dict[str, Any], pd.DataFr
 
 	try:
 		# Convert dict to simple dict for eval context
-		data_dict = data if isinstance(data, dict) else data.iloc[0].to_dict() if isinstance(data, pd.DataFrame) else {}
+		if isinstance(data, dict):
+			data_dict = data
+		elif isinstance(data, pd.DataFrame):
+			row_dict = data.iloc[0].to_dict()
+			# Normalize column names to lowercase for DSL compatibility
+			data_dict = {k.lower(): v for k, v in row_dict.items()}
+		else:
+			data_dict = {}
 
 		# Convert DSL syntax to traditional syntax for numeric evaluation
 		# (DSL parser is for boolean expressions, not numeric results)
@@ -115,6 +122,7 @@ def _convert_dsl_to_traditional(formula: str) -> str:
 		return f"data['{indicator}']"
 
 	# Pattern: identifier[number] or identifier[-number]
-	dsl_pattern = r'\b([a-z_][a-z0-9_]*)\[-?\d+\]'
+	# Match both lowercase and uppercase identifiers to handle case variations
+	dsl_pattern = r'\b([a-zA-Z_][a-zA-Z0-9_]*)\[-?\d+\]'
 	converted = re.sub(dsl_pattern, replace_dsl, formula)
 	return converted

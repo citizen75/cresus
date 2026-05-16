@@ -74,13 +74,12 @@ class PreMarketFlow(Flow):
 			signals_agent = SignalsAgent("SignalsAgent", self.context)
 			self.add_step(signals_agent, step_name="signals", required=True)
 		else:
-			# Live: Signals on all tickers first, then Watchlist
-			signals_agent = SignalsAgent("SignalsAgent", self.context)
-			self.add_step(signals_agent, step_name="signals", required=True)
-
 			# Watchlist step - filter tickers based on strategy criteria and signal scores
 			watchlist_agent = WatchListAgent("WatchListAgent", self.context)
 			self.add_step(watchlist_agent, step_name="watchlist", required=True)
+			# Live: Signals on all tickers first, then Watchlist
+			signals_agent = SignalsAgent("SignalsAgent", self.context)
+			self.add_step(signals_agent, step_name="signals", required=True)
 
 		# Note: Data slicing to target_date must happen BEFORE entry analysis
 		# so that entry_filter evaluates on the correct date's data
@@ -250,10 +249,12 @@ class PreMarketFlow(Flow):
 		"""Remove intermediate context variables, keeping only essential ones.
 
 		Removes: signals, entry_scores, timing_scores, rr_metrics,
-		entry_recommendations, filtered_duplicate_items, sorted_tickers, etc.
+		filtered_duplicate_items, sorted_tickers, etc.
 
 		Keeps: watchlist, data_history, strategy_config, ticker_scores
 		(needed for CLI display and downstream flows)
+
+		Note: entry_recommendations is no longer created (watchlist dict now contains all data)
 		"""
 		# Variables to remove (intermediate calculations not needed in final output)
 		to_remove = [
@@ -261,7 +262,6 @@ class PreMarketFlow(Flow):
 			"entry_scores",  # Entry signal scores (intermediate)
 			"timing_scores",  # Timing analysis scores (intermediate)
 			"rr_metrics",  # Risk/reward metrics (intermediate)
-			"entry_recommendations",  # Raw entry recommendations (superseded by orders)
 			"filtered_duplicate_items",  # Duplicate filter details (intermediate)
 			"sorted_tickers",  # Sorted ticker details (superseded by watchlist)
 			"top_ticker",  # Top ticker (not critical for final output)

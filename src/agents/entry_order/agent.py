@@ -68,42 +68,26 @@ class EntryOrderAgent(Agent):
 		if input_data is None:
 			input_data = {}
 
-		# Validate entry recommendations exist
-		entry_recommendations = self.context.get("entry_recommendations")
-		if not entry_recommendations:
-			return {
-				"status": "error",
-				"input": input_data,
-				"output": {},
-				"message": "No entry recommendations in context"
-			}
-
-		# Filter entry_recommendations to only include tickers in the final watchlist
-		# This ensures we only create orders for tickers that pass both:
-		# 1. Entry filter (signal + pattern matching)
-		# 2. Watchlist filter (volume, trend, volatility criteria)
-		watchlist = self.context.get("watchlist") or []
-		if watchlist:
-			watchlist_tickers = set(t.upper() for t in watchlist)
-			filtered_recs = [
-				rec for rec in entry_recommendations
-				if rec.get("ticker", "").upper() in watchlist_tickers
-			]
-			original_count = len(entry_recommendations)
-			if len(filtered_recs) < original_count:
-				self.logger.info(f"[ENTRY-ORDER] Filtered entry recommendations from {original_count} to {len(filtered_recs)} to match watchlist")
-				filtered_out = [rec["ticker"] for rec in entry_recommendations if rec.get("ticker", "").upper() not in watchlist_tickers]
-				self.logger.debug(f"[ENTRY-ORDER] Filtered out (not in watchlist): {filtered_out}")
-			entry_recommendations = filtered_recs
-
-		if not entry_recommendations:
-			self.logger.info("[ENTRY-ORDER] No recommendations after watchlist filtering")
+		# Read watchlist dict (contains entry_recommendations data)
+		watchlist = self.context.get("watchlist") or {}
+		if not watchlist:
+			# Empty watchlist is valid (all tickers filtered out) - return empty orders
 			return {
 				"status": "success",
 				"input": input_data,
-				"output": {"orders": [], "orders_count": 0},
-				"message": "No entry recommendations match final watchlist"
+				"output": {
+					"orders": [],
+					"orders_count": 0,
+					"message": "No tickers in watchlist after filtering"
+				},
+				"message": "No watchlist tickers to convert to orders"
 			}
+
+		# Convert watchlist dict to entry_recommendations list for backward compat with sub-agents
+		entry_recommendations = [
+			{**ticker_data, "ticker": ticker}
+			for ticker, ticker_data in watchlist.items()
+		]
 
 		# Ensure portfolio_name is set
 		portfolio_name = input_data.get("portfolio_name") or self.context.get("portfolio_name") or "default"

@@ -41,6 +41,7 @@ export default function BacktestDetail() {
   const [watchlistSortBy, setWatchlistSortBy] = useState('Score')
   const [watchlistCurrentPage, setWatchlistCurrentPage] = useState(1)
   const [watchlistHistorical, setWatchlistHistorical] = useState<{ [ticker: string]: any[] }>({})
+  const [allTrades, setAllTrades] = useState<any[]>([])
 
   useEffect(() => {
     if (tabParam && ['performance', 'distribution', 'transactions', 'watchlist'].includes(tabParam)) {
@@ -50,6 +51,16 @@ export default function BacktestDetail() {
 
   const handleTabChange = (tab: 'performance' | 'distribution' | 'transactions' | 'watchlist') => {
     navigate(`/backtests/${strategy}/${runId}/${tab}`)
+  }
+
+  const handleShowTickerChart = (ticker: string) => {
+    const tickerTrades = allTrades.filter((trade: any) => trade.ticker === ticker)
+    if (tickerTrades.length === 0) return
+    setChartPosition({
+      ticker,
+      positions: tickerTrades,
+      isMultiPosition: true
+    })
   }
 
   const loadWatchlist = async () => {
@@ -93,6 +104,69 @@ export default function BacktestDetail() {
       loadWatchlist()
     }
   }, [activeTab, strategy, runId])
+
+  // Extract and store all trades from response for multi-position chart
+  useEffect(() => {
+    try {
+      // Try both possible locations for trades data
+      let closedTrades = response?.data?.closed_trades
+
+      // If not in response.data, check distribution response
+      if (!Array.isArray(closedTrades)) {
+        closedTrades = response?.data?.trades
+      }
+
+      if (!Array.isArray(closedTrades) || closedTrades.length === 0) {
+        setAllTrades([])
+        return
+      }
+
+      // Build positions from trades
+      let buys: any = {}
+      const positions: any[] = []
+
+      closedTrades.forEach((trade: any) => {
+        if (trade.operation === 'BUY') {
+          if (!buys[trade.ticker]) buys[trade.ticker] = []
+          buys[trade.ticker].push({
+            date: trade.created_at,
+            quantity: trade.quantity,
+            price: trade.price,
+            fees: trade.fees || 0,
+            metadata: trade.metadata || ''
+          })
+        } else if (trade.operation === 'SELL' && buys[trade.ticker] && buys[trade.ticker].length > 0) {
+          let remainingQty = trade.quantity
+          while (remainingQty > 0 && buys[trade.ticker].length > 0) {
+            const buy = buys[trade.ticker].shift()
+            const matchedQty = Math.min(remainingQty, buy.quantity)
+            const grossPnL = matchedQty * (trade.price - buy.price)
+            const buyFeesPortion = buy.fees * (matchedQty / buy.quantity)
+            const sellFeesPortion = (trade.fees || 0) * (matchedQty / trade.quantity)
+            const netPnL = grossPnL - buyFeesPortion - sellFeesPortion
+            const costBasis = matchedQty * buy.price + buyFeesPortion
+            const returnPct = costBasis !== 0 ? (netPnL / costBasis) * 100 : 0
+            positions.push({
+              entry_date: buy.date,
+              exit_date: trade.created_at,
+              ticker: trade.ticker,
+              quantity: matchedQty,
+              entry_price: buy.price,
+              exit_price: trade.price,
+              pnl: netPnL,
+              return_pct: returnPct
+            })
+            remainingQty -= matchedQty
+          }
+        }
+      })
+
+      setAllTrades(positions)
+    } catch (error) {
+      console.error('Error extracting trades:', error)
+      setAllTrades([])
+    }
+  }, [response?.data?.closed_trades, response?.data?.trades])
 
   // Calculate EMA helper
   const calculateEMA = (data: any[], period: number, key: string) => {
@@ -1101,7 +1175,17 @@ export default function BacktestDetail() {
                                         }
                                       })()}
                                     </td>
-                                    <td className="py-2 px-2 text-white font-medium">{pos.ticker}</td>
+                                    <td className="py-2 px-2 text-white font-medium">
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleShowTickerChart(pos.ticker)
+                                        }}
+                                        className="hover:text-blue-400 hover:underline transition"
+                                      >
+                                        {pos.ticker}
+                                      </button>
+                                    </td>
                                     <td className="py-2 px-2 text-slate-400 text-sm">{tickerNames[pos.ticker] || '—'}</td>
                                     <td className="py-2 px-2 text-right text-white">{pos.quantity}</td>
                                     <td className="py-2 px-2 text-right text-slate-400">${pos.entry_price.toFixed(2)}</td>
@@ -1117,10 +1201,6 @@ export default function BacktestDetail() {
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation()
-                                          console.log('Position object:', pos)
-                                          console.log('Position keys:', Object.keys(pos))
-                                          console.log('entry_date:', pos.entry_date)
-                                          console.log('exit_date:', pos.exit_date)
                                           setChartPosition(pos)
                                         }}
                                         className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition whitespace-nowrap"
@@ -1286,21 +1366,36 @@ export default function BacktestDetail() {
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
               <div>
                 <h2 className="text-2xl font-bold text-white">
-                  {chartPosition.ticker} - Entry @ ${chartPosition.entry_price.toFixed(2)} | Exit @ ${chartPosition.exit_price.toFixed(2)}
+                  {chartPosition.ticker}
+                  {chartPosition.isMultiPosition ? (
+                    <span className="text-lg text-slate-400 ml-2">
+                      - {chartPosition.positions?.length || 0} positions
+                    </span>
+                  ) : (
+                    <span className="text-lg">
+                      - Entry @ ${chartPosition.entry_price?.toFixed(2)} | Exit @ ${chartPosition.exit_price?.toFixed(2)}
+                    </span>
+                  )}
                 </h2>
-                <p className="text-slate-400 text-sm mt-1">
-                  {(() => {
-                    try {
-                      const entryMeta = typeof chartPosition.entry_metadata === 'string' ? JSON.parse(chartPosition.entry_metadata) : chartPosition.entry_metadata
-                      const exitMeta = typeof chartPosition.exit_metadata === 'string' ? JSON.parse(chartPosition.exit_metadata) : chartPosition.exit_metadata
-                      const entryDate = new Date(entryMeta?.timestamp || chartPosition.entry_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-                      const exitDate = new Date(exitMeta?.timestamp || chartPosition.exit_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-                      return `${entryDate} → ${exitDate}`
-                    } catch {
-                      return 'Position period'
-                    }
-                  })()}
-                </p>
+                {chartPosition.isMultiPosition ? (
+                  <p className="text-slate-400 text-sm mt-1">
+                    Showing all entries and exits for {chartPosition.ticker}
+                  </p>
+                ) : (
+                  <p className="text-slate-400 text-sm mt-1">
+                    {(() => {
+                      try {
+                        const entryMeta = typeof chartPosition.entry_metadata === 'string' ? JSON.parse(chartPosition.entry_metadata) : chartPosition.entry_metadata
+                        const exitMeta = typeof chartPosition.exit_metadata === 'string' ? JSON.parse(chartPosition.exit_metadata) : chartPosition.exit_metadata
+                        const entryDate = new Date(entryMeta?.timestamp || chartPosition.entry_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                        const exitDate = new Date(exitMeta?.timestamp || chartPosition.exit_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                        return `${entryDate} → ${exitDate}`
+                      } catch {
+                        return 'Position period'
+                      }
+                    })()}
+                  </p>
+                )}
               </div>
               <button
                 onClick={() => setChartPosition(null)}
@@ -1314,11 +1409,17 @@ export default function BacktestDetail() {
             <div className="flex-1 overflow-hidden">
               {(() => {
                 try {
-                  const entryMeta = typeof chartPosition.entry_metadata === 'string' ? JSON.parse(chartPosition.entry_metadata) : chartPosition.entry_metadata
-                  const exitMeta = typeof chartPosition.exit_metadata === 'string' ? JSON.parse(chartPosition.exit_metadata) : chartPosition.exit_metadata
-                  const entryDate = entryMeta?.timestamp || chartPosition.entry_date
-                  const exitDate = exitMeta?.timestamp || chartPosition.exit_date
-                  return <TradingChart timeframe="1M" title={`${chartPosition.ticker} - Position Analysis`} ticker={chartPosition.ticker} entryDate={entryDate} exitDate={exitDate} />
+                  if (chartPosition.isMultiPosition && chartPosition.positions) {
+                    // Multi-position: pass array of positions
+                    return <TradingChart timeframe="1M" title={`${chartPosition.ticker} - All Positions`} ticker={chartPosition.ticker} positions={chartPosition.positions} />
+                  } else {
+                    // Single position: pass entry/exit dates
+                    const entryMeta = typeof chartPosition.entry_metadata === 'string' ? JSON.parse(chartPosition.entry_metadata) : chartPosition.entry_metadata
+                    const exitMeta = typeof chartPosition.exit_metadata === 'string' ? JSON.parse(chartPosition.exit_metadata) : chartPosition.exit_metadata
+                    const entryDate = entryMeta?.timestamp || chartPosition.entry_date
+                    const exitDate = exitMeta?.timestamp || chartPosition.exit_date
+                    return <TradingChart timeframe="1M" title={`${chartPosition.ticker} - Position Analysis`} ticker={chartPosition.ticker} entryDate={entryDate} exitDate={exitDate} />
+                  }
                 } catch {
                   return <TradingChart timeframe="1M" title={`${chartPosition.ticker} - Position Analysis`} ticker={chartPosition.ticker} entryDate={chartPosition.entry_date} exitDate={chartPosition.exit_date} />
                 }
@@ -1326,32 +1427,40 @@ export default function BacktestDetail() {
             </div>
 
             {/* Position Details */}
-            <div className="px-6 py-4 border-t border-slate-800 bg-slate-800/30 grid grid-cols-6 gap-4 text-sm">
-              <div>
-                <p className="text-slate-400 text-xs mb-1">Quantity</p>
-                <p className="text-white font-medium">{chartPosition.quantity}</p>
+            {chartPosition.isMultiPosition && chartPosition.positions ? (
+              <div className="px-6 py-4 border-t border-slate-800 bg-slate-800/30">
+                <p className="text-slate-300 text-sm">
+                  Showing <span className="font-semibold text-white">{chartPosition.positions.length}</span> positions for <span className="font-semibold text-white">{chartPosition.ticker}</span>
+                </p>
               </div>
-              <div>
-                <p className="text-slate-400 text-xs mb-1">Entry Price</p>
-                <p className="text-white font-medium">${chartPosition.entry_price.toFixed(2)}</p>
+            ) : (
+              <div className="px-6 py-4 border-t border-slate-800 bg-slate-800/30 grid grid-cols-6 gap-4 text-sm">
+                <div>
+                  <p className="text-slate-400 text-xs mb-1">Quantity</p>
+                  <p className="text-white font-medium">{chartPosition.quantity}</p>
+                </div>
+                <div>
+                  <p className="text-slate-400 text-xs mb-1">Entry Price</p>
+                  <p className="text-white font-medium">${chartPosition.entry_price.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-slate-400 text-xs mb-1">Exit Price</p>
+                  <p className="text-white font-medium">${chartPosition.exit_price.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-slate-400 text-xs mb-1">P&L</p>
+                  <p className={`font-medium ${chartPosition.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>${chartPosition.pnl.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-slate-400 text-xs mb-1">Return</p>
+                  <p className={`font-medium ${chartPosition.return_pct >= 0 ? 'text-green-400' : 'text-red-400'}`}>{chartPosition.return_pct.toFixed(2)}%</p>
+                </div>
+                <div>
+                  <p className="text-slate-400 text-xs mb-1">Close Reason</p>
+                  <p className="text-white font-medium text-xs">{chartPosition.close_reason}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-slate-400 text-xs mb-1">Exit Price</p>
-                <p className="text-white font-medium">${chartPosition.exit_price.toFixed(2)}</p>
-              </div>
-              <div>
-                <p className="text-slate-400 text-xs mb-1">P&L</p>
-                <p className={`font-medium ${chartPosition.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>${chartPosition.pnl.toFixed(2)}</p>
-              </div>
-              <div>
-                <p className="text-slate-400 text-xs mb-1">Return</p>
-                <p className={`font-medium ${chartPosition.return_pct >= 0 ? 'text-green-400' : 'text-red-400'}`}>{chartPosition.return_pct.toFixed(2)}%</p>
-              </div>
-              <div>
-                <p className="text-slate-400 text-xs mb-1">Close Reason</p>
-                <p className="text-white font-medium text-xs">{chartPosition.close_reason}</p>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       )}

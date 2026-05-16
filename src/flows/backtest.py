@@ -80,7 +80,7 @@ class BacktestFlow(Flow):
 		# Load and set strategy_config early (needed by all agents and flows)
 		from tools.strategy import StrategyManager
 		from tools.strategy.validator import StrategyValidator
-		sm = StrategyManager()
+		sm = StrategyManager(context=self.context)
 		strategy_result = sm.load_strategy(strategy_name)
 		if strategy_result.get("status") != "success":
 			return {

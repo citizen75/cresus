@@ -26,12 +26,15 @@ class StrategyManager:
 	automatic folder creation.
 	"""
 
-	def __init__(self, project_root: Optional[Path] = None):
-		"""Initialize StrategyManager with optional project root.
+	def __init__(self, project_root: Optional[Path] = None, context: Optional[Any] = None):
+		"""Initialize StrategyManager with optional project root and context.
 
 		Args:
 			project_root: Optional path to project root. If None, searches from current file.
+			context: Optional context (AgentContext object or dict) for sharing strategy_config and other state.
 		"""
+		self.context = context
+
 		if project_root:
 			self.project_root = Path(project_root)
 			# For explicit project_root (e.g., tests), use db/local/strategies for backward compatibility
@@ -144,6 +147,9 @@ class StrategyManager:
 	def load_strategy(self, strategy_name: str) -> Dict[str, Any]:
 		"""Load strategy configuration by name.
 
+		Checks context for cached strategy_config first, then loads from file.
+		Caches result in context for reuse.
+
 		Supports both YAML and JSON file formats.
 
 		Args:
@@ -152,6 +158,19 @@ class StrategyManager:
 		Returns:
 			Dict with strategy configuration or error status
 		"""
+		# Check if strategy_config is already in context
+		cached_config = self._get_context_value("strategy_config")
+		if cached_config and cached_config.get("name") == strategy_name:
+			# Return cached config with success status
+			return {
+				"status": "success",
+				"data": cached_config,
+				"name": cached_config.get("name"),
+				"description": cached_config.get("description"),
+				"source": cached_config.get("source"),
+				"cached": True,
+			}
+
 		try:
 			strategy_file = self._get_strategy_file(strategy_name)
 
@@ -168,6 +187,9 @@ class StrategyManager:
 					strategy_data = yaml.safe_load(f)
 				else:
 					strategy_data = json.load(f)
+
+			# Cache in context for reuse
+			self._set_context_value("strategy_config", strategy_data)
 
 			return {
 				"status": "success",
@@ -221,6 +243,80 @@ class StrategyManager:
 				"message": f"Failed to delete strategy: {str(e)}",
 				"error_type": type(e).__name__,
 			}
+
+	def _get_context_value(self, key: str) -> Optional[Any]:
+		"""Get value from context, handling both AgentContext objects and dicts.
+
+		Args:
+			key: Key to retrieve from context
+
+		Returns:
+			Value from context, or None if not found or no context
+		"""
+		if not self.context:
+			return None
+
+		# Handle AgentContext objects (has .get() method)
+		if hasattr(self.context, 'get') and callable(self.context.get):
+			return self.context.get(key)
+
+		# Handle dict-like objects
+		try:
+			return self.context[key] if key in self.context else None
+		except TypeError:
+			return None
+
+	def _set_context_value(self, key: str, value: Any) -> None:
+		"""Set value in context, handling both AgentContext objects and dicts.
+
+		Args:
+			key: Key to set in context
+			value: Value to set
+		"""
+		if not self.context:
+			return
+
+		# Handle AgentContext objects (has .set() method)
+		if hasattr(self.context, 'set') and callable(self.context.set):
+			self.context.set(key, value)
+		else:
+			# Handle dict-like objects
+			try:
+				self.context[key] = value
+			except TypeError:
+				pass
+
+	def set_strategy_config(self, strategy_config: Dict[str, Any]) -> None:
+		"""Set strategy_config in context for reuse across operations.
+
+		Args:
+			strategy_config: Strategy configuration to cache in context
+		"""
+		self._set_context_value("strategy_config", strategy_config)
+
+	def get_strategy_config(self) -> Optional[Dict[str, Any]]:
+		"""Get cached strategy_config from context.
+
+		Returns:
+			Strategy config from context if available, None otherwise
+		"""
+		return self._get_context_value("strategy_config")
+
+	def clear_strategy_config(self) -> None:
+		"""Clear cached strategy_config from context."""
+		if not self.context:
+			return
+
+		if hasattr(self.context, 'set') and callable(self.context.set):
+			# For AgentContext, set to None instead of deleting
+			self.context.set("strategy_config", None)
+		else:
+			# For dicts, delete the key
+			try:
+				if "strategy_config" in self.context:
+					del self.context["strategy_config"]
+			except TypeError:
+				pass
 
 	def list_strategies(self) -> Dict[str, Any]:
 		"""List all available strategies.

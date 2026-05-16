@@ -125,18 +125,6 @@ export default function CardChart({ data, ticker, showVariation = true }: CardCh
           </LineChart>
         </ResponsiveContainer>
       </div>
-
-      {/* Price Range */}
-      <div className="mt-3 flex justify-between text-xs text-slate-400 border-t border-slate-700/50 pt-3">
-        <div>
-          <p className="text-slate-500 text-xs">First</p>
-          <p className="text-white font-medium">€{firstPrice.toFixed(2)}</p>
-        </div>
-        <div className="text-right">
-          <p className="text-slate-500 text-xs">Last</p>
-          <p className="text-white font-medium">€{lastPrice.toFixed(2)}</p>
-        </div>
-      </div>
     </div>
   )
 }

@@ -67,6 +67,9 @@ entry:
     position_size:
       formula: 1000 / close[0]
       description: Number of shares to buy (can use formulas)
+    score_filter:
+      min: 60
+      description: Only enter positions with a composite score above 60 to ensure strong trend
     entry_filter:
       formula: close[0] > ema_20[0] && adx_14[0] > 20
       description: Market condition filter - entries only when True
@@ -84,7 +87,7 @@ order:
       formula: 2000 / close[0]
       description: Fixed €2,000 per position
     max_daily_orders:
-      formula: 3
+      formula: 2
       description: Allow up to 3 orders per day
     max_positions:
       formula: 5

@@ -177,14 +177,10 @@ def calculate_smooth(
     sha_green = pd.Series((sha_close > sha_open).astype(int), index=sha_close.index)
     sha_red = pd.Series((sha_close < sha_open).astype(int), index=sha_close.index)
 
-    # Calculate bullish indicator: strong upward movement (close in upper portion of range)
-    # For EMA-smoothed data, "bullish" means close > open AND close is in the upper half of the range
-    # This indicates sustained buying pressure, not just a tiny green wick
-    range_size = sha_high - sha_low
-    range_size = pd.Series(range_size).clip(lower=0.1)
-    midpoint = sha_low + range_size * 0.5
+    # Calculate bullish indicator: any upward candle (close > open)
+    # For reversal signals, any bullish candle qualifies
     sha_bullish = pd.Series(
-        ((sha_close > sha_open) & (sha_close > midpoint)).astype(int),
+        (sha_close > sha_open).astype(int),
         index=sha_close.index
     )
 

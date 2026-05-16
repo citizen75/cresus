@@ -57,9 +57,9 @@ class FilterOpenPositionsAgent(Agent):
 				"message": "No open positions to filter"
 			}
 
-		# Filter watchlist
+		# Filter watchlist dict
 		original_count = len(watchlist)
-		filtered_watchlist = [t for t in watchlist if t not in open_tickers]
+		filtered_watchlist = {t: watchlist[t] for t in watchlist if t not in open_tickers}
 		removed_count = original_count - len(filtered_watchlist)
 
 		self.context.set("watchlist", filtered_watchlist)

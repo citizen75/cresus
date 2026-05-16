@@ -33,15 +33,15 @@ class PositionDuplicateFilterAgent(Agent):
 		if input_data is None:
 			input_data = {}
 
-		entry_recommendations = self.context.get("entry_recommendations") or []
+		watchlist = self.context.get("watchlist") or {}
 
-		if not entry_recommendations:
-			self.logger.debug("[ENTRY-DUP-FILTER] No recommendations to filter")
+		if not watchlist:
+			self.logger.debug("[ENTRY-DUP-FILTER] No tickers in watchlist to filter")
 			return {
 				"status": "success",
 				"input": input_data,
 				"output": {},
-				"message": "No entry recommendations to filter"
+				"message": "No watchlist tickers to filter"
 			}
 
 		# Get portfolio state
@@ -67,33 +67,33 @@ class PositionDuplicateFilterAgent(Agent):
 
 		self.logger.debug(f"[ENTRY-DUP-FILTER] Portfolio has {len(existing_tickers)} open positions: {list(existing_tickers)[:5]}{'...' if len(existing_tickers) > 5 else ''}")
 
-		# Filter recommendations
-		filtered_recommendations = []
+		# Filter watchlist dict
+		filtered_watchlist = {}
 		filtered_items = []
 
-		for rec in entry_recommendations:
-			ticker = rec.get("ticker", "").upper()
+		for ticker, ticker_data in list(watchlist.items()):
+			ticker_upper = ticker.upper()
 
-			if ticker in existing_tickers:
+			if ticker_upper in existing_tickers:
 				# Position already exists - filter it out
 				filtered_items.append({
 					"ticker": ticker,
-					"entry_score": rec.get("entry_score", 0),
-					"composite_score": rec.get("composite_score", 0),
+					"entry_score": ticker_data.get("entry_score", 0),
+					"composite_score": ticker_data.get("composite_score", 0),
 					"reason": f"Position already exists for {ticker}"
 				})
 				self.logger.debug(f"[ENTRY-DUP-FILTER] {ticker}: FILTERED (existing position)")
 			else:
-				# Position doesn't exist - keep the recommendation
-				filtered_recommendations.append(rec)
+				# Position doesn't exist - keep the ticker in watchlist
+				filtered_watchlist[ticker] = ticker_data
 				self.logger.debug(f"[ENTRY-DUP-FILTER] {ticker}: PASSED (new position)")
 
-		# Update context with filtered recommendations
-		self.context.set("entry_recommendations", filtered_recommendations)
+		# Update context with filtered watchlist
+		self.context.set("watchlist", filtered_watchlist)
 		self.context.set("filtered_duplicate_items", filtered_items)
 
 		# Log summary
-		self.logger.info(f"[ENTRY-DUP-FILTER] Filtered {len(filtered_items)} duplicate positions: {len(entry_recommendations)} → {len(filtered_recommendations)}")
+		self.logger.info(f"[ENTRY-DUP-FILTER] Filtered {len(filtered_items)} duplicate positions: {len(watchlist)} → {len(filtered_watchlist)}")
 		if filtered_items:
 			self.logger.debug(f"[ENTRY-DUP-FILTER] Filtered: {[item['ticker'] for item in filtered_items]}")
 
@@ -101,10 +101,10 @@ class PositionDuplicateFilterAgent(Agent):
 			"status": "success",
 			"input": input_data,
 			"output": {
-				"original_count": len(entry_recommendations),
+				"original_count": len(watchlist),
 				"filtered_count": len(filtered_items),
-				"remaining_count": len(filtered_recommendations),
+				"remaining_count": len(filtered_watchlist),
 				"filtered_tickers": [item["ticker"] for item in filtered_items]
 			},
-			"message": f"Filtered {len(filtered_items)} duplicate positions, {len(filtered_recommendations)} recommendations remain"
+			"message": f"Filtered {len(filtered_items)} duplicate positions, {len(filtered_watchlist)} tickers remain"
 		}

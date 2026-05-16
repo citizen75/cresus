@@ -46,7 +46,7 @@ class EntryTimingAgent(Agent):
 		scored_count = 0
 		skipped_tickers = []
 
-		for ticker in watchlist:
+		for ticker in list(watchlist.keys()):
 			if ticker not in data_history:
 				skipped_tickers.append(f"{ticker}(no-data)")
 				continue

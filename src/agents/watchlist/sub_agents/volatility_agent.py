@@ -100,12 +100,12 @@ class VolatilityAgent(Agent):
 				self.logger.debug(f"Added indicators to strategy config: {added_indicators}")
 
 		# Analyze volatility for each ticker in watchlist
-		volatility_watchlist = []
-		for ticker in watchlist:
+		volatility_watchlist = {}
+		for ticker in list(watchlist.keys()):
 			if ticker in data_history:
 				ticker_data = data_history[ticker]
 				if self._matches_volatility_formula(ticker_data, volatility_formula):
-					volatility_watchlist.append(ticker)
+					volatility_watchlist[ticker] = watchlist[ticker]
 
 		removed_count = len(watchlist) - len(volatility_watchlist)
 		self.context.set("watchlist", volatility_watchlist)

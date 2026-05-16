@@ -52,7 +52,7 @@ class FilterStaleDataAgent(Agent):
 
 		# Find most recent trading date across all tickers
 		most_recent_date = None
-		for ticker in watchlist:
+		for ticker in list(watchlist.keys()):
 			if ticker not in data_history:
 				continue
 
@@ -96,10 +96,10 @@ class FilterStaleDataAgent(Agent):
 			}
 
 		# Filter watchlist to keep only tickers with recent data
-		filtered_watchlist = []
+		filtered_watchlist = {}
 		removed_count = 0
 
-		for ticker in watchlist:
+		for ticker in list(watchlist.keys()):
 			if ticker not in data_history:
 				removed_count += 1
 				continue
@@ -131,7 +131,7 @@ class FilterStaleDataAgent(Agent):
 
 			# Keep ticker if its last date matches the most recent date
 			if ticker_last_date == most_recent_date:
-				filtered_watchlist.append(ticker)
+				filtered_watchlist[ticker] = watchlist[ticker]
 			else:
 				removed_count += 1
 				self.logger.debug(f"Filtering out {ticker}: last_date={ticker_last_date}, most_recent={most_recent_date}")

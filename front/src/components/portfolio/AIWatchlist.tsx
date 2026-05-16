@@ -130,8 +130,8 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
           stock: item.ticker.replace('.PA', '').toUpperCase(),
           companyName: COMPANY_NAMES[item.ticker],
           ticker: item.ticker,
-          aiScore: Math.round((item.signal_score || 0) * 100),
-          match: item.signal_score >= 0.8 ? 'Excellent' : item.signal_score >= 0.6 ? 'Very Good' : 'Good',
+          aiScore: Math.round(item.composite_score || 0),
+          match: (item.composite_score || 0) >= 80 ? 'Excellent' : (item.composite_score || 0) >= 65 ? 'Very Good' : 'Good',
           updatePotential: `${Math.round((item.close || 0) / 100)}%`,
           riskScore: 'Medium',
           drivers: (item.signals || '').split(',').filter(Boolean).join(', ') || 'Strategy match',
@@ -577,17 +577,26 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
                       <p className="text-slate-400 text-xs">AI Score</p>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      item.match === 'Excellent' ? 'bg-green-900/30 text-green-400' :
-                      item.match === 'Very Good' ? 'bg-blue-900/30 text-blue-400' :
-                      'bg-slate-800/30 text-slate-400'
-                    }`}>
-                      {item.match}
-                    </span>
-                    <span className="px-2 py-1 rounded text-xs font-medium bg-slate-800/30 text-slate-400">
-                      Rank #{item.rank}
-                    </span>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex gap-2 items-center flex-wrap">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        item.match === 'Excellent' ? 'bg-green-900/30 text-green-400' :
+                        item.match === 'Very Good' ? 'bg-blue-900/30 text-blue-400' :
+                        'bg-slate-800/30 text-slate-400'
+                      }`}>
+                        {item.match}
+                      </span>
+                      <span className="px-2 py-1 rounded text-xs font-medium bg-slate-800/30 text-slate-400">
+                        Rank #{item.rank}
+                      </span>
+                      <div className="flex gap-1 flex-wrap">
+                        {item.drivers.split(',').map((driver, idx) => (
+                          <span key={idx} className="px-2 py-1 rounded text-xs font-medium bg-purple-900/30 text-purple-300">
+                            {driver.trim()}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -596,6 +605,7 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
                   <CardChart
                     data={historicalData[item.ticker]}
                     ticker={item.ticker}
+                    showVariation={false}
                   />
                 ) : (
                   <div className="p-4 h-48 bg-slate-800/20 flex items-center justify-center">
@@ -603,40 +613,36 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
                   </div>
                 )}
 
+                {/* Price Range Row - First/Var/Last */}
+                {historicalData[item.ticker] && historicalData[item.ticker].length > 0 && (() => {
+                  const data = historicalData[item.ticker]
+                  const firstPrice = data[0]?.close
+                  const lastPrice = data[data.length - 1]?.close
+                  const change = firstPrice ? ((lastPrice - firstPrice) / firstPrice) * 100 : 0
+                  return (
+                    <div className="border-t border-slate-800 px-4 py-3 bg-slate-800/30">
+                      <div className="flex justify-between items-center text-xs">
+                        <div className="flex flex-col items-center flex-1">
+                          <p className="text-slate-500 text-xs mb-1">First</p>
+                          <p className="text-white font-medium">€{firstPrice?.toFixed(2)}</p>
+                        </div>
+                        <div className="flex flex-col items-center flex-1">
+                          <p className="text-slate-500 text-xs mb-1">Var</p>
+                          <p className={`font-medium ${change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {change >= 0 ? '↗' : '↘'} {change >= 0 ? '+' : ''}{change.toFixed(2)}%
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-center flex-1">
+                          <p className="text-slate-500 text-xs mb-1">Last</p>
+                          <p className="text-white font-medium">€{lastPrice?.toFixed(2)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
+
                 {/* Card Footer */}
                 <div className="border-t border-slate-800 p-4 space-y-2">
-                  <div className="flex gap-2 mb-4">
-                    <button
-                      onClick={() => setChartTicker(item.ticker)}
-                      className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm font-medium transition"
-                    >
-                      📈 View Chart
-                    </button>
-                  </div>
-                  <div className="text-xs">
-                    <p className="text-slate-500 mb-1">Signals:</p>
-                    <p className="text-slate-300">{item.drivers}</p>
-                  </div>
-                  <div className="flex justify-between text-xs pt-2 border-t border-slate-700">
-                    <div>
-                      <p className="text-slate-500">Current Price</p>
-                      <p className="text-white font-medium">
-                        {item.currentPrice ? `€${item.currentPrice.toFixed(2)}` : '—'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-slate-500">Change</p>
-                      <p className={`font-medium ${
-                        item.priceChange !== undefined && item.priceChange >= 0
-                          ? 'text-green-400'
-                          : 'text-red-400'
-                      }`}>
-                        {item.priceChange !== undefined
-                          ? `${item.priceChange >= 0 ? '+' : ''}${item.priceChange.toFixed(2)}%`
-                          : '—'}
-                      </p>
-                    </div>
-                  </div>
 
                   {/* Analyst Targets */}
                   {item.targetPrice && (
@@ -667,7 +673,7 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
                             </span>
                           </div>
                         )}
-                        {item.analystCount && (
+                        {item.analystCount > 0 && (
                           <div className="flex justify-between text-xs">
                             <span className="text-slate-400">Analysts</span>
                             <span className="text-white">{item.analystCount}</span>
@@ -676,6 +682,15 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
                       </div>
                     </div>
                   )}
+
+                  <div className="flex gap-2 mt-4 pt-4 border-t border-slate-700">
+                    <button
+                      onClick={() => setChartTicker(item.ticker)}
+                      className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm font-medium transition"
+                    >
+                      📈 View Chart
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

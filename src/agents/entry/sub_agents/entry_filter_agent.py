@@ -33,18 +33,22 @@ class EntryFilterAgent(Agent):
 		if validation_result:
 			return validation_result
 
-		# Get entry recommendations and data from context
-		entry_recommendations = self.context.get("entry_recommendations") or []
+		# Get watchlist and data from context
+		watchlist = self.context.get("watchlist") or {}
 		data_history = self.context.get("data_history") or {}
 		strategy_name = self.context.get("strategy_name")
 
-		if not entry_recommendations:
-			self.logger.debug("[ENTRY-FILTER] No recommendations to filter")
+		#print(f"[ENTRY-FILTER] Starting with {len(watchlist)} tickers in watchlist")
+		#watchlist_tickers = watchlist.keys()
+		#print(f"[ENTRY-FILTER] Watchlist: {watchlist_tickers}...")
+
+		if not watchlist:
+			self.logger.debug("[ENTRY-FILTER] No tickers in watchlist to filter")
 			return {
 				"status": "success",
 				"input": input_data,
 				"output": {"filtered_count": 0, "passed_count": 0},
-				"message": "No entry recommendations to filter"
+				"message": "No watchlist tickers to filter"
 			}
 
 		if not strategy_name:
@@ -58,17 +62,8 @@ class EntryFilterAgent(Agent):
 
 		# Load latest strategy to ensure formula changes are picked up
 		try:
-			strategy_manager = StrategyManager()
-			strategy_result = strategy_manager.load_strategy(strategy_name)
-			if strategy_result.get("status") != "success":
-				self.logger.warning(f"Could not load strategy {strategy_name}: {strategy_result.get('message')}")
-				return {
-					"status": "success",
-					"input": input_data,
-					"output": {"filtered_count": 0, "passed_count": len(entry_recommendations)},
-					"message": f"Could not load strategy {strategy_name}"
-				}
-			strategy_data = strategy_result.get("data", {})
+			# Check if strategy_config is already in context
+			strategy_data = self.context.get("strategy_config")
 			entry_config = strategy_data.get("entry", {}).get("parameters", {})
 			entry_filter_config = entry_config.get("entry_filter")
 
@@ -77,59 +72,59 @@ class EntryFilterAgent(Agent):
 				return {
 					"status": "success",
 					"input": input_data,
-					"output": {"filtered_count": 0, "passed_count": len(entry_recommendations)},
+					"output": {"filtered_count": 0, "passed_count": len(watchlist)},
 					"message": "No entry_filter configured"
 				}
 
 			entry_filter_formula = entry_filter_config.get("formula")
+
 			if not entry_filter_formula:
 				self.logger.warning(f"No formula in entry_filter config for strategy {strategy_name}")
 				return {
 					"status": "success",
 					"input": input_data,
-					"output": {"filtered_count": 0, "passed_count": len(entry_recommendations)},
+					"output": {"filtered_count": 0, "passed_count": len(watchlist)},
 					"message": "No formula in entry_filter config"
 				}
 
-			self.logger.info(f"[ENTRY-FILTER] Applying filter to {len(entry_recommendations)} recommendations")
-			self.logger.debug(f"[ENTRY-FILTER] Formula: {entry_filter_formula}")
+			self.logger.info(f"[ENTRY-FILTER] Applying filter to {len(watchlist)} tickers")
+			self.logger.info(f"[ENTRY-FILTER] Formula: {entry_filter_formula}")
 
-			# Normalize formula: convert AND/OR to &&/||
-			import re
-			normalized_formula = entry_filter_formula
-			normalized_formula = re.sub(r'\bAND\b', '&&', normalized_formula, flags=re.IGNORECASE)
-			normalized_formula = re.sub(r'\bOR\b', '||', normalized_formula, flags=re.IGNORECASE)
-			normalized_formula = re.sub(r'\bNOT\b', '!', normalized_formula, flags=re.IGNORECASE)
-			if normalized_formula != entry_filter_formula:
-				self.logger.debug(f"[ENTRY-FILTER] Normalized formula: {normalized_formula}")
-
-			# Apply filter to recommendations
-			filtered_recommendations = []
+			# Apply filter to watchlist dict
+			filtered_watchlist = {}
 			blocked_count = 0
 			error_tickers = []
 			passed_tickers = []
 			no_data_tickers = []
 
-			for rec in entry_recommendations:
-				ticker = rec.get("ticker")
+			first_ticker = list(watchlist.keys())[0] if watchlist else None
+			self.logger.info(f"[ENTRY-FILTER] First ticker: {first_ticker}")
 
-				# If no data for ticker, pass through
+			for ticker, ticker_data in list(watchlist.items()):
+				# If no data for ticker, keep it (pass through)	
 				if ticker not in data_history:
 					no_data_tickers.append(ticker)
 					self.logger.debug(f"[ENTRY-FILTER] {ticker}: no data (pass-through)")
-					filtered_recommendations.append(rec)
+					filtered_watchlist[ticker] = ticker_data
 					continue
 
 				df = data_history[ticker]
 				if df.empty:
 					no_data_tickers.append(ticker)
 					self.logger.debug(f"[ENTRY-FILTER] {ticker}: empty data (pass-through)")
-					filtered_recommendations.append(rec)
+					filtered_watchlist[ticker] = ticker_data
 					continue
 
 				# Get last 5 days of data for evaluation (supports shift notation like [-1], [-2])
 				# Data is sorted newest-first, so [:5] gets the most recent 5 days
 				last_5_days = df.iloc[:5].copy() if len(df) >= 5 else df.copy()
+
+				#print(f"[ENTRY-FILTER] {ticker}: Evaluating with {len(last_5_days)} rows of data")
+				#print(f"[ENTRY-FILTER] {ticker}: Data columns: {list(last_5_days.columns)}")
+				#print(f"[ENTRY-FILTER] {ticker}: Data sample:\n{last_5_days.head(5)}")
+
+				#print(f"[ENTRY-FILTER] {ticker}: {data_history.get(ticker, 'No data in context').columns if ticker in data_history else 'No data in context'}")
+				#print(f"[ENTRY-FILTER] {ticker}: {data_history.get(ticker, 'No data in context')}")
 
 				# Debug: Show available columns and values for first few rows
 				if len(last_5_days) > 0:
@@ -138,50 +133,72 @@ class EntryFilterAgent(Agent):
 					if 'sha_10_red' in available_cols and 'sha_10_green' in available_cols:
 						for i in range(min(3, len(last_5_days))):
 							row = last_5_days.iloc[i]
-							self.logger.debug(f"[ENTRY-FILTER] {ticker}[{i}]: sha_10_red={row.get('sha_10_red')}, sha_10_green={row.get('sha_10_green')}")
+							self.logger.debug(f"[ENTRY-FILTER] {ticker}[{i}]: sha_10_red={row.get('sha_10_red')}, sha_10_green={row.get('sha_10_green')}, sha_10_bullish={row.get('sha_10_bullish')}")
 
-				# Evaluate entry_filter formula (using normalized formula with && and || operators)
+				# Evaluate entry_filter formula
 				try:
-					passes_filter = evaluate(normalized_formula, last_5_days)
+					self.logger.info(f"[ENTRY-FILTER] {ticker}: Evaluating formula '{entry_filter_formula}' on {len(last_5_days)} rows")
+
+					# Debug: Show actual values at each index
+					if len(last_5_days) > 0 and 'sha_10_red' in last_5_days.columns:
+						self.logger.info(f"[ENTRY-FILTER] {ticker}: sha_10_red values: {list(last_5_days['sha_10_red'].iloc[:3].values)}")
+					if len(last_5_days) > 0 and 'sha_10_bullish' in last_5_days.columns:
+						self.logger.info(f"[ENTRY-FILTER] {ticker}: sha_10_bullish values: {list(last_5_days['sha_10_bullish'].iloc[:3].values)}")
+
+					# Debug: Check individual parts
+					if len(last_5_days) > 0:
+						try:
+							red_prev = evaluate("sha_10_red[-1] == 1", last_5_days)
+							self.logger.info(f"[ENTRY-FILTER] {ticker}: sha_10_red[-1] == 1 evaluates to {red_prev}")
+						except Exception as e:
+							self.logger.info(f"[ENTRY-FILTER] {ticker}: sha_10_red[-1] error: {e}")
+						try:
+							bullish_now = evaluate("sha_10_bullish[0] == 1", last_5_days)
+							self.logger.info(f"[ENTRY-FILTER] {ticker}: sha_10_bullish[0] == 1 evaluates to {bullish_now}")
+						except Exception as e:
+							self.logger.info(f"[ENTRY-FILTER] {ticker}: sha_10_bullish[0] error: {e}")
+
+					passes_filter = evaluate(entry_filter_formula, last_5_days)
+					self.logger.info(f"[ENTRY-FILTER] {ticker}: Combined formula result = {passes_filter}")
 					if passes_filter:
 						self.logger.debug(f"[ENTRY-FILTER] {ticker}: PASS")
 						passed_tickers.append(ticker)
-						filtered_recommendations.append(rec)
+						filtered_watchlist[ticker] = ticker_data
 					else:
 						self.logger.debug(f"[ENTRY-FILTER] {ticker}: BLOCKED")
 						blocked_count += 1
 				except Exception as e:
-					error_msg = str(e)
-					available_cols = list(last_5_days.columns)
-					# Check if this is a syntax error in the formula
-					if "unexpected token" in error_msg.lower() or "syntax error" in error_msg.lower():
-						# Could be syntax error OR missing column - check if it's a known column
-						import re
-						token_match = re.search(r"Token\(INDICATOR, '([a-z_][a-z0-9_]*)\[(-?\d+)\]'\)", error_msg)
-						if token_match:
-							indicator_name = token_match.group(1)
+						error_msg = str(e)
+						available_cols = list(last_5_days.columns) if len(last_5_days) > 0 else []
+						# Check if this is a syntax error in the formula
+						if "unexpected token" in error_msg.lower() or "syntax error" in error_msg.lower():
+							# Could be syntax error OR missing column - check if it's a known column
+							import re
+							token_match = re.search(r"Token\(INDICATOR, '([a-z_][a-z0-9_]*)\[(-?\d+)\]'\)", error_msg)
+							if token_match:
+								indicator_name = token_match.group(1)
 
-							# Check if column exists
-							if indicator_name in available_cols:
-								error_msg = f"Formula syntax error in '{normalized_formula}': {error_msg}. Check for missing operators (&&, ||) between expressions."
+								# Check if column exists
+								if indicator_name in available_cols:
+									error_msg = f"Formula syntax error in '{entry_filter_formula}': {error_msg}. Check for missing operators (&&, ||) between expressions."
+								else:
+									error_msg = f"Missing indicator '{indicator_name}' in formula '{entry_filter_formula}'. Available columns: {available_cols}"
 							else:
-								error_msg = f"Missing indicator '{indicator_name}' in formula '{normalized_formula}'. Available columns: {available_cols}"
+								error_msg = f"Formula syntax error in '{entry_filter_formula}': {error_msg}. Available columns: {available_cols}"
+						elif "not found" in error_msg.lower():
+							# Missing indicator error
+							error_msg = f"Formula evaluation error in '{entry_filter_formula}': {error_msg}. Available columns: {available_cols}"
 						else:
-							error_msg = f"Formula syntax error in '{normalized_formula}': {error_msg}. Available columns: {available_cols}"
-					elif "not found" in error_msg.lower():
-						# Missing indicator error
-						error_msg = f"Formula evaluation error in '{normalized_formula}': {error_msg}. Available columns: {available_cols}"
-					else:
-						# Other errors
-						error_msg = f"Formula evaluation failed in '{normalized_formula}': {error_msg}. Available columns: {available_cols}"
+							# Other errors
+							error_msg = f"Formula evaluation failed in '{entry_filter_formula}': {error_msg}. Available columns: {available_cols}"
 
-					self.logger.error(f"Entry filter evaluation error for {ticker}: {error_msg}")
-					error_tickers.append(f"{ticker} ({error_msg})")
-					# On formula error, block the recommendation (don't pass through)
-					blocked_count += 1
+						self.logger.error(f"Entry filter evaluation error for {ticker}: {error_msg}")
+						error_tickers.append(f"{ticker} ({error_msg})")
+						# On formula error, block the recommendation (don't pass through)
+						blocked_count += 1
 
-			# Update context with filtered recommendations
-			self.context.set("entry_recommendations", filtered_recommendations)
+			# Update context with filtered watchlist
+			self.context.set("watchlist", filtered_watchlist)
 
 			# Log summary
 			self.logger.info(f"[ENTRY-FILTER] Results: {len(passed_tickers)} passed, {blocked_count} blocked, {len(no_data_tickers)} no-data")
@@ -195,14 +212,14 @@ class EntryFilterAgent(Agent):
 				"input": input_data,
 				"output": {
 					"filtered_count": blocked_count,
-					"passed_count": len(filtered_recommendations),
+					"passed_count": len(filtered_watchlist),
 					"error_tickers": error_tickers,
 				},
-				"message": f"Filtered {blocked_count} recommendations"
+				"message": f"Filtered {blocked_count} tickers"
 			}
 
 		except Exception as e:
-			self.logger.error(f"Unexpected error in entry_filter: {str(e)}", exc_info=True)
+			self.logger.error(f"Unexpected error in entry_filter: {str(e)}")
 			return {
 				"status": "error",
 				"input": input_data,
@@ -226,14 +243,14 @@ class EntryFilterAgent(Agent):
 				"message": "Missing data_history in context"
 			}
 
-		# Check if entry_recommendations exists (can be empty list but must exist)
-		if self.context.get("entry_recommendations") is None:
-			self.logger.warning("entry_recommendations not found in context")
+		# Check if watchlist exists (can be empty dict but must exist)
+		if self.context.get("watchlist") is None:
+			self.logger.warning("watchlist not found in context")
 			return {
 				"status": "error",
 				"input": {},
 				"output": {},
-				"message": "Missing entry_recommendations in context"
+				"message": "Missing watchlist in context"
 			}
 
 		return None

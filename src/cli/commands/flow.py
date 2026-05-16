@@ -778,7 +778,7 @@ Sortino Ratio                                  {sortino:.6f}"""
 			return
 
 		strategy = result.get("strategy", "unknown")
-		watchlist = result.get("watchlist", [])
+		watchlist = result.get("watchlist", {})
 		ticker_scores = result.get("ticker_scores", {})
 		executable_orders = result.get("executable_orders", [])
 		orders_count = result.get("orders_count", 0)
@@ -790,29 +790,35 @@ Sortino Ratio                                  {sortino:.6f}"""
 		console.print(f"\n[bold cyan]📊 Pre-Market Analysis: {strategy}[/bold cyan]")
 		console.print("=" * 100)
 
-		# Watchlist section
-		if watchlist:
-			# Build watchlist header with date and indicators
-			watchlist_header = f"Watchlist ({len(watchlist)} tickers)"
-			if target_date:
-				watchlist_header += f" - {target_date}"
-			if indicators:
-				indicators_str = ", ".join(indicators)
-				watchlist_header += f"\nIndicators: {indicators_str}"
-			console.print(f"\n[bold]{watchlist_header}[/bold]")
-			
+		# Convert dict to list of keys if needed
+		watchlist_tickers = list(watchlist.keys()) if isinstance(watchlist, dict) else watchlist
+
+		# Watchlist section - show even if empty to indicate filtering happened
+		watchlist_header = f"Watchlist ({len(watchlist_tickers)} tickers)"
+		if target_date:
+			watchlist_header += f" - {target_date}"
+		if indicators:
+			indicators_str = ", ".join(indicators)
+			watchlist_header += f"\nIndicators: {indicators_str}"
+		console.print(f"\n[bold]{watchlist_header}[/bold]")
+
+		if watchlist_tickers:
 			table = Table(box=None)
 			table.add_column("Ticker", style="cyan")
 			table.add_column("Score", style="green")
 			table.add_column("Signals", style="yellow")
-			
+
 			# Add columns for all indicators
 			for ind in indicators:
 				table.add_column(ind, style="dim")
 
-			for ticker in watchlist[:20]:  # Show top 20
+			for ticker in watchlist_tickers[:20]:  # Show top 20
+				# Get composite score from watchlist (entry analysis result)
+				ticker_watchlist_data = watchlist.get(ticker, {}) if isinstance(watchlist, dict) else {}
+				composite_score = ticker_watchlist_data.get("composite_score", 0)
+
+				# Get signals from ticker_scores (for display)
 				score_info = ticker_scores.get(ticker, {})
-				score = score_info.get("score", 0)
 				triggered_signals = score_info.get("triggered_signals", [])
 
 				# Format signal names
@@ -822,8 +828,8 @@ Sortino Ratio                                  {sortino:.6f}"""
 					signals_str = "-"
 
 				# Get indicator values for this ticker
-				row_data = [ticker, f"{score:.3f}", signals_str]
-				
+				row_data = [ticker, f"{composite_score:.2f}", signals_str]
+
 				ticker_data = data_history.get(ticker)
 				if ticker_data is not None and not ticker_data.empty:
 					# Get latest row (index 0, since sorted newest-first)
@@ -853,8 +859,10 @@ Sortino Ratio                                  {sortino:.6f}"""
 
 			console.print(table)
 
-			if len(watchlist) > 20:
-				console.print(f"[dim]... and {len(watchlist) - 20} more tickers[/dim]")
+			if len(watchlist_tickers) > 20:
+				console.print(f"[dim]... and {len(watchlist_tickers) - 20} more tickers[/dim]")
+		else:
+			console.print("[yellow]No tickers passed all filters[/yellow]")
 
 		# Orders section
 		if executable_orders:

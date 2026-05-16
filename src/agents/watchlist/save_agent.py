@@ -47,7 +47,9 @@ class SaveWatchlistAgent(Agent):
 		save_enabled = input_data.get("save_enabled", True)
 
 		# Get data from context
-		watchlist = self.context.get("watchlist") or []
+		watchlist_dict = self.context.get("watchlist") or {}
+		# Convert watchlist dict to list of tickers for WatchlistManager
+		watchlist = list(watchlist_dict.keys()) if isinstance(watchlist_dict, dict) else watchlist_dict
 		ticker_scores = self.context.get("ticker_scores") or {}
 		data_history = self.context.get("data_history") or {}
 		strategy_config = self.context.get("strategy_config") or {}
@@ -96,27 +98,25 @@ class SaveWatchlistAgent(Agent):
 		}
 
 	def _extract_orders_from_recommendations(self) -> Dict[str, Any]:
-		"""Extract order information from entry recommendations.
+		"""Extract order information from watchlist dict.
 
 		Returns:
 			Dict mapping ticker -> order info (qty, price, stops, etc.)
 		"""
 		orders = {}
-		entry_recommendations = self.context.get("entry_recommendations") or []
+		watchlist = self.context.get("watchlist") or {}
 
-		for rec in entry_recommendations:
-			ticker = rec.get("ticker")
-			if ticker:
-				orders[ticker] = {
-					"quantity": rec.get("quantity"),
-					"entry_price": rec.get("entry_price"),
-					"stop_loss": rec.get("stop_loss"),
-					"take_profit": rec.get("take_profit"),
-					"execution_method": rec.get("execution_method", "market"),
-					"status": "pending",
-					"risk_reward": rec.get("risk_reward"),
-					"entry_score": rec.get("entry_score"),
-				}
+		for ticker, ticker_data in watchlist.items():
+			orders[ticker] = {
+				"quantity": ticker_data.get("quantity"),
+				"entry_price": ticker_data.get("entry_price"),
+				"stop_loss": ticker_data.get("stop_loss"),
+				"take_profit": ticker_data.get("take_profit"),
+				"execution_method": ticker_data.get("execution_method", "market"),
+				"status": "pending",
+				"risk_reward": ticker_data.get("risk_reward"),
+				"entry_score": ticker_data.get("entry_score"),
+			}
 
 		return orders
 
@@ -133,23 +133,17 @@ class SaveWatchlistAgent(Agent):
 		# Get data history which contains calculated indicators
 		data_history = self.context.get("data_history") or {}
 
-		# Get entry scores which contain entry strength
-		entry_scores = self.context.get("entry_scores") or {}
-
-		# Get RR metrics which contain technical analysis
-		rr_metrics = self.context.get("rr_metrics") or {}
-
-		# Get timing scores
-		timing_scores = self.context.get("timing_scores") or {}
-
 		# Get strategy config for indicator specifications
 		strategy_config = self.context.get("strategy_config") or {}
 		strategy_indicators = strategy_config.get("indicators", [])
 
+		# Get watchlist (merged dict with all scores)
+		watchlist = self.context.get("watchlist") or {}
+
 		# Compile indicators for each ticker
-		watchlist = self.context.get("watchlist") or []
 		for ticker in watchlist:
 			ticker_indicators = {}
+			ticker_data_dict = watchlist[ticker]
 
 			# Extract indicators from data_history if available
 			if ticker in data_history:
@@ -190,14 +184,15 @@ class SaveWatchlistAgent(Agent):
 							except (ValueError, TypeError):
 								pass
 
-			# Add analysis metadata
-			ticker_indicators["entry_score"] = entry_scores.get(ticker)
-			ticker_indicators["timing_score"] = timing_scores.get(ticker)
+			# Add analysis metadata from merged watchlist dict
+			ticker_indicators["entry_score"] = ticker_data_dict.get("entry_score")
+			ticker_indicators["timing_score"] = ticker_data_dict.get("timing_score")
+			ticker_indicators["composite_score"] = ticker_data_dict.get("composite_score")
 
 			# Add risk/reward ratio
-			rr_data = rr_metrics.get(ticker, {})
-			if rr_data.get("rr_ratio") is not None:
-				ticker_indicators["rr_ratio"] = round(float(rr_data.get("rr_ratio", 0)), 4)
+			rr_ratio = ticker_data_dict.get("rr_ratio")
+			if rr_ratio is not None:
+				ticker_indicators["rr_ratio"] = round(float(rr_ratio), 4)
 
 			indicators[ticker] = ticker_indicators
 

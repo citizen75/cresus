@@ -46,7 +46,7 @@ class MaxTickersAgent(Agent):
 			}
 
 		# Limit to max tickers
-		limited_watchlist = watchlist[:self.max_tickers] if isinstance(watchlist, list) else []
+		limited_watchlist = dict(list(watchlist.items())[:self.max_tickers]) if isinstance(watchlist, dict) else {}
 		self.context.set("watchlist", limited_watchlist)
 
 		return {

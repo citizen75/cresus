@@ -62,11 +62,11 @@ class RankTickersAgent(Agent):
 			}
 
 		# Sort watchlist by metric (descending)
-		ranked_watchlist = sorted(
-			watchlist,
-			key=lambda t: metric_data.get(t, 0),
+		ranked_watchlist = dict(sorted(
+			watchlist.items(),
+			key=lambda x: metric_data.get(x[0], 0),
 			reverse=True
-		)
+		))
 
 		self.context.set("watchlist", ranked_watchlist)
 

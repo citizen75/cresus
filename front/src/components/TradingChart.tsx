@@ -8,12 +8,19 @@ interface TradingChartProps {
   ticker?: string
   entryDate?: string
   exitDate?: string
+  positions?: Array<{
+    entry_date: string
+    exit_date: string
+    entry_price: number
+    exit_price: number
+    pnl?: number
+  }>
   selectedIndicators?: Set<string>
   chartData?: any[]
   visibleWindow?: '1M' | '3M' | '6M' | 'YTD' | '1Y' | '2Y'
 }
 
-export default function TradingChart({ timeframe, title = 'Price Chart', ticker, entryDate, exitDate, selectedIndicators = new Set(), chartData: externalChartData, visibleWindow = '1Y' }: TradingChartProps) {
+export default function TradingChart({ timeframe, title = 'Price Chart', ticker, entryDate, exitDate, positions, selectedIndicators = new Set(), chartData: externalChartData, visibleWindow = '1Y' }: TradingChartProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [companyName, setCompanyName] = useState<string>('')
   const [chartData, setChartData] = useState<any[]>([])
@@ -321,34 +328,74 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
 
         const markers: any[] = []
 
-        if (entryDate) {
-          const entryDateObj = new Date(entryDate)
-          markers.push({
-            time: {
-              year: entryDateObj.getFullYear(),
-              month: entryDateObj.getMonth() + 1,
-              day: entryDateObj.getDate()
-            },
-            position: 'belowBar',
-            color: '#FFEB3B',
-            shape: 'arrowUp',
-            text: 'ENTRY',
+        if (positions && positions.length > 0) {
+          // Multi-position mode: add markers for all entries and exits
+          positions.forEach((pos, idx) => {
+            // Entry marker
+            if (pos.entry_date) {
+              const entryDateObj = new Date(pos.entry_date)
+              markers.push({
+                time: {
+                  year: entryDateObj.getFullYear(),
+                  month: entryDateObj.getMonth() + 1,
+                  day: entryDateObj.getDate()
+                },
+                position: 'belowBar',
+                color: '#FFF000',
+                shape: 'arrowUp',
+                text: `ENTRY ${idx + 1}`,
+                textSize: 14,
+              } as any)
+            }
+            // Exit marker
+            if (pos.exit_date) {
+              const exitDateObj = new Date(pos.exit_date)
+              markers.push({
+                time: {
+                  year: exitDateObj.getFullYear(),
+                  month: exitDateObj.getMonth() + 1,
+                  day: exitDateObj.getDate()
+                },
+                position: 'aboveBar',
+                color: '#FFF000',
+                shape: 'arrowDown',
+                text: `EXIT ${idx + 1}`,
+              } as any)
+            }
           })
-        }
+        } else {
+          // Single position mode: backward compatibility
+          if (entryDate) {
+            const entryDateObj = new Date(entryDate)
+            markers.push({
+              time: {
+                year: entryDateObj.getFullYear(),
+                month: entryDateObj.getMonth() + 1,
+                day: entryDateObj.getDate()
+              },
+              position: 'belowBar',
+              color: '#FFEB3B',
+              shape: 'arrowUp',
+              text: 'ENTRY',
+              textColor: '#FFEB3B',
+            } as any)
+          }
 
-        if (exitDate) {
-          const exitDateObj = new Date(exitDate)
-          markers.push({
-            time: {
-              year: exitDateObj.getFullYear(),
-              month: exitDateObj.getMonth() + 1,
-              day: exitDateObj.getDate()
-            },
-            position: 'aboveBar',
-            color: '#FFEB3B',
-            shape: 'arrowDown',
-            text: 'EXIT',
-          })
+          if (exitDate) {
+            const exitDateObj = new Date(exitDate)
+            markers.push({
+              time: {
+                year: exitDateObj.getFullYear(),
+                month: exitDateObj.getMonth() + 1,
+                day: exitDateObj.getDate()
+              },
+              position: 'aboveBar',
+              color: '#FFEB3B',
+              shape: 'arrowDown',
+              text: 'EXIT',
+              textColor: '#FFEB3B',
+            } as any)
+          }
         }
 
         if (markers.length > 0) {
@@ -441,7 +488,7 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
         chartRef.current = null
       }
     }
-  }, [timeframe, ticker, entryDate, exitDate])
+  }, [timeframe, ticker, entryDate, exitDate, positions])
 
   // Add SHA candlesticks series when data becomes available
   useEffect(() => {
