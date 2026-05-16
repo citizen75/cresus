@@ -50,6 +50,7 @@ class DataCommands:
 		table.add_row("data fetch fundamental <ticker>", "Fetch fundamental data")
 		table.add_row("data fetch universe <name> [start_date]", "Fetch all tickers in universe")
 		table.add_row("data fetch all <universe> [start_date]", "Fetch history + fundamental for universe")
+		table.add_row("data fetch ptf <portfolio_name>", "Calculate portfolio history from journal")
 		table.add_row("data show <ticker>", "Show ticker info (history dates, last OHLCV, fundamentals)")
 		table.add_row("data list [history|fundamentals|all]", "List cached data")
 		table.add_row("data clear [type] [ticker]", "Clear cache (types: history, fundamentals, all)")
@@ -60,7 +61,7 @@ class DataCommands:
 	def _handle_fetch(self, parts):
 		"""Handle data fetch command."""
 		if len(parts) < 3:
-			console.print("[red]✗[/red] Usage: data fetch <history|fundamental|universe|all> <ticker|name|universe> [start_date]")
+			console.print("[red]✗[/red] Usage: data fetch <history|fundamental|universe|all|ptf> <ticker|name|universe|portfolio> [start_date]")
 			return
 		data_type = parts[1]
 		target = parts[2]
@@ -78,8 +79,68 @@ class DataCommands:
 		elif data_type == "all":
 			result = self.data_manager.fetch_all(target, start_date)
 			self._print_universe_result(result)
+		elif data_type == "ptf":
+			self._handle_fetch_portfolio(target)
 		else:
 			console.print(f"[red]✗[/red] Unknown data type: {data_type}")
+
+	def _handle_fetch_portfolio(self, portfolio_name):
+		"""Handle portfolio history fetch command."""
+		from pathlib import Path
+		from tools.portfolio.portfolio_history import PortfolioHistory
+		from loguru import logger
+
+		try:
+			# Calculate portfolio history
+			console.print(f"[cyan]Calculating portfolio history for {portfolio_name}...[/cyan]")
+
+			# Get initial capital from portfolio metadata
+			from tools.portfolio.manager import PortfolioManager
+			pm = PortfolioManager()
+			metadata = pm._get_portfolio_metadata(portfolio_name)
+			initial_capital = float(metadata.get("initial_capital", 100000.0))
+
+			# Use PortfolioHistory to calculate
+			ph = PortfolioHistory(portfolio_name, initial_capital)
+			result = ph.calculate(recalculate=True)
+
+			if result.get("status") == "error":
+				console.print(f"[red]✗[/red] {result.get('message')}")
+				return
+
+			# Display results
+			history = result.get("history", [])
+			console.print(f"[green]✓[/green] Calculated {len(history)} daily values\n")
+
+			# Show summary
+			if history:
+				first_entry = history[0]
+				last_entry = history[-1]
+
+				table = Table(title=f"Portfolio History: {portfolio_name}", box=box.ROUNDED)
+				table.add_column("Metric", style="cyan")
+				table.add_column("Value", justify="right")
+
+				table.add_row("Period", f"{first_entry['date']} → {last_entry['date']}")
+				table.add_row("Starting Value", f"${first_entry['value']:,.2f}")
+				table.add_row("Ending Value", f"${last_entry['value']:,.2f}")
+
+				pnl = last_entry['value'] - first_entry['value']
+				pnl_pct = (pnl / first_entry['value'] * 100) if first_entry['value'] > 0 else 0
+				pnl_color = "green" if pnl >= 0 else "red"
+				table.add_row("P&L", f"[{pnl_color}]${pnl:,.2f} ({pnl_pct:+.2f}%)[/{pnl_color}]")
+
+				table.add_row("Total Days", str(len(history)))
+
+				console.print(table)
+				console.print(f"\n[dim]Portfolio history is now cached and available in the API[/dim]")
+			else:
+				console.print("[yellow]⚠[/yellow] No history data calculated")
+
+		except Exception as e:
+			console.print(f"[red]✗[/red] Error calculating portfolio history: {e}")
+			import traceback
+			logger.error(f"Portfolio history error: {traceback.format_exc()}")
 
 	def _handle_show(self, parts):
 		"""Handle data show command."""
