@@ -1,8 +1,8 @@
 """Health check and config endpoints."""
 
 from fastapi import APIRouter
-import yaml
 from pathlib import Path
+import os
 
 router = APIRouter(tags=["health"])
 
@@ -17,26 +17,41 @@ async def health():
 async def get_config():
     """Get API server configuration for frontend.
 
-    Returns the host and port from ~/.cresus/config/cresus.yml
+    Returns the host and port from ~/.cresus/.env
     """
     try:
-        config_path = Path.home() / ".cresus" / "config" / "cresus.yml"
-        if not config_path.exists():
-            return {
-                "api": {
-                    "host": "localhost",
-                    "port": 8000
-                }
-            }
+        env_path = Path.home() / ".cresus" / ".env"
 
-        with open(config_path, 'r') as f:
-            config = yaml.safe_load(f)
+        # Default values
+        api_host = "localhost"
+        api_port = 8000
 
-        api_config = config.get("api", {})
+        if env_path.exists():
+            # Parse .env file
+            with open(env_path, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    # Skip comments and empty lines
+                    if not line or line.startswith('#'):
+                        continue
+
+                    if '=' in line:
+                        key, value = line.split('=', 1)
+                        key = key.strip()
+                        value = value.strip()
+
+                        if key == "API_HOST":
+                            api_host = value
+                        elif key == "API_PORT":
+                            try:
+                                api_port = int(value)
+                            except ValueError:
+                                api_port = 8000
+
         return {
             "api": {
-                "host": api_config.get("host", "localhost"),
-                "port": api_config.get("port", 8000)
+                "host": api_host,
+                "port": api_port
             }
         }
     except Exception as e:
