@@ -1,25 +1,68 @@
 import axios, { AxiosInstance } from 'axios'
 
-export function getApiBaseUrl(): string {
-  // Priority: env var > construct from hostname with API port
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL
+let cachedApiUrl: string | null = null
+
+export async function fetchApiConfig(): Promise<string> {
+  // Return cached URL if available
+  if (cachedApiUrl) {
+    return cachedApiUrl
   }
-  
-  // Use same hostname as frontend, but API port (8000)
+
+  // Priority 1: Environment variable
+  if (import.meta.env.VITE_API_URL) {
+    cachedApiUrl = import.meta.env.VITE_API_URL
+    api.updateBaseURL(cachedApiUrl)
+    return cachedApiUrl
+  }
+
+  // Priority 2: Fetch config from backend
+  try {
+    // Try to fetch config from standard location (localhost:8000)
+    const configResponse = await axios.get('http://localhost:8000/api/v1/config', {
+      timeout: 2000
+    })
+    const { api: apiConfig } = configResponse.data
+    const host = apiConfig.host || 'localhost'
+    const port = apiConfig.port || 8000
+    cachedApiUrl = `http://${host}:${port}`
+    api.updateBaseURL(cachedApiUrl)
+    return cachedApiUrl
+  } catch (err) {
+    // Config fetch failed, fall back to hostname-based URL
+  }
+
+  // Priority 3: Use same hostname as frontend with default port
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname
-    // For localhost, use port 8000; for other hosts (192.168.x.x, etc), use port 8000
-    return `http://${hostname}:8000`
+    cachedApiUrl = `http://${hostname}:8000`
+    api.updateBaseURL(cachedApiUrl)
+    return cachedApiUrl
   }
-  
-  return 'http://localhost:8000'
+
+  // Fallback
+  cachedApiUrl = 'http://localhost:8000'
+  api.updateBaseURL(cachedApiUrl)
+  return cachedApiUrl
+}
+
+export function getApiBaseUrl(): string {
+  // Return cached URL or default
+  return cachedApiUrl || 'http://localhost:8000'
 }
 
 class CresusAPI {
   private client: AxiosInstance
 
-  constructor(baseURL: string = getApiBaseUrl()) {
+  constructor() {
+    // Use default initially, will be updated after config is fetched
+    const baseURL = getApiBaseUrl()
+    this.client = axios.create({
+      baseURL: `${baseURL}/api/v1`,
+      timeout: 30000,
+    })
+  }
+
+  updateBaseURL(baseURL: string) {
     this.client = axios.create({
       baseURL: `${baseURL}/api/v1`,
       timeout: 30000,
