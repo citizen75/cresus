@@ -30,9 +30,10 @@ function loadEnvFile() {
 }
 
 const envConfig = loadEnvFile()
-const API_HOST = envConfig.API_HOST || process.env.API_HOST || 'localhost'
-const API_PORT = envConfig.API_PORT || process.env.API_PORT || '8000'
-const FRONT_PORT = parseInt(envConfig.FRONT_PORT || process.env.FRONT_PORT || '5173')
+// Priority: shell env vars (set by bin/front) > file config > defaults
+const API_HOST = process.env.API_HOST || envConfig.API_HOST || 'localhost'
+const API_PORT = process.env.API_PORT || envConfig.API_PORT || '8000'
+const FRONT_PORT = parseInt(process.env.FRONT_PORT || envConfig.FRONT_PORT || '5173')
 
 // Set environment variables so import.meta.env can access them
 process.env.VITE_API_HOST = API_HOST
