@@ -28,15 +28,14 @@ const API_HOST = envConfig.API_HOST || process.env.API_HOST || 'localhost'
 const API_PORT = envConfig.API_PORT || process.env.API_PORT || '8000'
 const FRONT_PORT = parseInt(envConfig.FRONT_PORT || process.env.FRONT_PORT || '5173')
 
+// Set environment variables so import.meta.env can access them
+process.env.VITE_API_HOST = API_HOST
+process.env.VITE_API_PORT = API_PORT
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: { '@': path.resolve(__dirname, './src') },
-  },
-  define: {
-    // Expose environment variables to frontend code
-    __API_HOST__: JSON.stringify(API_HOST),
-    __API_PORT__: JSON.stringify(API_PORT),
   },
   server: {
     port: FRONT_PORT,

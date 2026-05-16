@@ -1,12 +1,9 @@
 import axios, { AxiosInstance } from 'axios'
 
-declare const __API_HOST__: string
-declare const __API_PORT__: string
-
 export function getApiBaseUrl(): string {
-  // Use values injected at build time from .cresus/.env
-  const host = __API_HOST__ || 'localhost'
-  const port = __API_PORT__ || '8000'
+  // Use values injected at build time from .cresus/.env via import.meta.env
+  const host = import.meta.env.VITE_API_HOST || 'localhost'
+  const port = import.meta.env.VITE_API_PORT || '8000'
   return `http://${host}:${port}`
 }
 
