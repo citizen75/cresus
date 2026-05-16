@@ -14,11 +14,10 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
     )
 
-    # CORS middleware - more permissive for development
-    # Allow all localhost and local network (192.168.x.x, 10.x.x.x)
+    # CORS middleware - allow all origins for development
     app.add_middleware(
         CORSMiddleware,
-        allow_origin_regex=r"^(http://|https://)(localhost|127\.0\.0\.1|192\.168\.|10\.)",
+        allow_origins=["*"],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
