@@ -32,10 +32,16 @@ const FRONT_PORT = parseInt(envConfig.FRONT_PORT || process.env.FRONT_PORT || '5
 process.env.VITE_API_HOST = API_HOST
 process.env.VITE_API_PORT = API_PORT
 
+console.log(`[Vite] Loading API config: ${API_HOST}:${API_PORT}`)
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: { '@': path.resolve(__dirname, './src') },
+  },
+  define: {
+    'import.meta.env.VITE_API_HOST': JSON.stringify(API_HOST),
+    'import.meta.env.VITE_API_PORT': JSON.stringify(API_PORT),
   },
   server: {
     port: FRONT_PORT,
