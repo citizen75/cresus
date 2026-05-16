@@ -32,7 +32,17 @@ const FRONT_PORT = parseInt(envConfig.FRONT_PORT || process.env.FRONT_PORT || '5
 process.env.VITE_API_HOST = API_HOST
 process.env.VITE_API_PORT = API_PORT
 
-console.log(`[Vite] Loading API config: ${API_HOST}:${API_PORT}`)
+// Log configuration on startup
+console.log('')
+console.log('╔════════════════════════════════════════╗')
+console.log('║     Cresus Frontend Configuration      ║')
+console.log('╠════════════════════════════════════════╣')
+console.log(`║ Frontend: http://0.0.0.0:${FRONT_PORT}`)
+console.log(`║ API Host: ${API_HOST}`)
+console.log(`║ API Port: ${API_PORT}`)
+console.log(`║ API URL:  http://${API_HOST}:${API_PORT}`)
+console.log('╚════════════════════════════════════════╝')
+console.log('')
 
 export default defineConfig({
   plugins: [react()],
