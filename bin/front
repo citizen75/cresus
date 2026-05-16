@@ -4,16 +4,30 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+FRONT_DIR="$PROJECT_ROOT/front"
 
 export CRESUS_PROJECT_ROOT="$PROJECT_ROOT"
 
-# Load .cresus/.env if it exists
+# Load .cresus/.env and generate front/.env.local
 if [ -f "$HOME/.cresus/.env" ]; then
-    # Source only API_HOST, API_PORT, FRONT_PORT
+    # Source environment variables
     export $(grep -E '^(API_HOST|API_PORT|FRONT_PORT)=' "$HOME/.cresus/.env" | xargs)
+
+    # Generate front/.env.local for Vite to read
+    cat > "$FRONT_DIR/.env.local" << ENVFILE
+# Auto-generated from ~/.cresus/.env
+VITE_API_HOST=${API_HOST:-localhost}
+VITE_API_PORT=${API_PORT:-8000}
+ENVFILE
+
+    echo "Frontend Configuration:"
+    echo "  API Host: ${API_HOST:-localhost}"
+    echo "  API Port: ${API_PORT:-8000}"
+else
+    echo "⚠️  ~/.cresus/.env not found, using defaults"
 fi
 
-cd "$PROJECT_ROOT/front"
+cd "$FRONT_DIR"
 
 # Check if node_modules exists, install if needed
 if [ ! -d "node_modules" ]; then
