@@ -1,5 +1,6 @@
 """Unified gateway server combining API and cron scheduler."""
 
+import os
 import sys
 import threading
 import signal
@@ -56,14 +57,19 @@ class GatewayServer:
 		self.cron_config_path = cron_config_path
 		self.running = False
 
-		# Initialize file watcher to monitor code changes
+		# Initialize file watcher to monitor code changes (disabled in production mode)
 		project_root = Path(__file__).parent.parent.parent
-		self.file_watcher = FileWatcher(
-			project_root,
-			on_api_change=self._on_api_change,
-			on_mcp_change=self._on_mcp_change,
-			on_gateway_change=self._on_gateway_change,
-		)
+		enable_file_watcher = os.getenv("CRESUS_ENABLE_WATCHER", "true").lower() == "true"
+		if enable_file_watcher:
+			self.file_watcher = FileWatcher(
+				project_root,
+				on_api_change=self._on_api_change,
+				on_mcp_change=self._on_mcp_change,
+				on_gateway_change=self._on_gateway_change,
+			)
+		else:
+			self.file_watcher = None
+			logger.info("File watcher disabled (CRESUS_ENABLE_WATCHER=false)")
 
 	def _on_api_change(self) -> None:
 		"""Handle API module changes - restart API server."""

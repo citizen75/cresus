@@ -65,10 +65,12 @@ class ServiceManager:
 
         try:
             if daemon:
+                # Disable file watcher in daemon mode (production)
+                env = {**dict(os.environ.items()), "CRESUS_PROJECT_ROOT": str(self.project_root), "CRESUS_ENABLE_WATCHER": "false"}
                 proc = subprocess.Popen(
                     cmd,
                     cwd=str(self.project_root),
-                    env={**dict(os.environ.items()), "CRESUS_PROJECT_ROOT": str(self.project_root)},
+                    env=env,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     start_new_session=True,
