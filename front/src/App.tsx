@@ -1,8 +1,6 @@
-import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClient } from '@/hooks/usePortfolio'
-import { fetchApiConfig } from '@/services/api'
 import Layout from '@/components/Layout'
 import Dashboard from '@/pages/Dashboard'
 import Portfolios from '@/pages/Portfolios'
@@ -20,10 +18,6 @@ import BacktestComparator from '@/pages/BacktestComparator'
 import Chart from '@/pages/Chart'
 
 export default function App() {
-  useEffect(() => {
-    fetchApiConfig()
-  }, [])
-
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>

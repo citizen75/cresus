@@ -1,53 +1,13 @@
 import axios, { AxiosInstance } from 'axios'
 
-let cachedApiUrl: string | null = null
-
-export async function fetchApiConfig(): Promise<string> {
-  // Return cached URL if available
-  if (cachedApiUrl) {
-    return cachedApiUrl
-  }
-
-  // Priority 1: Environment variable
-  if (import.meta.env.VITE_API_URL) {
-    cachedApiUrl = import.meta.env.VITE_API_URL
-    api.updateBaseURL(cachedApiUrl)
-    return cachedApiUrl
-  }
-
-  // Priority 2: Fetch config from backend
-  try {
-    // Try to fetch config from standard location (localhost:8000)
-    const configResponse = await axios.get('http://localhost:8000/api/v1/config', {
-      timeout: 2000
-    })
-    const { api: apiConfig } = configResponse.data
-    const host = apiConfig.host || 'localhost'
-    const port = apiConfig.port || 8000
-    cachedApiUrl = `http://${host}:${port}`
-    api.updateBaseURL(cachedApiUrl)
-    return cachedApiUrl
-  } catch (err) {
-    // Config fetch failed, fall back to hostname-based URL
-  }
-
-  // Priority 3: Use same hostname as frontend with default port
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname
-    cachedApiUrl = `http://${hostname}:8000`
-    api.updateBaseURL(cachedApiUrl)
-    return cachedApiUrl
-  }
-
-  // Fallback
-  cachedApiUrl = 'http://localhost:8000'
-  api.updateBaseURL(cachedApiUrl)
-  return cachedApiUrl
-}
+declare const __API_HOST__: string
+declare const __API_PORT__: string
 
 export function getApiBaseUrl(): string {
-  // Return cached URL or default
-  return cachedApiUrl || 'http://localhost:8000'
+  // Use values injected at build time from .cresus/.env
+  const host = __API_HOST__ || 'localhost'
+  const port = __API_PORT__ || '8000'
+  return `http://${host}:${port}`
 }
 
 class CresusAPI {

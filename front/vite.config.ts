@@ -11,6 +11,11 @@ export default defineConfig({
   resolve: {
     alias: { '@': path.resolve(__dirname, './src') },
   },
+  define: {
+    // Expose environment variables to frontend code
+    __API_HOST__: JSON.stringify(API_HOST),
+    __API_PORT__: JSON.stringify(API_PORT),
+  },
   server: {
     port: FRONT_PORT,
     host: '0.0.0.0',
