@@ -9,16 +9,22 @@ function loadEnvFile() {
   const envPath = path.join(os.homedir(), '.cresus', '.env')
   const env: Record<string, string> = {}
 
-  if (fs.existsSync(envPath)) {
-    const content = fs.readFileSync(envPath, 'utf-8')
-    content.split('\n').forEach(line => {
-      line = line.trim()
-      if (!line || line.startsWith('#')) return
-      const [key, value] = line.split('=')
-      if (key && value) {
-        env[key.trim()] = value.trim()
-      }
-    })
+  try {
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, 'utf-8')
+      content.split('\n').forEach(line => {
+        line = line.trim()
+        if (!line || line.startsWith('#')) return
+        const [key, value] = line.split('=')
+        if (key && value) {
+          env[key.trim()] = value.trim()
+        }
+      })
+    } else {
+      console.warn(`⚠️  Config file not found: ${envPath}`)
+    }
+  } catch (err) {
+    console.error(`❌ Error reading config: ${err}`)
   }
   return env
 }
@@ -42,6 +48,7 @@ console.log(`║ API Host: ${API_HOST}`)
 console.log(`║ API Port: ${API_PORT}`)
 console.log(`║ API URL:  http://${API_HOST}:${API_PORT}`)
 console.log('╚════════════════════════════════════════╝')
+console.log(`Config source: ${Object.keys(envConfig).length > 0 ? 'From ~/.cresus/.env' : 'Using defaults'}`)
 console.log('')
 
 export default defineConfig({
