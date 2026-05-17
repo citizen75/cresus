@@ -570,15 +570,24 @@ class PortfolioManager:
         # Convert to list of dicts
         transactions = []
         for _, row in df.iterrows():
+            quantity = float(row.get("quantity", 0))
+            price = float(row.get("price", 0))
+            amount = float(row.get("amount", 0))
+            # Calculate amount if not present
+            if amount == 0 and quantity > 0 and price > 0:
+                amount = quantity * price
+
             tx = {
                 "id": str(row.get("id", "")),
                 "created_at": str(row.get("created_at", "")),
                 "operation": str(row.get("operation", "")),
                 "ticker": str(row.get("ticker", "")),
-                "quantity": float(row.get("quantity", 0)),
-                "price": float(row.get("price", 0)),
+                "quantity": quantity,
+                "price": price,
+                "amount": amount,
                 "fees": float(row.get("fees", 0)),
                 "status": str(row.get("status", "")),
+                "status_at": str(row.get("status_at", "")),
                 "notes": str(row.get("notes", "")),
             }
             transactions.append(tx)

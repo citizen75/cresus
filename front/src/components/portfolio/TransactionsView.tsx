@@ -186,11 +186,11 @@ export default function TransactionsView({ name, filterTicker }: TransactionsVie
                             className="w-20 px-2 py-1 bg-slate-700 border border-slate-600 text-white rounded"
                           />
                         ) : (
-                          `€${tx.price.toLocaleString('de-DE', { maximumFractionDigits: 2 })}`
+                          `€${(tx.price ?? 0).toLocaleString('de-DE', { maximumFractionDigits: 2 })}`
                         )}
                       </td>
                       <td className="px-4 py-3 text-white font-medium">
-                        €{tx.amount.toLocaleString('de-DE', { maximumFractionDigits: 2 })}
+                        €{(tx.amount ?? tx.quantity * tx.price).toLocaleString('de-DE', { maximumFractionDigits: 2 })}
                       </td>
                       <td className="px-4 py-3 text-orange-400">
                         {editingId === tx.id ? (
@@ -202,7 +202,7 @@ export default function TransactionsView({ name, filterTicker }: TransactionsVie
                             className="w-16 px-2 py-1 bg-slate-700 border border-slate-600 text-white rounded"
                           />
                         ) : (
-                          `€${tx.fees.toLocaleString('de-DE', { maximumFractionDigits: 2 })}`
+                          `€${(tx.fees ?? 0).toLocaleString('de-DE', { maximumFractionDigits: 2 })}`
                         )}
                       </td>
                       <td className="px-4 py-3 text-slate-300 text-sm max-w-xs truncate">
