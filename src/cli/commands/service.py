@@ -81,7 +81,6 @@ class ServiceManager:
                         stderr=subprocess.STDOUT,
                         stdin=subprocess.DEVNULL,
                         start_new_session=True,
-                        preexec_fn=os.setsid,  # Additional session isolation
                     )
                 self._save_pid(service, proc.pid)
                 return {"status": "started", "pid": proc.pid}
