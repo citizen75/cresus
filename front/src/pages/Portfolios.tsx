@@ -12,7 +12,8 @@ export default function Portfolios() {
   const [deletingPortfolio, setDeletingPortfolio] = useState(false)
 
   const portfolios = data?.portfolios || []
-  const filtered = portfolios.filter(p =>
+  const livePortfolios = portfolios.filter(p => !p.name.toLowerCase().startsWith('test_'))
+  const filtered = livePortfolios.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
@@ -68,8 +69,8 @@ export default function Portfolios() {
         </div>
         <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
           <div className="text-slate-400 text-sm mb-2">Total portfolios</div>
-          <div className="text-3xl font-bold text-white">{portfolios.length}</div>
-          <div className="text-slate-400 text-sm mt-2">{portfolios.length} active</div>
+          <div className="text-3xl font-bold text-white">{livePortfolios.length}</div>
+          <div className="text-slate-400 text-sm mt-2">{livePortfolios.length} active</div>
         </div>
       </div>
 
