@@ -272,15 +272,10 @@ class PortfolioManager:
             open_pos = journal.get_open_positions()
             for _, row in open_pos.iterrows():
                 ticker = row["ticker"]
-                avg_entry_price = float(row["avg_entry_price"])
-
-                # Get current price from cache (silent mode to avoid error logs for invalid tickers)
                 prices = Fundamental(ticker)
-                current_price = prices.get_current_price(silent=True)
-                if not current_price:
-                    current_price = avg_entry_price
-
+                current_price = prices.get_current_price() or float(row.get("avg_entry_price", 0))
                 pos_value = float(row["quantity"]) * current_price
+                avg_entry_price = float(row["avg_entry_price"])
                 positions.append({
                     "ticker": ticker,
                     "quantity": int(row["quantity"]),
@@ -314,12 +309,7 @@ class PortfolioManager:
         for _, row in open_pos.iterrows():
             ticker = row["ticker"]
             avg_entry_price = float(row["avg_entry_price"])
-
-            # Get current price from cache (silent mode to avoid error logs for invalid tickers)
-            current_price = Fundamental(ticker).get_current_price(silent=True)
-            if not current_price:
-                current_price = avg_entry_price
-
+            current_price = Fundamental(ticker).get_current_price() or avg_entry_price
             positions.append({
                 "ticker": ticker,
                 "quantity": int(row["quantity"]),
