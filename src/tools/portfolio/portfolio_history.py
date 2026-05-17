@@ -123,24 +123,47 @@ class PortfolioHistory:
                     logger.warning(f"Failed to fetch history for {ticker}: {result.get('message', '')}")
                     failed_tickers.append(ticker)
 
-        # Calculate daily values with drawdown
+        # Calculate daily values efficiently
+        # Build position tracking by replaying transactions once (forward pass)
         daily_history = []
+        positions = {}  # {ticker: quantity}
+        cash = self.initial_capital if self.initial_capital else 0
+        peak_value = cash
+
+        # Get all unique transaction dates
+        tx_dates = sorted(df_valid["created_at"].unique())
+
+        # Cache ticker price lookups
+        ticker_price_cache = {}  # {ticker: {date: price}}
+
+        def get_price_on_date(ticker, date):
+            """Get price for ticker on or before date."""
+            if ticker not in ticker_history:
+                return None
+
+            if ticker not in ticker_price_cache:
+                ticker_price_cache[ticker] = {}
+
+            if date not in ticker_price_cache[ticker]:
+                df_ticker = ticker_history[ticker].copy()
+                df_ticker["timestamp"] = pd.to_datetime(df_ticker["timestamp"], errors="coerce")
+                if df_ticker["timestamp"].dt.tz is not None:
+                    df_ticker["timestamp"] = df_ticker["timestamp"].dt.tz_localize(None)
+                prices_before = df_ticker[df_ticker["timestamp"].dt.normalize() <= date]
+                if not prices_before.empty:
+                    ticker_price_cache[ticker][date] = float(prices_before.iloc[-1].get("close", 0))
+                else:
+                    ticker_price_cache[ticker][date] = None
+
+            return ticker_price_cache[ticker].get(date)
+
+        # Process each transaction date
         current_date = first_tx_date
-        peak_value = self.initial_capital if self.initial_capital else 0
+        for tx_date in tx_dates:
+            # Process all transactions on this date
+            rows_on_date = df_valid[df_valid["created_at"] == tx_date]
 
-        while current_date <= last_tx_date:
-            # Replay all transactions up to this date (inclusive)
-            rows_up_to = df_valid[df_valid["created_at"] <= current_date]
-
-            if rows_up_to.empty:
-                current_date += timedelta(days=1)
-                continue
-
-            # Calculate positions and cash
-            positions = {}
-            cash = self.initial_capital if self.initial_capital else 0
-
-            for _, row in rows_up_to.iterrows():
+            for _, row in rows_on_date.iterrows():
                 ticker = str(row.get("ticker", "")).strip().upper()
                 operation = str(row.get("operation", "")).upper()
                 quantity = float(row.get("quantity", 0))
@@ -148,7 +171,6 @@ class PortfolioHistory:
                 fees = float(row.get("fees", 0))
 
                 if operation == "CASH":
-                    # CASH: quantity is the amount (positive=deposit, negative=withdrawal)
                     cash += quantity
                 elif operation == "BUY":
                     if ticker not in positions:
@@ -161,41 +183,29 @@ class PortfolioHistory:
                     positions[ticker] -= quantity
                     cash += (quantity * price - fees)
 
-            # Calculate portfolio value at this date
+            # Record value at this transaction date
             portfolio_value = cash
             positions_value = 0
 
             for ticker, quantity in positions.items():
-                if quantity > 0 and ticker in ticker_history:
-                    # Get price on or before this date
-                    df_ticker = ticker_history[ticker].copy()
-                    df_ticker["timestamp"] = pd.to_datetime(df_ticker["timestamp"], errors="coerce")
-                    # Remove timezone info if present for comparison
-                    if df_ticker["timestamp"].dt.tz is not None:
-                        df_ticker["timestamp"] = df_ticker["timestamp"].dt.tz_localize(None)
-                    prices_before = df_ticker[df_ticker["timestamp"].dt.normalize() <= current_date]
+                if quantity > 0:
+                    p = get_price_on_date(ticker, tx_date)
+                    if p:
+                        positions_value += quantity * p
+                        portfolio_value += quantity * p
 
-                    if not prices_before.empty:
-                        price = float(prices_before.iloc[-1].get("close", 0))
-                        value = quantity * price
-                        positions_value += value
-                        portfolio_value += value
-
-            # Track peak and calculate drawdown
             if portfolio_value > peak_value:
                 peak_value = portfolio_value
 
             drawdown = ((portfolio_value - peak_value) / peak_value * 100) if peak_value > 0 else 0
 
             daily_history.append({
-                "date": current_date.strftime("%Y-%m-%d"),
+                "date": tx_date.strftime("%Y-%m-%d"),
                 "value": round(portfolio_value, 2),
                 "positions_value": round(positions_value, 2),
                 "cash": round(cash, 2),
                 "drawdown_pct": round(drawdown, 2),
             })
-
-            current_date += timedelta(days=1)
 
         logger.info(f"Calculated {len(daily_history)} daily values")
 
