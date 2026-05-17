@@ -119,13 +119,21 @@ class Fundamental:
 				"message": str(e),
 			}
 
-	def get_current_price(self) -> Optional[float]:
-		"""Get current price from cache or fetch."""
+	def get_current_price(self, silent: bool = False) -> Optional[float]:
+		"""Get current price from cache or fetch.
+
+		Args:
+			silent: If True, only use cached data and don't fetch (avoids error logging for invalid tickers)
+		"""
 		cached = self.load()
 		if cached:
 			price = cached.get("data", {}).get("quotation", {}).get("current_price")
 			if price:
 				return price
+
+		# If silent mode, don't try fetching (used by API endpoints to avoid error logs)
+		if silent:
+			return None
 
 		fresh = self.fetch()
 		return fresh.get("data", {}).get("quotation", {}).get("current_price")
