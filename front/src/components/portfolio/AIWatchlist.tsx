@@ -103,7 +103,7 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
       try {
         setLoading(true)
         const baseUrl = getApiBaseUrl()
-        const apiUrl = `${baseUrl}/api/v1/backtests/strategy/${name}/watchlist`
+        const apiUrl = `${baseUrl}/api/v1/portfolios/${name}/watchlist`
 
         const response = await fetch(apiUrl, {
           headers: {
@@ -113,19 +113,22 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
 
         if (!response.ok) {
           if (response.status === 404) {
-            throw new Error(`Watchlist '${name}' not found. Make sure you've run the strategy in live mode to generate watchlist data.`)
+            throw new Error(`Watchlist '${name}' not found. Make sure the portfolio has watchlist data.`)
           }
           throw new Error(`API error: ${response.status}`)
         }
 
         const data = await response.json()
 
-        if (!data.data?.watchlist || data.data.watchlist.length === 0) {
-          throw new Error('No watchlist data available for this strategy')
+        if (!data.watchlist || data.watchlist.length === 0) {
+          setWatchlist([])
+          setError(null)
+          setLoading(false)
+          return
         }
 
         // Transform API data to table format
-        const transformedWatchlist: WatchlistItem[] = data.data.watchlist.map((item: any, index: number) => ({
+        const transformedWatchlist: WatchlistItem[] = data.watchlist.map((item: any, index: number) => ({
           rank: index + 1,
           stock: item.ticker.replace('.PA', '').toUpperCase(),
           companyName: COMPANY_NAMES[item.ticker],
@@ -291,6 +294,18 @@ export default function AIWatchlist({ name }: AIWatchlistProps) {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (watchlist.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-slate-900 rounded-lg border border-slate-800 p-12 text-center">
+          <div className="text-slate-400 text-4xl mb-4">📋</div>
+          <h3 className="text-white font-medium mb-2">No watchlist data available</h3>
+          <p className="text-slate-400 text-sm">This portfolio doesn't have a watchlist yet. Run a strategy to generate watchlist recommendations.</p>
         </div>
       </div>
     )
