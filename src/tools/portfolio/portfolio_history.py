@@ -160,39 +160,47 @@ class PortfolioHistory:
 
             return ticker_price_cache[ticker].get(date)
 
-        # Process each transaction date
+        # Build daily history: fill days between transactions
         current_date = first_tx_date
-        for tx_date in tx_dates:
-            # Process all transactions on this date
-            rows_on_date = df_valid[df_valid["created_at"] == tx_date]
+        tx_idx = 0
 
-            for _, row in rows_on_date.iterrows():
-                ticker = str(row.get("ticker", "")).strip().upper()
-                operation = str(row.get("operation", "")).upper()
-                quantity = float(row.get("quantity", 0))
-                price = float(row.get("price", 0))
-                fees = float(row.get("fees", 0))
+        while current_date <= last_tx_date:
+            # Check if there are transactions on this date
+            tx_on_date = None
+            if tx_idx < len(tx_dates) and tx_dates[tx_idx].date() == current_date.date():
+                tx_on_date = tx_dates[tx_idx]
+                tx_idx += 1
 
-                if operation == "CASH":
-                    cash += quantity
-                elif operation == "BUY":
-                    if ticker not in positions:
-                        positions[ticker] = 0
-                    positions[ticker] += quantity
-                    cash -= (quantity * price + fees)
-                elif operation == "SELL":
-                    if ticker not in positions:
-                        positions[ticker] = 0
-                    positions[ticker] -= quantity
-                    cash += (quantity * price - fees)
+                # Process all transactions on this date
+                rows_on_date = df_valid[df_valid["created_at"] == tx_on_date]
 
-            # Record value at this transaction date
+                for _, row in rows_on_date.iterrows():
+                    ticker = str(row.get("ticker", "")).strip().upper()
+                    operation = str(row.get("operation", "")).upper()
+                    quantity = float(row.get("quantity", 0))
+                    price = float(row.get("price", 0))
+                    fees = float(row.get("fees", 0))
+
+                    if operation == "CASH":
+                        cash += quantity
+                    elif operation == "BUY":
+                        if ticker not in positions:
+                            positions[ticker] = 0
+                        positions[ticker] += quantity
+                        cash -= (quantity * price + fees)
+                    elif operation == "SELL":
+                        if ticker not in positions:
+                            positions[ticker] = 0
+                        positions[ticker] -= quantity
+                        cash += (quantity * price - fees)
+
+            # Calculate portfolio value for this date
             portfolio_value = cash
             positions_value = 0
 
             for ticker, quantity in positions.items():
                 if quantity > 0:
-                    p = get_price_on_date(ticker, tx_date)
+                    p = get_price_on_date(ticker, current_date)
                     if p:
                         positions_value += quantity * p
                         portfolio_value += quantity * p
@@ -203,12 +211,14 @@ class PortfolioHistory:
             drawdown = ((portfolio_value - peak_value) / peak_value * 100) if peak_value > 0 else 0
 
             daily_history.append({
-                "date": tx_date.strftime("%Y-%m-%d"),
+                "date": current_date.strftime("%Y-%m-%d"),
                 "value": round(portfolio_value, 2),
                 "positions_value": round(positions_value, 2),
                 "cash": round(cash, 2),
                 "drawdown_pct": round(drawdown, 2),
             })
+
+            current_date += timedelta(days=1)
 
         logger.info(f"Calculated {len(daily_history)} daily values")
 
