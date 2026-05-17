@@ -111,11 +111,11 @@ export default function PositionModal({ isOpen, mode, ticker, positionData, onCl
             <label className="block text-slate-400 text-sm font-medium mb-2">Quantity (Shares)</label>
             <input
               type="number"
-              step="0.01"
+              step="any"
               value={formData.quantity}
               onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
               placeholder="100"
-              min="0.01"
+              min="0"
               required
               className="w-full px-4 py-2 bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg focus:outline-none focus:border-purple-600"
             />
