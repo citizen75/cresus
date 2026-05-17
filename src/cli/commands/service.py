@@ -67,14 +67,22 @@ class ServiceManager:
             if daemon:
                 # Disable file watcher in daemon mode (production)
                 env = {**dict(os.environ.items()), "CRESUS_PROJECT_ROOT": str(self.project_root), "CRESUS_ENABLE_WATCHER": "false"}
-                proc = subprocess.Popen(
-                    cmd,
-                    cwd=str(self.project_root),
-                    env=env,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    start_new_session=True,
-                )
+
+                # Log file for daemon process output
+                log_file = self.project_root / "logs" / f"{service}.log"
+                log_file.parent.mkdir(parents=True, exist_ok=True)
+
+                with open(log_file, 'a') as log_f:
+                    proc = subprocess.Popen(
+                        cmd,
+                        cwd=str(self.project_root),
+                        env=env,
+                        stdout=log_f,
+                        stderr=subprocess.STDOUT,
+                        stdin=subprocess.DEVNULL,
+                        start_new_session=True,
+                        preexec_fn=os.setsid,  # Additional session isolation
+                    )
                 self._save_pid(service, proc.pid)
                 return {"status": "started", "pid": proc.pid}
             else:
