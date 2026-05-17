@@ -265,18 +265,17 @@ async def get_portfolio_value(name: str, use_cache: bool = True):
 
 
 @router.get("/{name}/history")
-async def get_portfolio_history(name: str, recalculate: bool = False, fetch: bool = False):
+async def get_portfolio_history(name: str, fetch: bool = False):
     """Get portfolio value history from transactions.
 
     Returns daily portfolio values (positions + cash) replayed from journal.
 
     Args:
-        recalculate: If True, recalculate even if cached
-        fetch: If True, fetch fresh data from yfinance (slower). Default uses cached data only.
+        fetch: If True, fetch fresh price data from yfinance. Default uses cached prices only.
     """
     pm = _get_portfolio_manager()
-    # Use cache_only by default (fast) - only fetch if explicitly requested
-    result = pm.calculate_portfolio_history(name, recalculate, use_cache_only=not fetch)
+    # Calculate is always done (fast enough) - only fetch if explicitly requested
+    result = pm.calculate_portfolio_history(name, recalculate=False, use_cache_only=not fetch)
     if "error" in result:
         raise HTTPException(404, result["error"])
     return result
