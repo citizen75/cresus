@@ -42,7 +42,6 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
       for (const pos of positions) {
         try {
           const result = await api.getHistoricalData(pos.ticker, 90)
-          console.log(`Loaded data for ${pos.ticker}:`, result)
 
           // Handle different response structures
           let historyArray = []
@@ -63,6 +62,10 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
               low: item.low || item.Low,
               volume: item.volume || item.Volume,
             }))
+          } else {
+            // No data found, try to fetch it
+            console.log(`No cached data for ${pos.ticker}, attempting to fetch...`)
+            // We'll set empty array for now and user can refresh
           }
         } catch (error) {
           console.error(`Failed to load historical data for ${pos.ticker}:`, error)
@@ -567,8 +570,9 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
                     showVariation={false}
                   />
                 ) : (
-                  <div className="p-4 h-48 bg-slate-800/20 flex items-center justify-center">
-                    <p className="text-slate-500 text-sm">Loading chart...</p>
+                  <div className="p-4 h-48 bg-slate-800/20 flex flex-col items-center justify-center gap-2">
+                    <p className="text-slate-500 text-sm">No historical data</p>
+                    <p className="text-slate-600 text-xs">Run: cresus data fetch history {pos.ticker}</p>
                   </div>
                 )}
 
