@@ -1,8 +1,10 @@
 import { usePortfolioMetrics, useCurrentPrices, usePortfolioHistory } from '@/hooks/usePortfolio'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 import PositionModal from './PositionModal'
 import TransactionsView from './TransactionsView'
+import CardChart from '@/components/CardChart'
+import { api } from '@/services/api'
 
 interface HoldingsViewProps {
   name: string
@@ -25,12 +27,42 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
   const [filterTickerForTransactions, setFilterTickerForTransactions] = useState<string | null>(null)
   const [sortColumn, setSortColumn] = useState<string | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [historicalData, setHistoricalData] = useState<Record<string, any[]>>({})
 
   const positions = priceData?.positions || []
   const totalValue = priceData?.total_value || 0
   const cash = priceData?.cash || 0
   const totalPortfolioValue = priceData?.total_portfolio_value || totalValue
   const itemsPerPage = 10
+
+  // Load historical data for cards view
+  useEffect(() => {
+    const loadHistoricalData = async () => {
+      const data: Record<string, any[]> = {}
+      for (const pos of positions) {
+        try {
+          const result = await api.getHistoricalData(pos.ticker, 90)
+          if (result && result.history) {
+            data[pos.ticker] = result.history.map((item: any) => ({
+              date: item.date,
+              close: item.close,
+              open: item.open,
+              high: item.high,
+              low: item.low,
+              volume: item.volume,
+            }))
+          }
+        } catch (error) {
+          console.error(`Failed to load historical data for ${pos.ticker}:`, error)
+        }
+      }
+      setHistoricalData(data)
+    }
+
+    if (positions.length > 0) {
+      loadHistoricalData()
+    }
+  }, [positions])
 
   // Sorting logic
   const getSortedPositions = () => {
@@ -513,106 +545,99 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
           )}
         </div>
 
-        {/* Right Sidebar - Charts View */}
+        {/* Charts View - Position Cards */}
         {activeTab === 'positions' && viewMode === 'charts' && (
-        <div className="space-y-6">
-          {/* Allocation Pie Chart */}
-          <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-white font-bold">Allocation</h3>
-              <button className="text-purple-400 hover:text-purple-300 text-sm">View full →</button>
-            </div>
-            <div className="flex flex-col items-center">
-              <div className="w-40 h-40">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={positions.slice(0, 5).map((pos: any) => ({
-                        name: pos.ticker,
-                        value: pos.position_value,
-                      }))}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={50}
-                      outerRadius={70}
-                      paddingAngle={1}
-                      dataKey="value"
-                    >
-                      {positions.map((_: any, index: number) => (
-                        <Cell key={`cell-${index}`} fill={chartColors[index % chartColors.length]} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="text-center mt-4">
-                <p className="text-slate-400 text-xs mb-1">Total Value</p>
-                <p className="text-white font-bold text-lg">€{totalValue.toLocaleString('de-DE', { maximumFractionDigits: 0 })}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Sector Exposure */}
-          <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-white font-bold">Sector Exposure</h3>
-              <button className="text-purple-400 hover:text-purple-300 text-sm">View full →</button>
-            </div>
-            <div className="space-y-3">
-              {sectorData.map((sector, index) => (
-                <div key={sector.name}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-slate-400 text-sm">{sector.name}</span>
-                    <span className="text-white font-medium text-sm">{sector.value.toFixed(1)}%</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {positions.map((pos: any) => (
+              <div key={pos.ticker} className="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden hover:border-purple-600/50 transition">
+                {/* Card Header */}
+                <div className="bg-slate-800/50 border-b border-slate-800 p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <p className="text-white font-bold text-lg">{pos.company_name || pos.ticker}</p>
+                      <p className="text-slate-400 text-xs">{pos.ticker}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-green-400">{((pos.position_gain / pos.position_value) * 100).toFixed(1)}%</p>
+                      <p className="text-slate-400 text-xs">Return</p>
+                    </div>
                   </div>
-                  <div className="w-full bg-slate-800 rounded-full h-2">
-                    <div
-                      className="h-2 rounded-full"
-                      style={{
-                        width: `${sector.value}%`,
-                        backgroundColor: chartColors[index % chartColors.length],
-                      }}
-                    ></div>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex gap-2 items-center flex-wrap">
+                      <span className="px-2 py-1 rounded text-xs font-medium bg-slate-800/30 text-slate-400">
+                        {pos.quantity} shares @ €{pos.avg_entry_price.toFixed(2)}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
 
-          {/* Risk Snapshot */}
-          <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-white font-bold">Risk Snapshot</h3>
-              <button className="text-purple-400 hover:text-purple-300 text-sm">View full →</button>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-slate-400 text-xs uppercase mb-2">Portfolio Beta</p>
-                <p className="text-white font-bold text-xl">1.08</p>
+                {/* Chart */}
+                {historicalData[pos.ticker] && historicalData[pos.ticker].length > 0 ? (
+                  <CardChart
+                    data={historicalData[pos.ticker]}
+                    ticker={pos.ticker}
+                    showVariation={false}
+                  />
+                ) : (
+                  <div className="p-4 h-48 bg-slate-800/20 flex items-center justify-center">
+                    <p className="text-slate-500 text-sm">Loading chart...</p>
+                  </div>
+                )}
+
+                {/* Price Range Row - First/Var/Last */}
+                {historicalData[pos.ticker] && historicalData[pos.ticker].length > 0 && (() => {
+                  const data = historicalData[pos.ticker]
+                  const firstPrice = data[0]?.close
+                  const lastPrice = data[data.length - 1]?.close
+                  const change = firstPrice ? ((lastPrice - firstPrice) / firstPrice) * 100 : 0
+                  return (
+                    <div className="border-t border-slate-800 px-4 py-3 bg-slate-800/30">
+                      <div className="flex justify-between items-center text-xs">
+                        <div className="flex flex-col items-center flex-1">
+                          <p className="text-slate-500 text-xs mb-1">90D Low</p>
+                          <p className="text-white font-medium">€{firstPrice?.toFixed(2)}</p>
+                        </div>
+                        <div className="flex flex-col items-center flex-1">
+                          <p className="text-slate-500 text-xs mb-1">Current</p>
+                          <p className={`font-medium ${change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            €{pos.current_price.toFixed(2)}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-center flex-1">
+                          <p className="text-slate-500 text-xs mb-1">90D High</p>
+                          <p className="text-white font-medium">€{lastPrice?.toFixed(2)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                {/* Card Footer */}
+                <div className="border-t border-slate-800 p-4 space-y-2">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-400">Position Value</span>
+                    <span className="text-white font-medium">€{pos.position_value.toLocaleString('de-DE', { maximumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-400">Unrealized P&L</span>
+                    <span className={`font-medium ${pos.position_gain >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      €{pos.position_gain.toLocaleString('de-DE', { maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSelectedTicker(pos.ticker)
+                      setSelectedPositionData(pos)
+                      setPositionModalMode('sell')
+                    }}
+                    className="w-full mt-3 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-medium transition"
+                  >
+                    Manage Position
+                  </button>
+                </div>
               </div>
-              <div>
-                <p className="text-slate-400 text-xs uppercase mb-2">Sharpe Ratio</p>
-                <p className="text-white font-bold text-xl">{metrics?.sharpe_ratio || 1.42}</p>
-              </div>
-              <div>
-                <p className="text-slate-400 text-xs uppercase mb-2">Max Drawdown</p>
-                <p className="text-red-400 font-bold text-xl">-12.3%</p>
-              </div>
-              <div>
-                <p className="text-slate-400 text-xs uppercase mb-2">Volatility (1Y)</p>
-                <p className="text-white font-bold text-xl">18.7%</p>
-              </div>
-              <div>
-                <p className="text-slate-400 text-xs uppercase mb-2">VaR (95%, 1D)</p>
-                <p className="text-white font-bold text-xl">-2.31%</p>
-              </div>
-              <div>
-                <p className="text-slate-400 text-xs uppercase mb-2">Tracking Error</p>
-                <p className="text-white font-bold text-xl">6.12%</p>
-              </div>
-            </div>
+            ))}
           </div>
-        </div>
         )}
       </div>
 
