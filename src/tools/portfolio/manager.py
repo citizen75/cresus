@@ -539,6 +539,95 @@ class PortfolioManager:
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
+    def get_portfolio_transactions(self, portfolio_name: str, ticker: Optional[str] = None) -> Dict[str, Any]:
+        """Get transactions for a portfolio, optionally filtered by ticker."""
+        journal = Journal(portfolio_name, context=self.context)
+        df = journal.load_df()
+
+        if df.empty:
+            return {"transactions": []}
+
+        # Filter by ticker if specified
+        if ticker:
+            df = df[df["ticker"].str.upper() == ticker.upper()]
+
+        # Convert to list of dicts
+        transactions = []
+        for _, row in df.iterrows():
+            tx = {
+                "id": str(row.get("id", "")),
+                "created_at": str(row.get("created_at", "")),
+                "operation": str(row.get("operation", "")),
+                "ticker": str(row.get("ticker", "")),
+                "quantity": float(row.get("quantity", 0)),
+                "price": float(row.get("price", 0)),
+                "fees": float(row.get("fees", 0)),
+                "status": str(row.get("status", "")),
+                "notes": str(row.get("notes", "")),
+            }
+            transactions.append(tx)
+
+        return {"transactions": transactions}
+
+    def update_transaction(self, portfolio_name: str, transaction_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
+        """Update a transaction."""
+        journal = Journal(portfolio_name, context=self.context)
+        try:
+            journal.update_transaction(transaction_id, updates)
+            journal.flush()
+            self.update_portfolio_cache(portfolio_name)
+            return {"status": "success", "message": "Transaction updated"}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    def delete_transaction(self, portfolio_name: str, transaction_id: str) -> Dict[str, Any]:
+        """Delete a transaction."""
+        journal = Journal(portfolio_name, context=self.context)
+        try:
+            journal.delete_transaction(transaction_id)
+            journal.flush()
+            self.update_portfolio_cache(portfolio_name)
+            return {"status": "success", "message": "Transaction deleted"}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    def get_portfolio_orders(self, portfolio_name: str) -> Dict[str, Any]:
+        """Get pending and executed orders for a portfolio."""
+        from tools.portfolio.orders import Orders
+
+        try:
+            orders_mgr = Orders(portfolio_name)
+            all_orders = orders_mgr.to_orders()
+
+            if not all_orders:
+                return {"orders": [], "count": 0}
+
+            # Convert to API format
+            orders = []
+            for order in all_orders:
+                api_order = {
+                    "id": order["id"][:8],
+                    "ticker": order["ticker"],
+                    "shares": order["quantity"],
+                    "entryPrice": order["entry_price"],
+                    "executionMethod": order["execution_method"],
+                    "stopLoss": order["stop_loss"],
+                    "takeProfit": order["take_profit"],
+                    "riskAmount": order["risk_amount"],
+                    "riskReward": order["risk_reward"],
+                    "status": order["status"].upper(),
+                    "createdAt": order["created_at"],
+                    "metadata": order["metadata"],
+                }
+                orders.append(api_order)
+
+            # Sort by date descending
+            orders.sort(key=lambda x: x["createdAt"], reverse=True)
+            return {"orders": orders, "count": len(orders)}
+        except Exception as e:
+            logger.error(f"Error fetching orders for {portfolio_name}: {e}")
+            return {"orders": [], "count": 0}
+
     def refresh_portfolio_fundamentals(self, name: str) -> Dict[str, Any]:
         """Refresh prices for all positions."""
         positions = self.get_portfolio_positions(name)

@@ -116,42 +116,8 @@ async def delete_portfolio(name: str):
 @router.get("/{name}/orders")
 async def get_portfolio_orders(name: str):
     """Get orders for a portfolio (pending, executed, rejected)."""
-    from tools.portfolio.orders import Orders
-
-    try:
-        orders_mgr = Orders(name)
-        all_orders = orders_mgr.to_orders()
-
-        if not all_orders:
-            return {"orders": [], "count": 0}
-
-        # Convert to API format
-        orders = []
-        for order in all_orders:
-            api_order = {
-                "id": order["id"][:8],  # Truncate ID
-                "ticker": order["ticker"],
-                "shares": order["quantity"],
-                "entryPrice": order["entry_price"],
-                "executionMethod": order["execution_method"],
-                "stopLoss": order["stop_loss"],
-                "takeProfit": order["take_profit"],
-                "riskAmount": order["risk_amount"],
-                "riskReward": order["risk_reward"],
-                "status": order["status"].upper(),
-                "createdAt": order["created_at"],
-                "metadata": order["metadata"],
-            }
-            orders.append(api_order)
-
-        # Sort by date descending (most recent first)
-        orders.sort(key=lambda x: x["createdAt"], reverse=True)
-
-        return {"orders": orders, "count": len(orders)}
-
-    except Exception as e:
-        print(f"Error fetching portfolio orders: {e}")
-        return {"orders": [], "count": 0}
+    pm = _get_portfolio_manager()
+    return pm.get_portfolio_orders(name)
 
 
 @router.get("/{name}")
@@ -177,59 +143,13 @@ async def get_portfolio_positions(name: str):
 @router.get("/{name}/transactions")
 async def get_portfolio_transactions(name: str, ticker: Optional[str] = None):
     """Get all transactions for a portfolio, optionally filtered by ticker."""
-    from tools.portfolio.journal import Journal
-
-    journal = Journal(name)
-    df = journal.load_df()
-
-    if df.empty:
-        return {
-            "name": name,
-            "transactions": [],
-            "total_count": 0,
-            "ticker_filter": ticker,
-        }
-
-    # Filter by ticker if provided
-    if ticker:
-        df = df[df["ticker"].str.upper() == ticker.upper()]
-
-    # Convert to list of dicts
-    transactions = []
-    for _, row in df.iterrows():
-        # Helper to convert NaN to 0
-        def safe_float(val, default=0.0):
-            try:
-                f = float(pd.to_numeric(val, errors="coerce"))
-                return default if pd.isna(f) else f
-            except (TypeError, ValueError):
-                return default
-
-        def safe_int(val, default=0):
-            try:
-                i = int(pd.to_numeric(val, errors="coerce"))
-                return default if pd.isna(i) else i
-            except (TypeError, ValueError):
-                return default
-
-        transactions.append({
-            "id": str(row.get("id", "")),
-            "created_at": str(row.get("created_at", "")),
-            "operation": str(row.get("operation", "")),
-            "ticker": str(row.get("ticker", "")),
-            "quantity": safe_int(row.get("quantity", 0)),
-            "price": safe_float(row.get("price", 0)),
-            "amount": safe_float(row.get("amount", 0)),
-            "fees": safe_float(row.get("fees", 0)),
-            "status": str(row.get("status", "")),
-            "status_at": str(row.get("status_at", "")),
-            "notes": str(row.get("notes", "")),
-        })
+    pm = _get_portfolio_manager()
+    result = pm.get_portfolio_transactions(name, ticker)
 
     return {
         "name": name,
-        "transactions": transactions,
-        "total_count": len(transactions),
+        "transactions": result.get("transactions", []),
+        "total_count": len(result.get("transactions", [])),
         "ticker_filter": ticker,
     }
 
@@ -459,67 +379,33 @@ async def get_current_prices(name: str):
 @router.put("/{name}/transactions/{transaction_id}")
 async def update_transaction(name: str, transaction_id: str, data: Dict[str, Any]):
     """Update a transaction."""
-    from tools.portfolio.journal import Journal
+    pm = _get_portfolio_manager()
+    result = pm.update_transaction(name, transaction_id, data)
 
-    journal = Journal(name)
-    df = journal.load_df()
+    if result.get("status") == "error":
+        raise HTTPException(400, result.get("message"))
 
-    if df.empty or not any(df["id"] == transaction_id):
-        raise HTTPException(404, f"Transaction '{transaction_id}' not found")
-
-    try:
-        # Find and update the transaction
-        idx = df[df["id"] == transaction_id].index[0]
-        df.loc[idx, "quantity"] = int(data.get("quantity", df.loc[idx, "quantity"]))
-        df.loc[idx, "price"] = float(data.get("price", df.loc[idx, "price"]))
-        df.loc[idx, "amount"] = float(df.loc[idx, "quantity"]) * float(df.loc[idx, "price"])
-        df.loc[idx, "fees"] = float(data.get("fees", df.loc[idx, "fees"]))
-        df.loc[idx, "notes"] = data.get("notes", df.loc[idx, "notes"])
-        if "created_at" in data and data["created_at"]:
-            df.loc[idx, "created_at"] = data["created_at"]
-        df.loc[idx, "status_at"] = datetime.now().isoformat()
-
-        journal.save(df)
-
-        # Update portfolio cache
-        pm = _get_portfolio_manager()
-        pm.update_portfolio_cache(name)
-
-        return {
-            "status": "success",
-            "message": f"Transaction {transaction_id} updated",
-            "portfolio": name,
-        }
-    except Exception as e:
-        raise HTTPException(400, f"Failed to update transaction: {str(e)}")
+    return {
+        "status": "success",
+        "message": f"Transaction {transaction_id} updated",
+        "portfolio": name,
+    }
 
 
 @router.delete("/{name}/transactions/{transaction_id}")
 async def delete_transaction(name: str, transaction_id: str):
     """Delete a transaction."""
-    from tools.portfolio.journal import Journal
+    pm = _get_portfolio_manager()
+    result = pm.delete_transaction(name, transaction_id)
 
-    journal = Journal(name)
-    df = journal.load_df()
+    if result.get("status") == "error":
+        raise HTTPException(400, result.get("message"))
 
-    if df.empty or not any(df["id"] == transaction_id):
-        raise HTTPException(404, f"Transaction '{transaction_id}' not found")
-
-    try:
-        df = df[df["id"] != transaction_id]
-        journal.save(df)
-
-        # Update portfolio cache
-        pm = _get_portfolio_manager()
-        pm.update_portfolio_cache(name)
-
-        return {
-            "status": "success",
-            "message": f"Transaction {transaction_id} deleted",
-            "portfolio": name,
-        }
-    except Exception as e:
-        raise HTTPException(400, f"Failed to delete transaction: {str(e)}")
+    return {
+        "status": "success",
+        "message": f"Transaction {transaction_id} deleted",
+        "portfolio": name,
+    }
 
 
 @router.get("/{name}/backtest")
