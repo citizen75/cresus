@@ -130,22 +130,28 @@ export default function Portfolios() {
                   {/* Value */}
                   <div className="col-span-2">
                     <div className="text-slate-400 text-xs uppercase tracking-wider mb-1">Total value</div>
-                    <div className="text-white font-bold text-lg">€100,000</div>
-                    <div className="text-green-400 text-sm">+€12,540</div>
+                    <div className="text-white font-bold text-lg">€{(portfolio.total_portfolio_value || 0).toLocaleString('de-DE', { maximumFractionDigits: 2 })}</div>
+                    <div className={`text-sm ${(portfolio.unrealized_gain || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {(portfolio.unrealized_gain || 0) >= 0 ? '+' : ''}€{(portfolio.unrealized_gain || 0).toLocaleString('de-DE', { maximumFractionDigits: 2 })} ({(portfolio.unrealized_gain_pct || 0).toFixed(2)}%)
+                    </div>
                   </div>
 
-                  {/* Today */}
+                  {/* Invested */}
                   <div className="col-span-2">
-                    <div className="text-slate-400 text-xs uppercase tracking-wider mb-1">Today</div>
-                    <div className="text-white font-bold text-lg">+€580</div>
-                    <div className="text-green-400 text-sm">+1.87%</div>
+                    <div className="text-slate-400 text-xs uppercase tracking-wider mb-1">Invested</div>
+                    <div className="text-white font-bold text-lg">€{(portfolio.total_positions_value || 0).toLocaleString('de-DE', { maximumFractionDigits: 2 })}</div>
+                    <div className="text-slate-400 text-sm">
+                      {((portfolio.total_positions_value || 0) / (portfolio.total_portfolio_value || 1) * 100).toFixed(1)}% of portfolio
+                    </div>
                   </div>
 
-                  {/* YTD Return */}
+                  {/* Cash */}
                   <div className="col-span-2">
-                    <div className="text-slate-400 text-xs uppercase tracking-wider mb-1">YTD return</div>
-                    <div className="text-green-400 font-bold text-lg">+28.74%</div>
-                    <div className="text-slate-400 text-sm">vs. SPY +11.02%</div>
+                    <div className="text-slate-400 text-xs uppercase tracking-wider mb-1">Cash</div>
+                    <div className="text-white font-bold text-lg">€{(portfolio.cash || 0).toLocaleString('de-DE', { maximumFractionDigits: 2 })}</div>
+                    <div className="text-slate-400 text-sm">
+                      {((portfolio.cash || 0) / (portfolio.total_portfolio_value || 1) * 100).toFixed(1)}% of portfolio
+                    </div>
                   </div>
 
                   {/* Positions */}

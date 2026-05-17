@@ -93,12 +93,23 @@ class PortfolioManager:
             open_pos = journal.get_open_positions()
             completed = df[df["status"] == "completed"] if not df.empty else pd.DataFrame()
 
+            # Calculate gains from metadata
+            total_portfolio_value = metadata.get("total_portfolio_value", 0.0)
+            initial_capital = metadata.get("initial_capital", 100000.0)
+            unrealized_gain = total_portfolio_value - initial_capital
+            unrealized_gain_pct = (unrealized_gain / initial_capital * 100) if initial_capital > 0 else 0.0
+
             portfolios.append({
                 "name": metadata.get("name", portfolio_name),
                 "type": metadata.get("type", "paper"),
                 "currency": metadata.get("currency", "EUR"),
                 "description": metadata.get("description", ""),
-                "initial_capital": metadata.get("initial_capital", 100000.0),
+                "initial_capital": initial_capital,
+                "total_portfolio_value": total_portfolio_value,
+                "total_positions_value": metadata.get("total_positions_value", 0.0),
+                "cash": metadata.get("cash", 0.0),
+                "unrealized_gain": unrealized_gain,
+                "unrealized_gain_pct": unrealized_gain_pct,
                 "num_positions": len(open_pos),
                 "num_trades": len(completed),
                 "total_return_pct": metadata.get("total_return_pct", 0.0),
