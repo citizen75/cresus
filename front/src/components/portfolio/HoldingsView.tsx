@@ -4,6 +4,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 import PositionModal from './PositionModal'
 import TransactionsView from './TransactionsView'
 import CardChart from '@/components/CardChart'
+import TradingChart from '@/components/TradingChart'
 import { api } from '@/services/api'
 
 interface HoldingsViewProps {
@@ -31,6 +32,7 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
   const [historicalData, setHistoricalData] = useState<Record<string, any[]>>({})
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [sectorFilter, setSectorFilter] = useState<string>('All sectors')
+  const [chartPosition, setChartPosition] = useState<any>(null)
 
   const positions = priceData?.positions || []
   const totalValue = priceData?.total_value || 0
@@ -564,8 +566,11 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
                             <button
                               onClick={(e) => {
                                 e.stopPropagation()
-                                setViewMode('charts')
-                                setSelectedPosition(pos.ticker)
+                                setChartPosition({
+                                  ticker: pos.ticker,
+                                  current_price: pos.current_price,
+                                  quantity: pos.quantity
+                                })
                               }}
                               className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded transition"
                               title="View chart"
@@ -854,6 +859,41 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
         </div>
         )}
       </div>
+
+      {/* Chart Modal */}
+      {chartPosition && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 rounded-lg border border-slate-800 w-full max-w-6xl h-screen max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
+              <div>
+                <h2 className="text-2xl font-bold text-white">
+                  {chartPosition.ticker}
+                  <span className="text-lg text-slate-400 ml-2">
+                    - Current Price: €{chartPosition.current_price?.toFixed(2)} | Qty: {chartPosition.quantity}
+                  </span>
+                </h2>
+                <p className="text-slate-400 text-sm mt-1">Live Position Analysis</p>
+              </div>
+              <button
+                onClick={() => setChartPosition(null)}
+                className="text-slate-400 hover:text-white transition text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Chart Container */}
+            <div className="flex-1 overflow-hidden">
+              <TradingChart
+                timeframe="1Y"
+                title={`${chartPosition.ticker} - Position Analysis`}
+                ticker={chartPosition.ticker}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Position Modal */}
       <PositionModal
