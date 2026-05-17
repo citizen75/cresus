@@ -29,6 +29,8 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
   const [sortColumn, setSortColumn] = useState<string | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [historicalData, setHistoricalData] = useState<Record<string, any[]>>({})
+  const [searchQuery, setSearchQuery] = useState<string>('')
+  const [sectorFilter, setSectorFilter] = useState<string>('All sectors')
 
   const positions = priceData?.positions || []
   const totalValue = priceData?.total_value || 0
@@ -119,9 +121,23 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
 
   // Sorting logic
   const getSortedPositions = () => {
-    if (!sortColumn) return positions
+    // First, filter by search query and sector
+    let filtered = positions.filter((pos: any) => {
+      // Search filter
+      const matchesSearch = searchQuery === '' ||
+        pos.ticker.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (pos.company_name || '').toLowerCase().includes(searchQuery.toLowerCase())
 
-    return [...positions].sort((a: any, b: any) => {
+      // Sector filter
+      const matchesSector = sectorFilter === 'All sectors' || pos.sector === sectorFilter
+
+      return matchesSearch && matchesSector
+    })
+
+    // Then sort if needed
+    if (!sortColumn) return filtered
+
+    return filtered.sort((a: any, b: any) => {
       let aVal, bVal
 
       switch (sortColumn) {
@@ -352,6 +368,11 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
                     <input
                       type="text"
                       placeholder="Search by symbol or company..."
+                      value={searchQuery}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value)
+                        setCurrentPage(1)
+                      }}
                       className="w-full px-4 py-2 bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg focus:outline-none focus:border-purple-600"
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500">🔍</span>
@@ -363,7 +384,14 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
                     <option>Short only</option>
                   </select>
 
-                  <select className="px-4 py-2 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:border-slate-600 transition">
+                  <select
+                    value={sectorFilter}
+                    onChange={(e) => {
+                      setSectorFilter(e.target.value)
+                      setCurrentPage(1)
+                    }}
+                    className="px-4 py-2 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:border-slate-600 transition"
+                  >
                     <option>All sectors</option>
                     {Array.from(sectorMap.keys())
                       .sort()
