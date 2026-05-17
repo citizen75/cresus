@@ -60,20 +60,16 @@ async def get_history_by_query(
 				df = df[available_cols]
 
 		# Convert to list of dicts, handling NaN values
-		records = []
-		for _, row in df.iterrows():
-			record = {}
-			for col in df.columns:
-				value = row[col]
+		records = df.to_dict(orient='records')
+		for record in records:
+			for col in record:
+				value = record[col]
 				if pd.isna(value):
 					record[col] = None
 				elif col == 'volume':
-					record[col] = int(value)
+					record[col] = int(value) if not pd.isna(value) else None
 				elif col in ['open', 'high', 'low', 'close']:
-					record[col] = float(value)
-				else:
-					record[col] = str(value)
-			records.append(record)
+					record[col] = float(value) if not pd.isna(value) else None
 
 		return {
 			"ticker": ticker,
@@ -188,20 +184,18 @@ async def get_ticker_history(
 				df = df[available_cols]
 
 		# Convert to list of dicts, handling NaN values
-		records = []
-		for _, row in df.iterrows():
-			record = {}
-			for col in df.columns:
-				value = row[col]
+		records = df.to_dict(orient='records')
+		for record in records:
+			for col in record:
+				value = record[col]
 				if pd.isna(value):
 					record[col] = None
 				elif col == 'volume':
-					record[col] = int(value)
+					record[col] = int(value) if not pd.isna(value) else None
 				elif col in ['open', 'high', 'low', 'close']:
+					record[col] = float(value) if not pd.isna(value) else None
+				elif isinstance(value, (int, float)) and not pd.isna(value):
 					record[col] = float(value)
-				else:
-					record[col] = float(value) if isinstance(value, (int, float)) else str(value)
-			records.append(record)
 
 		return {
 			"ticker": ticker,
