@@ -28,7 +28,7 @@ export default function CardChart({ data, ticker, showVariation = true }: CardCh
   const isPositive = variation >= 0
 
   return (
-    <div className="relative p-4 bg-slate-800/20">
+    <div className="relative p-4 bg-slate-800/20 w-full overflow-hidden">
       {/* Variation Badge */}
       {showVariation && (
         <div className="absolute top-4 right-4 z-10">
@@ -48,7 +48,7 @@ export default function CardChart({ data, ticker, showVariation = true }: CardCh
       )}
 
       {/* Chart */}
-      <div className="h-48">
+      <div style={{ width: '100%', height: '12rem' }}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={data}
