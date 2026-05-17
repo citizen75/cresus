@@ -19,6 +19,7 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
   const { data: history } = usePortfolioHistory(name)
   const [activeTab, setActiveTab] = useState('positions')
   const [viewMode, setViewMode] = useState<'table' | 'charts'>('table')
+  const [timeframe, setTimeframe] = useState<'1W' | '1M' | '3M' | 'YTD' | 'ALL'>('1M')
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedPosition, setSelectedPosition] = useState<string | null>(null)
   const [positionModalMode, setPositionModalMode] = useState<'buy' | 'sell' | null>(null)
@@ -35,13 +36,40 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
   const totalPortfolioValue = priceData?.total_portfolio_value || totalValue
   const itemsPerPage = 10
 
+  // Calculate days based on timeframe
+  const getDaysForTimeframe = (tf: string) => {
+    switch (tf) {
+      case '1W': return 7
+      case '1M': return 30
+      case '3M': return 90
+      case 'YTD': return 365
+      case 'ALL': return 1825 // ~5 years
+      default: return 30
+    }
+  }
+
+  // Filter data by timeframe
+  const filterDataByTimeframe = (data: any[], tf: string) => {
+    if (tf === 'ALL') return data
+
+    const days = getDaysForTimeframe(tf)
+    const cutoffDate = new Date()
+    cutoffDate.setDate(cutoffDate.getDate() - days)
+
+    return data.filter((item: any) => {
+      const itemDate = new Date(item.date)
+      return itemDate >= cutoffDate
+    })
+  }
+
   // Load historical data for cards view
   useEffect(() => {
     const loadHistoricalData = async () => {
       const data: Record<string, any[]> = {}
+      const days = getDaysForTimeframe(timeframe)
       for (const pos of positions) {
         try {
-          const result = await api.getHistoricalData(pos.ticker, 90)
+          const result = await api.getHistoricalData(pos.ticker, days)
 
           // Handle different response structures
           let historyArray = []
@@ -77,7 +105,7 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
     if (positions.length > 0) {
       loadHistoricalData()
     }
-  }, [positions])
+  }, [positions, timeframe])
 
   // Sorting logic
   const getSortedPositions = () => {
@@ -352,34 +380,51 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
                   </button>
                 </div>
 
-                {/* Table/Charts Toggle */}
-                <div className="flex gap-2 bg-slate-800 border border-slate-700 rounded-lg p-1">
-                  <button
-                    onClick={() => {
-                      setViewMode('table')
-                      setCurrentPage(1)
-                    }}
-                    className={`px-4 py-1.5 rounded transition font-medium text-sm ${
-                      viewMode === 'table'
-                        ? 'bg-purple-600 text-white'
-                        : 'text-slate-400 hover:text-slate-300'
-                    }`}
-                  >
-                    📊 Table
-                  </button>
-                  <button
-                    onClick={() => {
-                      setViewMode('charts')
-                      setCurrentPage(1)
-                    }}
-                    className={`px-4 py-1.5 rounded transition font-medium text-sm ${
-                      viewMode === 'charts'
-                        ? 'bg-purple-600 text-white'
-                        : 'text-slate-400 hover:text-slate-300'
-                    }`}
-                  >
-                    📈 Charts
-                  </button>
+                {/* Table/Charts Toggle and Timeframe */}
+                <div className="flex gap-2">
+                  <div className="flex gap-2 bg-slate-800 border border-slate-700 rounded-lg p-1">
+                    <button
+                      onClick={() => {
+                        setViewMode('table')
+                        setCurrentPage(1)
+                      }}
+                      className={`px-4 py-1.5 rounded transition font-medium text-sm ${
+                        viewMode === 'table'
+                          ? 'bg-purple-600 text-white'
+                          : 'text-slate-400 hover:text-slate-300'
+                      }`}
+                    >
+                      📊 Table
+                    </button>
+                    <button
+                      onClick={() => {
+                        setViewMode('charts')
+                        setCurrentPage(1)
+                      }}
+                      className={`px-4 py-1.5 rounded transition font-medium text-sm ${
+                        viewMode === 'charts'
+                          ? 'bg-purple-600 text-white'
+                          : 'text-slate-400 hover:text-slate-300'
+                      }`}
+                    >
+                      📈 Charts
+                    </button>
+                  </div>
+
+                  {/* Timeframe Dropdown - Only visible in charts mode */}
+                  {viewMode === 'charts' && (
+                    <select
+                      value={timeframe}
+                      onChange={(e) => setTimeframe(e.target.value as '1W' | '1M' | '3M' | 'YTD' | 'ALL')}
+                      className="px-4 py-1.5 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:border-slate-600 transition font-medium text-sm"
+                    >
+                      <option value="1W">1W</option>
+                      <option value="1M">1M</option>
+                      <option value="3M">3M</option>
+                      <option value="YTD">YTD</option>
+                      <option value="ALL">ALL</option>
+                    </select>
+                  )}
                 </div>
               </div>
             </>
@@ -565,7 +610,7 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
                 {/* Chart */}
                 {historicalData[pos.ticker] && historicalData[pos.ticker].length > 0 ? (
                   <CardChart
-                    data={historicalData[pos.ticker]}
+                    data={filterDataByTimeframe(historicalData[pos.ticker], timeframe)}
                     ticker={pos.ticker}
                     showVariation={false}
                   />
@@ -578,9 +623,9 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
 
                 {/* Price Range Row - First/Var/Last */}
                 {historicalData[pos.ticker] && historicalData[pos.ticker].length > 0 && (() => {
-                  const data = historicalData[pos.ticker]
-                  const firstPrice = data[0]?.close
-                  const lastPrice = data[data.length - 1]?.close
+                  const filteredData = filterDataByTimeframe(historicalData[pos.ticker], timeframe)
+                  const firstPrice = filteredData[0]?.close
+                  const lastPrice = filteredData[filteredData.length - 1]?.close
                   const change = firstPrice ? ((lastPrice - firstPrice) / firstPrice) * 100 : 0
                   return (
                     <div className="border-t border-slate-800 px-4 py-3 bg-slate-800/30">
