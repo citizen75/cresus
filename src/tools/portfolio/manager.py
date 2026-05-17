@@ -448,10 +448,15 @@ class PortfolioManager:
             "positions": positions.get("positions", []),
         }
 
-    def calculate_portfolio_history(self, name: str, recalculate: bool = False) -> Dict[str, Any]:
+    def calculate_portfolio_history(self, name: str, recalculate: bool = False, use_cache_only: bool = False) -> Dict[str, Any]:
         """Get portfolio value history from transactions.
 
         Replays journal transactions to compute daily portfolio value including cash.
+
+        Args:
+            name: Portfolio name
+            recalculate: If True, recalculate even if cached
+            use_cache_only: If True, only use cached data (skip fetching for API endpoints)
         """
         # Get initial capital from portfolio metadata
         metadata = self._get_portfolio_metadata(name)
@@ -459,7 +464,7 @@ class PortfolioManager:
 
         # Use PortfolioHistory to calculate
         ph = PortfolioHistory(name, initial_capital)
-        result = ph.calculate(recalculate)
+        result = ph.calculate(recalculate, use_cache_only=use_cache_only)
 
         if result.get("status") == "error":
             return {

@@ -31,11 +31,12 @@ class PortfolioHistory:
         self.initial_capital = initial_capital
         self.data_manager = data_manager or DataManager(Path.cwd())
 
-    def calculate(self, recalculate: bool = False) -> Dict[str, Any]:
+    def calculate(self, recalculate: bool = False, use_cache_only: bool = False) -> Dict[str, Any]:
         """Calculate daily portfolio history.
 
         Args:
             recalculate: If True, recalculate even if cached
+            use_cache_only: If True, only use cached data and skip fetching for invalid tickers
 
         Returns:
             Dict with history data and metadata
@@ -87,29 +88,40 @@ class PortfolioHistory:
             if ticker and ticker != "CASH":
                 tickers.add(ticker)
 
-        # Preload history data for all tickers via DataManager
-        logger.info(f"Preloading history for {len(tickers)} tickers")
+        # Preload history data for all tickers
+        logger.info(f"Preloading history for {len(tickers)} tickers (cache_only={use_cache_only})")
         ticker_history = {}
         failed_tickers = []
 
+        from tools.data import DataHistory
+
         for ticker in tickers:
-            result = self.data_manager.fetch_history(ticker, start_date=first_tx_date.strftime("%Y-%m-%d"))
+            dh = DataHistory(ticker)
 
-            if result.get("status") == "success":
-                # DataManager fetched successfully - get the data directly
-                from tools.data import DataHistory
-                dh = DataHistory(ticker)
+            if use_cache_only:
+                # Only use cached data - don't fetch
                 df_all = dh.get_all()
-
                 if df_all is not None and not df_all.empty:
                     ticker_history[ticker] = df_all
-                    logger.debug(f"  Loaded {len(df_all)} rows for {ticker}")
+                    logger.debug(f"  Loaded {len(df_all)} rows for {ticker} (cached)")
                 else:
-                    logger.warning(f"No history data found for {ticker}")
+                    logger.warning(f"No cached history for {ticker}")
                     failed_tickers.append(ticker)
             else:
-                logger.warning(f"Failed to fetch history for {ticker}: {result.get('message', '')}")
-                failed_tickers.append(ticker)
+                # Fetch fresh data via DataManager
+                result = self.data_manager.fetch_history(ticker, start_date=first_tx_date.strftime("%Y-%m-%d"))
+
+                if result.get("status") == "success":
+                    df_all = dh.get_all()
+                    if df_all is not None and not df_all.empty:
+                        ticker_history[ticker] = df_all
+                        logger.debug(f"  Loaded {len(df_all)} rows for {ticker}")
+                    else:
+                        logger.warning(f"No history data found for {ticker}")
+                        failed_tickers.append(ticker)
+                else:
+                    logger.warning(f"Failed to fetch history for {ticker}: {result.get('message', '')}")
+                    failed_tickers.append(ticker)
 
         # Calculate daily values with drawdown
         daily_history = []
