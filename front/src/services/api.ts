@@ -59,6 +59,10 @@ class CresusAPI {
     return (await this.client.delete(`/strategies/${name}`)).data
   }
 
+  async getPortfolioMetadata(name: string) {
+    return (await this.client.get(`/portfolios/${name}/metadata`)).data
+  }
+
   async getPortfolioDetails(name: string) {
     return (await this.client.get(`/portfolios/${name}`)).data
   }

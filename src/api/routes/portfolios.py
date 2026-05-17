@@ -120,6 +120,16 @@ async def get_portfolio_orders(name: str):
     return pm.get_portfolio_orders(name)
 
 
+@router.get("/{name}/metadata")
+async def get_portfolio_metadata(name: str):
+    """Get portfolio metadata only (no expensive price lookups)."""
+    pm = _get_portfolio_manager()
+    result = pm.get_portfolio_metadata(name)
+    if not result:
+        raise HTTPException(404, f"Portfolio '{name}' not found")
+    return result
+
+
 @router.get("/{name}")
 async def get_portfolio_details(name: str):
     """Get portfolio details."""

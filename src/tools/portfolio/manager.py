@@ -270,6 +270,22 @@ class PortfolioManager:
             logger.error(f"Error deleting portfolio: {e}")
             return {"status": "error", "message": str(e)}
 
+    def get_portfolio_metadata(self, name: str) -> Optional[Dict[str, Any]]:
+        """Get portfolio metadata only (no expensive price lookups)."""
+        metadata = self._get_portfolio_metadata(name)
+        if not metadata:
+            return None
+
+        return {
+            "name": name,
+            "portfolio_type": metadata.get("type", "paper"),
+            "currency": metadata.get("currency", "EUR"),
+            "description": metadata.get("description", ""),
+            "initial_capital": metadata.get("initial_capital", 100000.0),
+            "created_at": metadata.get("created_at"),
+            "strategy": metadata.get("strategy", name),
+        }
+
     def get_portfolio_details(self, name: str) -> Optional[Dict[str, Any]]:
         """Get portfolio with positions and metadata."""
         # Load metadata

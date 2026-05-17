@@ -36,8 +36,8 @@ export default function PortfolioSettings({ name }: PortfolioSettingsProps) {
       try {
         setLoading(true)
 
-        // Load portfolio config
-        const result = await api.getPortfolioDetails(name)
+        // Load portfolio metadata (fast - no price lookups)
+        const result = await api.getPortfolioMetadata(name)
         setConfig(result)
         setEditedConfig(result)
 
