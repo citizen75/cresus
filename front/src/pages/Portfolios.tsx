@@ -17,6 +17,12 @@ export default function Portfolios() {
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
+  // Calculate metrics from real portfolios only
+  const totalNetWorth = livePortfolios.reduce((sum, p) => sum + (p.total_portfolio_value || 0), 0)
+  const totalInvested = livePortfolios.reduce((sum, p) => sum + (p.initial_capital || 0), 0)
+  const totalGain = totalNetWorth - totalInvested
+  const totalGainPercent = totalInvested > 0 ? (totalGain / totalInvested * 100) : 0
+
   const handleDelete = async (name: string) => {
     setDeletingPortfolio(true)
     try {
@@ -54,18 +60,26 @@ export default function Portfolios() {
       <div className="grid grid-cols-4 gap-6">
         <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
           <div className="text-slate-400 text-sm mb-2">Total net worth</div>
-          <div className="text-3xl font-bold text-white">€1,287,460</div>
-          <div className="text-green-400 text-sm mt-2">+€22,841 (+1.81%)</div>
+          <div className="text-3xl font-bold text-white">€{totalNetWorth.toLocaleString('de-DE', { maximumFractionDigits: 0 })}</div>
+          <div className={`${totalGain >= 0 ? 'text-green-400' : 'text-red-400'} text-sm mt-2`}>
+            {totalGain >= 0 ? '+' : ''}€{totalGain.toLocaleString('de-DE', { maximumFractionDigits: 2 })} ({totalGainPercent >= 0 ? '+' : ''}{totalGainPercent.toFixed(2)}%)
+          </div>
         </div>
         <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
           <div className="text-slate-400 text-sm mb-2">Today's change</div>
-          <div className="text-3xl font-bold text-green-400">+€22,841</div>
-          <div className="text-green-400 text-sm mt-2">+1.81%</div>
+          <div className={`text-3xl font-bold ${totalGain >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            {totalGain >= 0 ? '+' : ''}€{totalGain.toLocaleString('de-DE', { maximumFractionDigits: 2 })}
+          </div>
+          <div className={`${totalGain >= 0 ? 'text-green-400' : 'text-red-400'} text-sm mt-2`}>
+            {totalGainPercent >= 0 ? '+' : ''}{totalGainPercent.toFixed(2)}%
+          </div>
         </div>
         <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
           <div className="text-slate-400 text-sm mb-2">YTD return (weighted)</div>
-          <div className="text-3xl font-bold text-green-400">+24.31%</div>
-          <div className="text-slate-400 text-sm mt-2">vs. SPY +11.02%</div>
+          <div className={`text-3xl font-bold ${totalGainPercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            {totalGainPercent >= 0 ? '+' : ''}{totalGainPercent.toFixed(2)}%
+          </div>
+          <div className="text-slate-400 text-sm mt-2">from {livePortfolios.length} {livePortfolios.length === 1 ? 'portfolio' : 'portfolios'}</div>
         </div>
         <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
           <div className="text-slate-400 text-sm mb-2">Total portfolios</div>

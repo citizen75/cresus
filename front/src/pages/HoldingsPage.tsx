@@ -1,4 +1,4 @@
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import HoldingsView from '@/components/portfolio/HoldingsView'
 
 const MAIN_TABS = [
@@ -12,7 +12,6 @@ const MAIN_TABS = [
 
 export default function HoldingsPage() {
   const { name = 'main' } = useParams()
-  const navigate = useNavigate()
 
   return (
     <div className="space-y-6">
@@ -80,12 +79,7 @@ export default function HoldingsPage() {
       </div>
 
       {/* Holdings Content */}
-      <HoldingsView
-        name={name}
-        onViewTransactions={(ticker) => {
-          navigate(`/portfolios/${encodeURIComponent(name)}/holdings/transactions?ticker=${encodeURIComponent(ticker)}`)
-        }}
-      />
+      <HoldingsView name={name} />
     </div>
   )
 }

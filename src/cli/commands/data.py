@@ -51,6 +51,7 @@ class DataCommands:
 		table.add_row("data fetch universe <name> [start_date]", "Fetch all tickers in universe")
 		table.add_row("data fetch all <universe> [start_date]", "Fetch history + fundamental for universe")
 		table.add_row("data fetch ptf <portfolio_name>", "Calculate portfolio history from journal")
+		table.add_row("data fetch ptf all", "Fetch fundamental data for all portfolio tickers")
 		table.add_row("data show <ticker>", "Show ticker info (history dates, last OHLCV, fundamentals)")
 		table.add_row("data list [history|fundamentals|all]", "List cached data")
 		table.add_row("data clear [type] [ticker]", "Clear cache (types: history, fundamentals, all)")
@@ -85,17 +86,59 @@ class DataCommands:
 			console.print(f"[red]✗[/red] Unknown data type: {data_type}")
 
 	def _handle_fetch_portfolio(self, portfolio_name):
-		"""Handle portfolio history fetch command."""
-		from pathlib import Path
-		from tools.portfolio.portfolio_history import PortfolioHistory
+		"""Handle portfolio history fetch or all portfolio tickers data fetch."""
 		from loguru import logger
+		from tools.portfolio.manager import PortfolioManager
 
+		# Handle "all" case - fetch data for all portfolio tickers
+		if portfolio_name.lower() == "all":
+			try:
+				console.print(f"[cyan]Fetching fundamental data for all portfolio tickers...[/cyan]")
+				pm = PortfolioManager()
+				result = pm.fetch_all_ticker_data(days=365)
+
+				if result.get("status") == "error":
+					console.print(f"[red]✗[/red] {result.get('message')}")
+					return
+
+				# Display results
+				tickers_processed = result.get("tickers_processed", 0)
+				tickers_total = result.get("tickers_total", 0)
+				tickers_failed = result.get("tickers_failed", [])
+
+				console.print(f"[green]✓[/green] Processed {tickers_processed}/{tickers_total} tickers")
+
+				if tickers_failed:
+					console.print(f"[yellow]⚠[/yellow] Failed tickers: {', '.join(tickers_failed)}")
+				else:
+					console.print()
+
+				# Show summary table
+				table = Table(title="Portfolio Ticker Data Fetch", box=box.ROUNDED)
+				table.add_column("Metric", style="cyan")
+				table.add_column("Value", justify="right")
+				table.add_row("Total Tickers", str(tickers_total))
+				table.add_row("Successfully Fetched", str(tickers_processed))
+				table.add_row("Failed", str(len(tickers_failed)))
+				table.add_row("Status", "[green]Success[/green]" if result.get("status") == "success" else "[yellow]Partial[/yellow]")
+
+				console.print(table)
+				console.print(f"\n[dim]All portfolio ticker data is now cached and available in the API[/dim]")
+
+			except Exception as e:
+				console.print(f"[red]✗[/red] Error fetching portfolio ticker data: {e}")
+				import traceback
+				logger.error(f"Portfolio ticker fetch error: {traceback.format_exc()}")
+			return
+
+		# Original behavior - calculate portfolio history
 		try:
+			from tools.portfolio.portfolio_history import PortfolioHistory
+
 			# Calculate portfolio history
 			console.print(f"[cyan]Calculating portfolio history for {portfolio_name}...[/cyan]")
 
 			# Get initial capital from portfolio metadata
-			from tools.portfolio.manager import PortfolioManager
 			pm = PortfolioManager()
 			metadata = pm._get_portfolio_metadata(portfolio_name)
 			initial_capital = float(metadata.get("initial_capital", 100000.0))

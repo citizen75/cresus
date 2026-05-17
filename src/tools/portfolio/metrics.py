@@ -244,7 +244,7 @@ class PortfolioMetrics(PortfolioManager):
                     sell = next_sells.iloc[0]
                     buy_price = float(buy['price'])
                     sell_price = float(sell['price'])
-                    quantity = int(buy['quantity'])
+                    quantity = float(buy['quantity'])
                     
                     # Calculate P&L
                     pnl = (sell_price - buy_price) * quantity

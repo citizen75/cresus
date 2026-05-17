@@ -1,20 +1,20 @@
 import { usePortfolioMetrics, useCurrentPrices, usePortfolioHistory } from '@/hooks/usePortfolio'
 import { useState, useEffect } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
+import { useNavigate } from 'react-router-dom'
 import PositionModal from './PositionModal'
-import TransactionsView from './TransactionsView'
 import CardChart from '@/components/CardChart'
 import TradingChart from '@/components/TradingChart'
 import { api } from '@/services/api'
 
 interface HoldingsViewProps {
   name: string
-  onViewTransactions?: (ticker: string) => void
 }
 
 const chartColors = ['#a78bfa', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6']
 
-export default function HoldingsView({ name, onViewTransactions }: HoldingsViewProps) {
+export default function HoldingsView({ name }: HoldingsViewProps) {
+  const navigate = useNavigate()
   const { data: metrics } = usePortfolioMetrics(name)
   const { data: priceData, isLoading: isPricesLoading, error: pricesError } = useCurrentPrices(name)
   const { data: history } = usePortfolioHistory(name)
@@ -26,7 +26,6 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
   const [positionModalMode, setPositionModalMode] = useState<'buy' | 'sell' | null>(null)
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null)
   const [selectedPositionData, setSelectedPositionData] = useState<any>(null)
-  const [filterTickerForTransactions, setFilterTickerForTransactions] = useState<string | null>(null)
   const [sortColumn, setSortColumn] = useState<string | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [historicalData, setHistoricalData] = useState<Record<string, any[]>>({})
@@ -259,7 +258,7 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
   const invested = totalValue
   const investedPercent = totalPortfolioValue > 0 ? (totalValue / totalPortfolioValue) * 100 : 0
 
-  const tabs = ['Overview', 'Positions', 'Allocation', 'Performance', 'Risk', 'Transactions', 'Exposure', 'Income']
+  const tabs = ['Overview', 'Positions', 'Allocation', 'Performance', 'Risk', 'Exposure', 'Income']
 
   return (
     <div className="space-y-6">
@@ -292,6 +291,12 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
               📉 Sell
             </button>
           )}
+          <button
+            onClick={() => navigate(`/portfolios/${encodeURIComponent(name)}/holdings/transactions`)}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-medium transition text-sm"
+          >
+            📋 Transactions
+          </button>
           <button className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-medium transition text-sm">
             Rebalance
           </button>
@@ -560,7 +565,6 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
                         <td className={`px-4 py-3 font-medium ${pos.position_gain_pct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                           {pos.position_gain_pct > 0 ? '+' : ''}{pos.position_gain_pct.toFixed(2)}%
                         </td>
-                        <td className="px-4 py-3 text-green-400 font-medium">+0.45%</td>
                         <td className="px-4 py-3">
                           <div className="flex gap-2">
                             <button
@@ -580,8 +584,7 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
                             <button
                               onClick={(e) => {
                                 e.stopPropagation()
-                                setFilterTickerForTransactions(pos.ticker)
-                                setActiveTab('transactions')
+                                navigate(`/portfolios/${encodeURIComponent(name)}/holdings/transactions?ticker=${encodeURIComponent(pos.ticker)}`)
                               }}
                               className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded transition"
                               title="View and edit transactions"
@@ -733,28 +736,6 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
           </div>
         )}
 
-          {/* Transactions Tab */}
-          {activeTab === 'transactions' && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 pb-4 border-b border-slate-800">
-                <button
-                  onClick={() => {
-                    setFilterTickerForTransactions(null)
-                    setActiveTab('positions')
-                  }}
-                  className="text-slate-400 hover:text-slate-300 text-sm font-medium"
-                >
-                  ← Back to Positions
-                </button>
-                {filterTickerForTransactions && (
-                  <span className="text-slate-400 text-sm">
-                    Filtered by: <span className="text-white font-medium">{filterTickerForTransactions}</span>
-                  </span>
-                )}
-              </div>
-              <TransactionsView name={name} filterTicker={filterTickerForTransactions || undefined} />
-            </div>
-          )}
         </div>
 
         {/* Right Sidebar - Allocation, Sector, Risk Metrics */}

@@ -155,7 +155,7 @@ class Journal:
             "created_at": tx_created_at,
             "operation": operation_upper,
             "ticker": ticker_val,
-            "quantity": int(quantity),
+            "quantity": float(quantity),
             "price": price_val,
             "amount": round(amount, 2),
             "fees": float(fees),
@@ -249,7 +249,7 @@ class Journal:
 
             result.append({
                 "ticker": ticker,
-                "quantity": int(data["quantity"]),
+                "quantity": float(data["quantity"]),
                 "avg_entry_price": round(avg_entry_price, 2),
                 "entry_fees": round(data["fees"], 2),
                 "entry_price": round(avg_entry_price, 2),
@@ -289,7 +289,7 @@ class Journal:
 
         # Update the first (earliest) BUY transaction
         idx = ticker_buys.index[0]
-        df.loc[idx, "quantity"] = int(quantity)
+        df.loc[idx, "quantity"] = float(quantity)
         df.loc[idx, "price"] = float(price)
         df.loc[idx, "amount"] = round(quantity * price, 2)
         df.loc[idx, "fees"] = float(fees)

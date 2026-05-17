@@ -3,6 +3,51 @@
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from loguru import logger
+from apscheduler.schedulers.background import BackgroundScheduler
+
+
+def setup_scheduler(app: FastAPI) -> None:
+    """Set up background scheduler for data fetching."""
+    scheduler = BackgroundScheduler()
+
+    def fetch_portfolio_data():
+        """Fetch fundamental data for all portfolio tickers."""
+        try:
+            from tools.portfolio.manager import PortfolioManager
+            pm = PortfolioManager()
+            result = pm.fetch_all_ticker_data(days=365)
+            logger.info(f"Scheduled data fetch: {result['tickers_processed']}/{result['tickers_total']} tickers updated")
+        except Exception as e:
+            logger.error(f"Error in scheduled data fetch: {e}")
+
+    # Schedule data fetch every 30 minutes on weekdays from 9am to 11pm
+    # Cron format: (minute, hour, day_of_week, month, day)
+    # 9-23 means 9am to 11pm (hour 23)
+    # 0-4 means Monday to Friday
+    scheduler.add_job(
+        fetch_portfolio_data,
+        "cron",
+        minute="*/30",  # Every 30 minutes
+        hour="9-23",    # 9am to 11pm
+        day_of_week="0-4",  # Monday to Friday
+        id="fetch_portfolio_data",
+        name="Fetch portfolio fundamental data",
+        max_instances=1,  # Prevent concurrent executions
+    )
+
+    # Start scheduler
+    scheduler.start()
+    logger.info("Scheduler started: Data fetch job scheduled (weekdays 9-23, every 30 min)")
+
+    # Store scheduler in app state for shutdown
+    app.state.scheduler = scheduler
+
+    # Add shutdown event
+    @app.on_event("shutdown")
+    def shutdown_scheduler():
+        scheduler.shutdown()
+        logger.info("Scheduler shutdown")
 
 
 def create_app() -> FastAPI:
@@ -41,6 +86,9 @@ def create_app() -> FastAPI:
     app.include_router(strategies_router, prefix="/api/v1")
     app.include_router(backtests_router, prefix="/api/v1")
     app.include_router(websocket_router, prefix="/api/v1")
+
+    # Setup background scheduler for data fetching
+    setup_scheduler(app)
 
     return app
 

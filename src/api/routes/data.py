@@ -272,3 +272,26 @@ async def get_ticker_fundamental(ticker: str):
 		raise
 	except Exception as e:
 		raise HTTPException(500, f"Error loading fundamental data: {str(e)}")
+
+
+@router.post("/cache/refresh")
+async def refresh_portfolio_cache():
+	"""Manually trigger refresh of fundamental data for all portfolio tickers.
+
+	This endpoint fetches and caches fundamental data for all tickers in real portfolios.
+	Useful for manual updates or testing the cron job.
+
+	Returns:
+		Cache refresh results
+	"""
+	try:
+		from tools.portfolio.manager import PortfolioManager
+		pm = PortfolioManager()
+		result = pm.fetch_all_ticker_data(days=365)
+		return {
+			"status": "success",
+			"message": f"Cache refresh complete: {result['tickers_processed']}/{result['tickers_total']} tickers updated",
+			**result,
+		}
+	except Exception as e:
+		raise HTTPException(500, f"Error refreshing cache: {str(e)}")

@@ -163,7 +163,7 @@ class Orders:
             "id": order_id,
             "created_at": now,
             "ticker": ticker.upper(),
-            "quantity": int(quantity),
+            "quantity": float(quantity),
             "entry_price": float(entry_price),
             "limit_price": float(limit_price) if limit_price is not None else None,
             "stop_loss": float(stop_loss) if stop_loss is not None else None,
@@ -359,7 +359,7 @@ class Orders:
             order = {
                 "id": str(row.get("id", "")),
                 "ticker": str(row.get("ticker", "")),
-                "quantity": int(row.get("quantity", 0)),
+                "quantity": float(row.get("quantity", 0)),
                 "entry_price": float(row.get("entry_price", 0)),
                 "stop_loss": float(row.get("stop_loss")) if pd.notna(row.get("stop_loss")) else None,
                 "take_profit": float(row.get("take_profit")) if pd.notna(row.get("take_profit")) else None,

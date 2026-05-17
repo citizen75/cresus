@@ -303,13 +303,14 @@ class PortfolioManager:
                 current_price = prices.get_current_price() or float(row.get("avg_entry_price", 0))
                 pos_value = float(row["quantity"]) * current_price
                 avg_entry_price = float(row["avg_entry_price"])
+                quantity = float(row["quantity"])
                 positions.append({
                     "ticker": ticker,
-                    "quantity": int(row["quantity"]),
+                    "quantity": quantity,
                     "avg_entry_price": avg_entry_price,
                     "current_price": current_price,
                     "position_value": round(pos_value, 2),
-                    "position_gain": round((current_price - avg_entry_price) * int(row["quantity"]), 2),
+                    "position_gain": round((current_price - avg_entry_price) * quantity, 2),
                     "position_gain_pct": round(((current_price - avg_entry_price) / avg_entry_price * 100), 2) if avg_entry_price > 0 else 0,
                 })
 
@@ -335,14 +336,15 @@ class PortfolioManager:
         positions = []
         for _, row in open_pos.iterrows():
             ticker = row["ticker"]
+            quantity = float(row["quantity"])
             avg_entry_price = float(row["avg_entry_price"])
             current_price = Fundamental(ticker).get_current_price() or avg_entry_price
             positions.append({
                 "ticker": ticker,
-                "quantity": int(row["quantity"]),
+                "quantity": quantity,
                 "avg_entry_price": avg_entry_price,
                 "current_price": current_price,
-                "position_value": round(float(row["quantity"]) * current_price, 2),
+                "position_value": round(quantity * current_price, 2),
             })
         return {"positions": positions, "total_value": sum(p["position_value"] for p in positions)}
 
@@ -390,7 +392,7 @@ class PortfolioManager:
         cash = initial_capital
         for _, row in df.iterrows():
             operation = str(row["operation"]).upper()
-            quantity = int(row["quantity"])
+            quantity = float(row["quantity"])
             price = float(row["price"])
             fees = float(row.get("fees", 0))
 
@@ -405,7 +407,7 @@ class PortfolioManager:
         return round(cash, 2)
 
     def update_portfolio_cache(self, name: str) -> None:
-        """Update portfolio cache and portfolio.json metadata with latest metrics."""
+        """Update portfolio cache and portfolio.json metadata with latest metrics (minimal cache - no position data)."""
         details = self.get_portfolio_details(name)
         perf = self.get_portfolio_performance(name)
         cash = self.get_portfolio_cash(name)
@@ -416,10 +418,10 @@ class PortfolioManager:
         # Get current portfolio metadata
         metadata = self._get_portfolio_metadata(name)
 
-        # Build cache entry
+        # Build minimal cache entry (summary only, NO position data)
         total_value = details.get("total_value", 0)
         total_portfolio_value = total_value + cash
-        positions = details.get("positions", [])
+        num_positions = details.get("num_positions", 0)
 
         cache_entry = {
             "name": name,
@@ -427,19 +429,11 @@ class PortfolioManager:
             "currency": metadata.get("currency", "EUR"),
             "description": metadata.get("description", ""),
             "initial_capital": float(metadata.get("initial_capital", 100000.0)),
-            "positions": {
-                "count": details.get("num_positions", 0),
-                "data": positions,
-            },
-            "metrics": {
-                "total_positions_value": round(total_value, 2),
-                "cash": round(cash, 2),
-                "total_portfolio_value": round(total_portfolio_value, 2),
-                "num_trades": perf.get("num_trades", 0),
-                "buy_trades": perf.get("buy_trades", 0),
-                "sell_trades": perf.get("sell_trades", 0),
-                "total_fees": perf.get("total_fees", 0.0),
-            },
+            "total_portfolio_value": round(total_portfolio_value, 2),
+            "total_positions_value": round(total_value, 2),
+            "cash": round(cash, 2),
+            "num_positions": num_positions,
+            "num_trades": perf.get("num_trades", 0),
         }
 
         # Update portfolio.json metadata with latest metrics
@@ -447,7 +441,7 @@ class PortfolioManager:
             "total_positions_value": round(total_value, 2),
             "cash": round(cash, 2),
             "total_portfolio_value": round(total_portfolio_value, 2),
-            "num_positions": details.get("num_positions", 0),
+            "num_positions": num_positions,
             "num_trades": perf.get("num_trades", 0),
             "updated_at": pd.Timestamp.now().isoformat(),
         })
@@ -750,3 +744,102 @@ class PortfolioManager:
             "holdings": top_holdings[:limit],
             "total_value": round(total_value, 2),
         }
+
+    def get_all_portfolio_tickers(self) -> List[str]:
+        """Get all unique tickers from all real portfolios (journals and watchlist).
+
+        Returns:
+            List of unique ticker symbols
+        """
+        tickers = set()
+
+        # Get all real portfolios
+        portfolios = self.list_portfolios()
+        real_portfolios = [p for p in portfolios if p["type"] == "real"]
+
+        logger.info(f"Scanning {len(real_portfolios)} real portfolios for tickers")
+
+        # Get tickers from journal (transactions)
+        for portfolio in real_portfolios:
+            portfolio_name = portfolio["name"]
+            try:
+                journal = Journal(portfolio_name, context=self.context)
+                df = journal.load_df()
+
+                if not df.empty:
+                    # Get unique tickers from journal (skip CASH operations)
+                    journal_tickers = df[df["ticker"] != "CASH"]["ticker"].unique().tolist()
+                    tickers.update(journal_tickers)
+                    logger.debug(f"  {portfolio_name}: {len(journal_tickers)} tickers from journal")
+            except Exception as e:
+                logger.warning(f"Error reading journal for {portfolio_name}: {e}")
+
+        # Get tickers from watchlist (if available)
+        # Note: WatchlistManager is strategy-specific, so skip for now
+        # Watchlist tickers are less critical since they're strategy-dependent
+        logger.debug("Skipping watchlist (strategy-specific data)")
+
+        ticker_list = sorted(list(tickers))
+        logger.info(f"Total unique tickers across all real portfolios: {len(ticker_list)}")
+        logger.debug(f"Tickers: {ticker_list}")
+
+        return ticker_list
+
+    def fetch_all_ticker_data(self, days: int = 365) -> Dict[str, Any]:
+        """Fetch history and fundamental data for all portfolio tickers.
+
+        This pre-caches data to avoid slow API calls during portfolio operations.
+
+        Args:
+            days: Number of days of history to fetch (default: 365)
+
+        Returns:
+            Dictionary with fetch results
+        """
+        tickers = self.get_all_portfolio_tickers()
+
+        if not tickers:
+            logger.info("No tickers to fetch")
+            return {
+                "status": "success",
+                "tickers_processed": 0,
+                "tickers_failed": [],
+            }
+
+        logger.info(f"Fetching data for {len(tickers)} tickers (last {days} days)")
+
+        failed_tickers = []
+        success_count = 0
+
+        for ticker in tickers:
+            try:
+                # Fetch history data (loads from cache or yfinance)
+                history = DataHistory(ticker)
+                hist_result = history.fetch()
+
+                # Fetch fundamental data
+                fundamental = Fundamental(ticker)
+                fund_result = fundamental.fetch()
+
+                if hist_result.get("status") == "success" and fund_result.get("status") == "success":
+                    success_count += 1
+                    price = fund_result.get("current_price", 0)
+                    logger.debug(f"  ✓ {ticker}: history loaded, price €{price:.2f}")
+                else:
+                    failed_tickers.append(ticker)
+                    logger.warning(f"  ✗ {ticker}: incomplete data")
+
+            except Exception as e:
+                failed_tickers.append(ticker)
+                logger.warning(f"  ✗ {ticker}: {str(e)[:100]}")
+
+        result = {
+            "status": "success" if not failed_tickers else "partial",
+            "tickers_processed": success_count,
+            "tickers_failed": failed_tickers,
+            "tickers_total": len(tickers),
+        }
+
+        logger.info(f"Fetch complete: {success_count}/{len(tickers)} successful")
+
+        return result
