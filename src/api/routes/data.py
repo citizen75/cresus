@@ -174,6 +174,9 @@ async def get_ticker_history(
 					# Apply values to original df using timestamp lookup
 					df[col_name] = df['timestamp'].map(ts_value_map)
 			except Exception as e:
+				from loguru import logger
+				import traceback
+				logger.error(f"Indicator calc failed for {ticker} {indicator}: {str(e)}\n{traceback.format_exc()}")
 				raise HTTPException(400, f"Error calculating indicator '{indicator}': {str(e)}")
 
 		# Select specific columns if requested
