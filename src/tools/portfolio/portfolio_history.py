@@ -130,8 +130,11 @@ class PortfolioHistory:
         cash = self.initial_capital if self.initial_capital else 0
         peak_value = cash
 
-        # Get all unique transaction dates
+        # Get all unique transaction dates, starting from oldest transaction
         tx_dates = sorted(df_valid["created_at"].unique())
+
+        if not tx_dates:
+            return {"status": "error", "message": "No transactions found"}
 
         # Cache ticker price lookups
         ticker_price_cache = {}  # {ticker: {date: price}}
