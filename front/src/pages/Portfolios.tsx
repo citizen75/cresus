@@ -12,7 +12,7 @@ export default function Portfolios() {
   const [deletingPortfolio, setDeletingPortfolio] = useState(false)
 
   const portfolios = data?.portfolios || []
-  const livePortfolios = portfolios.filter(p => !p.name.toLowerCase().startsWith('test_'))
+  const livePortfolios = portfolios.filter(p => p.type === 'real')
   const filtered = livePortfolios.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   )
