@@ -62,11 +62,11 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
     })
   }
 
-  // Load historical data for cards view
+  // Load historical data for cards view (fetch full history once)
   useEffect(() => {
     const loadHistoricalData = async () => {
       const data: Record<string, any[]> = {}
-      const days = getDaysForTimeframe(timeframe)
+      const days = 1825 // Always fetch full history (~5 years), filter on demand
       for (const pos of positions) {
         try {
           const result = await api.getHistoricalData(pos.ticker, days)
@@ -105,7 +105,7 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
     if (positions.length > 0) {
       loadHistoricalData()
     }
-  }, [positions, timeframe])
+  }, [positions])
 
   // Sorting logic
   const getSortedPositions = () => {
