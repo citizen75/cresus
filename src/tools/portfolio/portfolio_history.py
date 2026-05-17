@@ -160,18 +160,27 @@ class PortfolioHistory:
 
             return ticker_price_cache[ticker].get(date)
 
-        # Build daily history: fill days between transactions
-        current_date = first_tx_date
+        # Get all available price dates (union of all tickers' data)
+        available_dates = set()
+        for ticker_data in ticker_history.values():
+            ticker_data["timestamp"] = pd.to_datetime(ticker_data["timestamp"], errors="coerce")
+            if ticker_data["timestamp"].dt.tz is not None:
+                ticker_data["timestamp"] = ticker_data["timestamp"].dt.tz_localize(None)
+            available_dates.update(ticker_data["timestamp"].dt.normalize().unique())
+
+        # Also include all transaction dates
+        available_dates.update(pd.to_datetime(tx_dates).normalize())
+
+        # Sort dates and generate history only for dates with data
+        all_dates = sorted(list(available_dates))
+        if not all_dates:
+            all_dates = [first_tx_date]
+
         tx_idx = 0
-
-        while current_date <= last_tx_date:
-            # Check if there are transactions on this date
-            tx_on_date = None
-            if tx_idx < len(tx_dates) and tx_dates[tx_idx].date() == current_date.date():
+        for current_date in all_dates:
+            # Process transactions up to this date
+            while tx_idx < len(tx_dates) and tx_dates[tx_idx].date() <= current_date.date():
                 tx_on_date = tx_dates[tx_idx]
-                tx_idx += 1
-
-                # Process all transactions on this date
                 rows_on_date = df_valid[df_valid["created_at"] == tx_on_date]
 
                 for _, row in rows_on_date.iterrows():
@@ -193,6 +202,8 @@ class PortfolioHistory:
                             positions[ticker] = 0
                         positions[ticker] -= quantity
                         cash += (quantity * price - fees)
+
+                tx_idx += 1
 
             # Calculate portfolio value for this date
             portfolio_value = cash
@@ -217,8 +228,6 @@ class PortfolioHistory:
                 "cash": round(cash, 2),
                 "drawdown_pct": round(drawdown, 2),
             })
-
-            current_date += timedelta(days=1)
 
         logger.info(f"Calculated {len(daily_history)} daily values")
 
