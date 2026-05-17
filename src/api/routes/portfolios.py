@@ -269,12 +269,37 @@ async def get_portfolio_history(name: str, recalculate: bool = False):
     """Get portfolio value history from transactions.
 
     Returns daily portfolio values (positions + cash) replayed from journal.
+    If recalculate=true, queues a background refresh (doesn't block response).
     """
     pm = _get_portfolio_manager()
-    result = pm.calculate_portfolio_history(name, recalculate)
+
+    if recalculate:
+        # Don't block on recalculate - queue it for background processing
+        import asyncio
+        asyncio.create_task(_recalculate_history_background(name, pm))
+        return {
+            "portfolio_name": name,
+            "status": "recalculating",
+            "message": "Portfolio history recalculation queued in background"
+        }
+
+    # Return cached history without blocking
+    result = pm.calculate_portfolio_history(name, recalculate=False)
     if "error" in result:
         raise HTTPException(404, result["error"])
     return result
+
+
+async def _recalculate_history_background(name: str, pm):
+    """Background task to recalculate portfolio history."""
+    import asyncio
+    from loguru import logger
+
+    try:
+        await asyncio.to_thread(pm.calculate_portfolio_history, name, True)
+        logger.info(f"Recalculated history for portfolio {name}")
+    except Exception as e:
+        logger.error(f"Error recalculating history for {name}: {e}")
 
 
 @router.post("/{name}/refresh")
