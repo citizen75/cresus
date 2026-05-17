@@ -52,9 +52,16 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
   const filterDataByTimeframe = (data: any[], tf: string) => {
     if (tf === 'ALL') return data
 
-    const days = getDaysForTimeframe(tf)
-    const cutoffDate = new Date()
-    cutoffDate.setDate(cutoffDate.getDate() - days)
+    let cutoffDate = new Date()
+
+    if (tf === 'YTD') {
+      // Year To Date: from Jan 1 to today
+      cutoffDate = new Date(cutoffDate.getFullYear(), 0, 1)
+    } else {
+      // Other periods: N days back from today
+      const days = getDaysForTimeframe(tf)
+      cutoffDate.setDate(cutoffDate.getDate() - days)
+    }
 
     return data.filter((item: any) => {
       const itemDate = new Date(item.date)
