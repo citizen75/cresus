@@ -42,14 +42,26 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
       for (const pos of positions) {
         try {
           const result = await api.getHistoricalData(pos.ticker, 90)
-          if (result && result.history) {
-            data[pos.ticker] = result.history.map((item: any) => ({
-              date: item.date,
-              close: item.close,
-              open: item.open,
-              high: item.high,
-              low: item.low,
-              volume: item.volume,
+          console.log(`Loaded data for ${pos.ticker}:`, result)
+
+          // Handle different response structures
+          let historyArray = []
+          if (result && Array.isArray(result)) {
+            historyArray = result
+          } else if (result && result.history && Array.isArray(result.history)) {
+            historyArray = result.history
+          } else if (result && result.data && Array.isArray(result.data)) {
+            historyArray = result.data
+          }
+
+          if (historyArray.length > 0) {
+            data[pos.ticker] = historyArray.map((item: any) => ({
+              date: item.date || item.timestamp || item.Date,
+              close: parseFloat(item.close || item.Close),
+              open: item.open || item.Open,
+              high: item.high || item.High,
+              low: item.low || item.Low,
+              volume: item.volume || item.Volume,
             }))
           }
         } catch (error) {
