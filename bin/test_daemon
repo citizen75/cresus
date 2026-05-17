@@ -1,6 +1,0 @@
-#!/usr/bin/env python3
-import time
-import sys
-print('Service started at PID:', os.getpid(), file=sys.stderr, flush=True)
-while True:
-    time.sleep(1)
