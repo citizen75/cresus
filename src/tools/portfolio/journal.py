@@ -365,3 +365,38 @@ class Journal:
     def to_transactions(self) -> pd.DataFrame:
         """Return all transactions."""
         return self.load_df().copy()
+
+    def update_transaction(self, transaction_id: str, updates: Dict[str, Any]) -> bool:
+        """Update a transaction by ID."""
+        df = self.load_df()
+
+        # Find the transaction
+        idx = df[df["id"] == transaction_id].index
+        if idx.empty:
+            raise ValueError(f"Transaction {transaction_id} not found")
+
+        # Update the row
+        idx = idx[0]
+        for field, value in updates.items():
+            if field in df.columns:
+                df.loc[idx, field] = value
+
+        # Update status_at timestamp
+        df.loc[idx, "status_at"] = datetime.now().isoformat()
+
+        self.save(df)
+        return True
+
+    def delete_transaction(self, transaction_id: str) -> bool:
+        """Delete a transaction by ID."""
+        df = self.load_df()
+
+        # Check if transaction exists
+        if not (df["id"] == transaction_id).any():
+            raise ValueError(f"Transaction {transaction_id} not found")
+
+        # Delete the row
+        df = df[df["id"] != transaction_id]
+
+        self.save(df)
+        return True
