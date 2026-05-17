@@ -192,8 +192,7 @@ export default function PortfolioSettings({ name }: PortfolioSettingsProps) {
             className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded text-white text-sm focus:outline-none focus:border-purple-500"
           >
             <option value="paper">Paper Trading</option>
-            <option value="live">Live Trading</option>
-            <option value="backtest">Backtest</option>
+            <option value="real">Real Trading</option>
           </select>
         </div>
 
