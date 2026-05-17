@@ -63,10 +63,13 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
       cutoffDate.setDate(cutoffDate.getDate() - days)
     }
 
-    return data.filter((item: any) => {
+    const filtered = data.filter((item: any) => {
       const itemDate = new Date(item.date)
       return itemDate >= cutoffDate
     })
+
+    console.log(`Filter ${tf}: cutoff=${cutoffDate.toISOString()}, input=${data.length}, output=${filtered.length}`)
+    return filtered
   }
 
   // Load historical data for cards view (fetch full history once)
