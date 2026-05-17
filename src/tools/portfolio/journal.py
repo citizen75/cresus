@@ -32,8 +32,11 @@ class Journal:
             backtest_dir = context.get("backtest_dir")
 
         if backtest_dir:
-            # Use sandboxed backtest directory
-            self.filepath = Path(backtest_dir) / "portfolios" / normalized_name / "journal.csv"
+            # In backtest mode, check for root-level journal first (backtest format)
+            root_journal = Path(backtest_dir) / "portfolios" / f"{normalized_name}_journal.csv"
+            subdir_journal = Path(backtest_dir) / "portfolios" / normalized_name / "journal.csv"
+            # Prefer root-level journal if it exists, otherwise use subdirectory
+            self.filepath = root_journal if root_journal.exists() else subdir_journal
         else:
             # Use ~/.cresus/db/portfolios/{portfolio_name}/journal.csv
             cresus_home = Path.home() / ".cresus"
