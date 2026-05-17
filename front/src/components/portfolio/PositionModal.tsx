@@ -129,7 +129,7 @@ export default function PositionModal({ isOpen, mode, ticker, positionData, onCl
               onChange={(e) => setFormData({ ...formData, price: e.target.value })}
               placeholder="150.50"
               min="0.01"
-              step="0.01"
+              step="0.001"
               required
               className="w-full px-4 py-2 bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg focus:outline-none focus:border-purple-600"
             />
@@ -144,7 +144,7 @@ export default function PositionModal({ isOpen, mode, ticker, positionData, onCl
               onChange={(e) => setFormData({ ...formData, fees: e.target.value })}
               placeholder="0.00"
               min="0"
-              step="0.01"
+              step="0.001"
               className="w-full px-4 py-2 bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg focus:outline-none focus:border-purple-600"
             />
           </div>
@@ -178,14 +178,14 @@ export default function PositionModal({ isOpen, mode, ticker, positionData, onCl
               <div className="flex justify-between">
                 <span className="text-slate-400">Position Value:</span>
                 <span className="text-white">
-                  €{(parseFloat(formData.quantity) * parseFloat(formData.price)).toLocaleString('de-DE', { maximumFractionDigits: 2 })}
+                  €{(parseFloat(formData.quantity) * parseFloat(formData.price)).toLocaleString('de-DE', { maximumFractionDigits: 3 })}
                 </span>
               </div>
               {formData.fees && parseFloat(formData.fees) > 0 && (
                 <div className="flex justify-between">
                   <span className="text-slate-400">Fees:</span>
                   <span className="text-orange-400">
-                    €{parseFloat(formData.fees).toLocaleString('de-DE', { maximumFractionDigits: 2 })}
+                    €{parseFloat(formData.fees).toLocaleString('de-DE', { maximumFractionDigits: 3 })}
                   </span>
                 </div>
               )}
@@ -195,7 +195,7 @@ export default function PositionModal({ isOpen, mode, ticker, positionData, onCl
                   €{(
                     parseFloat(formData.quantity) * parseFloat(formData.price) +
                     (formData.fees ? parseFloat(formData.fees) : 0)
-                  ).toLocaleString('de-DE', { maximumFractionDigits: 2 })}
+                  ).toLocaleString('de-DE', { maximumFractionDigits: 3 })}
                 </span>
               </div>
             </div>
