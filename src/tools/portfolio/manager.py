@@ -477,6 +477,7 @@ class PortfolioManager:
         """Record a transaction (BUY, SELL, or CASH).
 
         CASH operations: ticker should be "CASH", quantity is the amount (positive=deposit, negative=withdrawal)
+        After recording, automatically fetches history and fundamental data for the ticker.
         """
         journal = Journal(portfolio_name, context=self.context)
         operation_upper = operation.upper()
@@ -496,6 +497,22 @@ class PortfolioManager:
             )
             # Flush to disk immediately (don't wait for context flush)
             journal.flush()
+
+            # Fetch history and fundamental data for the ticker (unless it's CASH)
+            if operation_upper != "CASH" and ticker.upper() != "CASH":
+                try:
+                    logger.info(f"Fetching data for {ticker}")
+                    # Fetch history data
+                    dh = DataHistory(ticker)
+                    dh.fetch()
+                    # Fetch fundamental data
+                    fund = Fundamental(ticker)
+                    fund.fetch()
+                except Exception as fetch_error:
+                    logger.warning(f"Failed to fetch data for {ticker}: {fetch_error}")
+                    # Don't fail the transaction if data fetch fails
+                    pass
+
             # Update cache after successful transaction
             self.update_portfolio_cache(portfolio_name)
             return {
