@@ -11,23 +11,25 @@ import pandas as pd
 from loguru import logger
 
 from .journal import Journal
-from tools.data import DataHistory
+from tools.data.manager import DataManager
 
 
 class PortfolioHistory:
     """Calculate daily portfolio value history."""
 
-    def __init__(self, portfolio_name: str, initial_capital: Optional[float] = None, context: Optional[Dict[str, Any]] = None):
+    def __init__(self, portfolio_name: str, initial_capital: Optional[float] = None, context: Optional[Dict[str, Any]] = None, data_manager: Optional[DataManager] = None):
         """Initialize portfolio history calculator.
 
         Args:
             portfolio_name: Name of the portfolio
             initial_capital: Starting cash amount. If None, loads from config.
             context: Optional context dict (for backtest sandboxing)
+            data_manager: Optional DataManager for centralized data fetching
         """
         self.portfolio_name = portfolio_name
         self.journal = Journal(portfolio_name, context=context)
         self.initial_capital = initial_capital
+        self.data_manager = data_manager or DataManager(Path.cwd())
 
     def calculate(self, recalculate: bool = False) -> Dict[str, Any]:
         """Calculate daily portfolio history.
@@ -85,31 +87,29 @@ class PortfolioHistory:
             if ticker and ticker != "CASH":
                 tickers.add(ticker)
 
-        # Preload history data for all tickers
+        # Preload history data for all tickers via DataManager
         logger.info(f"Preloading history for {len(tickers)} tickers")
         ticker_history = {}
-        for ticker in tickers:
-            try:
-                history_store = DataHistory(ticker)
-                df_all = history_store.get_all()
+        failed_tickers = []
 
-                # If no cached data, try to fetch
-                if df_all.empty:
-                    logger.info(f"  No cache for {ticker}, fetching from yfinance...")
-                    result = history_store.fetch(start_date=first_tx_date.strftime("%Y-%m-%d"))
-                    if result.get("status") == "success":
-                        df_all = history_store.get_all()
-                    else:
-                        logger.warning(f"Failed to fetch history for {ticker}: {result.get('message', '')}")
+        for ticker in tickers:
+            result = self.data_manager.fetch_history(ticker, start_date=first_tx_date.strftime("%Y-%m-%d"))
+
+            if result.get("status") == "success":
+                # DataManager fetched successfully - get the data directly
+                from tools.data import DataHistory
+                dh = DataHistory(ticker)
+                df_all = dh.get_all()
 
                 if df_all is not None and not df_all.empty:
                     ticker_history[ticker] = df_all
                     logger.debug(f"  Loaded {len(df_all)} rows for {ticker}")
                 else:
                     logger.warning(f"No history data found for {ticker}")
-            except Exception as e:
-                logger.warning(f"Error loading history for {ticker}: {e}")
-                continue
+                    failed_tickers.append(ticker)
+            else:
+                logger.warning(f"Failed to fetch history for {ticker}: {result.get('message', '')}")
+                failed_tickers.append(ticker)
 
         # Calculate daily values with drawdown
         daily_history = []
@@ -187,8 +187,16 @@ class PortfolioHistory:
 
         logger.info(f"Calculated {len(daily_history)} daily values")
 
-        return {
+        result = {
             "portfolio_name": self.portfolio_name,
             "history": daily_history,
             "status": "success",
+            "tickers_loaded": len(ticker_history),
+            "tickers_total": len(tickers),
         }
+
+        if failed_tickers:
+            result["failed_tickers"] = failed_tickers
+            logger.warning(f"Failed to fetch data for {len(failed_tickers)} tickers: {failed_tickers}")
+
+        return result

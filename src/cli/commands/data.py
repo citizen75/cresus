@@ -110,7 +110,18 @@ class DataCommands:
 
 			# Display results
 			history = result.get("history", [])
-			console.print(f"[green]✓[/green] Calculated {len(history)} daily values\n")
+			tickers_loaded = result.get("tickers_loaded", 0)
+			tickers_total = result.get("tickers_total", 0)
+			failed_tickers = result.get("failed_tickers", [])
+
+			console.print(f"[green]✓[/green] Calculated {len(history)} daily values")
+			console.print(f"[cyan]Tickers:[/cyan] {tickers_loaded}/{tickers_total} loaded successfully")
+
+			if failed_tickers:
+				console.print(f"[yellow]⚠[/yellow] Failed to fetch data for: {', '.join(failed_tickers)}")
+				console.print("[dim]These tickers are invalid or no longer available on Yahoo Finance[/dim]\n")
+			else:
+				console.print()
 
 			# Show summary
 			if history:
