@@ -46,7 +46,7 @@ export default function PositionModal({ isOpen, mode, ticker, positionData, onCl
       const response = await api.recordTransaction(portfolioName, {
         operation,
         ticker: formData.ticker,
-        quantity: parseInt(formData.quantity),
+        quantity: parseFloat(formData.quantity),
         price: parseFloat(formData.price),
         fees: formData.fees ? parseFloat(formData.fees) : 0,
         notes: formData.notes,
@@ -111,10 +111,11 @@ export default function PositionModal({ isOpen, mode, ticker, positionData, onCl
             <label className="block text-slate-400 text-sm font-medium mb-2">Quantity (Shares)</label>
             <input
               type="number"
+              step="0.01"
               value={formData.quantity}
               onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
               placeholder="100"
-              min="1"
+              min="0.01"
               required
               className="w-full px-4 py-2 bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg focus:outline-none focus:border-purple-600"
             />

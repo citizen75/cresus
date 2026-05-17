@@ -168,8 +168,9 @@ export default function TransactionsView({ name, filterTicker }: TransactionsVie
                         {editingId === tx.id ? (
                           <input
                             type="number"
+                            step="0.01"
                             value={editData.quantity}
-                            onChange={(e) => setEditData({ ...editData, quantity: parseInt(e.target.value) })}
+                            onChange={(e) => setEditData({ ...editData, quantity: parseFloat(e.target.value) })}
                             className="w-16 px-2 py-1 bg-slate-700 border border-slate-600 text-white rounded"
                           />
                         ) : (
