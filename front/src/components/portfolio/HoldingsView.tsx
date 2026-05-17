@@ -370,7 +370,7 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
             </>
           )}
 
-          {/* Tab Content */}
+          {/* Tab Content - Table View */}
           {activeTab === 'positions' && viewMode === 'table' && (
           <div className="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden">
             {positions.length === 0 ? (
@@ -521,33 +521,9 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
           </div>
           )}
 
-          {/* Transactions Tab */}
-          {activeTab === 'transactions' && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 pb-4 border-b border-slate-800">
-                <button
-                  onClick={() => {
-                    setFilterTickerForTransactions(null)
-                    setActiveTab('positions')
-                  }}
-                  className="text-slate-400 hover:text-slate-300 text-sm font-medium"
-                >
-                  ← Back to Positions
-                </button>
-                {filterTickerForTransactions && (
-                  <span className="text-slate-400 text-sm">
-                    Filtered by: <span className="text-white font-medium">{filterTickerForTransactions}</span>
-                  </span>
-                )}
-              </div>
-              <TransactionsView name={name} filterTicker={filterTickerForTransactions || undefined} />
-            </div>
-          )}
-        </div>
-
-        {/* Charts View - Position Cards */}
-        {activeTab === 'positions' && viewMode === 'charts' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* Cards View - Position Cards */}
+          {activeTab === 'positions' && viewMode === 'charts' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {positions.map((pos: any) => (
               <div key={pos.ticker} className="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden hover:border-purple-600/50 transition">
                 {/* Card Header */}
@@ -639,8 +615,133 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
             ))}
           </div>
         )}
-      </div>
 
+          {/* Transactions Tab */}
+          {activeTab === 'transactions' && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-4 border-b border-slate-800">
+                <button
+                  onClick={() => {
+                    setFilterTickerForTransactions(null)
+                    setActiveTab('positions')
+                  }}
+                  className="text-slate-400 hover:text-slate-300 text-sm font-medium"
+                >
+                  ← Back to Positions
+                </button>
+                {filterTickerForTransactions && (
+                  <span className="text-slate-400 text-sm">
+                    Filtered by: <span className="text-white font-medium">{filterTickerForTransactions}</span>
+                  </span>
+                )}
+              </div>
+              <TransactionsView name={name} filterTicker={filterTickerForTransactions || undefined} />
+            </div>
+          )}
+        </div>
+
+        {/* Right Sidebar - Allocation, Sector, Risk Metrics */}
+        {activeTab === 'positions' && (
+        <div className="space-y-6">
+          {/* Allocation Pie Chart */}
+          <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-white font-bold">Allocation</h3>
+              <button className="text-purple-400 hover:text-purple-300 text-sm">View full →</button>
+            </div>
+            <div className="flex flex-col items-center">
+              <div className="w-40 h-40">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={positions.slice(0, 5).map((pos: any) => ({
+                        name: pos.ticker,
+                        value: pos.position_value,
+                      }))}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={70}
+                      paddingAngle={1}
+                      dataKey="value"
+                    >
+                      {positions.map((_: any, index: number) => (
+                        <Cell key={`cell-${index}`} fill={chartColors[index % chartColors.length]} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="text-center mt-4">
+                <p className="text-slate-400 text-xs mb-1">Total Value</p>
+                <p className="text-white font-bold text-lg">€{totalValue.toLocaleString('de-DE', { maximumFractionDigits: 0 })}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Sector Exposure */}
+          <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-white font-bold">Sector Exposure</h3>
+              <button className="text-purple-400 hover:text-purple-300 text-sm">View full →</button>
+            </div>
+            <div className="space-y-3">
+              {sectorData.map((sector, index) => (
+                <div key={sector.name}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-slate-400 text-sm">{sector.name}</span>
+                    <span className="text-white font-medium text-sm">{sector.value.toFixed(1)}%</span>
+                  </div>
+                  <div className="w-full bg-slate-800 rounded-full h-2">
+                    <div
+                      className="h-2 rounded-full"
+                      style={{
+                        width: `${sector.value}%`,
+                        backgroundColor: chartColors[index % chartColors.length],
+                      }}
+                    ></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Risk Snapshot */}
+          <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-white font-bold">Risk Snapshot</h3>
+              <button className="text-purple-400 hover:text-purple-300 text-sm">View full →</button>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-slate-400 text-xs uppercase mb-2">Portfolio Beta</p>
+                <p className="text-white font-bold text-xl">1.08</p>
+              </div>
+              <div>
+                <p className="text-slate-400 text-xs uppercase mb-2">Sharpe Ratio</p>
+                <p className="text-white font-bold text-xl">{metrics?.sharpe_ratio || 1.42}</p>
+              </div>
+              <div>
+                <p className="text-slate-400 text-xs uppercase mb-2">Max Drawdown</p>
+                <p className="text-red-400 font-bold text-xl">-12.3%</p>
+              </div>
+              <div>
+                <p className="text-slate-400 text-xs uppercase mb-2">Volatility (1Y)</p>
+                <p className="text-white font-bold text-xl">18.7%</p>
+              </div>
+              <div>
+                <p className="text-slate-400 text-xs uppercase mb-2">VaR (95%, 1D)</p>
+                <p className="text-white font-bold text-xl">-2.31%</p>
+              </div>
+              <div>
+                <p className="text-slate-400 text-xs uppercase mb-2">Tracking Error</p>
+                <p className="text-white font-bold text-xl">6.12%</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        )}
+      </div>
 
       {/* Position Modal */}
       <PositionModal
