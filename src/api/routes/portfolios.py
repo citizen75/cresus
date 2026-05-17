@@ -287,16 +287,27 @@ async def get_portfolio_strategy(name: str):
 @router.get("/{name}/watchlist")
 async def get_portfolio_watchlist(name: str, limit: int = 50):
     """Get watchlist for portfolio from its associated strategy."""
-    pm = _get_portfolio_manager()
-    details = pm.get_portfolio_details(name)
-    if not details:
+    from tools.portfolio.manager import PortfolioManager
+    from pathlib import Path
+    from utils.env import get_db_root
+    import json
+
+    # Get portfolio metadata directly without fetching prices
+    db_root = get_db_root()
+    portfolio_dir = db_root / "portfolios" / name
+    portfolio_json = portfolio_dir / "portfolio.json"
+
+    if not portfolio_json.exists():
         raise HTTPException(404, f"Portfolio '{name}' not found")
 
-    # Get the strategy name (defaults to portfolio name if not explicitly set)
-    strategy_name = details.get("strategy", name)
+    # Load portfolio metadata
+    with open(portfolio_json, 'r') as f:
+        metadata = json.load(f)
 
-    # Load watchlist from the portfolio directory using WatchlistManager
-    # The portfolio_name parameter tells WatchlistManager to look in db/portfolios/{name}/watchlist.csv
+    # Get the strategy name (defaults to portfolio name if not set)
+    strategy_name = metadata.get("strategy", name)
+
+    # Load watchlist using WatchlistManager
     wm = WatchlistManager(strategy_name, portfolio_name=name)
     df = wm.load()
 
