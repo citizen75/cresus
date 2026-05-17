@@ -532,17 +532,30 @@ export default function HoldingsView({ name, onViewTransactions }: HoldingsViewP
                         </td>
                         <td className="px-4 py-3 text-green-400 font-medium">+0.45%</td>
                         <td className="px-4 py-3">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setFilterTickerForTransactions(pos.ticker)
-                              setActiveTab('transactions')
-                            }}
-                            className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded transition"
-                            title="View and edit transactions"
-                          >
-                            Transactions
-                          </button>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setViewMode('charts')
+                                setSelectedPosition(pos.ticker)
+                              }}
+                              className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded transition"
+                              title="View chart"
+                            >
+                              📊 Chart
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setFilterTickerForTransactions(pos.ticker)
+                                setActiveTab('transactions')
+                              }}
+                              className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded transition"
+                              title="View and edit transactions"
+                            >
+                              Transactions
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     )
