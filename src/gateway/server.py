@@ -130,6 +130,7 @@ class GatewayServer:
 				"api.app:create_app",
 				host=self.api_host,
 				port=self.api_port,
+				workers=4,
 				factory=True,
 				log_level="info",
 			)
