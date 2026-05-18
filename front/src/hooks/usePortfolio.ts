@@ -37,8 +37,8 @@ export function usePortfolioMetrics(name: string) {
 export function usePortfolioHistory(name: string) {
   return useQuery({
     queryKey: ['portfolio-history', name],
-    queryFn: () => api.getPortfolioHistory(name, true), // Always recalculate for fresh data
-    staleTime: 60_000, // 1 minute
+    queryFn: () => api.getPortfolioHistory(name, false), // Use cached history
+    staleTime: 5 * 60_000, // 5 minutes - history doesn't change frequently
     enabled: !!name,
   })
 }
@@ -65,9 +65,9 @@ export function useCurrentPrices(name: string) {
   return useQuery({
     queryKey: ['current-prices', name],
     queryFn: () => api.getCurrentPrices(name),
-    staleTime: 30_000, // 30 seconds - prices update frequently
+    staleTime: 5 * 60_000, // 5 minutes - use cached prices
     enabled: !!name,
-    refetchInterval: 60_000, // Refetch every minute
+    // Disabled auto-refetch to prevent excessive polling
   })
 }
 
