@@ -1,10 +1,10 @@
 """Portfolio API endpoints."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
 from functools import lru_cache
 from typing import Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 import pandas as pd
 
 from tools.portfolio.manager import PortfolioManager
@@ -335,12 +335,16 @@ async def get_portfolio_watchlist(name: str, limit: int = 50):
 
 
 @router.get("/{name}/current-prices")
-async def get_current_prices(name: str):
-    """Get current prices for all positions using Fundamental data."""
+async def get_current_prices(name: str, response: Response):
+    """Get current prices for all positions using cached Fundamental data."""
     pm = _get_portfolio_manager()
     details = pm.get_portfolio_details(name)
     if not details:
         raise HTTPException(404, f"Portfolio '{name}' not found")
+
+    # Add cache header: 5 minutes (300 seconds)
+    response.headers["Cache-Control"] = "public, max-age=300"
+    response.headers["Expires"] = (datetime.utcnow() + timedelta(seconds=300)).strftime("%a, %d %b %Y %H:%M:%S GMT")
 
     from tools.data import Fundamental
 
@@ -352,7 +356,7 @@ async def get_current_prices(name: str):
         quantity = pos["quantity"]
         avg_entry_price = pos["avg_entry_price"]
 
-        # Get current price from Fundamental
+        # Get current price from cached Fundamental (don't fetch fresh)
         fundamental = Fundamental(ticker)
         current_price = fundamental.get_current_price()
 
@@ -365,7 +369,7 @@ async def get_current_prices(name: str):
 
         total_value += position_value
 
-        # Get company information
+        # Get company information from cached data
         company_info = fundamental.get_company_info()
 
         positions_with_prices.append({
