@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '@/services/api'
 import CreatePortfolioModal from '@/components/portfolio/CreatePortfolioModal'
+import { formatCurrency } from '@/utils/currency'
 
 export default function Portfolios() {
   const { data, isLoading, refetch } = usePortfolios()
@@ -57,36 +58,43 @@ export default function Portfolios() {
       </div>
 
       {/* Summary Metrics */}
-      <div className="grid grid-cols-4 gap-6">
-        <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
-          <div className="text-slate-400 text-sm mb-2">Total net worth</div>
-          <div className="text-3xl font-bold text-white">€{totalNetWorth.toLocaleString('de-DE', { maximumFractionDigits: 0 })}</div>
-          <div className={`${totalGain >= 0 ? 'text-green-400' : 'text-red-400'} text-sm mt-2`}>
-            {totalGain >= 0 ? '+' : ''}€{totalGain.toLocaleString('de-DE', { maximumFractionDigits: 2 })} ({totalGainPercent >= 0 ? '+' : ''}{totalGainPercent.toFixed(2)}%)
+      {(() => {
+        // Use first portfolio's currency or default to USD
+        const displayCurrency = livePortfolios.length > 0 ? (livePortfolios[0].currency || 'USD') : 'USD'
+
+        return (
+          <div className="grid grid-cols-4 gap-6">
+            <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
+              <div className="text-slate-400 text-sm mb-2">Total net worth</div>
+              <div className="text-3xl font-bold text-white">{formatCurrency(totalNetWorth, displayCurrency)}</div>
+              <div className={`${totalGain >= 0 ? 'text-green-400' : 'text-red-400'} text-sm mt-2`}>
+                {totalGain >= 0 ? '+' : ''}{formatCurrency(Math.abs(totalGain), displayCurrency)} ({totalGainPercent >= 0 ? '+' : ''}{totalGainPercent.toFixed(2)}%)
+              </div>
+            </div>
+            <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
+              <div className="text-slate-400 text-sm mb-2">Today's change</div>
+              <div className={`text-3xl font-bold ${totalGain >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {totalGain >= 0 ? '+' : ''}{formatCurrency(Math.abs(totalGain), displayCurrency)}
+              </div>
+              <div className={`${totalGain >= 0 ? 'text-green-400' : 'text-red-400'} text-sm mt-2`}>
+                {totalGainPercent >= 0 ? '+' : ''}{totalGainPercent.toFixed(2)}%
+              </div>
+            </div>
+            <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
+              <div className="text-slate-400 text-sm mb-2">YTD return (weighted)</div>
+              <div className={`text-3xl font-bold ${totalGainPercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {totalGainPercent >= 0 ? '+' : ''}{totalGainPercent.toFixed(2)}%
+              </div>
+              <div className="text-slate-400 text-sm mt-2">from {livePortfolios.length} {livePortfolios.length === 1 ? 'portfolio' : 'portfolios'}</div>
+            </div>
+            <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
+              <div className="text-slate-400 text-sm mb-2">Total portfolios</div>
+              <div className="text-3xl font-bold text-white">{livePortfolios.length}</div>
+              <div className="text-slate-400 text-sm mt-2">{livePortfolios.length} active</div>
+            </div>
           </div>
-        </div>
-        <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
-          <div className="text-slate-400 text-sm mb-2">Today's change</div>
-          <div className={`text-3xl font-bold ${totalGain >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-            {totalGain >= 0 ? '+' : ''}€{totalGain.toLocaleString('de-DE', { maximumFractionDigits: 2 })}
-          </div>
-          <div className={`${totalGain >= 0 ? 'text-green-400' : 'text-red-400'} text-sm mt-2`}>
-            {totalGainPercent >= 0 ? '+' : ''}{totalGainPercent.toFixed(2)}%
-          </div>
-        </div>
-        <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
-          <div className="text-slate-400 text-sm mb-2">YTD return (weighted)</div>
-          <div className={`text-3xl font-bold ${totalGainPercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-            {totalGainPercent >= 0 ? '+' : ''}{totalGainPercent.toFixed(2)}%
-          </div>
-          <div className="text-slate-400 text-sm mt-2">from {livePortfolios.length} {livePortfolios.length === 1 ? 'portfolio' : 'portfolios'}</div>
-        </div>
-        <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
-          <div className="text-slate-400 text-sm mb-2">Total portfolios</div>
-          <div className="text-3xl font-bold text-white">{livePortfolios.length}</div>
-          <div className="text-slate-400 text-sm mt-2">{livePortfolios.length} active</div>
-        </div>
-      </div>
+        )
+      })()}
 
       {/* Search and Filter */}
       <div className="flex items-center justify-between gap-6">
@@ -144,16 +152,16 @@ export default function Portfolios() {
                   {/* Value */}
                   <div className="col-span-2">
                     <div className="text-slate-400 text-xs uppercase tracking-wider mb-1">Total value</div>
-                    <div className="text-white font-bold text-lg">€{(portfolio.total_portfolio_value || 0).toLocaleString('de-DE', { maximumFractionDigits: 2 })}</div>
+                    <div className="text-white font-bold text-lg">{formatCurrency(portfolio.total_portfolio_value || 0, portfolio.currency || 'USD')}</div>
                     <div className={`text-sm ${(portfolio.unrealized_gain || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {(portfolio.unrealized_gain || 0) >= 0 ? '+' : ''}€{(portfolio.unrealized_gain || 0).toLocaleString('de-DE', { maximumFractionDigits: 2 })} ({(portfolio.unrealized_gain_pct || 0).toFixed(2)}%)
+                      {(portfolio.unrealized_gain || 0) >= 0 ? '+' : ''}{formatCurrency(Math.abs(portfolio.unrealized_gain || 0), portfolio.currency || 'USD')} ({(portfolio.unrealized_gain_pct || 0).toFixed(2)}%)
                     </div>
                   </div>
 
                   {/* Invested */}
                   <div className="col-span-2">
                     <div className="text-slate-400 text-xs uppercase tracking-wider mb-1">Invested</div>
-                    <div className="text-white font-bold text-lg">€{(portfolio.total_positions_value || 0).toLocaleString('de-DE', { maximumFractionDigits: 2 })}</div>
+                    <div className="text-white font-bold text-lg">{formatCurrency(portfolio.total_positions_value || 0, portfolio.currency || 'USD')}</div>
                     <div className="text-slate-400 text-sm">
                       {((portfolio.total_positions_value || 0) / (portfolio.total_portfolio_value || 1) * 100).toFixed(1)}% of portfolio
                     </div>
@@ -162,7 +170,7 @@ export default function Portfolios() {
                   {/* Cash */}
                   <div className="col-span-2">
                     <div className="text-slate-400 text-xs uppercase tracking-wider mb-1">Cash</div>
-                    <div className="text-white font-bold text-lg">€{(portfolio.cash || 0).toLocaleString('de-DE', { maximumFractionDigits: 2 })}</div>
+                    <div className="text-white font-bold text-lg">{formatCurrency(portfolio.cash || 0, portfolio.currency || 'USD')}</div>
                     <div className="text-slate-400 text-sm">
                       {((portfolio.cash || 0) / (portfolio.total_portfolio_value || 1) * 100).toFixed(1)}% of portfolio
                     </div>
