@@ -1051,8 +1051,21 @@ class CresusCLI(cmd2.Cmd):
 			)
 
 			if pull_result.returncode == 0:
-				print("✓ Update completed successfully", flush=True)
+				print("✓ Git pull completed successfully", flush=True)
 				print(f"Merged {num_commits} commit{'s' if num_commits != 1 else ''}", flush=True)
+
+				# Update Python dependencies
+				print("▸ Updating Python dependencies...", flush=True)
+				pip_result = subprocess.run(
+					["pip", "install", "-e", str(self.project_root)],
+					timeout=300
+				)
+
+				if pip_result.returncode == 0:
+					print("✓ Dependencies updated successfully", flush=True)
+					print("✓ Update completed successfully", flush=True)
+				else:
+					print(f"✗ Dependency update failed with exit code {pip_result.returncode}", file=sys.stderr, flush=True)
 			else:
 				print(f"✗ Pull failed with exit code {pull_result.returncode}", file=sys.stderr, flush=True)
 
