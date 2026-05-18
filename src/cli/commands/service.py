@@ -108,6 +108,21 @@ class ServiceManager:
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
+    def restart(self, service: str, daemon: bool = True) -> Dict[str, Any]:
+        """Restart a service (stop and start in daemon mode)."""
+        if service not in self.SERVICES:
+            return {"error": f"Unknown service: {service}"}
+
+        # Stop the service
+        stop_result = self.stop(service)
+        if stop_result.get("status") == "error":
+            return stop_result
+
+        # Start the service in daemon mode
+        import time
+        time.sleep(0.5)  # Brief pause to ensure clean restart
+        return self.start(service, daemon=daemon)
+
     def status(self, service: Optional[str] = None) -> Dict[str, Any]:
         """Get service status."""
         services = [service] if service else self.SERVICES.keys()
@@ -207,6 +222,24 @@ class ServiceManager:
                 console.print(f"[yellow]⚠[/yellow] {service} not running")
             else:
                 console.print(f"[red]✗[/red] Failed to stop {service}: {result.get('message', 'Unknown error')}")
+
+    def restart_services(self, service_names: str = "all") -> None:
+        """Restart one or more services."""
+        from rich.console import Console
+
+        console = Console()
+
+        if service_names == "all":
+            services = list(self.SERVICES.keys())
+        else:
+            services = [service_names]
+
+        for service in services:
+            result = self.restart(service, daemon=True)
+            if result.get("status") == "started":
+                console.print(f"[green]✓[/green] Restarted {service} (PID: {result['pid']})")
+            else:
+                console.print(f"[red]✗[/red] Failed to restart {service}: {result.get('message', 'Unknown error')}")
 
     def view_logs(self, service: str, follow: bool = False, lines: Optional[int] = None) -> None:
         """View service logs."""

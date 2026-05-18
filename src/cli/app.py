@@ -255,17 +255,18 @@ class CresusCLI(cmd2.Cmd):
 
 	# ==================== Service Commands ====================
 	def do_service(self, args):
-		"""Manage services: start|stop|status|logs [service] [-d]"""
+		"""Manage services: start|stop|restart|status|logs [service] [-d]"""
 		args_str = str(args).strip() if args else ""
 
 		if not args_str:
 			table = Table(title="Service Management Commands", box=box.ROUNDED)
 			table.add_column("Command", style="cyan")
 			table.add_column("Description")
-			table.add_row("service start <api|mcp|front|all> [-d]", "Start service(s)")
-			table.add_row("service stop <api|mcp|front|all>", "Stop service(s)")
+			table.add_row("service start <gateway|front|all> [-d]", "Start service(s)")
+			table.add_row("service stop <gateway|front|all>", "Stop service(s)")
+			table.add_row("service restart <gateway|front|all>", "Restart service(s) in daemon mode")
 			table.add_row("service status [service]", "Check service status")
-			table.add_row("service logs <api|mcp|front> [-f] [lines]", "View service logs")
+			table.add_row("service logs <gateway|front> [-f] [lines]", "View service logs")
 			console.print(table)
 			return
 
@@ -279,6 +280,9 @@ class CresusCLI(cmd2.Cmd):
 		elif cmd == "stop":
 			service_names = parts[1] if len(parts) > 1 else "all"
 			self.service_manager.stop_services(service_names)
+		elif cmd == "restart":
+			service_names = parts[1] if len(parts) > 1 else "all"
+			self.service_manager.restart_services(service_names)
 		elif cmd == "status":
 			service_name = parts[1] if len(parts) > 1 else None
 			self.service_manager.check_status(service_name)
