@@ -165,7 +165,15 @@ async def get_ticker_history(
 					]
 
 				# Calculate indicator using DSL formula on normalized dataframe
-				indicator_results = calculate_indicators(indicators_to_calculate, df_normalized)
+				# Run in thread pool to avoid blocking event loop
+				import asyncio
+				loop = asyncio.get_event_loop()
+				indicator_results = await loop.run_in_executor(
+					None,
+					calculate_indicators,
+					indicators_to_calculate,
+					df_normalized
+				)
 
 				# Create a mapping of timestamp -> indicator values for proper merging
 				for col_name, col_data in indicator_results.items():
