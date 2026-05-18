@@ -1,4 +1,4 @@
-import { usePortfolioMetrics, useCurrentPrices, usePortfolioHistory } from '@/hooks/usePortfolio'
+import { usePortfolioMetrics, useCurrentPrices, usePortfolioHistory, usePortfolioDetails } from '@/hooks/usePortfolio'
 import { useState, useEffect } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 import { useNavigate } from 'react-router-dom'
@@ -6,6 +6,7 @@ import PositionModal from './PositionModal'
 import CardChart from '@/components/CardChart'
 import TradingChart from '@/components/TradingChart'
 import { api } from '@/services/api'
+import { formatCurrency } from '@/utils/currency'
 
 interface HoldingsViewProps {
   name: string
@@ -15,6 +16,7 @@ const chartColors = ['#a78bfa', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b
 
 export default function HoldingsView({ name }: HoldingsViewProps) {
   const navigate = useNavigate()
+  const { data: details } = usePortfolioDetails(name)
   const { data: metrics } = usePortfolioMetrics(name)
   const { data: priceData, isLoading: isPricesLoading, error: pricesError } = useCurrentPrices(name)
   const { data: history } = usePortfolioHistory(name)
@@ -314,31 +316,31 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
       <div className="grid grid-cols-5 gap-4">
         <div className="bg-slate-900 rounded-lg p-4 border border-slate-800">
           <p className="text-slate-400 text-xs uppercase mb-2">Total Value</p>
-          <p className="text-white font-bold text-2xl">€{totalPortfolioValue.toLocaleString('de-DE', { maximumFractionDigits: 2 })}</p>
-          <p className="text-green-400 text-sm mt-1">+€12,540.32 (+1.87%)</p>
+          <p className="text-white font-bold text-2xl">{formatCurrency(totalPortfolioValue, details?.currency || 'USD')}</p>
+          <p className="text-green-400 text-sm mt-1">+{formatCurrency(12540.32, details?.currency || 'USD')} (+1.87%)</p>
         </div>
 
         <div className="bg-slate-900 rounded-lg p-4 border border-slate-800">
           <p className="text-slate-400 text-xs uppercase mb-2">Day P&L</p>
-          <p className={`${dayPNL >= 0 ? 'text-green-400' : 'text-red-400'} font-bold text-2xl`}>{dayPNL >= 0 ? '+' : ''}€{dayPNL.toLocaleString('de-DE', { maximumFractionDigits: 2 })}</p>
+          <p className={`${dayPNL >= 0 ? 'text-green-400' : 'text-red-400'} font-bold text-2xl`}>{dayPNL >= 0 ? '+' : ''}{formatCurrency(Math.abs(dayPNL), details?.currency || 'USD')}</p>
           <p className={`${dayPNL >= 0 ? 'text-green-400' : 'text-red-400'} text-sm mt-1`}>({dayPNL >= 0 ? '+' : ''}{dayPNLPercent.toFixed(2)}%)</p>
         </div>
 
         <div className="bg-slate-900 rounded-lg p-4 border border-slate-800">
           <p className="text-slate-400 text-xs uppercase mb-2">Unrealized P&L</p>
-          <p className="text-green-400 font-bold text-2xl">+€{unrealizedPNL.toLocaleString('de-DE', { maximumFractionDigits: 2 })}</p>
+          <p className="text-green-400 font-bold text-2xl">+{formatCurrency(unrealizedPNL, details?.currency || 'USD')}</p>
           <p className="text-green-400 text-sm mt-1">(+{unrealizedPNLPercent.toFixed(2)}%)</p>
         </div>
 
         <div className="bg-slate-900 rounded-lg p-4 border border-slate-800">
           <p className="text-slate-400 text-xs uppercase mb-2">Cash</p>
-          <p className="text-white font-bold text-2xl">€{cash.toLocaleString('de-DE', { maximumFractionDigits: 2 })}</p>
+          <p className="text-white font-bold text-2xl">{formatCurrency(cash, details?.currency || 'USD')}</p>
           <p className="text-slate-400 text-sm mt-1">({cashPercent.toFixed(1)}%)</p>
         </div>
 
         <div className="bg-slate-900 rounded-lg p-4 border border-slate-800">
           <p className="text-slate-400 text-xs uppercase mb-2">Invested</p>
-          <p className="text-white font-bold text-2xl">€{invested.toLocaleString('de-DE', { maximumFractionDigits: 2 })}</p>
+          <p className="text-white font-bold text-2xl">{formatCurrency(invested, details?.currency || 'USD')}</p>
           <p className="text-slate-400 text-sm mt-1">({investedPercent.toFixed(1)}%)</p>
         </div>
       </div>
@@ -556,11 +558,11 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
                         <td className="px-4 py-3 text-slate-300 text-sm">{pos.asset_type || 'Stock'}</td>
                         <td className="px-4 py-3 text-white font-medium">{weight.toFixed(2)}%</td>
                         <td className="px-4 py-3 text-white">{pos.quantity}</td>
-                        <td className="px-4 py-3 text-white">€{pos.avg_entry_price.toLocaleString('de-DE', { maximumFractionDigits: 2 })}</td>
-                        <td className="px-4 py-3 text-white">€{pos.current_price.toLocaleString('de-DE', { maximumFractionDigits: 2 })}</td>
-                        <td className="px-4 py-3 text-white font-medium">€{pos.position_value.toLocaleString('de-DE', { maximumFractionDigits: 2 })}</td>
+                        <td className="px-4 py-3 text-white">{formatCurrency(pos.avg_entry_price, details?.currency || 'USD')}</td>
+                        <td className="px-4 py-3 text-white">{formatCurrency(pos.current_price, details?.currency || 'USD')}</td>
+                        <td className="px-4 py-3 text-white font-medium">{formatCurrency(pos.position_value, details?.currency || 'USD')}</td>
                         <td className={`px-4 py-3 font-medium ${pos.position_gain >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                          {pos.position_gain >= 0 ? '+' : ''}€{pos.position_gain.toLocaleString('de-DE', { maximumFractionDigits: 2 })}
+                          {pos.position_gain >= 0 ? '+' : ''}{formatCurrency(Math.abs(pos.position_gain), details?.currency || 'USD')}
                         </td>
                         <td className={`px-4 py-3 font-medium ${pos.position_gain_pct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                           {pos.position_gain_pct > 0 ? '+' : ''}{pos.position_gain_pct.toFixed(2)}%

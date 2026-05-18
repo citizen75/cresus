@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import CardChart from '@/components/CardChart'
 import Spinner from '@/components/Spinner'
+import { usePortfolioDetails } from '@/hooks/usePortfolio'
+import { formatCurrency } from '@/utils/currency'
 
 interface OrdersViewProps {
   name: string
@@ -28,6 +30,7 @@ interface HistoricalData {
 }
 
 export default function OrdersView({ name }: OrdersViewProps) {
+  const { data: details } = usePortfolioDetails(name)
   const [orders, setOrders] = useState<Order[]>([])
   const [historicalData, setHistoricalData] = useState<HistoricalData>({})
   const [loading, setLoading] = useState(true)
@@ -272,14 +275,14 @@ export default function OrdersView({ name }: OrdersViewProps) {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-white">{order.shares}</td>
-                    <td className="px-6 py-4 text-white font-medium">€{order.entryPrice.toFixed(2)}</td>
+                    <td className="px-6 py-4 text-white font-medium">{formatCurrency(order.entryPrice, details?.currency || 'USD')}</td>
                     <td className="px-6 py-4">
                       <span className={`px-3 py-1 rounded text-xs font-medium ${getExecutionMethodColor(order.executionMethod)}`}>
                         {order.executionMethod.toUpperCase()}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-white">{order.stopLoss ? `€${order.stopLoss.toFixed(2)}` : '—'}</td>
-                    <td className="px-6 py-4 text-white">{order.takeProfit ? `€${order.takeProfit.toFixed(2)}` : '—'}</td>
+                    <td className="px-6 py-4 text-white">{order.stopLoss ? formatCurrency(order.stopLoss, details?.currency || 'USD') : '—'}</td>
+                    <td className="px-6 py-4 text-white">{order.takeProfit ? formatCurrency(order.takeProfit, details?.currency || 'USD') : '—'}</td>
                     <td className="px-6 py-4">
                       {order.riskReward ? (
                         <span className="text-white font-medium">{order.riskReward.toFixed(2)}x</span>
@@ -376,15 +379,15 @@ export default function OrdersView({ name }: OrdersViewProps) {
                   <div className="grid grid-cols-3 gap-2 text-xs">
                     <div>
                       <p className="text-slate-500 mb-1">Entry</p>
-                      <p className="text-white font-medium">€{order.entryPrice.toFixed(2)}</p>
+                      <p className="text-white font-medium">{formatCurrency(order.entryPrice, details?.currency || 'USD')}</p>
                     </div>
                     <div>
                       <p className="text-slate-500 mb-1">Stop Loss</p>
-                      <p className="text-red-400 font-medium">{order.stopLoss ? `€${order.stopLoss.toFixed(2)}` : '—'}</p>
+                      <p className="text-red-400 font-medium">{order.stopLoss ? formatCurrency(order.stopLoss, details?.currency || 'USD') : '—'}</p>
                     </div>
                     <div>
                       <p className="text-slate-500 mb-1">Target</p>
-                      <p className="text-green-400 font-medium">{order.takeProfit ? `€${order.takeProfit.toFixed(2)}` : '—'}</p>
+                      <p className="text-green-400 font-medium">{order.takeProfit ? formatCurrency(order.takeProfit, details?.currency || 'USD') : '—'}</p>
                     </div>
                   </div>
                   {order.reason && (

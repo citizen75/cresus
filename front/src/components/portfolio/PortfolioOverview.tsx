@@ -2,6 +2,7 @@ import { usePortfolioDetails, usePortfolioMetrics, usePortfolioHistory, usePortf
 import PortfolioChart from '@/components/PortfolioChart'
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
 import { useState } from 'react'
+import { formatCurrency } from '@/utils/currency'
 
 interface PortfolioOverviewProps {
   name: string
@@ -116,9 +117,9 @@ export default function PortfolioOverview({ name }: PortfolioOverviewProps) {
         <div className="flex items-end justify-between mb-6">
           <div>
             <p className="text-slate-400 text-sm mb-2">Total value</p>
-            <p className="text-5xl font-bold text-white">€{totalValue.toLocaleString('de-DE', { maximumFractionDigits: 2 })}</p>
+            <p className="text-5xl font-bold text-white">{formatCurrency(totalValue, details?.currency || 'USD')}</p>
             <p className={`text-lg mt-2 ${dailyChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-              {dailyChange >= 0 ? '+' : ''}€{dailyChange.toLocaleString('de-DE', { maximumFractionDigits: 2 })} ({dailyChangePercent >= 0 ? '+' : ''}{dailyChangePercent.toFixed(2)}%) {changeLabel}
+              {dailyChange >= 0 ? '+' : ''}{formatCurrency(dailyChange, details?.currency || 'USD')} ({dailyChangePercent >= 0 ? '+' : ''}{dailyChangePercent.toFixed(2)}%) {changeLabel}
             </p>
           </div>
           <div className="flex gap-2">
@@ -154,7 +155,7 @@ export default function PortfolioOverview({ name }: PortfolioOverviewProps) {
               <Tooltip
                 contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }}
                 labelStyle={{ color: '#f1f5f9' }}
-                formatter={(value) => ['€' + value.toLocaleString(), 'Value']}
+                formatter={(value) => [formatCurrency(value, details?.currency || 'USD'), 'Value']}
               />
               <Line
                 type="monotone"
@@ -211,7 +212,7 @@ export default function PortfolioOverview({ name }: PortfolioOverviewProps) {
           <div className="mt-6 pt-6 border-t border-slate-700">
             <div className="text-center">
               <p className="text-slate-400 text-sm">Total value</p>
-              <p className="text-white font-bold">€{totalValue.toLocaleString('de-DE', { maximumFractionDigits: 0 })}</p>
+              <p className="text-white font-bold">{formatCurrency(totalValue, details?.currency || 'USD')}</p>
               <p className="text-slate-400 text-xs">{details?.num_positions || 0} positions</p>
             </div>
           </div>
@@ -305,7 +306,7 @@ export default function PortfolioOverview({ name }: PortfolioOverviewProps) {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-white font-medium">{holding.weight.toFixed(1)}%</td>
-                    <td className="px-6 py-4 text-white">€{holding.value.toLocaleString('de-DE', { maximumFractionDigits: 2 })}</td>
+                    <td className="px-6 py-4 text-white">{formatCurrency(holding.value, details?.currency || 'USD')}</td>
                     <td className={`px-6 py-4 font-medium ${holding.today_change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                       {holding.today_change > 0 ? '+' : ''}{holding.today_change.toFixed(2)}%
                     </td>
