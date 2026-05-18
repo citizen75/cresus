@@ -13,6 +13,7 @@ try:
 except ImportError:
 	WATCHDOG_AVAILABLE = False
 	logger.warning("watchdog library not installed. Install with: pip install watchdog")
+	FileSystemEventHandler = object
 
 
 class CodeChangeHandler(FileSystemEventHandler):

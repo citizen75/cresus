@@ -299,11 +299,11 @@ class PortfolioManager:
             open_pos = journal.get_open_positions()
             for _, row in open_pos.iterrows():
                 ticker = row["ticker"]
-                prices = Fundamental(ticker)
-                current_price = prices.get_current_price() or float(row.get("avg_entry_price", 0))
-                pos_value = float(row["quantity"]) * current_price
                 avg_entry_price = float(row["avg_entry_price"])
                 quantity = float(row["quantity"])
+                # Use cached current_price from portfolio.json instead of doing fresh lookup
+                current_price = float(row.get("current_price", avg_entry_price))
+                pos_value = quantity * current_price
                 positions.append({
                     "ticker": ticker,
                     "quantity": quantity,

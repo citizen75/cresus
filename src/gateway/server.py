@@ -11,8 +11,12 @@ from loguru import logger
 import uvicorn
 
 from gateway.cron import CronScheduler
-from gateway.watchdog import FileWatcher
 from utils.env import get_config_root
+
+try:
+	from gateway.watchdog import FileWatcher
+except ImportError:
+	FileWatcher = None
 
 
 class GatewayServer:
@@ -60,7 +64,7 @@ class GatewayServer:
 		# Initialize file watcher to monitor code changes (disabled in production mode)
 		project_root = Path(__file__).parent.parent.parent
 		enable_file_watcher = os.getenv("CRESUS_ENABLE_WATCHER", "true").lower() == "true"
-		if enable_file_watcher:
+		if enable_file_watcher and FileWatcher is not None:
 			self.file_watcher = FileWatcher(
 				project_root,
 				on_api_change=self._on_api_change,
@@ -69,7 +73,10 @@ class GatewayServer:
 			)
 		else:
 			self.file_watcher = None
-			logger.info("File watcher disabled (CRESUS_ENABLE_WATCHER=false)")
+			if not enable_file_watcher:
+				logger.info("File watcher disabled (CRESUS_ENABLE_WATCHER=false)")
+			elif FileWatcher is None:
+				logger.warning("File watcher disabled (watchdog not installed)")
 
 	def _on_api_change(self) -> None:
 		"""Handle API module changes - restart API server."""
@@ -175,6 +182,32 @@ class GatewayServer:
 		except Exception as e:
 			logger.error(f"MCP server failed: {e}", exc_info=True)
 
+	def _warm_caches(self) -> None:
+		"""Pre-warm critical caches before API starts."""
+		try:
+			logger.info("Warming up caches...")
+			import sys
+			sys.path.insert(0, str(Path(__file__).parent.parent))
+
+			from tools.portfolio.manager import PortfolioManager
+			import json
+			from pathlib import Path as PathlibPath
+
+			# Pre-warm portfolio history cache
+			pm = PortfolioManager()
+			portfolios = pm.list_portfolios()
+			for portfolio_name in portfolios[:3]:  # Warm up first 3 portfolios
+				logger.info(f"Warming cache for portfolio: {portfolio_name}")
+				try:
+					# Calculate history which will cache it
+					pm.calculate_portfolio_history(portfolio_name, recalculate=False, use_cache_only=True)
+				except Exception as e:
+					logger.warning(f"Cache warm-up for {portfolio_name} failed: {e}")
+
+			logger.info("Cache warm-up complete")
+		except Exception as e:
+			logger.warning(f"Cache warm-up failed: {e}")
+
 	def start(self) -> None:
 		"""Start the gateway server."""
 		if self.running:
@@ -186,6 +219,9 @@ class GatewayServer:
 		# Set up signal handlers for graceful shutdown
 		signal.signal(signal.SIGINT, self._signal_handler)
 		signal.signal(signal.SIGTERM, self._signal_handler)
+
+		# Warm up caches before starting API
+		self._warm_caches()
 
 		# Start API server in a separate thread
 		logger.info("Starting Cresus Gateway")

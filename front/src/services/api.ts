@@ -75,9 +75,9 @@ class CresusAPI {
     return (await this.client.get(`/portfolios/${name}/metrics`)).data
   }
 
-  async getPortfolioHistory(name: string, recalculate: boolean = false) {
+  async getPortfolioHistory(name: string, fetch: boolean = false) {
     return (await this.client.get(`/portfolios/${name}/history`, {
-      params: { recalculate }
+      params: { fetch }
     })).data
   }
 

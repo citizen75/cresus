@@ -16,7 +16,7 @@ dependencies = [
     "pyyaml>=6.0",
     "python-dotenv>=1.0.0",
     "rich>=13.0.0",
-    "pandas>=2.2.0",
+    "pandas==3.0.3",
     "numpy>=1.24.0",
     "yfinance>=0.2.0",
     "gspread>=6.0.0",

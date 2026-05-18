@@ -1,5 +1,6 @@
 """Portfolio API endpoints."""
 
+import os
 from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
 from functools import lru_cache
@@ -203,11 +204,45 @@ async def get_portfolio_history(name: str, fetch: bool = False):
     Args:
         fetch: If True, fetch fresh price data from yfinance. Default uses cached prices only.
     """
+    from pathlib import Path
+    import json
+    from loguru import logger
+
+    # Try to load from cache file first (unless fetch=true)
+    if not fetch:
+        db_root = Path(os.path.expanduser("~/.cresus/db"))
+        history_cache = db_root / "portfolios" / name / "history.json"
+        logger.info(f"Checking cache: {history_cache}, exists={history_cache.exists()}")
+        if history_cache.exists():
+            try:
+                logger.info(f"Loading cache for {name}")
+                with open(history_cache, 'r') as f:
+                    cached_result = json.load(f)
+                # Verify cache is valid (has required keys)
+                if 'history' in cached_result and isinstance(cached_result.get('history'), list):
+                    logger.info(f"Returning cached history for {name} ({len(cached_result['history'])} records)")
+                    return cached_result
+            except Exception as e:
+                logger.warning(f"Cache load failed: {e}")
+                pass  # Fall through to calculate if cache is invalid
+
+    # Calculate history
     pm = _get_portfolio_manager()
-    # Calculate is always done (fast enough) - only fetch if explicitly requested
     result = pm.calculate_portfolio_history(name, recalculate=False, use_cache_only=not fetch)
     if "error" in result:
         raise HTTPException(404, result["error"])
+
+    # Cache the result for future requests (unless fetch=true which means fresh calculation)
+    if not fetch and "history" in result:
+        try:
+            from pathlib import Path
+            db_root = Path(os.path.expanduser("~/.cresus/db"))
+            history_cache = db_root / "portfolios" / name / "history.json"
+            with open(history_cache, 'w') as f:
+                json.dump(result, f)
+        except Exception:
+            pass  # Silently fail cache write, still return result
+
     return result
 
 
@@ -372,6 +407,10 @@ async def get_current_prices(name: str, response: Response):
         # Get company information from cached data
         company_info = fundamental.get_company_info()
 
+        # Load fundamental data once per ticker for timestamp
+        fundamental_data = fundamental.load()
+        last_updated = fundamental_data.get("timestamp") if fundamental_data else None
+
         positions_with_prices.append({
             "ticker": ticker,
             "company_name": company_info.get("company_name"),
@@ -384,7 +423,7 @@ async def get_current_prices(name: str, response: Response):
             "position_value": round(position_value, 2),
             "position_gain": round(position_gain, 2),
             "position_gain_pct": round(position_gain_pct, 2),
-            "last_updated": Fundamental(ticker).load().get("timestamp") if Fundamental(ticker).load() else None,
+            "last_updated": last_updated,
         })
 
     # Get cash balance
