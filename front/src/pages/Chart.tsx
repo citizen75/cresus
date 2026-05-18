@@ -34,6 +34,7 @@ export default function ChartPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [selectedIndicators, setSelectedIndicators] = useState<Set<string>>(new Set(['RSI 14', 'MACD']))
   const [visibleWindow, setVisibleWindow] = useState<'1M' | '3M' | '6M' | 'YTD' | '1Y' | '2Y'>('1Y')
+  const [selectedIndex, setSelectedIndex] = useState(0)
 
   // Handle column sort
   const handleSort = (column: 'ticker' | 'price' | 'score' | 'entry') => {
@@ -123,6 +124,7 @@ export default function ChartPage() {
       try {
         const result = await api.getPortfolioDetails(selectedPortfolio)
         setHoldings(result.positions || [])
+        setSelectedIndex(0)
         if (result.positions && result.positions.length > 0) {
           setSelectedTicker(result.positions[0].ticker)
         }
@@ -137,10 +139,38 @@ export default function ChartPage() {
     loadHoldings()
   }, [selectedPortfolio])
 
+  // Handle keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const currentList = activeTab === 'holdings' ? holdings : sortedWatchlist
+      if (currentList.length === 0) return
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        const newIndex = Math.min(selectedIndex + 1, currentList.length - 1)
+        setSelectedIndex(newIndex)
+        const ticker = activeTab === 'holdings' ? currentList[newIndex].ticker : currentList[newIndex].ticker || currentList[newIndex].symbol
+        setSelectedTicker(ticker)
+        navigate(`/chart/${ticker}`)
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        const newIndex = Math.max(selectedIndex - 1, 0)
+        setSelectedIndex(newIndex)
+        const ticker = activeTab === 'holdings' ? currentList[newIndex].ticker : currentList[newIndex].ticker || currentList[newIndex].symbol
+        setSelectedTicker(ticker)
+        navigate(`/chart/${ticker}`)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedIndex, activeTab, holdings, sortedWatchlist, navigate])
+
   // Load watchlist when tab changes to watchlist
   useEffect(() => {
     if (activeTab !== 'watchlist' || !selectedPortfolio) return
 
+    setSelectedIndex(0)
     const loadWatchlist = async () => {
       setLoadingWatchlist(true)
       try {
@@ -273,15 +303,16 @@ export default function ChartPage() {
               ) : holdings.length === 0 ? (
                 <div className="px-4 py-4 text-xs text-slate-400">No holdings in portfolio</div>
               ) : (
-                holdings.map((holding) => (
+                holdings.map((holding, idx) => (
                   <div
                     key={holding.ticker}
                     onClick={() => {
+                      setSelectedIndex(idx)
                       setSelectedTicker(holding.ticker)
                       navigate(`/chart/${holding.ticker}`)
                     }}
                     className={`px-4 py-3 border-b border-slate-800 cursor-pointer hover:bg-slate-800/50 transition ${
-                      selectedTicker === holding.ticker ? 'bg-purple-600/20' : ''
+                      selectedIndex === idx ? 'bg-purple-600/30 border-l-2 border-l-purple-600' : ''
                     }`}
                   >
                     <div className="grid grid-cols-4 gap-2 items-center">
@@ -308,15 +339,16 @@ export default function ChartPage() {
               ) : watchlist.length === 0 ? (
                 <div className="px-4 py-4 text-xs text-slate-400">Watchlist is empty</div>
               ) : (
-                sortedWatchlist.map((item) => (
+                sortedWatchlist.map((item, idx) => (
                   <div
                     key={item.ticker}
                     onClick={() => {
+                      setSelectedIndex(idx)
                       setSelectedTicker(item.ticker)
                       navigate(`/chart/${item.ticker}`)
                     }}
                     className={`px-4 py-3 border-b border-slate-800 cursor-pointer hover:bg-slate-800/50 transition ${
-                      selectedTicker === item.ticker ? 'bg-purple-600/20' : ''
+                      selectedIndex === idx ? 'bg-purple-600/30 border-l-2 border-l-purple-600' : ''
                     }`}
                   >
                     <div className="grid grid-cols-4 gap-2 items-center">
