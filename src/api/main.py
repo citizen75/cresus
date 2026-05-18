@@ -28,6 +28,7 @@ def main():
 		factory=True,
 		host=host,
 		port=port,
+		workers=4,
 		reload=False,
 		log_level="info",
 	)
