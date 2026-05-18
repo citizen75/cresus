@@ -85,14 +85,6 @@ export default function BacktestRunning() {
 
   // Real progress is tracked via WebSocket messages, no simulation needed
 
-  // When backtest completes, set progress to 100
-  useEffect(() => {
-    if (backtest_id) {
-      setProgress({ current: 100, total: 100, percentage: 100 })
-      setStatus('completed')
-    }
-  }, [backtest_id])
-
   const isSuccess = status === 'completed'
   const isFailed = status === 'error'
 
