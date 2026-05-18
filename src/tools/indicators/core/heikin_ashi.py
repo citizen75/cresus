@@ -76,9 +76,9 @@ def calculate(
     # Calculate Heikin Ashi
     n = len(o)
     ha_close = (o + h + l + c) / 4.0
-    ha_open = pd.Series(ha_close).shift(1).fillna(ha_close[0]).values
+    ha_open = pd.Series(ha_close).shift(1).fillna(ha_close[0]).values.copy()
     ha_open[0] = (o[0] + c[0]) / 2.0
-    
+
     # Forward-fill HA Open to match logic: HA_Open[i] = (HA_Open[i-1] + HA_Close[i-1]) / 2
     for i in range(1, n):
         ha_open[i] = (ha_open[i - 1] + ha_close[i - 1]) / 2.0
