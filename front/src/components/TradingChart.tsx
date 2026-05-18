@@ -509,7 +509,7 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
         wickUpColor: '#ffffff',
         wickDownColor: '#9333ea',
         visible: showSHA10,
-      }, 0)
+      })
 
       shaSeriesRef.current = shaSeries
       shaSeries.setData(shaCandles)
@@ -518,6 +518,7 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
           top: 0.05,
           bottom: 0.15,
         },
+        alignLabels: false,
       })
     } catch (err) {
       console.error('Error adding SHA candlesticks:', err)
