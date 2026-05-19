@@ -16,6 +16,7 @@ from core.flow import Flow
 from agents.strategy.agent import StrategyAgent
 from agents.watchlist.agent import WatchListAgent
 from agents.watchlist.save_agent import SaveWatchlistAgent
+from agents.watchlist_alphas.agent import WatchlistAlphasAgent
 from agents.data.agent import DataAgent
 from agents.signals.agent import SignalsAgent
 from agents.watchlist_ranking.agent import WatchlistRankingAgent
@@ -48,11 +49,12 @@ class PreMarketFlow(Flow):
 		Flow order:
 		1. Strategy - load config and tickers
 		2. Data - fetch data and calculate indicators
-		3. Signals - generate trading signals (backtest: on watchlist; live: on all)
-		4. Watchlist - filter and sort tickers for trading
-		5. Ranking - rank watchlist tickers using LGBM walk-forward validated model
-		6. Entry - apply entry_filter to ranked watchlist tickers
-		7. Entry_order - create executable orders
+		3. Alphas - calculate named alpha factors from config for feature engineering
+		4. Signals - generate trading signals (backtest: on watchlist; live: on all)
+		5. Watchlist - filter and sort tickers for trading
+		6. Ranking - rank watchlist tickers using LGBM walk-forward validated model
+		7. Entry - apply entry_filter to ranked watchlist tickers
+		8. Entry_order - create executable orders
 		"""
 		# Strategy step - load tickers and strategy config
 		strategy_agent = StrategyAgent(f"StrategyAgent[{self.strategy_name}]", self.context)
@@ -62,6 +64,11 @@ class PreMarketFlow(Flow):
 		# Skip if already in context (backtest mode - data loaded by BacktestAgent)
 		data_agent = DataAgent(f"DataAgent[{self.strategy_name}]", self.context)
 		self.add_step(data_agent, step_name="data", required=True)
+
+		# Alphas step - calculate alpha factors from strategy config
+		# Adds named alpha columns to data_history for feature engineering
+		alphas_agent = WatchlistAlphasAgent("WatchlistAlphasAgent", self.context)
+		self.add_step(alphas_agent, step_name="alphas", required=False)
 
 		# In backtest mode, filter watchlist BEFORE signals to reduce computation
 		# This significantly speeds up backtests (filters 258 → ~20 before signal analysis)

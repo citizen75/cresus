@@ -42,51 +42,117 @@ features:
   alphas:
     # Momentum alphas - capture trend strength
     momentum:
-      - roc_5              # 5-day rate of change %
-      - roc_10             # 10-day rate of change %
-      - roc_20             # 20-day momentum
-      - roc_60             # 60-day momentum
-      - roc_120            # 120-day momentum
-      - roc_250            # 250-day momentum (annual)
-      - roc_20 - roc_250   # Medium-term vs long-term momentum
-      - ema_10 - ema_20    # EMA momentum spread
-      - macd_12_26_cross   # MACD crossover signal
-      - rsi_14             # Relative strength index
-      - close[0] > ema_10[0]  # Price above short EMA
-      - close[0] > ema_20[0]  # Price above medium EMA
-      - ema_10[0] > ema_20[0] # Short above medium EMA
+      - name: mom_roc5
+        formula: roc_5
+        description: 5-day rate of change %
+      - name: mom_roc10
+        formula: roc_10
+        description: 10-day rate of change %
+      - name: mom_roc20
+        formula: roc_20
+        description: 20-day momentum
+      - name: mom_roc60
+        formula: roc_60
+        description: 60-day momentum
+      - name: mom_roc120
+        formula: roc_120
+        description: 120-day momentum
+      - name: mom_roc250
+        formula: roc_250
+        description: 250-day momentum (annual)
+      - name: mom_roc_spread
+        formula: roc_20 - roc_250
+        description: Medium-term vs long-term momentum spread
+      - name: mom_ema_spread
+        formula: ema_10 - ema_20
+        description: EMA momentum spread
+      - name: mom_macd
+        formula: macd_12_26_cross
+        description: MACD crossover signal
+      - name: mom_rsi14
+        formula: rsi_14
+        description: Relative strength index (14 period)
+      - name: mom_price_above_ema10
+        formula: close[0] > ema_10[0]
+        description: Price above short EMA (10-day)
+      - name: mom_price_above_ema20
+        formula: close[0] > ema_20[0]
+        description: Price above medium EMA (20-day)
+      - name: mom_ema_uptrend
+        formula: ema_10[0] > ema_20[0]
+        description: Short EMA above medium EMA
 
     # Mean reversion alphas - capture overbought/oversold conditions
     mean_reversion:
-      - -1*roc_1           # Reversal from 1-day move
-      - -1*roc_5           # Reversal from 5-day move
-      - -1*roc_10          # Reversal from 10-day move
-      - rsi_14 < 30        # RSI oversold condition
-      - rsi_14 > 70        # RSI overbought condition
-      - close[0] < ema_20[0]  # Price below medium EMA (mean reversion)
+      - name: mr_roc_reversal1
+        formula: -1*roc_1
+        description: Reversal from 1-day move
+      - name: mr_roc_reversal5
+        formula: -1*roc_5
+        description: Reversal from 5-day move
+      - name: mr_roc_reversal10
+        formula: -1*roc_10
+        description: Reversal from 10-day move
+      - name: mr_rsi_oversold
+        formula: rsi_14 < 30
+        description: RSI oversold condition
+      - name: mr_rsi_overbought
+        formula: rsi_14 > 70
+        description: RSI overbought condition
+      - name: mr_price_below_ema20
+        formula: close[0] < ema_20[0]
+        description: Price below medium EMA (mean reversion)
 
     # Volatility alphas - capture volatility expansion/contraction
     volatility:
-      - atr_14             # Average true range
-      - atr_14 / close[0]  # Volatility as % of price
-      - volume[0] / volume_sma_20[0]  # Volume expansion
-      - bb_20_upper[0] - bb_20_lower[0]  # Bollinger band width
-      - (close[0] - bb_20_lower[0]) / (bb_20_upper[0] - bb_20_lower[0])  # %B Bollinger position
+      - name: vol_atr14
+        formula: atr_14
+        description: Average true range (14 period)
+      - name: vol_atr_pct
+        formula: atr_14 / close[0]
+        description: Volatility as % of price
+      - name: vol_expansion
+        formula: volume[0] / volume_sma_20[0]
+        description: Volume expansion ratio
+      - name: vol_bb_width
+        formula: bb_20_upper[0] - bb_20_lower[0]
+        description: Bollinger band width
+      - name: vol_bb_percent
+        formula: (close[0] - bb_20_lower[0]) / (bb_20_upper[0] - bb_20_lower[0])
+        description: %B Bollinger band position (0-1)
 
     # Trend quality alphas - capture trend strength and direction
     trend:
-      - adx_14             # ADX trend strength
-      - adx_20             # ADX-20 trend strength
-      - close[0] - sma_50[0]  # Price vs 50-day MA
-      - (close[0] - sma_200[0]) / close[0]  # Price deviation from 200-day MA
-      - sma_20[0] - sma_50[0]  # Short MA vs medium MA
+      - name: trend_adx14
+        formula: adx_14
+        description: ADX trend strength (14 period)
+      - name: trend_adx20
+        formula: adx_20
+        description: ADX-20 trend strength
+      - name: trend_price_sma50
+        formula: close[0] - sma_50[0]
+        description: Price vs 50-day moving average
+      - name: trend_price_deviation
+        formula: (close[0] - sma_200[0]) / close[0]
+        description: Price deviation from 200-day MA
+      - name: trend_ema_slope
+        formula: sma_20[0] - sma_50[0]
+        description: Short MA vs medium MA slope
 
     # Cross-asset correlation alphas
     correlations:
-      - volume[0] / volume[20]  # Volume trend
-      - high[0] - low[0]        # Intrabar range
-      - (high[0] - close[0]) / (high[0] - low[0])  # Upper wick size
-      - (close[0] - low[0]) / (high[0] - low[0])   # Lower wick size
+      - name: corr_volume_trend
+        formula: volume[0] / volume[20]
+        description: Volume trend ratio
+      - name: corr_intrabar_range
+        formula: high[0] - low[0]
+        description: Intrabar price range
+      - name: corr_wick_upper
+        formula: (high[0] - close[0]) / (high[0] - low[0])
+        description: Upper wick size
+      - name: corr_wick_lower
+        formula: (close[0] - low[0]) / (high[0] - low[0])
+        description: Lower wick size
 
 # Signal generation configuration
 signals:
