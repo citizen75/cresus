@@ -123,7 +123,9 @@ class WatchlistRankingAgent(Agent):
 				count_added = 0
 				for ticker, data in watchlist.items():
 					if isinstance(data, dict):
-						data["ranking_score"] = scores.get(ticker, 0)
+						# Convert numpy float64 to native Python float for JSON serialization
+						score = scores.get(ticker, 0)
+						data["ranking_score"] = float(score) if score is not None else 0
 						count_added += 1
 				self.logger.info(f"[WATCHLIST-RANKING] Added ranking_score to {count_added} watchlist items")
 
@@ -145,7 +147,9 @@ class WatchlistRankingAgent(Agent):
 				for item in watchlist:
 					if isinstance(item, dict):
 						ticker = item.get("ticker", "")
-						item["ranking_score"] = scores.get(ticker, 0)
+						# Convert numpy float64 to native Python float for JSON serialization
+						score = scores.get(ticker, 0)
+						item["ranking_score"] = float(score) if score is not None else 0
 
 				# Sort list by ranking_score descending
 				sorted_watchlist = sorted(watchlist, key=lambda x: x.get("ranking_score", 0) if isinstance(x, dict) else 0, reverse=True)

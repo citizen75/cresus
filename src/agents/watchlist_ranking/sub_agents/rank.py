@@ -45,8 +45,8 @@ class RankAgent(Agent):
 		else:
 			scores = self._score_with_features(features_df)
 
-		# Combine tickers with scores
-		scores_dict = dict(zip(features_df["ticker"], scores))
+		# Combine tickers with scores, converting numpy types to native Python floats
+		scores_dict = {ticker: float(score) for ticker, score in zip(features_df["ticker"], scores)}
 
 		# Sort by score descending
 		ranked = sorted(scores_dict.items(), key=lambda x: x[1], reverse=True)
