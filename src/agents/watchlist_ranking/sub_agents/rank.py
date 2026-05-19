@@ -53,8 +53,8 @@ class RankAgent(Agent):
 
 		self.logger.info(f"[RANK] Top 5 tickers: {ranked[:5]}")
 
-		# Store in context for downstream use
-		self.context.set("ticker_scores", scores_dict)
+		# Store ranking scores in context (don't overwrite ticker_scores which contains signal info)
+		self.context.set("ranking_model_scores", scores_dict)
 		self.context.set("ranked_tickers", ranked)
 
 		return {
