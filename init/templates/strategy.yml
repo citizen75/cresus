@@ -42,13 +42,13 @@ features:
   alphas:
     # Momentum alphas - capture trend strength
     momentum:
-      - return_5d          # 5-day return
-      - return_10d         # 10-day return
-      - return_20d         # 20-day return momentum
-      - return_60d         # 60-day momentum
-      - return_120d        # 120-day momentum
-      - return_250d        # 250-day momentum (annual)
-      - return_20d - return_250d  # Medium-term vs long-term momentum
+      - return_5           # 5-day return %
+      - return_10          # 10-day return %
+      - return_20          # 20-day return % momentum
+      - return_60          # 60-day momentum %
+      - return_120         # 120-day momentum %
+      - return_250         # 250-day momentum % (annual)
+      - return_20 - return_250  # Medium-term vs long-term momentum
       - ema_10 - ema_20    # EMA momentum spread
       - macd_12_26_cross   # MACD crossover signal
       - rsi_14             # Relative strength index
@@ -58,9 +58,9 @@ features:
 
     # Mean reversion alphas - capture overbought/oversold conditions
     mean_reversion:
-      - -1*return_1d       # Reversal from 1-day move
-      - -1*return_5d       # Reversal from 5-day move
-      - -1*return_10d      # Reversal from 10-day move
+      - -1*return_1        # Reversal from 1-day move
+      - -1*return_5        # Reversal from 5-day move
+      - -1*return_10       # Reversal from 10-day move
       - rsi_14 < 30        # RSI oversold condition
       - rsi_14 > 70        # RSI overbought condition
       - close[0] < ema_20[0]  # Price below medium EMA (mean reversion)

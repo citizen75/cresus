@@ -12,6 +12,7 @@ INDICATOR_PARAMS = {
     "macd": {"params": ["fast", "slow", "signal"], "defaults": {"fast": 12, "slow": 26, "signal": 9}},
     "roc": {"params": ["period"], "defaults": {"period": 12}},
     "mom": {"params": ["period"], "defaults": {"period": 12}},
+    "return": {"params": ["period"], "defaults": {"period": 5}},
 
     # Trend indicators
     "ema": {"params": ["period"], "defaults": {"period": 20}},

@@ -251,10 +251,11 @@ def _register_all_indicators():
 
     try:
         # Momentum indicators
-        from .momentum import rsi, macd, roc
+        from .momentum import rsi, macd, roc, return_calc
         register_indicator("rsi", rsi.calculate)
         register_indicator("macd", macd.calculate)
         register_indicator("roc", roc.calculate)
+        register_indicator("return", return_calc.calculate)
     except ImportError:
         pass  # Indicator not yet implemented
 
