@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { usePortfolioContext } from '@/context/PortfolioContext'
 import { api } from '@/services/api'
 import TradingChart from '@/components/TradingChart'
 
@@ -22,6 +23,7 @@ interface Transaction {
 }
 
 export default function TransactionsView({ name, filterTicker }: TransactionsViewProps) {
+  const { refreshData } = usePortfolioContext()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
@@ -33,6 +35,10 @@ export default function TransactionsView({ name, filterTicker }: TransactionsVie
   const [chartTransaction, setChartTransaction] = useState<Transaction | null>(null)
 
   const itemsPerPage = 10
+
+  const invalidatePortfolioCache = async () => {
+    await refreshData(['currentPrices', 'details', 'history', 'metrics'])
+  }
 
   useEffect(() => {
     loadTransactions()
@@ -67,6 +73,7 @@ export default function TransactionsView({ name, filterTicker }: TransactionsVie
     try {
       await api.updateTransaction(name, id, editData)
       setEditingId(null)
+      invalidatePortfolioCache()
       loadTransactions()
     } catch (err: any) {
       setError(err.message || 'Failed to update transaction')
@@ -79,6 +86,7 @@ export default function TransactionsView({ name, filterTicker }: TransactionsVie
     try {
       await api.deleteTransaction(name, id)
       setDeleteConfirm(null)
+      invalidatePortfolioCache()
       loadTransactions()
     } catch (err: any) {
       setError(err.message || 'Failed to delete transaction')

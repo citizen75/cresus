@@ -1,4 +1,6 @@
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { PortfolioProvider, usePortfolioContext } from '@/context/PortfolioContext'
 import PortfolioOverview from '@/components/portfolio/PortfolioOverview'
 import StrategyBuilder from '@/components/portfolio/StrategyBuilder'
 import AIWatchlist from '@/components/portfolio/AIWatchlist'
@@ -17,11 +19,22 @@ const TABS = [
   { id: 'settings', label: 'Settings' },
 ]
 
-export default function PortfolioDetail() {
+function PortfolioDetailContent() {
   const { name = 'main' } = useParams()
   const location = useLocation()
   const navigate = useNavigate()
-  
+  const { refetch } = usePortfolioContext()
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    try {
+      await refetch()
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
+
   // Detect active tab from URL path
   const getActiveTab = () => {
     // Check URL for routed tabs
@@ -81,13 +94,23 @@ export default function PortfolioDetail() {
 
       {/* Portfolio Header */}
       <div className="flex items-start justify-between border-b border-slate-800 pb-4">
-        <div>
+        <div className="flex-1">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-violet-600 rounded-lg flex items-center justify-center">
               <span className="text-lg">🚀</span>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold text-white capitalize">{name} Portfolio</h1>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <h1 className="text-3xl font-bold text-white capitalize">{name} Portfolio</h1>
+                <button
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  className="p-2 text-slate-400 hover:text-white transition disabled:opacity-50"
+                  title="Refresh portfolio data"
+                >
+                  <span className={`text-xl ${isRefreshing ? 'animate-spin' : ''}`}>🔄</span>
+                </button>
+              </div>
               <p className="text-slate-400 text-sm">High growth companies and AI innovators.</p>
             </div>
           </div>
@@ -131,5 +154,15 @@ export default function PortfolioDetail() {
         {activeTab === 'activity' && <div className="text-slate-400 py-12 text-center">Activity tab - Coming soon</div>}
       </div>
     </div>
+  )
+}
+
+export default function PortfolioDetail() {
+  const { name = 'main' } = useParams()
+
+  return (
+    <PortfolioProvider portfolioName={name}>
+      <PortfolioDetailContent />
+    </PortfolioProvider>
   )
 }

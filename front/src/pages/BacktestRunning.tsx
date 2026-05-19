@@ -22,6 +22,7 @@ export default function BacktestRunning() {
   const [metrics, setMetrics] = useState<any>(null)
   const [daysProcessed, setDaysProcessed] = useState(0)
   const [totalDays, setTotalDays] = useState(0)
+  const [trades, setTrades] = useState<any[]>([])
 
   // WebSocket connection for real-time updates
   const { isConnected, lastMessage } = useBacktestWebSocket({
@@ -52,6 +53,16 @@ export default function BacktestRunning() {
           return newCount
         })
         setLogs(prev => [...prev, `📊 Processed ${date}`])
+      } else if (lastMessage.type === 'trade_executed') {
+        const trade = lastMessage.data
+        setTrades(prev => [...prev, {
+          ticker: trade.ticker,
+          operation: trade.operation,
+          quantity: trade.quantity,
+          price: trade.price,
+          pnl: trade.pnl,
+          return_pct: trade.return_pct
+        }])
       } else if (lastMessage.type === 'backtest_complete') {
         setLogs(prev => [...prev, '✓ Backtest completed!'])
         setMetrics(lastMessage.data.metrics)
@@ -181,6 +192,31 @@ export default function BacktestRunning() {
                     </div>
                   </div>
                 </div>
+
+                {/* Trades List */}
+                {trades.length > 0 && (
+                  <div className="space-y-2 mt-4 pt-4 border-t border-slate-700">
+                    <div className="text-sm text-slate-400 font-semibold">Trades Executed:</div>
+                    <div className="bg-slate-950 rounded p-3 border border-slate-800 max-h-40 overflow-y-auto space-y-1">
+                      {trades.map((trade, idx) => (
+                        <div key={idx} className="text-xs text-slate-300 flex items-center justify-between py-1">
+                          <div>
+                            <span className={`font-bold ${trade.operation === 'BUY' ? 'text-blue-400' : 'text-orange-400'}`}>
+                              {trade.operation}
+                            </span>
+                            <span className="text-slate-400 ml-2">{trade.ticker}</span>
+                            <span className="text-slate-500 ml-1">× {trade.quantity}</span>
+                          </div>
+                          {trade.pnl !== undefined && (
+                            <span className={`font-bold ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              ${trade.pnl.toFixed(2)}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

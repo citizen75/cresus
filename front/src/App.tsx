@@ -18,6 +18,8 @@ import BacktestRunning from '@/pages/BacktestRunning'
 import BacktestDetail from '@/pages/BacktestDetail'
 import BacktestComparator from '@/pages/BacktestComparator'
 import Chart from '@/pages/Chart'
+import Alerts from '@/pages/Alerts'
+import Insights from '@/pages/Insights'
 
 export default function App() {
   useEffect(() => {
@@ -49,6 +51,8 @@ export default function App() {
           <Route path="/backtests/:strategy/:runId/:tab?" element={<Layout><BacktestDetail /></Layout>} />
           <Route path="/chart" element={<Layout><Chart /></Layout>} />
           <Route path="/chart/:ticker" element={<Layout><Chart /></Layout>} />
+          <Route path="/alerts" element={<Layout><Alerts /></Layout>} />
+          <Route path="/insights" element={<Layout><Insights /></Layout>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

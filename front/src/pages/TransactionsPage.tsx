@@ -1,4 +1,5 @@
 import { useParams, useSearchParams, Link } from 'react-router-dom'
+import { PortfolioProvider } from '@/context/PortfolioContext'
 import TransactionsView from '@/components/portfolio/TransactionsView'
 
 const MAIN_TABS = [
@@ -10,7 +11,7 @@ const MAIN_TABS = [
   { id: 'activity', label: 'Activity' },
 ]
 
-export default function TransactionsPage() {
+function TransactionsPageContent() {
   const { name = 'main' } = useParams()
   const [searchParams] = useSearchParams()
   const filterTicker = searchParams.get('ticker') || undefined
@@ -97,5 +98,15 @@ export default function TransactionsPage() {
       {/* Transactions Content */}
       <TransactionsView name={name} filterTicker={filterTicker} />
     </div>
+  )
+}
+
+export default function TransactionsPage() {
+  const { name = 'main' } = useParams()
+
+  return (
+    <PortfolioProvider portfolioName={name}>
+      <TransactionsPageContent />
+    </PortfolioProvider>
   )
 }

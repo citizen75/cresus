@@ -8,12 +8,12 @@ const menuItems = [
   { icon: '🏠', label: 'Home', path: '/' },
   { icon: '💼', label: 'Portfolios', path: '/portfolios' },
   { icon: '🎯', label: 'Strategies', path: '/strategies' },
-  { icon: '📊', label: 'Insights', path: '#' },
+  { icon: '📊', label: 'Insights', path: '/insights' },
   { icon: '🔍', label: 'Explore', path: '#' },
   { icon: '🔖', label: 'Watchlist', path: '#' },
   { icon: '⚡', label: 'Backtest', path: '/backtests' },
   { icon: '📈', label: 'Chart', path: '/chart' },
-  { icon: '🔔', label: 'Alerts', path: '#' },
+  { icon: '🔔', label: 'Alerts', path: '/alerts' },
   { icon: '⚙️', label: 'Settings', path: '#' },
 ]
 

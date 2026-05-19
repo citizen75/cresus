@@ -67,7 +67,13 @@ class CompositeRecommendationAgent(Agent):
 			)
 
 			# Merge all data into watchlist[ticker]
-			ticker_data = watchlist[ticker].copy()
+			# Preserve all existing fields (including ranking_score if present)
+			ticker_data = watchlist[ticker].copy() if isinstance(watchlist[ticker], dict) else {}
+
+			# Log to debug missing ranking_score
+			if "ranking_score" in watchlist[ticker] if isinstance(watchlist[ticker], dict) else False:
+				self.logger.debug(f"[ENTRY] Preserving ranking_score for {ticker}: {watchlist[ticker].get('ranking_score')}")
+
 			ticker_data.update({
 				"composite_score": round(composite_score, 2),
 				"entry_score": round(entry_score, 2),
@@ -82,10 +88,11 @@ class CompositeRecommendationAgent(Agent):
 			})
 			merged[ticker] = ticker_data
 
-		# Sort by composite_score descending and rebuild as dict
+		# Sort by ranking_score (if present) as primary, then composite_score as secondary
+		# This preserves the LGBM ranking order while still filtering by entry signals
 		sorted_merged = dict(sorted(
 			merged.items(),
-			key=lambda x: x[1].get("composite_score", 0),
+			key=lambda x: (x[1].get("ranking_score", 0), x[1].get("composite_score", 0)),
 			reverse=True
 		))
 		return sorted_merged

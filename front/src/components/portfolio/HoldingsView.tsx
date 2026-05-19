@@ -1,6 +1,5 @@
-import { usePortfolioMetrics, useCurrentPrices, usePortfolioHistory, usePortfolioDetails } from '@/hooks/usePortfolio'
+import { usePortfolioContext } from '@/context/PortfolioContext'
 import { useState, useEffect } from 'react'
-import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 import { useNavigate } from 'react-router-dom'
 import PositionModal from './PositionModal'
 import CardChart from '@/components/CardChart'
@@ -12,18 +11,15 @@ interface HoldingsViewProps {
   name: string
 }
 
-const chartColors = ['#a78bfa', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6']
-
 export default function HoldingsView({ name }: HoldingsViewProps) {
   const navigate = useNavigate()
-  const { data: details } = usePortfolioDetails(name)
-  const { data: metrics } = usePortfolioMetrics(name)
-  const { data: priceData, isLoading: isPricesLoading, error: pricesError } = useCurrentPrices(name)
-  const { data: history } = usePortfolioHistory(name)
+  const { data, isLoading: isContextLoading, refreshData } = usePortfolioContext()
+  const { details, currentPrices: priceData, history } = data
+  const isPricesLoading = isContextLoading
+  const pricesError = null
   const [activeTab, setActiveTab] = useState('positions')
   const [viewMode, setViewMode] = useState<'table' | 'charts'>('table')
   const [timeframe, setTimeframe] = useState<'1W' | '1M' | '3M' | 'YTD' | 'ALL'>('1M')
-  const [currentPage, setCurrentPage] = useState(1)
   const [selectedPosition, setSelectedPosition] = useState<string | null>(null)
   const [positionModalMode, setPositionModalMode] = useState<'buy' | 'sell' | null>(null)
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null)
@@ -34,12 +30,12 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [sectorFilter, setSectorFilter] = useState<string>('All sectors')
   const [chartPosition, setChartPosition] = useState<any>(null)
+  const [fundamentalData, setFundamentalData] = useState<Record<string, any>>({})
 
   const positions = priceData?.positions || []
   const totalValue = priceData?.total_value || 0
   const cash = priceData?.cash || 0
   const totalPortfolioValue = priceData?.total_portfolio_value || totalValue
-  const itemsPerPage = 10
 
   // Calculate days based on timeframe
   const getDaysForTimeframe = (tf: string) => {
@@ -122,6 +118,27 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
     }
   }, [positions])
 
+  // Fetch fundamental data for daily changes
+  useEffect(() => {
+    const fetchFundamentals = async () => {
+      const data: Record<string, any> = {}
+      for (const pos of positions) {
+        try {
+          const result = await api.getFundamental(pos.ticker)
+          data[pos.ticker] = result?.data?.quotation || {}
+        } catch (error) {
+          console.error(`Failed to load fundamental data for ${pos.ticker}:`, error)
+          data[pos.ticker] = {}
+        }
+      }
+      setFundamentalData(data)
+    }
+
+    if (positions.length > 0) {
+      fetchFundamentals()
+    }
+  }, [positions])
+
   // Sorting logic
   const getSortedPositions = () => {
     // First, filter by search query and sector
@@ -176,6 +193,14 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
           aVal = a.current_price
           bVal = b.current_price
           break
+        case 'daily_change':
+          const aFund = fundamentalData[a.ticker] || {}
+          const bFund = fundamentalData[b.ticker] || {}
+          const aPrevClose = aFund.previous_close || a.current_price
+          const bPrevClose = bFund.previous_close || b.current_price
+          aVal = a.current_price - aPrevClose
+          bVal = b.current_price - bPrevClose
+          break
         case 'market_value':
           aVal = a.position_value
           bVal = b.position_value
@@ -215,7 +240,6 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
       setSortColumn(column)
       setSortDirection('asc')
     }
-    setCurrentPage(1)
   }
 
   const getSortIndicator = (column: string) => {
@@ -224,8 +248,6 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
   }
 
   const sortedPositions = getSortedPositions()
-  const totalPages = Math.ceil(sortedPositions.length / itemsPerPage)
-  const paginatedPositions = sortedPositions.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
 
   // Calculate sector exposure from positions
   const sectorMap = new Map<string, number>()
@@ -233,11 +255,6 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
     const sector = pos.sector || 'Unknown'
     sectorMap.set(sector, (sectorMap.get(sector) || 0) + pos.position_value)
   })
-
-  const sectorData = Array.from(sectorMap.entries()).map(([name, value]) => ({
-    name,
-    value: totalValue > 0 ? (value / totalValue) * 100 : 0,
-  }))
 
   // Calculate summary metrics
   const unrealizedPNL = positions.reduce((sum: number, pos: any) => sum + (pos.position_gain || 0), 0)
@@ -345,10 +362,10 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
         </div>
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-3 gap-6">
-        {/* Left: Holdings Table */}
-        <div className="col-span-2">
+      {/* Main Content */}
+      <div>
+        {/* Holdings Table */}
+        <div>
           {/* Tab Navigation */}
           <div className="border-b border-slate-800 mb-6">
             <div className="flex gap-6 overflow-x-auto">
@@ -378,10 +395,7 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
                       type="text"
                       placeholder="Search by symbol or company..."
                       value={searchQuery}
-                      onChange={(e) => {
-                        setSearchQuery(e.target.value)
-                        setCurrentPage(1)
-                      }}
+                      onChange={(e) => setSearchQuery(e.target.value)}
                       className="w-full px-4 py-2 bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg focus:outline-none focus:border-purple-600"
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500">🔍</span>
@@ -395,10 +409,7 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
 
                   <select
                     value={sectorFilter}
-                    onChange={(e) => {
-                      setSectorFilter(e.target.value)
-                      setCurrentPage(1)
-                    }}
+                    onChange={(e) => setSectorFilter(e.target.value)}
                     className="px-4 py-2 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:border-slate-600 transition"
                   >
                     <option>All sectors</option>
@@ -431,10 +442,7 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
                 <div className="flex gap-2">
                   <div className="flex gap-2 bg-slate-800 border border-slate-700 rounded-lg p-1">
                     <button
-                      onClick={() => {
-                        setViewMode('table')
-                        setCurrentPage(1)
-                      }}
+                      onClick={() => setViewMode('table')}
                       className={`px-4 py-1.5 rounded transition font-medium text-sm ${
                         viewMode === 'table'
                           ? 'bg-purple-600 text-white'
@@ -444,10 +452,7 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
                       📊 Table
                     </button>
                     <button
-                      onClick={() => {
-                        setViewMode('charts')
-                        setCurrentPage(1)
-                      }}
+                      onClick={() => setViewMode('charts')}
                       className={`px-4 py-1.5 rounded transition font-medium text-sm ${
                         viewMode === 'charts'
                           ? 'bg-purple-600 text-white'
@@ -479,7 +484,7 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
 
           {/* Tab Content - Table View */}
           {activeTab === 'positions' && viewMode === 'table' && (
-          <div className="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden">
+          <div className="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden flex flex-col">
             {positions.length === 0 ? (
               <div className="p-12 text-center text-slate-400">
                 {isPricesLoading ? (
@@ -490,7 +495,7 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
               </div>
             ) : (
               <>
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto overflow-y-auto max-h-[600px]">
                   <table className="w-full text-sm">
                     <thead className="bg-slate-800/50 border-b border-slate-800">
                       <tr>
@@ -518,6 +523,9 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
                         <th className="px-4 py-3 text-left text-slate-400 font-medium cursor-pointer hover:text-slate-200 transition" onClick={() => handleColumnSort('price')}>
                           Price{getSortIndicator('price')}
                         </th>
+                        <th className="px-4 py-3 text-left text-slate-400 font-medium cursor-pointer hover:text-slate-200 transition" onClick={() => handleColumnSort('daily_change')}>
+                          Daily Change{getSortIndicator('daily_change')}
+                        </th>
                         <th className="px-4 py-3 text-left text-slate-400 font-medium cursor-pointer hover:text-slate-200 transition" onClick={() => handleColumnSort('market_value')}>
                           Market Value{getSortIndicator('market_value')}
                         </th>
@@ -531,7 +539,7 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
                       </tr>
                     </thead>
                     <tbody>
-                      {paginatedPositions.map((pos: any) => {
+                      {sortedPositions.map((pos: any) => {
                     const weight = (pos.position_value / totalValue * 100)
                     return (
                       <tr
@@ -560,6 +568,24 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
                         <td className="px-4 py-3 text-white">{pos.quantity}</td>
                         <td className="px-4 py-3 text-white">{formatCurrency(pos.avg_entry_price, details?.currency || 'USD')}</td>
                         <td className="px-4 py-3 text-white">{formatCurrency(pos.current_price, details?.currency || 'USD')}</td>
+                        <td className="px-4 py-3">
+                          {(() => {
+                            const fundamental = fundamentalData[pos.ticker]
+                            const previousClose = fundamental?.previous_close || pos.current_price
+                            const dailyChange = pos.current_price - previousClose
+                            const dailyChangePct = previousClose > 0 ? (dailyChange / previousClose) * 100 : 0
+                            return (
+                              <div className="flex flex-col">
+                                <span className={`font-medium ${dailyChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                  {dailyChange >= 0 ? '+' : ''}{formatCurrency(Math.abs(dailyChange), details?.currency || 'USD')}
+                                </span>
+                                <span className={`text-xs ${dailyChangePct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                  {dailyChangePct >= 0 ? '+' : ''}{dailyChangePct.toFixed(2)}%
+                                </span>
+                              </div>
+                            )
+                          })()}
+                        </td>
                         <td className="px-4 py-3 text-white font-medium">{formatCurrency(pos.position_value, details?.currency || 'USD')}</td>
                         <td className={`px-4 py-3 font-medium ${pos.position_gain >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                           {pos.position_gain >= 0 ? '+' : ''}{formatCurrency(Math.abs(pos.position_gain), details?.currency || 'USD')}
@@ -600,42 +626,6 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
                   })}
                 </tbody>
               </table>
-            </div>
-
-            {/* Pagination */}
-            <div className="px-6 py-4 border-t border-slate-800 bg-slate-900 flex items-center justify-between text-sm">
-              <p className="text-slate-400">
-                Showing {Math.min((currentPage - 1) * itemsPerPage + 1, sortedPositions.length)}-{Math.min(currentPage * itemsPerPage, sortedPositions.length)} of {sortedPositions.length} positions
-              </p>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                  className="px-2 py-1 bg-slate-800 border border-slate-700 text-slate-300 rounded hover:bg-slate-700 disabled:opacity-50 transition"
-                >
-                  ←
-                </button>
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => i + 1).map((page) => (
-                  <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    className={`px-2 py-1 rounded transition ${
-                      page === currentPage
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700'
-                    }`}
-                  >
-                    {page}
-                  </button>
-                ))}
-                <button
-                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage === totalPages}
-                  className="px-2 py-1 bg-slate-800 border border-slate-700 text-slate-300 rounded hover:bg-slate-700 disabled:opacity-50 transition"
-                >
-                  →
-                </button>
-              </div>
             </div>
             </>
             )}
@@ -737,110 +727,7 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
             ))}
           </div>
         )}
-
         </div>
-
-        {/* Right Sidebar - Allocation, Sector, Risk Metrics */}
-        {activeTab === 'positions' && (
-        <div className="space-y-6">
-          {/* Allocation Pie Chart */}
-          <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-white font-bold">Allocation</h3>
-              <button className="text-purple-400 hover:text-purple-300 text-sm">View full →</button>
-            </div>
-            <div className="flex flex-col items-center">
-              <div className="w-40 h-40">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={positions.slice(0, 5).map((pos: any) => ({
-                        name: pos.ticker,
-                        value: pos.position_value,
-                      }))}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={50}
-                      outerRadius={70}
-                      paddingAngle={1}
-                      dataKey="value"
-                    >
-                      {positions.map((_: any, index: number) => (
-                        <Cell key={`cell-${index}`} fill={chartColors[index % chartColors.length]} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="text-center mt-4">
-                <p className="text-slate-400 text-xs mb-1">Total Value</p>
-                <p className="text-white font-bold text-lg">€{totalValue.toLocaleString('de-DE', { maximumFractionDigits: 0 })}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Sector Exposure */}
-          <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-white font-bold">Sector Exposure</h3>
-              <button className="text-purple-400 hover:text-purple-300 text-sm">View full →</button>
-            </div>
-            <div className="space-y-3">
-              {sectorData.map((sector, index) => (
-                <div key={sector.name}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-slate-400 text-sm">{sector.name}</span>
-                    <span className="text-white font-medium text-sm">{sector.value.toFixed(1)}%</span>
-                  </div>
-                  <div className="w-full bg-slate-800 rounded-full h-2">
-                    <div
-                      className="h-2 rounded-full"
-                      style={{
-                        width: `${sector.value}%`,
-                        backgroundColor: chartColors[index % chartColors.length],
-                      }}
-                    ></div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Risk Snapshot */}
-          <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-white font-bold">Risk Snapshot</h3>
-              <button className="text-purple-400 hover:text-purple-300 text-sm">View full →</button>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-slate-400 text-xs uppercase mb-2">Portfolio Beta</p>
-                <p className="text-white font-bold text-xl">1.08</p>
-              </div>
-              <div>
-                <p className="text-slate-400 text-xs uppercase mb-2">Sharpe Ratio</p>
-                <p className="text-white font-bold text-xl">{metrics?.sharpe_ratio || 1.42}</p>
-              </div>
-              <div>
-                <p className="text-slate-400 text-xs uppercase mb-2">Max Drawdown</p>
-                <p className="text-red-400 font-bold text-xl">-12.3%</p>
-              </div>
-              <div>
-                <p className="text-slate-400 text-xs uppercase mb-2">Volatility (1Y)</p>
-                <p className="text-white font-bold text-xl">18.7%</p>
-              </div>
-              <div>
-                <p className="text-slate-400 text-xs uppercase mb-2">VaR (95%, 1D)</p>
-                <p className="text-white font-bold text-xl">-2.31%</p>
-              </div>
-              <div>
-                <p className="text-slate-400 text-xs uppercase mb-2">Tracking Error</p>
-                <p className="text-white font-bold text-xl">6.12%</p>
-              </div>
-            </div>
-          </div>
-        </div>
-        )}
       </div>
 
       {/* Chart Modal */}
@@ -890,8 +777,8 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
           setSelectedPositionData(null)
         }}
         onSuccess={() => {
-          // Refetch portfolio details
-          window.location.reload()
+          // Refresh portfolio context data
+          refreshData(['currentPrices', 'details', 'history', 'metrics'])
         }}
         portfolioName={name}
       />

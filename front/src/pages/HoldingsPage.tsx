@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { PortfolioProvider, usePortfolioContext } from '@/context/PortfolioContext'
 import HoldingsView from '@/components/portfolio/HoldingsView'
 
 const MAIN_TABS = [
@@ -10,8 +12,19 @@ const MAIN_TABS = [
   { id: 'activity', label: 'Activity' },
 ]
 
-export default function HoldingsPage() {
+function HoldingsPageContent() {
   const { name = 'main' } = useParams()
+  const { refetch } = usePortfolioContext()
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    try {
+      await refetch()
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -34,13 +47,23 @@ export default function HoldingsPage() {
 
       {/* Portfolio Header */}
       <div className="flex items-start justify-between border-b border-slate-800 pb-4">
-        <div>
+        <div className="flex-1">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-violet-600 rounded-lg flex items-center justify-center">
               <span className="text-lg">🚀</span>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold text-white capitalize">{name} Portfolio</h1>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <h1 className="text-3xl font-bold text-white capitalize">{name} Portfolio</h1>
+                <button
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  className="p-2 text-slate-400 hover:text-white transition disabled:opacity-50"
+                  title="Refresh portfolio data"
+                >
+                  <span className={`text-xl ${isRefreshing ? 'animate-spin' : ''}`}>🔄</span>
+                </button>
+              </div>
               <p className="text-slate-400 text-sm">High growth companies and AI innovators.</p>
             </div>
           </div>
@@ -81,5 +104,15 @@ export default function HoldingsPage() {
       {/* Holdings Content */}
       <HoldingsView name={name} />
     </div>
+  )
+}
+
+export default function HoldingsPage() {
+  const { name = 'main' } = useParams()
+
+  return (
+    <PortfolioProvider portfolioName={name}>
+      <HoldingsPageContent />
+    </PortfolioProvider>
   )
 }

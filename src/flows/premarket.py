@@ -18,6 +18,7 @@ from agents.watchlist.agent import WatchListAgent
 from agents.watchlist.save_agent import SaveWatchlistAgent
 from agents.data.agent import DataAgent
 from agents.signals.agent import SignalsAgent
+from agents.watchlist_ranking.agent import WatchlistRankingAgent
 from agents.entry.agent import EntryAgent
 from agents.entry_order.agent import EntryOrderAgent
 from agents.exit.agent import ExitAgent
@@ -49,8 +50,9 @@ class PreMarketFlow(Flow):
 		2. Data - fetch data and calculate indicators
 		3. Signals - generate trading signals (backtest: on watchlist; live: on all)
 		4. Watchlist - filter and sort tickers for trading
-		5. Entry - apply entry_filter to watchlist tickers
-		6. Entry_order - create executable orders
+		5. Ranking - rank watchlist tickers using LGBM walk-forward validated model
+		6. Entry - apply entry_filter to ranked watchlist tickers
+		7. Entry_order - create executable orders
 		"""
 		# Strategy step - load tickers and strategy config
 		strategy_agent = StrategyAgent(f"StrategyAgent[{self.strategy_name}]", self.context)
@@ -80,6 +82,10 @@ class PreMarketFlow(Flow):
 			# Live: Signals on all tickers first, then Watchlist
 			signals_agent = SignalsAgent("SignalsAgent", self.context)
 			self.add_step(signals_agent, step_name="signals", required=True)
+
+		# Ranking step - rank watchlist tickers using LGBM model (walk-forward validated)
+		ranking_agent = WatchlistRankingAgent("WatchlistRankingAgent", self.context)
+		self.add_step(ranking_agent, step_name="ranking", required=False)
 
 		# Note: Data slicing to target_date must happen BEFORE entry analysis
 		# so that entry_filter evaluates on the correct date's data
@@ -155,7 +161,11 @@ class PreMarketFlow(Flow):
 		# === FINAL OUTPUT: Watchlist and Orders ===
 		# Plus display-essential data for CLI output
 
-		# Extract final watchlist
+		# Extract ranking scores (ranked tickers with LGBM scores)
+		ranking_scores = self.context.get("ranking_scores") or {}
+		result["ranking_scores"] = ranking_scores
+
+		# Extract final watchlist (already sorted by WatchlistRankingAgent)
 		watchlist = self.context.get("watchlist") or []
 		result["watchlist"] = watchlist
 

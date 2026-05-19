@@ -1,4 +1,4 @@
-import { usePortfolioDetails, usePortfolioMetrics, usePortfolioHistory, usePortfolioAllocation, useTopHoldings } from '@/hooks/usePortfolio'
+import { usePortfolioContext } from '@/context/PortfolioContext'
 import PortfolioChart from '@/components/PortfolioChart'
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
 import { useState } from 'react'
@@ -9,15 +9,12 @@ interface PortfolioOverviewProps {
 }
 
 export default function PortfolioOverview({ name }: PortfolioOverviewProps) {
-  const { data: details, isLoading: detailsLoading } = usePortfolioDetails(name)
-  const { data: metrics, isLoading: metricsLoading } = usePortfolioMetrics(name)
-  const { data: history, isLoading: historyLoading } = usePortfolioHistory(name)
-  const { data: allocation, isLoading: allocationLoading } = usePortfolioAllocation(name)
-  const { data: holdings, isLoading: holdingsLoading } = useTopHoldings(name)
+  const { data, isLoading } = usePortfolioContext()
+  const { details, metrics, history, allocation, topHoldings: holdings } = data
 
   const [timeRange, setTimeRange] = useState('1M')
 
-  if (detailsLoading || metricsLoading || historyLoading) {
+  if (isLoading) {
     return <div className="text-slate-400">Loading portfolio...</div>
   }
 
@@ -59,7 +56,9 @@ export default function PortfolioOverview({ name }: PortfolioOverviewProps) {
     }
   }
 
-  const performanceData = getFilteredHistoryData(timeRange, history?.history || [])
+  const historyArray = history?.history || history || []
+  console.log('History data in PortfolioOverview:', { history, historyArray, length: historyArray.length })
+  const performanceData = getFilteredHistoryData(timeRange, historyArray)
 
   // Get total value from history (includes positions + cash)
   let totalValue = details?.total_value || 0
@@ -264,6 +263,70 @@ export default function PortfolioOverview({ name }: PortfolioOverviewProps) {
                 <span className="text-slate-400 text-sm">Sharpe ratio</span>
                 <span className="text-white font-medium">{metrics?.sharpe_ratio || 1.42}</span>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Sector Exposure & Risk Snapshot */}
+      <div className="grid grid-cols-2 gap-6">
+        {/* Sector Exposure */}
+        <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
+          <h3 className="text-white font-bold mb-4">Sector Exposure</h3>
+          <div className="space-y-3">
+            {[
+              { name: 'Technology', value: 45 },
+              { name: 'Healthcare', value: 25 },
+              { name: 'Financial', value: 15 },
+              { name: 'Consumer', value: 10 },
+              { name: 'Industrial', value: 5 }
+            ].map((sector, index) => (
+              <div key={sector.name}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-slate-400 text-sm">{sector.name}</span>
+                  <span className="text-white font-medium text-sm">{sector.value}%</span>
+                </div>
+                <div className="w-full bg-slate-800 rounded-full h-2">
+                  <div
+                    className="h-2 rounded-full"
+                    style={{
+                      width: `${sector.value}%`,
+                      backgroundColor: ['#8b5cf6', '#06b6d4', '#ef4444', '#eab308', '#10b981'][index]
+                    }}
+                  ></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Risk Snapshot */}
+        <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
+          <h3 className="text-white font-bold mb-4">Risk Snapshot</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-slate-400 text-xs uppercase mb-2">Portfolio Beta</p>
+              <p className="text-white font-bold text-xl">1.08</p>
+            </div>
+            <div>
+              <p className="text-slate-400 text-xs uppercase mb-2">Sharpe Ratio</p>
+              <p className="text-white font-bold text-xl">{metrics?.sharpe_ratio || 1.42}</p>
+            </div>
+            <div>
+              <p className="text-slate-400 text-xs uppercase mb-2">Max Drawdown</p>
+              <p className="text-red-400 font-bold text-xl">-12.3%</p>
+            </div>
+            <div>
+              <p className="text-slate-400 text-xs uppercase mb-2">Volatility (1Y)</p>
+              <p className="text-white font-bold text-xl">18.7%</p>
+            </div>
+            <div>
+              <p className="text-slate-400 text-xs uppercase mb-2">VaR (95%, 1D)</p>
+              <p className="text-white font-bold text-xl">-2.31%</p>
+            </div>
+            <div>
+              <p className="text-slate-400 text-xs uppercase mb-2">Tracking Error</p>
+              <p className="text-white font-bold text-xl">6.12%</p>
             </div>
           </div>
         </div>

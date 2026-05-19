@@ -47,6 +47,8 @@ class PortfolioCommands:
 			table.add_column("Description")
 			table.add_row("watchlist show <strategy>", "Show watchlist with OHLCV and signal scores")
 			table.add_row("watchlist extended <strategy>", "Show watchlist with detailed technical indicators")
+			table.add_row("watchlist train <strategy>", "Train LGBM ranking model for strategy")
+			table.add_row("watchlist rank <strategy>", "Rank tickers using LGBM model")
 			console.print(table)
 			return
 
@@ -65,6 +67,18 @@ class PortfolioCommands:
 				return
 			strategy = parts[1]
 			self._print_watchlist_extended(strategy)
+		elif cmd == "train":
+			if len(parts) < 2:
+				console.print("[red]✗[/red] Usage: watchlist train <strategy>")
+				return
+			strategy = parts[1]
+			self._train_ranking_model(strategy)
+		elif cmd == "rank":
+			if len(parts) < 2:
+				console.print("[red]✗[/red] Usage: watchlist rank <strategy>")
+				return
+			strategy = parts[1]
+			self._rank_watchlist(strategy)
 		else:
 			# Support legacy format: watchlist <strategy> (assumes show)
 			strategy = cmd
@@ -475,3 +489,168 @@ class PortfolioCommands:
 			ema[i] = (data[i] * multiplier) + (ema[i - 1] * (1 - multiplier))
 
 		return ema
+
+	def _train_ranking_model(self, strategy: str):
+		"""Train LGBM ranking model for a strategy."""
+		try:
+			from core.context import AgentContext
+			from agents.strategy.agent import StrategyAgent
+			from agents.data.agent import DataAgent
+			from agents.watchlist_ranking.agent import WatchlistRankingAgent
+			from pathlib import Path
+
+			console.print(f"\n[cyan]Training LGBM ranking model for {strategy}...[/cyan]\n")
+
+			# Create context and load data
+			ctx = AgentContext()
+
+			# Load strategy
+			strategy_agent = StrategyAgent(f"strategy[{strategy}]", ctx)
+			result = strategy_agent.process({})
+			if result.get("status") != "success":
+				console.print(f"[red]✗[/red] Failed to load strategy: {result.get('message')}")
+				return
+
+			# Load data
+			data_agent = DataAgent(f"data[{strategy}]", ctx)
+			result = data_agent.process({})
+			if result.get("status") != "success":
+				console.print(f"[red]✗[/red] Failed to load data: {result.get('message')}")
+				return
+
+			tickers_loaded = result.get("output", {}).get("data_after_quantity_filter", 0)
+			console.print(f"  Data loaded: {tickers_loaded} tickers")
+			console.print(f"  Features extracted: {result.get('output', {}).get('indicators_count', 0)} indicators\n")
+
+			# Train model
+			ranking_agent = WatchlistRankingAgent("RankingAgent", ctx)
+			result = ranking_agent.train(strategy)
+
+			if result.get("status") == "success":
+				output = result.get("output", {})
+				model_path = output.get("model_path", "")
+				samples = output.get("samples", 0)
+				features = output.get("features", 0)
+				folds = output.get("folds", 0)
+				metrics = output.get("metrics", {})
+				fold_results = output.get("fold_results", [])
+				fallback = output.get("fallback")
+
+				# Display model info
+				if samples and samples > 0 and folds > 0:
+					console.print(f"[green]✓[/green] Walk-forward training completed!\n")
+					console.print(f"  [bold]Model Path:[/bold] {model_path}")
+					console.print(f"  [bold]Storage:[/bold] ~/.cresus/db/models/watchlist_ranking/{Path(model_path).name}")
+					console.print(f"  [bold]Total Samples:[/bold] {samples}")
+					console.print(f"  [bold]Features:[/bold] {features}")
+					console.print(f"  [bold]Folds:[/bold] {folds}\n")
+
+					# Display walk-forward summary
+					if metrics and "avg_ic" in metrics:
+						console.print("[bold]Walk-Forward Summary[/bold]")
+						console.print(f"  Avg IC (Information Coefficient): {metrics.get('avg_ic'):.4f}")
+						console.print(f"  Avg RMSE:                        {metrics.get('avg_rmse'):.6f}")
+						console.print(f"  Avg MAE:                         {metrics.get('avg_mae'):.6f}")
+						console.print(f"  Positive IC Folds:               {metrics.get('positive_ic_pct'):.1f}%\n")
+
+					# Display recent fold details
+					if fold_results:
+						console.print("[bold]Recent Fold Results (last 10)[/bold]")
+						fold_table = Table(box=box.ROUNDED)
+						fold_table.add_column("Period", style="cyan")
+						fold_table.add_column("Train", justify="right", style="dim")
+						fold_table.add_column("Test", justify="right", style="dim")
+						fold_table.add_column("RMSE", justify="right")
+						fold_table.add_column("IC", justify="right", style="yellow")
+
+						for fold in fold_results[-10:]:
+							rmse_color = "green" if fold.get("rmse", 0) < 0.03 else "yellow" if fold.get("rmse", 0) < 0.05 else "red"
+							ic_color = "green" if fold.get("ic", 0) > 0.05 else "yellow" if fold.get("ic", 0) > 0 else "red"
+							fold_table.add_row(
+								fold.get("period", "-"),
+								str(fold.get("train_n", 0)),
+								str(fold.get("test_n", 0)),
+								f"[{rmse_color}]{fold.get('rmse', 0):.6f}[/{rmse_color}]",
+								f"[{ic_color}]{fold.get('ic', 0):.4f}[/{ic_color}]"
+							)
+
+						console.print(fold_table)
+						console.print()
+
+					# Model info
+					model_info = output.get("model", {})
+					if model_info:
+						console.print("[bold]Final Model Configuration[/bold]")
+						console.print(f"  Type: {model_info.get('type')}")
+						console.print(f"  Boosting Rounds: {model_info.get('rounds')}")
+						params = model_info.get("params", {})
+						console.print(f"  Learning Rate: {params.get('learning_rate')}")
+						console.print(f"  Num Leaves: {params.get('num_leaves')}\n")
+
+				else:
+					console.print(f"[yellow]⚠[/yellow] Training completed but no model saved\n")
+					console.print(f"  [bold]Reason:[/bold] {metrics.get('reason', 'Insufficient data')}")
+					if fallback:
+						console.print(f"  [bold]Fallback:[/bold] {fallback}\n")
+			else:
+				console.print(f"[red]✗[/red] Training failed: {result.get('message')}")
+
+		except Exception as e:
+			console.print(f"[red]✗[/red] Error: {str(e)}")
+
+	def _rank_watchlist(self, strategy: str):
+		"""Rank tickers using LGBM model."""
+		try:
+			from core.context import AgentContext
+			from agents.strategy.agent import StrategyAgent
+			from agents.data.agent import DataAgent
+			from agents.watchlist_ranking.agent import WatchlistRankingAgent
+
+			console.print(f"[cyan]Ranking tickers for {strategy}...[/cyan]")
+
+			# Create context and load data
+			ctx = AgentContext()
+
+			# Load strategy
+			strategy_agent = StrategyAgent(f"strategy[{strategy}]", ctx)
+			result = strategy_agent.process({})
+			if result.get("status") != "success":
+				console.print(f"[red]✗[/red] Failed to load strategy: {result.get('message')}")
+				return
+
+			# Load data
+			data_agent = DataAgent(f"data[{strategy}]", ctx)
+			result = data_agent.process({})
+			if result.get("status") != "success":
+				console.print(f"[red]✗[/red] Failed to load data: {result.get('message')}")
+				return
+
+			# Rank tickers
+			ranking_agent = WatchlistRankingAgent("RankingAgent", ctx)
+			result = ranking_agent.rank(strategy)
+
+			if result.get("status") == "success":
+				output = result.get("output", {})
+				ranked = output.get("ranked", [])
+
+				if ranked:
+					console.print(f"[green]✓[/green] Ranked {len(output.get('scores', {}))} tickers\n")
+
+					# Display top 20 ranked tickers
+					table = Table(title=f"Top Ranked Tickers - {strategy}", box=box.ROUNDED)
+					table.add_column("Rank", style="cyan", justify="right")
+					table.add_column("Ticker", style="blue", no_wrap=True)
+					table.add_column("Score", justify="right", style="yellow")
+
+					for i, (ticker, score) in enumerate(ranked[:20], 1):
+						score_str = f"{float(score):.4f}"
+						table.add_row(str(i), ticker, score_str)
+
+					console.print(table)
+				else:
+					console.print("[yellow]⚠[/yellow] No tickers to rank")
+			else:
+				console.print(f"[red]✗[/red] Ranking failed: {result.get('message')}")
+
+		except Exception as e:
+			console.print(f"[red]✗[/red] Error: {str(e)}")
