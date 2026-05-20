@@ -106,8 +106,19 @@ class SignalsAgent(Agent):
 		self.context.set("signals", signal_results)
 		self.context.set("ticker_scores", ticker_scores)
 
-		# Sort tickers by score (descending)
-		sorted_tickers = sorted(ticker_scores.items(), key=lambda x: x[1]["score"], reverse=True)
+		# Get ranking_scores if available (from LGBM model)
+		ranking_scores = self.context.get("ranking_scores") or {}
+
+		# Sort tickers by ranking_score (LGBM model) if available, otherwise by signal score
+		def get_sort_key(item):
+			ticker, score_info = item
+			# Prefer ranking_score (LGBM model prediction) over signal score
+			if ranking_scores and ticker in ranking_scores:
+				return ranking_scores[ticker]
+			# Fall back to signal score
+			return score_info["score"]
+
+		sorted_tickers = sorted(ticker_scores.items(), key=get_sort_key, reverse=True)
 
 		# Log top tickers
 		self.logger.info(f"Top 5 tickers by signal score:")
