@@ -239,6 +239,16 @@ class EntryOrderAgent(Agent):
 				)
 			self.logger.info(f"Created {len(executable_orders)} pending orders (not executed)")
 
+		# Sort orders by ranking_score (LGBM model predictions) descending
+		if executable_orders:
+			ranking_scores = self.context.get("ranking_scores", {})
+			if ranking_scores:
+				executable_orders.sort(
+					key=lambda order: ranking_scores.get(order.get("ticker", ""), 0),
+					reverse=True
+				)
+				self.logger.info(f"Sorted {len(executable_orders)} orders by LGBM ranking_score")
+
 		return {
 			"status": "success",
 			"input": input_data,
