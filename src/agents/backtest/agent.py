@@ -14,6 +14,7 @@ from core.context import AgentContext
 from core.flow import Flow
 from agents.strategy.agent import StrategyAgent
 from agents.data.agent import DataAgent
+from agents.watchlist_alphas.agent import WatchlistAlphasAgent
 from tools.portfolio.journal import Journal
 from tools.portfolio.orders import Orders
 from tools.backtest.manager import BacktestManager
@@ -193,6 +194,13 @@ class BacktestAgent(Agent):
 		data_result = data_agent.run({})
 		if data_result.get("status") == "error":
 			return data_result
+
+		# Calculate alphas via WatchlistAlphasAgent
+		alphas_agent = WatchlistAlphasAgent(f"alphas[{strategy_name}]", self.context)
+		alphas_result = alphas_agent.run({})
+		if alphas_result.get("status") == "error":
+			self.logger.warning(f"Alphas calculation failed: {alphas_result.get('message')}")
+			# Continue anyway - alphas are optional
 
 		# Extract trading days from context
 		data_history = self.context.get("data_history") or {}

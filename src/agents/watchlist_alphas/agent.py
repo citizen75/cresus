@@ -72,10 +72,11 @@ class WatchlistAlphasAgent(Agent):
 				"message": "No valid alphas extracted"
 			}
 
-		self.logger.info(f"[ALPHAS] Calculating {len(alpha_definitions)} alphas for {len(data_history)} tickers")
+		self.logger.info(f"[ALPHAS] Processing {len(alpha_definitions)} alphas for {len(data_history)} tickers")
 
 		# Calculate alphas for each ticker
 		alphas_added = 0
+		alphas_skipped = 0
 		errors = []
 
 		for ticker, data in data_history.items():
@@ -86,8 +87,14 @@ class WatchlistAlphasAgent(Agent):
 				# Calculate each alpha for this ticker
 				for alpha_name, alpha_formula in alpha_definitions.items():
 					try:
+						# Skip if alpha already exists in the data
+						if alpha_name in data.columns:
+							self.logger.debug(f"[ALPHAS] Skipping {alpha_name} for {ticker} - already exists")
+							alphas_skipped += 1
+							continue
+
 						# Evaluate the formula with the data
-						result = self._evaluate_formula(alpha_formula, data)
+						result = self._evaluate_formula(alpha_formula, data, ticker)
 
 						# Add alpha column to data
 						data[alpha_name] = result
@@ -103,22 +110,27 @@ class WatchlistAlphasAgent(Agent):
 		# Update context with modified data_history
 		self.context.set("data_history", data_history)
 
+		# Store alpha names for CLI display
+		self.context.set("alpha_names", list(alpha_definitions.keys()))
+
 		# Log results
 		if errors:
 			self.logger.warning(f"[ALPHAS] {len(errors)} calculation errors")
 
-		self.logger.info(f"[ALPHAS] Added {alphas_added} alpha values across {len(data_history)} tickers")
+		self.logger.info(f"[ALPHAS] Added {alphas_added} alpha values, skipped {alphas_skipped} existing alphas across {len(data_history)} tickers")
 
 		return {
 			"status": "success",
 			"input": input_data,
 			"output": {
 				"alphas_calculated": alphas_added,
+				"alphas_skipped": alphas_skipped,
 				"alpha_count": len(alpha_definitions),
 				"ticker_count": len(data_history),
-				"errors": len(errors)
+				"errors": len(errors),
+				"alpha_names": list(alpha_definitions.keys())
 			},
-			"message": f"Calculated {len(alpha_definitions)} alphas for {len(data_history)} tickers"
+			"message": f"Processed {len(alpha_definitions)} alphas: {alphas_added} calculated, {alphas_skipped} skipped (already exist)"
 		}
 
 	def _extract_alpha_definitions(self, alphas_config: Dict) -> Dict[str, str]:
@@ -151,12 +163,16 @@ class WatchlistAlphasAgent(Agent):
 
 		return alpha_definitions
 
-	def _evaluate_formula(self, formula: str, data: pd.DataFrame) -> pd.Series:
+	def _evaluate_formula(self, formula: str, data: pd.DataFrame, ticker: str = "") -> pd.Series:
 		"""Evaluate alpha formula for a single ticker's data.
 
+		Supports both simple indicators (rsi_7), composites (roc_20 - roc_250),
+		and conditional expressions (rsi_7 < 25, close > ema_20).
+
 		Args:
-			formula: Formula string (e.g., "rsi_14", "roc_20 - roc_250")
-			data: OHLCV DataFrame for the ticker
+			formula: Formula string
+			data: OHLCV DataFrame for the ticker (sorted ascending by date, newest last)
+			ticker: Ticker symbol for error reporting
 
 		Returns:
 			Series with calculated alpha values
@@ -164,29 +180,173 @@ class WatchlistAlphasAgent(Agent):
 		Raises:
 			Exception: If formula evaluation fails
 		"""
-		from src.tools.indicators import calculate, parse_formula
+		from src.tools.indicators import calculate
+		from src.tools.formula.dsl_helpers import is_dsl_formula
+		from src.tools.formula.dsl_parser import evaluate_dsl
+		import numpy as np
 
-		# Parse the formula
-		try:
-			indicator_name, params = parse_formula(formula)
-		except Exception:
-			# If parse_formula fails, try to evaluate as a simple expression
-			return self._evaluate_expression(formula, data)
+		# Check if it's a DSL formula (contains comparison/logical operators or shift notation)
+		if is_dsl_formula(formula) or any(op in formula for op in ['<', '>', '<=', '>=', '==', '!=']):
+			# Conditional/DSL formula - evaluate row by row
+			return self._evaluate_dsl_formula(formula, data, ticker)
 
-		# Check if it's a composite formula (e.g., "roc_20 - roc_250")
-		if any(op in formula for op in ['+', '-', '*', '/', '(', ')']):
-			# Composite formula - need to calculate components and combine
-			return self._evaluate_composite_formula(formula, data)
-
-		# Single indicator - calculate it
+		# Parse as a simple indicator
 		try:
 			result = calculate([formula], data)
 			return result[formula]
-		except Exception as e:
-			self.logger.debug(f"[ALPHAS] Failed to calculate {formula}: {str(e)}")
+		except Exception:
+			# Try as composite formula (e.g., "roc_20 - roc_250")
+			if any(op in formula for op in ['+', '-', '*', '/', '(', ')']):
+				return self._evaluate_composite_formula(formula, data, ticker)
+			# Try as expression
+			ticker_str = f" for {ticker}" if ticker else ""
+			self.logger.error(f"[ALPHAS] Failed to calculate {formula}{ticker_str}")
 			raise
 
-	def _evaluate_composite_formula(self, formula: str, data: pd.DataFrame) -> pd.Series:
+	def _evaluate_dsl_formula(self, formula: str, data: pd.DataFrame, ticker: str = "") -> pd.Series:
+		"""Evaluate DSL formula using vectorized pandas operations.
+
+		Args:
+			formula: DSL formula (e.g., "rsi_7 < 25", "close > ema_20")
+			data: OHLCV DataFrame sorted ascending by date
+
+		Returns:
+			Series of boolean values (0.0/1.0) for each row
+		"""
+		import re
+		import numpy as np
+		from src.tools.indicators import calculate
+
+		try:
+			# Extract all indicator/column references from formula
+			pattern = r'([a-z_]+(?:_\d+)?(?:\[\d+\])?)'
+			matches = set(re.findall(pattern, formula, re.IGNORECASE))
+
+			# Pre-calculate all indicators as columns
+			data_work = data.copy()
+			for match in matches:
+				# Skip OHLCV columns
+				if match.lower() in ['close', 'high', 'low', 'open', 'volume']:
+					if match.upper() not in data_work.columns and match.lower() not in data_work.columns:
+						if match.upper() in data.columns:
+							data_work[match.lower()] = data[match.upper()]
+						elif match in data.columns:
+							data_work[match] = data[match]
+					continue
+
+				# Skip shift notation (handled in vectorized expression)
+				if '[' in match:
+					base_name = match.split('[')[0]
+					if base_name not in matches or base_name == match:
+						try:
+							result = calculate([base_name], data_work)
+							data_work[base_name] = result[base_name]
+						except Exception:
+							pass
+					continue
+
+				# Calculate indicator
+				if match not in data_work.columns:
+					try:
+						result = calculate([match], data_work)
+						data_work[match] = result[match]
+					except Exception:
+						pass
+
+			# Convert DSL formula to vectorized pandas expression
+			# Replace logical operators and comparisons
+			vectorized_formula = self._convert_dsl_to_vectorized(formula)
+
+			# Evaluate vectorized formula
+			try:
+				result = pd.eval(vectorized_formula, local_dict=data_work)
+				if isinstance(result, pd.Series):
+					return result.fillna(0).astype(float)
+				else:
+					# Handle scalar results
+					return pd.Series([1.0 if result else 0.0] * len(data), index=data.index)
+			except Exception:
+				# Fall back to row-by-row evaluation
+				return self._evaluate_dsl_formula_rowwise(formula, data, ticker)
+
+		except Exception as e:
+			ticker_str = f" for {ticker}" if ticker else ""
+			self.logger.error(f"[ALPHAS] Failed to vectorize '{formula}'{ticker_str}: {str(e)}")
+			# Fall back to row-by-row
+			return self._evaluate_dsl_formula_rowwise(formula, data, ticker)
+
+	def _convert_dsl_to_vectorized(self, formula: str) -> str:
+		"""Convert DSL formula to pandas-compatible vectorized expression.
+
+		Args:
+			formula: DSL formula with logical operators
+
+		Returns:
+			Pandas-compatible expression
+		"""
+		import re
+		# Replace DSL operators with pandas operators
+		result = formula
+		result = result.replace(' and ', ' & ')
+		result = result.replace(' or ', ' | ')
+		result = result.replace(' not ', ' ~')
+		result = re.sub(r'\bnot\b', '~', result)
+		return result
+
+	def _evaluate_dsl_formula_rowwise(self, formula: str, data: pd.DataFrame, ticker: str = "") -> pd.Series:
+		"""Fallback row-by-row evaluation for complex DSL formulas.
+
+		Args:
+			formula: DSL formula
+			data: OHLCV DataFrame sorted ascending by date
+			ticker: Ticker for error messages
+
+		Returns:
+			Series of boolean values (0.0/1.0) for each row
+		"""
+		from src.tools.formula.dsl_parser import evaluate_dsl
+		import numpy as np
+
+		# Normalize column names to lowercase
+		data_normalized = data.copy()
+		col_mapping = {}
+		for col in data_normalized.columns:
+			lower_col = col.lower()
+			if lower_col != col:
+				data_normalized[lower_col] = data_normalized[col]
+				col_mapping[lower_col] = col
+
+		# Data should be sorted ascending (oldest first)
+		# But evaluate_dsl expects newest-first, so we need to reverse for evaluation
+		data_desc = data_normalized.iloc[::-1].reset_index(drop=True)
+
+		results = []
+		for idx in range(len(data_desc)):
+			# Get row and all previous rows (for shift operations like [0], [-1], etc.)
+			row_data = data_desc.iloc[idx:].reset_index(drop=True)
+
+			try:
+				# Evaluate formula on this row
+				result = evaluate_dsl(formula, row_data)
+				results.append(1.0 if result else 0.0)
+			except (ValueError, ZeroDivisionError) as e:
+				error_msg = str(e)
+				# Expected edge cases - silently return NaN
+				if any(msg in error_msg for msg in ["Not enough data for shift", "Division by zero", "divide by zero"]):
+					results.append(np.nan)
+				else:
+					ticker_str = f" for {ticker}" if ticker else ""
+					self.logger.error(f"[ALPHAS] Failed to evaluate '{formula}' at row {idx}{ticker_str}: {error_msg}")
+					results.append(np.nan)
+			except Exception as e:
+				ticker_str = f" for {ticker}" if ticker else ""
+				self.logger.error(f"[ALPHAS] Failed to evaluate '{formula}' at row {idx}{ticker_str}: {str(e)}")
+				results.append(np.nan)
+
+		# Reverse back to original order (ascending by date)
+		return pd.Series(results[::-1], index=data.index)
+
+	def _evaluate_composite_formula(self, formula: str, data: pd.DataFrame, ticker: str = "") -> pd.Series:
 		"""Evaluate composite formulas with operators.
 
 		Args:
@@ -232,10 +392,11 @@ class WatchlistAlphasAgent(Agent):
 			result = eval(formula, {"__builtins__": {}}, namespace)
 			return pd.Series(result, index=data.index)
 		except Exception as e:
-			self.logger.debug(f"[ALPHAS] Failed to evaluate formula '{formula}': {str(e)}")
+			ticker_str = f" for {ticker}" if ticker else ""
+			self.logger.error(f"[ALPHAS] Failed to evaluate formula '{formula}'{ticker_str}: {str(e)}")
 			raise
 
-	def _evaluate_expression(self, expr: str, data: pd.DataFrame) -> pd.Series:
+	def _evaluate_expression(self, expr: str, data: pd.DataFrame, ticker: str = "") -> pd.Series:
 		"""Evaluate expression-based alpha (for complex formulas).
 
 		Args:
@@ -263,5 +424,6 @@ class WatchlistAlphasAgent(Agent):
 			else:
 				return pd.Series(result, index=data.index) if not isinstance(result, pd.Series) else result
 		except Exception as e:
-			self.logger.debug(f"[ALPHAS] Failed to evaluate expression '{expr}': {str(e)}")
+			ticker_str = f" for {ticker}" if ticker else ""
+			self.logger.error(f"[ALPHAS] Failed to evaluate expression '{expr}'{ticker_str}: {str(e)}")
 			raise
