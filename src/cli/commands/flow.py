@@ -15,7 +15,9 @@ from flows.premarket import PreMarketFlow
 from flows.transact import TransactFlow
 from flows.backtest import BacktestFlow
 from flows.portfolio_analysis import PortfolioAnalysisFlow
+from flows.train_rank import TrainRankFlow
 from tools.strategy.strategy import StrategyManager
+from tools.strategy.validator import StrategyValidator
 from tools.universe.universe import Universe
 
 
@@ -30,6 +32,29 @@ class FlowManager:
 		"""
 		self.project_root = project_root
 		self.strategy_manager = StrategyManager(project_root)
+		self.validator = StrategyValidator()
+
+	def _validate_and_report_indicators(self, strategy_data: Dict[str, Any]) -> Dict[str, Any]:
+		"""Validate indicators in strategy and return validation results.
+
+		Args:
+			strategy_data: Strategy configuration dictionary
+
+		Returns:
+			Validation result dict with validation data and any errors found
+		"""
+		try:
+			validation_result = self.validator.validate_all_indicators(strategy_data)
+			return {
+				"status": "success",
+				"validation": validation_result,
+			}
+		except Exception as e:
+			return {
+				"status": "error",
+				"message": f"Failed to validate indicators: {str(e)}",
+				"error_type": type(e).__name__,
+			}
 
 	def run_workflow(self, workflow_name: str, strategy: str = "default", input_data: Optional[Dict[str, Any]] = None, include_context: bool = False, debug: bool = False, use_backtest: bool = False, show_metrics: bool = False) -> Dict[str, Any]:
 		"""Run a workflow.
@@ -60,6 +85,25 @@ class FlowManager:
 		try:
 			if workflow_name.lower() == "signals":
 				# Signals flow - generate trading signals
+				# Load and validate strategy
+				strategy_result = self.strategy_manager.load_strategy(strategy)
+				if strategy_result.get("status") == "success":
+					strategy_data = strategy_result.get("data") or strategy_result
+					validation_result = self._validate_and_report_indicators(strategy_data)
+					if validation_result.get("status") == "success":
+						validation = validation_result.get("validation", {})
+						# Display and check validation errors
+						if not validation.get("is_valid"):
+							from rich.console import Console
+							console = Console()
+							self._print_indicator_validation_errors(validation, console)
+							return {
+								"status": "error",
+								"message": f"Strategy '{strategy}' has indicator validation errors. Fix the errors and try again.",
+								"validation": validation,
+								"error_type": "IndicatorValidation",
+							}
+
 				flow = SignalsFlow(strategy)
 				result = flow.process(input_data or {})
 
@@ -88,12 +132,30 @@ class FlowManager:
 							"message": f"Strategy '{strategy}' not found. Provide tickers: flow run watchlist {strategy} AAPL GOOGL MSFT"
 						}
 
-					# Get universe from strategy
-					universe_name = strategy_result.get("source")
+					# Get universe from strategy data (check both 'universe' and 'source' fields)
+					strategy_data = strategy_result.get("data") or strategy_result
+
+					# Validate indicators in strategy
+					validation_result = self._validate_and_report_indicators(strategy_data)
+					if validation_result.get("status") == "success":
+						validation = validation_result.get("validation", {})
+						# Display and check validation errors
+						if not validation.get("is_valid"):
+							from rich.console import Console
+							console = Console()
+							self._print_indicator_validation_errors(validation, console)
+							return {
+								"status": "error",
+								"message": f"Strategy '{strategy}' has indicator validation errors. Fix the errors and try again.",
+								"validation": validation,
+								"error_type": "IndicatorValidation",
+							}
+
+					universe_name = strategy_data.get("universe") or strategy_data.get("source")
 					if not universe_name:
 						return {
 							"status": "error",
-							"message": f"Strategy '{strategy}' does not specify a universe or source"
+							"message": f"Strategy '{strategy}' does not specify a 'universe' or 'source' field"
 						}
 
 					try:
@@ -141,7 +203,49 @@ class FlowManager:
 
 			elif workflow_name.lower() == "premarket":
 				# Pre-market flow - watchlist generation + signal analysis
+				# Load and validate strategy
+				strategy_result = self.strategy_manager.load_strategy(strategy)
+				if strategy_result.get("status") == "success":
+					strategy_data = strategy_result.get("data") or strategy_result
+					validation_result = self._validate_and_report_indicators(strategy_data)
+					if validation_result.get("status") == "success":
+						validation = validation_result.get("validation", {})
+						# Display and check validation errors
+						if not validation.get("is_valid"):
+							from rich.console import Console
+							console = Console()
+							self._print_indicator_validation_errors(validation, console)
+							return {
+								"status": "error",
+								"message": f"Strategy '{strategy}' has indicator validation errors. Fix the errors and try again.",
+								"validation": validation,
+								"error_type": "IndicatorValidation",
+							}
+
 				flow = PreMarketFlow(strategy)
+				result = flow.process(input_data or {})
+
+				# Include context if requested
+				if include_context:
+					result["_context"] = {
+						key: value for key, value in flow.context.__dict__.items()
+						if not key.startswith("_") and key != "logger"
+					}
+
+				return result
+
+			elif workflow_name.lower() == "train_rank":
+				# Train ranking model flow - train LGBM model on historical data
+				# Load and validate strategy
+				strategy_result = self.strategy_manager.load_strategy(strategy)
+				if strategy_result.get("status") != "success":
+					return {
+						"status": "error",
+						"message": f"Strategy '{strategy}' not found",
+						"error_type": "StrategyNotFound",
+					}
+
+				flow = TrainRankFlow(strategy)
 				result = flow.process(input_data or {})
 
 				# Include context if requested
@@ -188,6 +292,25 @@ class FlowManager:
 						"status": "error",
 						"message": "strategy parameter required for backtest"
 					}
+
+				# Load and validate strategy
+				strategy_result = self.strategy_manager.load_strategy(flow_input["strategy"])
+				if strategy_result.get("status") == "success":
+					strategy_data = strategy_result.get("data") or strategy_result
+					validation_result = self._validate_and_report_indicators(strategy_data)
+					if validation_result.get("status") == "success":
+						validation = validation_result.get("validation", {})
+						# Display and check validation errors
+						if not validation.get("is_valid"):
+							from rich.console import Console
+							console = Console()
+							self._print_indicator_validation_errors(validation, console)
+							return {
+								"status": "error",
+								"message": f"Strategy '{flow_input['strategy']}' has indicator validation errors. Fix the errors and try again.",
+								"validation": validation,
+								"error_type": "IndicatorValidation",
+							}
 
 				flow = BacktestFlow()
 				result = flow.process(flow_input)
@@ -249,7 +372,7 @@ class FlowManager:
 				return {
 					"status": "error",
 					"message": f"Unknown workflow: {workflow_name}",
-					"available": ["signals", "watchlist", "premarket", "transact", "backtest", "portfolio_analysis", "market_regime"]
+					"available": ["signals", "watchlist", "premarket", "train_rank", "transact", "backtest", "portfolio_analysis", "market_regime"]
 				}
 		finally:
 			# Always disable debug mode after workflow completes
@@ -329,6 +452,45 @@ class FlowManager:
 
 		console.print(table)
 
+	def _print_indicator_validation_errors(self, validation: Dict[str, Any], console) -> None:
+		"""Print indicator validation errors if any exist.
+
+		Args:
+			validation: Validation result dict from validate_all_indicators()
+			console: Rich console object
+		"""
+		from rich.table import Table
+
+		declared_errors = validation.get("declared_errors", [])
+		extracted_errors = validation.get("extracted_errors", [])
+		missing = validation.get("missing_from_declaration", [])
+
+		if not (declared_errors or extracted_errors or missing):
+			return
+
+		console.print(f"\n[yellow]⚠️  Indicator Validation Issues[/yellow]")
+		console.print("=" * 100)
+
+		# Display declared indicator errors
+		if declared_errors:
+			console.print(f"\n[bold]Declared Indicators ({len(declared_errors)} error(s)):[/bold]")
+			for error in declared_errors:
+				console.print(f"  [red]✗[/red] {error}")
+
+		# Display extracted indicator errors
+		if extracted_errors:
+			console.print(f"\n[bold]Extracted from Formulas ({len(extracted_errors)} error(s)):[/bold]")
+			for error in extracted_errors:
+				console.print(f"  [red]✗[/red] {error}")
+
+		# Display missing indicators
+		if missing:
+			console.print(f"\n[bold]Missing from Declaration ({len(missing)} indicator(s)):[/bold]")
+			for ind_name in missing:
+				console.print(f"  [yellow]⚠️ [/yellow] '{ind_name}' used in formulas but not declared")
+
+		console.print()
+
 	def _print_flow_result(self, result, workflow_name=None):
 		"""Print flow execution result."""
 		from rich.console import Console
@@ -336,6 +498,11 @@ class FlowManager:
 		from rich.text import Text
 
 		console = Console()
+
+		# Check for indicator validation errors
+		indicator_validation = result.get("_indicator_validation")
+		if indicator_validation and not indicator_validation.get("is_valid"):
+			self._print_indicator_validation_errors(indicator_validation, console)
 
 		if result.get("status") == "error":
 			console.print(f"\n[red]✗ Flow failed:[/red] {result.get('message')}")
@@ -780,6 +947,7 @@ Sortino Ratio                                  {sortino:.6f}"""
 		strategy = result.get("strategy", "unknown")
 		watchlist = result.get("watchlist", {})
 		ticker_scores = result.get("ticker_scores", {})
+		ranking_scores = result.get("ranking_scores", {})
 		executable_orders = result.get("executable_orders", [])
 		orders_count = result.get("orders_count", 0)
 		watchlist_saved = result.get("watchlist_saved", {})
@@ -793,6 +961,16 @@ Sortino Ratio                                  {sortino:.6f}"""
 		# Convert dict to list of keys if needed
 		watchlist_tickers = list(watchlist.keys()) if isinstance(watchlist, dict) else watchlist
 
+		# Sort by ranking_score descending (use ranking score if available, else composite_score)
+		def get_sort_key(ticker):
+			if ranking_scores and ticker in ranking_scores:
+				return ranking_scores[ticker]
+			if isinstance(watchlist, dict):
+				return watchlist.get(ticker, {}).get("composite_score", 0)
+			return 0
+
+		sorted_tickers = sorted(watchlist_tickers, key=get_sort_key, reverse=True)
+
 		# Watchlist section - show even if empty to indicate filtering happened
 		watchlist_header = f"Watchlist ({len(watchlist_tickers)} tickers)"
 		if target_date:
@@ -803,19 +981,21 @@ Sortino Ratio                                  {sortino:.6f}"""
 		console.print(f"\n[bold]{watchlist_header}[/bold]")
 
 		if watchlist_tickers:
+			# Limit display to first 15 columns to fit in terminal
+			display_indicators = indicators[:15]
+
 			table = Table(box=None)
 			table.add_column("Ticker", style="cyan")
-			table.add_column("Score", style="green")
+			table.add_column("Ranking Score", style="green")
 			table.add_column("Signals", style="yellow")
 
-			# Add columns for all indicators
-			for ind in indicators:
+			# Add columns for first N indicators
+			for ind in display_indicators:
 				table.add_column(ind, style="dim")
 
-			for ticker in watchlist_tickers[:20]:  # Show top 20
-				# Get composite score from watchlist (entry analysis result)
-				ticker_watchlist_data = watchlist.get(ticker, {}) if isinstance(watchlist, dict) else {}
-				composite_score = ticker_watchlist_data.get("composite_score", 0)
+			for ticker in sorted_tickers[:20]:  # Show top 20 sorted by ranking score
+				# Get ranking score from model (LGBM walk-forward validated)
+				ranking_score = ranking_scores.get(ticker, 0) if ranking_scores else 0
 
 				# Get signals from ticker_scores (for display)
 				score_info = ticker_scores.get(ticker, {})
@@ -828,13 +1008,13 @@ Sortino Ratio                                  {sortino:.6f}"""
 					signals_str = "-"
 
 				# Get indicator values for this ticker
-				row_data = [ticker, f"{composite_score:.2f}", signals_str]
+				row_data = [ticker, f"{ranking_score:.4f}", signals_str]
 
 				ticker_data = data_history.get(ticker)
 				if ticker_data is not None and not ticker_data.empty:
 					# Get latest row (index 0, since sorted newest-first)
 					latest = ticker_data.iloc[0]
-					for ind in indicators:
+					for ind in display_indicators:
 						if ind in latest.index:
 							val = latest[ind]
 							# Format values based on type and name
@@ -853,11 +1033,14 @@ Sortino Ratio                                  {sortino:.6f}"""
 							row_data.append("-")
 				else:
 					# No data for ticker
-					row_data.extend(["-"] * len(indicators))
+					row_data.extend(["-"] * len(display_indicators))
 
 				table.add_row(*row_data)
 
 			console.print(table)
+
+			if len(indicators) > 15:
+				console.print(f"[dim](showing first {len(display_indicators)} of {len(indicators)} indicators; full data saved to watchlist file)[/dim]")
 
 			if len(watchlist_tickers) > 20:
 				console.print(f"[dim]... and {len(watchlist_tickers) - 20} more tickers[/dim]")
