@@ -241,7 +241,7 @@ class EntryOrderAgent(Agent):
 
 		# Sort orders by ranking_score (LGBM model predictions) descending
 		if executable_orders:
-			ranking_scores = self.context.get("ranking_scores", {})
+			ranking_scores = self.context.get("ranking_scores") or {}
 			if ranking_scores:
 				executable_orders.sort(
 					key=lambda order: ranking_scores.get(order.get("ticker", ""), 0),
