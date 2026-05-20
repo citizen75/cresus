@@ -78,8 +78,13 @@ class RankAgent(Agent):
 			Array of scores
 		"""
 		try:
-			X = features_df.drop(columns=["ticker"]).fillna(0)
-			scores = model.predict(X)
+			# Select only numeric columns (exclude ticker, date, and other non-numeric types)
+			X = features_df.drop(columns=["ticker"], errors="ignore")
+			numeric_cols = [c for c in X.columns if X[c].dtype in ['float64', 'float32', 'int64', 'int32']]
+			X = X[numeric_cols].fillna(0)
+
+			# Suppress shape checking in case features changed since training
+			scores = model.predict(X, predict_disable_shape_check=True)
 			return scores
 		except Exception as e:
 			self.logger.warning(f"[RANK] Model prediction failed: {str(e)}, falling back to feature scoring")

@@ -86,6 +86,10 @@ class TrainAgent(Agent):
 			# Build full cross-sectional dataset
 			full_df = self._build_cross_sectional_dataset(data_history)
 
+			self.logger.info(f"[TRAIN] After building dataset: shape={full_df.shape}")
+			self.logger.info(f"[TRAIN] Columns: {list(full_df.columns)}")
+			self.logger.info(f"[TRAIN] Dtypes:\n{full_df.dtypes}")
+
 			if len(full_df) == 0:
 				self.logger.warning("[TRAIN] No valid training data generated")
 				self.context.set("lgb_model", None)
@@ -142,13 +146,17 @@ class TrainAgent(Agent):
 			avg_mae = np.mean([f.get("mae", 0) for f in fold_results])
 			positive_ic_pct = 100 * sum(1 for f in fold_results if f.get("ic", 0) > 0) / len(fold_results)
 
+			# Count actual numeric features used
+			all_feature_cols = [c for c in full_df.columns if c not in ["date", "ticker", "label", "period", "future_date"]]
+			numeric_feature_cols = [c for c in all_feature_cols if full_df[c].dtype in ['float64', 'float32', 'int64', 'int32']]
+
 			return {
 				"status": "success",
 				"input": {"mode": "train", "strategy_name": strategy_name},
 				"output": {
 					"model_path": str(model_path),
 					"samples": len(full_df),
-					"features": len([c for c in full_df.columns if c not in ["date", "ticker", "label", "period"]]),
+					"features": len(numeric_feature_cols),
 					"folds": len(fold_results),
 					"fold_results": fold_results,
 					"metrics": {
@@ -201,12 +209,18 @@ class TrainAgent(Agent):
 				"message": f"Training failed: {str(e)}"
 			}
 
-	def _build_cross_sectional_dataset(self, data_history: Dict, max_years: int = 5) -> pd.DataFrame:
+	def _build_cross_sectional_dataset(self, data_history: Dict, max_years: int = 5, prediction_days: int = 10) -> pd.DataFrame:
 		"""Build full cross-sectional dataset with all (ticker, date) rows.
 
+		IMPORTANT: Ensures strict date alignment - at date T, features use only data through T,
+		label is forward N-day return from T to T+N.
+
+		Changed from 5-day to 10-day returns to avoid mean reversion signal and get better generalization.
+
 		Args:
-			data_history: Dict of ticker → DataFrame
+			data_history: Dict of ticker → DataFrame (indicators calculated on full data)
 			max_years: Limit history to last N years
+			prediction_days: Number of days to predict forward (default 10, was 5)
 
 		Returns:
 			DataFrame with columns: date, ticker, features..., label
@@ -215,41 +229,55 @@ class TrainAgent(Agent):
 		cutoff = pd.Timestamp.now() - pd.DateOffset(years=max_years)
 		exclude_cols = {"timestamp", "ticker", "Dividends", "Stock Splits"}
 
+		self.logger.info(f"[TRAIN] Building cross-sectional dataset: {prediction_days}-day forward returns")
+
 		for ticker, df in data_history.items():
-			if df is None or len(df) < 6:
+			if df is None or len(df) < prediction_days + 1:
 				continue
 
 			# Sort ascending by timestamp for forward-looking labels
+			# This ensures iloc[i] = earlier, iloc[i+N] = N periods later
 			df_asc = df.sort_values("timestamp").reset_index(drop=True)
 			df_asc = df_asc[df_asc["timestamp"] >= cutoff]
 
-			if len(df_asc) < 6:
+			if len(df_asc) < prediction_days + 1:
 				continue
 
 			feature_cols = [c for c in df_asc.columns if c not in exclude_cols]
 
-			# Generate one row per date (with label from T+5)
-			for i in range(len(df_asc) - 5):
+			# Generate one row per date (with label from T+prediction_days)
+			# CRITICAL: At row i (date T):
+			# - Features come from row i (data at time T, calculated using only T and earlier data)
+			# - Label is from row i+N (future data at time T+N days)
+			# This ensures no future information leaks into features
+			for i in range(len(df_asc) - prediction_days):
 				cur_close = df_asc.iloc[i].get("close")
-				fut_close = df_asc.iloc[i + 5].get("close")
+				fut_close = df_asc.iloc[i + prediction_days].get("close")
+				cur_date = df_asc.iloc[i]["timestamp"]
+				fut_date = df_asc.iloc[i + prediction_days]["timestamp"]
 
 				if pd.isna(cur_close) or pd.isna(fut_close) or cur_close == 0:
 					continue
 
-				# True forward 5-day return
+				# True forward N-day return
 				label = (fut_close - cur_close) / cur_close
 
+				# Extract features from time T (row i only, not including future rows)
 				row = {col: df_asc.iloc[i][col] for col in feature_cols}
-				row["date"] = df_asc.iloc[i]["timestamp"]
+				row["date"] = cur_date
+				row["future_date"] = fut_date
 				row["ticker"] = ticker
 				row["label"] = label
 				rows.append(row)
 
 		if not rows:
+			self.logger.warning("[TRAIN] No valid training data generated")
 			return pd.DataFrame()
 
 		full_df = pd.DataFrame(rows).fillna(0)
 		full_df["period"] = full_df["date"].dt.to_period("M")
+
+		self.logger.info(f"[TRAIN] Built dataset: {len(full_df)} rows, {len([c for c in full_df.columns if c not in ['date', 'future_date', 'ticker', 'label', 'period']])} features, {prediction_days}-day labels")
 		return full_df
 
 	def _walk_forward_validate(self, full_df: pd.DataFrame, train_months: int = 3, test_months: int = 1) -> List[Dict[str, Any]]:
@@ -269,7 +297,16 @@ class TrainAgent(Agent):
 
 		full_df = full_df.copy()
 		periods = sorted(full_df["period"].unique())
-		feature_cols = [c for c in full_df.columns if c not in ["date", "ticker", "label", "period"]]
+
+		# DEBUG: Log all columns and their types
+		self.logger.info(f"[TRAIN] All columns in dataset: {list(full_df.columns)}")
+		self.logger.info(f"[TRAIN] Column dtypes:\n{full_df.dtypes}")
+
+		feature_cols = [c for c in full_df.columns if c not in ["date", "ticker", "label", "period", "future_date"]]
+
+		self.logger.info(f"[TRAIN] Walk-forward setup: {len(periods)} periods, {len(feature_cols)} features, {len(full_df)} total rows")
+		self.logger.debug(f"[TRAIN] Feature columns: {feature_cols[:5]}... (showing first 5)")
+		self.logger.info(f"[TRAIN] Selected feature types: {[(c, str(full_df[c].dtype)) for c in feature_cols[:10]]}")
 
 		fold_results = []
 		params = {
@@ -280,6 +317,7 @@ class TrainAgent(Agent):
 		}
 
 		# Walk-forward loop
+		folds_attempted = 0
 		for i in range(train_months, len(periods)):
 			# Training periods: [i-train_months, i-1]
 			train_start = max(0, i - train_months)
@@ -292,9 +330,12 @@ class TrainAgent(Agent):
 			train_mask = full_df["period"].isin(train_periods)
 			test_mask = full_df["period"].isin(test_period)
 
-			X_train = full_df[train_mask][feature_cols].fillna(0)
+			# Select only numeric features (exclude date, ticker, and non-numeric columns)
+			numeric_feature_cols = [c for c in feature_cols if full_df[c].dtype in ['float64', 'float32', 'int64', 'int32']]
+
+			X_train = full_df[train_mask][numeric_feature_cols].fillna(0)
 			y_train = full_df[train_mask]["label"]
-			X_test = full_df[test_mask][feature_cols].fillna(0)
+			X_test = full_df[test_mask][numeric_feature_cols].fillna(0)
 			y_test = full_df[test_mask]["label"]
 
 			# Skip if insufficient data
@@ -303,6 +344,9 @@ class TrainAgent(Agent):
 				continue
 
 			try:
+				# DEBUG: Check data types before training
+				self.logger.info(f"[TRAIN] X_train shape: {X_train.shape}, dtypes: {X_train.dtypes.to_dict()}")
+
 				# Train model
 				train_data = lgb.Dataset(X_train, label=y_train)
 				model = lgb.train(params, train_data, num_boost_round=100)
@@ -346,8 +390,12 @@ class TrainAgent(Agent):
 		"""
 		import lightgbm as lgb
 
-		feature_cols = [c for c in full_df.columns if c not in ["date", "ticker", "label", "period"]]
-		X = full_df[feature_cols].fillna(0)
+		feature_cols = [c for c in full_df.columns if c not in ["date", "ticker", "label", "period", "future_date"]]
+
+		# Select only numeric features (exclude non-numeric columns like dates)
+		numeric_feature_cols = [c for c in feature_cols if full_df[c].dtype in ['float64', 'float32', 'int64', 'int32']]
+
+		X = full_df[numeric_feature_cols].fillna(0)
 		y = full_df["label"]
 
 		# Remove rows with missing labels
