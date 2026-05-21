@@ -178,10 +178,6 @@ class TransactAgent(Agent):
 	) -> List[Dict[str, Any]]:
 		"""Execute pending SELL orders using market data.
 
-		Stop loss exits take precedence over condition-based exits.
-		If a position has both a stop loss hit and a condition exit, uses the
-		better exit price (higher for SELL orders).
-
 		Args:
 			orders_mgr: Orders manager
 			journal: Journal for recording transactions
@@ -226,34 +222,11 @@ class TransactAgent(Agent):
 
 		sell_orders = [(idx, row) for idx, row in sell_orders_df.iterrows()]
 
-		# Get effective stop losses and open positions for priority check
-		effective_stop_losses = self.context.get("effective_stop_losses") or {}
-		open_positions = journal.get_open_positions() if not journal.get_open_positions().empty else None
-
-		# Track executed positions to prevent duplicates
-		executed_tickers = set()
-
 		try:
 			for _, order_row in sell_orders:
 				order_id = str(order_row.get("id", ""))
 				ticker = str(order_row.get("ticker", ""))
 				quantity = int(order_row.get("quantity", 0))
-
-				# Skip if already executed (stop loss might have already closed it)
-				if ticker in executed_tickers:
-					self.logger.debug(f"Skipping {ticker}: already executed via stop loss")
-					orders_mgr.update_order_status(order_id, "executed")
-					continue
-
-				# Get exit_type to determine if this is a condition exit
-				exit_type = None
-				try:
-					metadata_str = order_row.get("metadata", "")
-					if metadata_str:
-						metadata_dict = json.loads(metadata_str) if isinstance(metadata_str, str) else metadata_str
-						exit_type = metadata_dict.get("exit_type")
-				except (json.JSONDecodeError, TypeError):
-					pass
 
 				# Get market price for the date
 				market_price = self._get_market_price(ticker, day_data)
@@ -263,20 +236,6 @@ class TransactAgent(Agent):
 					continue
 
 				execution_price = market_price
-
-				# For condition exits, check if stop loss would be better
-				if exit_type == "condition" and ticker in effective_stop_losses:
-					stop_loss_price = effective_stop_losses[ticker]
-					day_low = self._get_day_low(ticker, day_data)
-
-					# If day_low hit the stop loss, use stop_loss_price (it's better/higher for SELL)
-					if day_low is not None and day_low <= stop_loss_price:
-						self.logger.info(
-							f"CONDITION EXIT OVERRIDDEN BY STOP LOSS: {ticker} "
-							f"condition_price={market_price:.2f} → stop_loss_price={stop_loss_price:.2f}"
-						)
-						execution_price = stop_loss_price
-						exit_type = "stop_loss"
 
 				# Convert order for broker
 				broker_order = {
@@ -305,7 +264,16 @@ class TransactAgent(Agent):
 				# Update order status and record transaction if filled
 				if result.status == "filled":
 					orders_mgr.update_order_status(order_id, "executed")
-					executed_tickers.add(ticker)
+
+					# Extract exit_type from metadata (stored as JSON string)
+					exit_type = None
+					try:
+						metadata_str = order_row.get("metadata", "")
+						if metadata_str:
+							metadata_dict = json.loads(metadata_str) if isinstance(metadata_str, str) else metadata_str
+							exit_type = metadata_dict.get("exit_type")
+					except (json.JSONDecodeError, TypeError):
+						pass
 
 					# Get market data row for metadata
 					market_row = day_data.get(ticker)
@@ -342,7 +310,7 @@ class TransactAgent(Agent):
 
 					self.logger.info(
 						f"SELL {result.filled_quantity} {ticker} @ {result.filled_price:.2f} "
-						f"({exit_type or 'order'} exit)"
+						f"(order {order_id[:8]})"
 					)
 				else:
 					orders_mgr.update_order_status(order_id, "rejected")
@@ -578,25 +546,6 @@ class TransactAgent(Agent):
 		row = day_data[ticker]
 		try:
 			return float(row.get("close")) if "close" in row else None
-		except (ValueError, AttributeError):
-			return None
-
-	def _get_day_low(self, ticker: str, day_data: Dict[str, Any]) -> Optional[float]:
-		"""Get daily low price for ticker from day data.
-
-		Args:
-			ticker: Ticker symbol
-			day_data: Pre-sliced market data {ticker: row}
-
-		Returns:
-			Daily low price or None
-		"""
-		if ticker not in day_data:
-			return None
-
-		row = day_data[ticker]
-		try:
-			return float(row.get("low")) if "low" in row else None
 		except (ValueError, AttributeError):
 			return None
 
