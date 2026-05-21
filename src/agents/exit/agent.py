@@ -132,6 +132,36 @@ class ExitAgent(Agent):
 						all_exit_orders.extend(condition_orders)
 					break
 
+			# Check if condition exits should be overridden by stop loss
+			effective_stop_losses = self.context.get("effective_stop_losses") or {}
+			if effective_stop_losses and day_data:
+				for exit_order in all_exit_orders:
+					# Only check condition exits
+					if exit_order.get("exit_type") != "condition":
+						continue
+
+					ticker = exit_order.get("ticker")
+					if ticker not in effective_stop_losses:
+						continue
+
+					# Get the stop loss level and check if it was hit
+					stop_loss_price = effective_stop_losses[ticker]
+					day_low = day_data.get(ticker, {}).get("low")
+					if day_low is None:
+						continue
+
+					day_low = float(day_low) if day_low else None
+					if day_low is None or day_low > stop_loss_price:
+						continue
+
+					# Stop loss was hit - override condition exit with stop loss exit
+					self.logger.info(
+						f"[EXIT] Stop loss precedence: {ticker} condition_price={exit_order.get('exit_price'):.2f} "
+						f"→ stop_loss_price={stop_loss_price:.2f}"
+					)
+					exit_order["exit_type"] = "stop_loss"
+					exit_order["exit_price"] = stop_loss_price
+
 			# Save all collected exit orders
 			if all_exit_orders:
 				for exit_order in all_exit_orders:
