@@ -9,6 +9,7 @@ Returns: Series with lowest/highest values over the period
 
 import pandas as pd
 from typing import Optional
+from ..utils.helpers import get_high, get_low
 
 
 def calculate_lowest(
@@ -32,16 +33,18 @@ def calculate_lowest(
 		Lowest = minimum(LOW) over last N bars
 	"""
 	# Get LOW
-	low = data.get("LOW", data.get("Low", None))
-
-	if low is None:
+	try:
+		low = get_low(data)
+	except Exception:
 		return pd.Series([0.0] * len(data))
 
 	# Use history if provided
 	if history_df is not None:
-		hist_low = history_df.get("LOW", history_df.get("Low", None))
-		if hist_low is not None:
+		try:
+			hist_low = get_low(history_df)
 			low = pd.concat([hist_low, low], ignore_index=True)
+		except Exception:
+			pass
 
 	# Calculate rolling minimum (lowest)
 	lowest = low.rolling(window=period, min_periods=1).min()
@@ -74,16 +77,18 @@ def calculate_highest(
 		Highest = maximum(HIGH) over last N bars
 	"""
 	# Get HIGH
-	high = data.get("HIGH", data.get("High", None))
-
-	if high is None:
+	try:
+		high = get_high(data)
+	except Exception:
 		return pd.Series([0.0] * len(data))
 
 	# Use history if provided
 	if history_df is not None:
-		hist_high = history_df.get("HIGH", history_df.get("High", None))
-		if hist_high is not None:
+		try:
+			hist_high = get_high(history_df)
 			high = pd.concat([hist_high, high], ignore_index=True)
+		except Exception:
+			pass
 
 	# Calculate rolling maximum (highest)
 	highest = high.rolling(window=period, min_periods=1).max()

@@ -10,6 +10,7 @@ Returns: Series with RSI values (0-100)
 import pandas as pd
 import numpy as np
 from typing import Optional
+from ..utils.helpers import get_close, validate_rsi_output
 
 
 def calculate(
@@ -34,12 +35,7 @@ def calculate(
         RSI = 100 - (100 / (1 + RS))
     """
     # Get close prices
-    if "CLOSE" in data.columns:
-        close = data["CLOSE"]
-    elif "Close" in data.columns:
-        close = data["Close"]
-    else:
-        close = data.iloc[:, -1]  # Assume last column is close
+    close = get_close(data)
 
     # Calculate price changes
     delta = close.diff()
@@ -57,4 +53,7 @@ def calculate(
     rsi = 100 - (100 / (1 + rs))
     rsi = rsi.fillna(50)  # Fill NaN with 50 (neutral)
 
-    return rsi.reset_index(drop=True)
+    result = rsi.reset_index(drop=True)
+    validate_rsi_output(result)
+
+    return result

@@ -23,6 +23,9 @@ INDICATOR_PARAMS = {
     # Volatility indicators
     "atr": {"params": ["period"], "defaults": {"period": 14}},
     "bb": {"params": ["period", "std_dev"], "defaults": {"period": 20, "std_dev": 2}},
+    "bb_lower": {"params": ["period"], "defaults": {"period": 20}},
+    "bb_middle": {"params": ["period"], "defaults": {"period": 20}},
+    "bb_upper": {"params": ["period"], "defaults": {"period": 20}},
     "bollinger_bands": {"params": ["period", "std_dev"], "defaults": {"period": 20, "std_dev": 2}},
     "parkinson": {"params": ["period"], "defaults": {"period": 14}},
     "garman_klass": {"params": ["period"], "defaults": {"period": 14}},
@@ -50,6 +53,10 @@ INDICATOR_PARAMS = {
     # Core indicators
     "ha": {"params": [], "defaults": {}},  # Heikin Ashi
     "sha": {"params": ["period"], "defaults": {"period": 14}},  # Smooth Heikin Ashi
+    "sha_green": {"params": ["period"], "defaults": {"period": 14}},  # SHA bullish candle
+    "sha_red": {"params": ["period"], "defaults": {"period": 14}},  # SHA bearish candle
+    "sha_up": {"params": ["period"], "defaults": {"period": 14}},  # SHA bullish without bottom wick
+    "sha_down": {"params": ["period"], "defaults": {"period": 14}},  # SHA bearish without top wick
 }
 
 # Indicator return types

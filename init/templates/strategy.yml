@@ -119,7 +119,7 @@ features:
         description: Bollinger band width
       - name: vol_bb_percent
         formula: (close[0] - bb_20_lower[0]) / (bb_20_upper[0] - bb_20_lower[0])
-        description: %B Bollinger band position (0-1)
+        description: "%B Bollinger band position (0-1)"
 
     # Trend quality alphas - capture trend strength and direction
     trend:
@@ -142,7 +142,7 @@ features:
     # Cross-asset correlation alphas
     correlations:
       - name: corr_volume_trend
-        formula: volume[0] / volume[20]
+        formula: volume[0] / volume[-20]
         description: Volume trend ratio
       - name: corr_intrabar_range
         formula: high[0] - low[0]
@@ -193,7 +193,7 @@ entry:
       formula: close[0] > ema_20[0] && adx_14[0] > 20
       description: Market condition filter - entries only when True
     order_type:
-      formula: limit
+      type: limit
       description: "limit or market - determines how entry orders are executed"
     limit_price:
       formula: close[0] * 0.99

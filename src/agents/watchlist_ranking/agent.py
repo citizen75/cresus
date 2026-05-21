@@ -40,7 +40,8 @@ class WatchlistRankingAgent(Agent):
 		if input_data is None:
 			input_data = {}
 
-		mode = input_data.get("mode", "rank")
+		# Check for mode in input_data first, then context (for flows that set it in context)
+		mode = input_data.get("mode") or self.context.get("ranking_mode") or "rank"
 		strategy_name = input_data.get("strategy_name") or self.context.get("strategy_name")
 
 		self.logger.info(f"[WATCHLIST-RANKING] Starting {mode} mode for {strategy_name}")
@@ -103,6 +104,9 @@ class WatchlistRankingAgent(Agent):
 		self.context.set("ranking_scores", scores)
 		self.context.set("ranked_tickers", output.get("ranked", []))
 
+		# Merge ranking scores into ticker_scores to preserve signal metadata
+		self._merge_ranking_into_scores(scores)
+
 		# Update watchlist with ranking scores and sort
 		watchlist = self.context.get("watchlist")
 		watchlist_len = len(watchlist) if isinstance(watchlist, (dict, list)) else 0
@@ -162,6 +166,50 @@ class WatchlistRankingAgent(Agent):
 			"output": output,
 			"message": f"Ranked {len(scores)} tickers, sorted {len(watchlist) if watchlist else 0} watchlist items"
 		}
+
+	def _merge_ranking_into_scores(self, ranking_scores: Dict[str, float]) -> None:
+		"""Merge LGBM ranking scores into ticker_scores while preserving signal metadata.
+
+		Adds ranking_model_score to each ticker's score info, allowing downstream
+		processors to use both signal scores and model predictions.
+
+		Args:
+			ranking_scores: Dict of ticker -> ranking score from LGBM model
+		"""
+		ticker_scores = self.context.get("ticker_scores") or {}
+
+		if not ticker_scores:
+			# If no signal scores yet, create structure with just ranking scores
+			ticker_scores = {
+				ticker: {
+					"ranking_model_score": float(score),
+					"score": float(score),  # Use ranking score as primary
+					"raw_score": float(score),
+					"triggered_signals": [],
+					"signal_count": 0,
+				}
+				for ticker, score in ranking_scores.items()
+			}
+		else:
+			# Merge ranking scores into existing signal scores
+			for ticker, score in ranking_scores.items():
+				if ticker in ticker_scores:
+					# Preserve existing signal data, add ranking score
+					ticker_scores[ticker]["ranking_model_score"] = float(score)
+					# Use ranking score as primary score for entry decisions
+					ticker_scores[ticker]["score"] = float(score)
+				else:
+					# Ticker has ranking score but no signals, create entry
+					ticker_scores[ticker] = {
+						"ranking_model_score": float(score),
+						"score": float(score),
+						"raw_score": float(score),
+						"triggered_signals": [],
+						"signal_count": 0,
+					}
+
+		self.context.set("ticker_scores", ticker_scores)
+		self.logger.info(f"[WATCHLIST-RANKING] Merged ranking scores into ticker_scores for {len(ticker_scores)} tickers")
 
 	def train(self, strategy_name: str) -> Dict[str, Any]:
 		"""Train LGBM model for a strategy.

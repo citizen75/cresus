@@ -93,7 +93,8 @@ def is_dsl_formula(formula: str) -> bool:
 		formula: Formula string to check
 
 	Returns:
-		True if formula contains DSL notation (indicator[n]) or DSL operators (&&, ||, !)
+		True if formula contains DSL notation (indicator[n]), DSL operators (&&, ||, !),
+		or bare indicator names with comparisons (e.g., "rsi_7 > 50")
 	"""
 	# Check for shift notation (indicator[n])
 	has_shift_notation = bool(re.search(DSL_PATTERN, formula))
@@ -102,7 +103,12 @@ def is_dsl_formula(formula: str) -> bool:
 	# These are DSL operators. Traditional pandas would use 'and', 'or', 'not'
 	has_dsl_operators = bool(re.search(r'(&&|\|\||!(?!=))', formula))
 
-	return has_shift_notation or has_dsl_operators
+	# Check for bare indicator names with comparisons or logical operators
+	# Pattern: word chars (indicator names) followed by comparison/logical operators
+	# Examples: "rsi_7 > 50", "ema_20 < close", "ma_10 and ma_20", "bb_upper == 100"
+	has_bare_indicator_formula = bool(re.search(r'\b[a-z_]\w*\s*(?:>|<|==|!=|<=|>=|and|or|not)', formula, re.IGNORECASE))
+
+	return has_shift_notation or has_dsl_operators or has_bare_indicator_formula
 
 
 def convert_formulas_in_dict(data: Dict) -> Dict:

@@ -9,6 +9,7 @@ Returns: Dict with pivot levels
 
 import pandas as pd
 from typing import Optional, Dict
+from ..utils.helpers import get_high, get_low, get_close
 
 
 def calculate(
@@ -35,11 +36,11 @@ def calculate(
         - demark: Uses proprietary formula
     """
     # Get OHLC
-    high = data.get("HIGH", data.get("High", None))
-    low = data.get("LOW", data.get("Low", None))
-    close = data.get("CLOSE", data.get("Close", None))
-
-    if any(x is None for x in [high, low, close]):
+    try:
+        high = get_high(data)
+        low = get_low(data)
+        close = get_close(data)
+    except Exception:
         return {
             "pivot": pd.Series([0.0] * len(data)),
             "pivot_r1": pd.Series([0.0] * len(data)),

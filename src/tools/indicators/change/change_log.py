@@ -10,6 +10,7 @@ Returns: Series with log change values
 import pandas as pd
 import numpy as np
 from typing import Optional
+from ..utils.helpers import get_close
 
 
 def calculate(
@@ -33,19 +34,11 @@ def calculate(
         Log Change = log(Close / Close[n periods ago])
     """
     # Get close
-    if "CLOSE" in data.columns:
-        close = data["CLOSE"]
-    elif "Close" in data.columns:
-        close = data["Close"]
-    else:
-        close = data.iloc[:, -1]
+    close = get_close(data)
 
     # Use history if provided
     if history_df is not None:
-        if "CLOSE" in history_df.columns:
-            hist_close = history_df["CLOSE"]
-        else:
-            hist_close = history_df.iloc[:, -1]
+        hist_close = get_close(history_df)
         combined = pd.concat([hist_close, close], ignore_index=True)
     else:
         combined = close

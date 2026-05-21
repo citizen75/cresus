@@ -184,6 +184,19 @@ def calculate_smooth(
         index=sha_close.index
     )
 
+    # Calculate wick indicators
+    # sha_up: Bullish candle with no bottom wick (close > open AND low >= open)
+    sha_up = pd.Series(
+        ((sha_close > sha_open) & (sha_low >= sha_open)).astype(int),
+        index=sha_close.index
+    )
+
+    # sha_down: Bearish candle with no top wick (close < open AND high <= open)
+    sha_down = pd.Series(
+        ((sha_close < sha_open) & (sha_high <= sha_open)).astype(int),
+        index=sha_close.index
+    )
+
     # Include period in key names for proper formula reference
     period_suffix = f"_{period}" if period else ""
     return {
@@ -194,5 +207,7 @@ def calculate_smooth(
         f"sha{period_suffix}_green": sha_green,
         f"sha{period_suffix}_red": sha_red,
         f"sha{period_suffix}_bullish": sha_bullish,
+        f"sha{period_suffix}_up": sha_up,
+        f"sha{period_suffix}_down": sha_down,
         f"sha{period_suffix}": sha_close,  # Default to close
     }

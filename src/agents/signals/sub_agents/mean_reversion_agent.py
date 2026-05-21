@@ -59,7 +59,7 @@ class MeanReversionAgent(Agent):
 		# Analyze mean reversion for each ticker
 		mr_tickers = []
 		for ticker, ticker_data in data_history.items():
-			if self._matches_mr_formula(ticker_data, mr_formula):
+			if self._matches_mr_formula(ticker_data, mr_formula, ticker):
 				mr_tickers.append(ticker)
 
 		strength = len(mr_tickers) / len(data_history) if data_history else 0
@@ -75,7 +75,7 @@ class MeanReversionAgent(Agent):
 			}
 		}
 
-	def _matches_mr_formula(self, ticker_data: Any, formula: str) -> bool:
+	def _matches_mr_formula(self, ticker_data: Any, formula: str, ticker: str = "") -> bool:
 		"""Evaluate mean reversion formula on latest row.
 
 		Args:
@@ -112,7 +112,8 @@ class MeanReversionAgent(Agent):
 			return evaluate(formula, data)
 
 		except Exception as e:
-			self.logger.debug(f"Error evaluating mean reversion formula: {e}")
+			ticker_str = f" for {ticker}" if ticker else ""
+			self.logger.error(f"Error evaluating mean reversion formula{ticker_str}: {e}")
 			return False
 
 	def _extract_indicators(self, formula: str) -> List[str]:

@@ -62,7 +62,7 @@ class MomentumAgent(Agent):
 		# Analyze momentum for each ticker
 		momentum_tickers = []
 		for ticker, ticker_data in data_history.items():
-			if self._matches_momentum_formula(ticker_data, momentum_formula):
+			if self._matches_momentum_formula(ticker_data, momentum_formula, ticker):
 				momentum_tickers.append(ticker)
 
 		strength = len(momentum_tickers) / len(data_history) if data_history else 0
@@ -78,12 +78,13 @@ class MomentumAgent(Agent):
 			}
 		}
 
-	def _matches_momentum_formula(self, ticker_data: Any, formula: str) -> bool:
+	def _matches_momentum_formula(self, ticker_data: Any, formula: str, ticker: str = "") -> bool:
 		"""Evaluate momentum formula on latest row.
 
 		Args:
 			ticker_data: Price history DataFrame
 			formula: Python expression to evaluate
+			ticker: Ticker symbol for error reporting
 
 		Returns:
 			True if momentum condition is met
@@ -115,7 +116,8 @@ class MomentumAgent(Agent):
 			return evaluate(formula, data)
 
 		except Exception as e:
-			self.logger.debug(f"Error evaluating momentum formula: {e}")
+			ticker_str = f" for {ticker}" if ticker else ""
+			self.logger.error(f"Error evaluating momentum formula{ticker_str}: {e}")
 			return False
 
 	def _extract_indicators(self, formula: str) -> List[str]:

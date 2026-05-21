@@ -15,10 +15,14 @@ class FeaturesAgent(Agent):
 	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
 		"""Extract features from historical data.
 
+		If data_history is already in context with calculated indicators/alphas,
+		simply extracts them. Otherwise, calculates features (delegates to WatchlistAlphasAgent
+		if alphas not already calculated).
+
 		Creates a feature matrix with:
 		- Price features (open, high, low, close, volume)
 		- Indicator features (all calculated indicators)
-		- Derived features (returns, volatility, momentum)
+		- Alpha features (if pre-calculated by WatchlistAlphasAgent)
 
 		Args:
 			input_data: Input data (optional)
@@ -39,8 +43,13 @@ class FeaturesAgent(Agent):
 				"status": "error",
 				"input": input_data,
 				"output": {},
-				"message": "No data_history in context"
+				"message": "No data_history in context (use WatchlistAlphasAgent to calculate)"
 			}
+
+		# Check if alphas were already calculated by WatchlistAlphasAgent
+		alpha_names = self.context.get("alpha_names") or []
+		if alpha_names:
+			self.logger.info(f"[FEATURES] Using pre-calculated alphas from WatchlistAlphasAgent: {len(alpha_names)} alphas")
 
 		# Build feature matrix: columns are features, rows are (ticker, date) pairs
 		features_list = []
@@ -51,10 +60,10 @@ class FeaturesAgent(Agent):
 			if df.empty:
 				continue
 
-			# Get latest row (most recent date, since data is sorted descending)
+			# Get latest row (most recent date, since data is sorted newest-first)
 			row = df.iloc[0].to_dict()
 
-			# Extract features from row
+			# Extract ALL available features from row (including pre-calculated alphas)
 			features = self._extract_row_features(row)
 			features["ticker"] = ticker
 

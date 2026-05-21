@@ -59,7 +59,7 @@ class VolumeAnomalyAgent(Agent):
 		# Analyze volume anomalies for each ticker
 		va_tickers = []
 		for ticker, ticker_data in data_history.items():
-			if self._matches_va_formula(ticker_data, va_formula):
+			if self._matches_va_formula(ticker_data, va_formula, ticker):
 				va_tickers.append(ticker)
 
 		strength = len(va_tickers) / len(data_history) if data_history else 0
@@ -75,7 +75,7 @@ class VolumeAnomalyAgent(Agent):
 			}
 		}
 
-	def _matches_va_formula(self, ticker_data: Any, formula: str) -> bool:
+	def _matches_va_formula(self, ticker_data: Any, formula: str, ticker: str = "") -> bool:
 		"""Evaluate volume anomaly formula on latest row.
 
 		Args:
@@ -112,7 +112,8 @@ class VolumeAnomalyAgent(Agent):
 			return evaluate(formula, data)
 
 		except Exception as e:
-			self.logger.debug(f"Error evaluating volume anomaly formula: {e}")
+			ticker_str = f" for {ticker}" if ticker else ""
+			self.logger.error(f"Error evaluating volume anomaly formula{ticker_str}: {e}")
 			return False
 
 	def _extract_indicators(self, formula: str) -> List[str]:

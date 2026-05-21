@@ -10,6 +10,7 @@ Returns: Series with MFI values (0-100)
 import pandas as pd
 import numpy as np
 from typing import Optional
+from ..utils.helpers import get_high, get_low, get_close, get_volume
 
 
 def calculate(
@@ -38,26 +39,28 @@ def calculate(
         MFI = 100 - (100 / (1 + Money Flow Ratio))
     """
     # Get HLCV
-    high = data.get("HIGH", data.get("High", None))
-    low = data.get("LOW", data.get("Low", None))
-    close = data.get("CLOSE", data.get("Close", None))
-    volume = data.get("VOLUME", data.get("Volume", None))
-
-    if any(x is None for x in [high, low, close, volume]):
+    try:
+        high = get_high(data)
+        low = get_low(data)
+        close = get_close(data)
+        volume = get_volume(data)
+    except Exception:
         return pd.Series([50.0] * len(data))
 
     # Use history if provided
     if history_df is not None:
-        hist_high = history_df.get("HIGH", history_df.get("High", None))
-        hist_low = history_df.get("LOW", history_df.get("Low", None))
-        hist_close = history_df.get("CLOSE", history_df.get("Close", None))
-        hist_volume = history_df.get("VOLUME", history_df.get("Volume", None))
+        try:
+            hist_high = get_high(history_df)
+            hist_low = get_low(history_df)
+            hist_close = get_close(history_df)
+            hist_volume = get_volume(history_df)
 
-        if all(x is not None for x in [hist_high, hist_low, hist_close, hist_volume]):
             high = pd.concat([hist_high, high], ignore_index=True)
             low = pd.concat([hist_low, low], ignore_index=True)
             close = pd.concat([hist_close, close], ignore_index=True)
             volume = pd.concat([hist_volume, volume], ignore_index=True)
+        except Exception:
+            pass
 
     # Calculate Typical Price
     tp = (high + low + close) / 3

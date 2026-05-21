@@ -160,7 +160,7 @@ class VolatilityAgent(Agent):
 			return evaluate(formula, data)
 
 		except Exception as e:
-			self.logger.debug(f"Error evaluating volatility formula: {e}")
+			self.logger.error(f"Error evaluating volatility formula: {e}")
 			return False
 
 	def _extract_indicators(self, formula: str) -> List[str]:

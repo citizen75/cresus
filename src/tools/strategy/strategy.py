@@ -37,8 +37,8 @@ class StrategyManager:
 
 		if project_root:
 			self.project_root = Path(project_root)
-			# For explicit project_root (e.g., tests), use db/local/strategies for backward compatibility
-			self.strategies_dir = self.project_root / "db" / "local" / "strategies"
+			# Use db/strategies for consistency (not db/local/strategies)
+			self.strategies_dir = self.project_root / "db" / "strategies"
 		else:
 			# Find project root by looking for config directory
 			self.project_root = self._find_project_root()

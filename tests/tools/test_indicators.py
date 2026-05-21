@@ -316,68 +316,68 @@ class TestSmoothHeikinAshiCalculate:
 	def test_sha_calculate_required_keys(self, sample_ohlcv_df):
 		"""Test that calculate_smooth returns all required keys."""
 		result = calculate_sha(sample_ohlcv_df, period=14)
-		
-		required_keys = {'sha_open', 'sha_high', 'sha_low', 'sha_close', 'sha_green', 'sha_red', 'sha'}
+
+		required_keys = {'sha_14_open', 'sha_14_high', 'sha_14_low', 'sha_14_close', 'sha_14_green', 'sha_14_red', 'sha_14'}
 		assert required_keys.issubset(set(result.keys()))
 
 	def test_sha_default_period(self, sample_ohlcv_df):
 		"""Test that SHA uses default period of 14."""
 		result = calculate_sha(sample_ohlcv_df)
-		
-		assert 'sha_close' in result
-		assert len(result['sha_close']) == len(sample_ohlcv_df)
+
+		assert 'sha_14_close' in result
+		assert len(result['sha_14_close']) == len(sample_ohlcv_df)
 
 	def test_sha_custom_period(self, sample_ohlcv_df):
 		"""Test that SHA respects custom period."""
 		result_7 = calculate_sha(sample_ohlcv_df, period=7)
 		result_21 = calculate_sha(sample_ohlcv_df, period=21)
-		
+
 		# Different periods should produce different results
-		assert not result_7['sha_close'].equals(result_21['sha_close'])
+		assert not result_7['sha_7_close'].equals(result_21['sha_21_close'])
 
 	def test_sha_smoothing_effect(self, sample_ohlcv_df):
 		"""Test that SHA is smoother than raw HA."""
 		ha_result = calculate_ha(sample_ohlcv_df)
 		sha_result = calculate_sha(sample_ohlcv_df, period=14)
-		
+
 		# Smoothed should have fewer direction changes (is smoother)
 		ha_close = ha_result['ha_close'].values
-		sha_close = sha_result['sha_close'].values
-		
+		sha_close = sha_result['sha_14_close'].values
+
 		# Calculate direction changes - when price reverses direction
 		ha_diffs = np.diff(ha_close)
 		sha_diffs = np.diff(sha_close)
-		
+
 		ha_direction = np.sign(ha_diffs)
 		sha_direction = np.sign(sha_diffs)
-		
+
 		ha_changes = np.sum(np.diff(ha_direction) != 0)
 		sha_changes = np.sum(np.diff(sha_direction) != 0)
-		
+
 		# SHA should have fewer or equal direction changes (is smoother)
 		assert sha_changes <= ha_changes
 
 	def test_sha_green_is_binary(self, sample_ohlcv_df):
 		"""Test that SHA green indicator is binary."""
 		result = calculate_sha(sample_ohlcv_df, period=14)
-		
-		assert set(result['sha_green'].unique()) <= {0, 1}
+
+		assert set(result['sha_14_green'].unique()) <= {0, 1}
 
 	def test_sha_red_is_binary(self, sample_ohlcv_df):
 		"""Test that SHA red indicator is binary."""
 		result = calculate_sha(sample_ohlcv_df, period=14)
-		
-		assert set(result['sha_red'].unique()) <= {0, 1}
+
+		assert set(result['sha_14_red'].unique()) <= {0, 1}
 
 	def test_sha_colors_based_on_close_open(self, sample_ohlcv_df):
 		"""Test that colors are based on close > open."""
 		result = calculate_sha(sample_ohlcv_df, period=14)
-		
+
 		# Green should be 1 when close > open, 0 otherwise
-		close_gt_open = result['sha_close'] > result['sha_open']
-		
+		close_gt_open = result['sha_14_close'] > result['sha_14_open']
+
 		# Most of the time, green should match this condition
-		matches = (result['sha_green'] == close_gt_open.astype(int)).sum()
+		matches = (result['sha_14_green'] == close_gt_open.astype(int)).sum()
 		assert matches > len(sample_ohlcv_df) * 0.95
 
 	def test_sha_with_history_df(self, sample_ohlcv_df):
@@ -388,11 +388,11 @@ class TestSmoothHeikinAshiCalculate:
 			'Low': [94 + i*0.5 for i in range(10)],
 			'Close': [96 + i*0.5 for i in range(10)],
 		})
-		
+
 		result = calculate_sha(sample_ohlcv_df, period=14, history_df=history)
-		
+
 		# Output should match input length, not include history
-		assert len(result['sha_close']) == len(sample_ohlcv_df)
+		assert len(result['sha_14_close']) == len(sample_ohlcv_df)
 
 	def test_sha_returns_series(self, sample_ohlcv_df):
 		"""Test that all SHA values are Series."""
@@ -404,8 +404,8 @@ class TestSmoothHeikinAshiCalculate:
 	def test_sha_preserves_length(self, sample_ohlcv_df):
 		"""Test that SHA preserves input length."""
 		result = calculate_sha(sample_ohlcv_df, period=14)
-		
-		assert len(result['sha_close']) == len(sample_ohlcv_df)
+
+		assert len(result['sha_14_close']) == len(sample_ohlcv_df)
 
 	def test_sha_numeric_stability(self, sample_ohlcv_df):
 		"""Test that SHA is numerically stable."""
@@ -476,14 +476,14 @@ class TestIndicatorEdgeCases:
 			'Low': [99 + i for i in range(100)],
 			'Close': [101 + i for i in range(100)],
 		})
-		
+
 		# Very large period
 		result_large = calculate_sha(df, period=50)
-		assert len(result_large['sha_close']) == 100
-		
+		assert len(result_large['sha_50_close']) == 100
+
 		# Very small period
 		result_small = calculate_sha(df, period=2)
-		assert len(result_small['sha_close']) == 100
+		assert len(result_small['sha_2_close']) == 100
 
 	def test_calculate_with_zero_prices(self):
 		"""Test calculate with zero prices (edge case)."""
@@ -533,6 +533,121 @@ class TestIndicatorEdgeCases:
 			# If both exist, they should be equal
 			if sha_key in result and sha_key != sha_close_key:
 				pd.testing.assert_series_equal(result[sha_key], result[sha_close_key], check_names=False)
+
+
+class TestMissingIndicators:
+	"""Test indicators that were missing test coverage."""
+
+	@pytest.fixture
+	def sample_ohlcv_df(self):
+		"""Create sample OHLCV DataFrame."""
+		dates = pd.date_range('2026-01-01', periods=100, freq='D')
+		return pd.DataFrame({
+			'Open': [100 + i*0.5 for i in range(100)],
+			'High': [102 + i*0.5 for i in range(100)],
+			'Low': [99 + i*0.5 for i in range(100)],
+			'Close': [101 + i*0.5 for i in range(100)],
+			'Volume': [1000000 + i*10000 for i in range(100)],
+		}, index=dates)
+
+	# OBV (On Balance Volume)
+	def test_obv_basic(self, sample_ohlcv_df):
+		"""Test OBV calculation."""
+		result = calculate(['obv'], sample_ohlcv_df)
+		assert 'obv' in result
+		assert len(result['obv']) == len(sample_ohlcv_df)
+		assert isinstance(result['obv'], pd.Series)
+
+	def test_obv_cumulative(self, sample_ohlcv_df):
+		"""OBV should be cumulative."""
+		result = calculate(['obv'], sample_ohlcv_df)
+		obv = result['obv'].values
+		# OBV should not decrease (or decrease only when price goes down)
+		assert obv[-1] > obv[0]  # Ends higher than starts in uptrend
+
+	# MFI (Money Flow Index)
+	def test_mfi_basic(self, sample_ohlcv_df):
+		"""Test MFI calculation."""
+		result = calculate(['mfi_14'], sample_ohlcv_df)
+		assert 'mfi_14' in result
+		assert len(result['mfi_14']) == len(sample_ohlcv_df)
+
+	def test_mfi_range(self, sample_ohlcv_df):
+		"""MFI should be between 0 and 100."""
+		result = calculate(['mfi_14'], sample_ohlcv_df)
+		mfi = result['mfi_14'].dropna()
+		assert (mfi >= 0).all() and (mfi <= 100).all()
+
+	def test_mfi_custom_period(self, sample_ohlcv_df):
+		"""Test MFI with different periods."""
+		result_7 = calculate(['mfi_7'], sample_ohlcv_df)
+		result_21 = calculate(['mfi_21'], sample_ohlcv_df)
+		assert 'mfi_7' in result_7
+		assert 'mfi_21' in result_21
+
+	# CMF (Chaikin Money Flow)
+	def test_cmf_basic(self, sample_ohlcv_df):
+		"""Test CMF calculation."""
+		result = calculate(['cmf_20'], sample_ohlcv_df)
+		assert 'cmf_20' in result
+		assert len(result['cmf_20']) == len(sample_ohlcv_df)
+
+	def test_cmf_range(self, sample_ohlcv_df):
+		"""CMF should be between -1 and 1."""
+		result = calculate(['cmf_20'], sample_ohlcv_df)
+		cmf = result['cmf_20'].dropna()
+		assert (cmf >= -1).all() and (cmf <= 1).all()
+
+	# VWAP (Volume Weighted Average Price)
+	def test_vwap_basic(self, sample_ohlcv_df):
+		"""Test VWAP calculation."""
+		result = calculate(['vwap'], sample_ohlcv_df)
+		assert 'vwap' in result
+		assert len(result['vwap']) == len(sample_ohlcv_df)
+
+	def test_vwap_roughly_near_price(self, sample_ohlcv_df):
+		"""VWAP should be roughly near the price."""
+		result = calculate(['vwap'], sample_ohlcv_df)
+		vwap = result['vwap'].dropna()
+		close = sample_ohlcv_df['Close'].iloc[vwap.index]
+		# VWAP should not deviate too much from price (20% is reasonable tolerance)
+		diff_pct = abs(vwap.values - close.values) / close.values
+		assert (diff_pct < 0.2).mean() > 0.8  # 80% of points within 20%
+
+	# ROC (Rate of Change)
+	def test_roc_basic(self, sample_ohlcv_df):
+		"""Test ROC calculation."""
+		result = calculate(['roc_12'], sample_ohlcv_df)
+		assert 'roc_12' in result
+		assert len(result['roc_12']) == len(sample_ohlcv_df)
+
+	def test_roc_uptrend(self, sample_ohlcv_df):
+		"""ROC should be positive in uptrend."""
+		result = calculate(['roc_12'], sample_ohlcv_df)
+		roc = result['roc_12'].dropna()
+		# In uptrend, most ROC values should be positive
+		assert (roc > 0).sum() > len(roc) * 0.6
+
+	# ADX (Average Directional Index)
+	def test_adx_basic(self, sample_ohlcv_df):
+		"""Test ADX calculation."""
+		result = calculate(['adx_14'], sample_ohlcv_df)
+		assert 'adx_14' in result
+		assert len(result['adx_14']) == len(sample_ohlcv_df)
+
+	def test_adx_range(self, sample_ohlcv_df):
+		"""ADX should be between 0 and 100."""
+		result = calculate(['adx_14'], sample_ohlcv_df)
+		adx = result['adx_14'].dropna()
+		assert (adx >= 0).all() and (adx <= 100).all()
+
+	# Pivot Points
+	def test_pivot_basic(self, sample_ohlcv_df):
+		"""Test Pivot points calculation."""
+		result = calculate(['pivot_classic'], sample_ohlcv_df)
+		assert 'pivot_classic' in result or 'pivot' in result
+		key = 'pivot_classic' if 'pivot_classic' in result else 'pivot'
+		assert len(result[key]) == len(sample_ohlcv_df)
 
 
 if __name__ == '__main__':

@@ -25,8 +25,8 @@ from agents.entry_order.agent import EntryOrderAgent
 from agents.exit.agent import ExitAgent
 
 
-class WatchlistFlow(Flow):
-	"""Flow for pre-market analysis with watchlist and signals.
+class TrainRankFlow(Flow):
+	"""Flow for training and ranking watchlist tickers.
 
 	Generates a watchlist from strategy criteria, then analyzes signals
 	on the watchlist tickers for pre-market decision making.
@@ -39,144 +39,118 @@ class WatchlistFlow(Flow):
 			strategy: Strategy name to use for watchlist and signals
 			context: Optional AgentContext for shared state
 		"""
-		print(f"Initializing WatchlistFlow for strategy: {strategy}")
-		super().__init__(f"WatchlistFlow[{strategy}]", context=context)
+		print(f"Initializing TrainRankFlow for strategy: {strategy}")
+		super().__init__(f"TrainRankFlow[{strategy}]", context=context)
 		self.strategy_name = strategy
 		self._setup_default_steps()
 
 	def _setup_default_steps(self) -> None:
-		"""Set up default steps for watchlist flow.
+		"""Set up steps for model training flow.
 
 		Flow order:
 		1. Strategy - load config and tickers
 		2. Data - fetch data and calculate indicators
-		3. Alphas - calculate named alpha factors from config for feature engineering
-		4. Watchlist - filter and sort tickers based on strategy criteria
-		5. Signals - generate trading signals on scored watchlist
-		6. Ranking - rank watchlist tickers using LGBM walk-forward validated model
-		7. Entry - apply entry_filter to ranked watchlist tickers
-		8. Entry_order - create executable orders
+		3. Ranking (train mode) - train LGBM model with walk-forward validation
 		"""
 		# Strategy step - load tickers and strategy config
 		strategy_agent = StrategyAgent(f"StrategyAgent[{self.strategy_name}]", self.context)
 		self.add_step(strategy_agent, step_name="strategy", required=True)
 
 		# Data step - fetch data and calculate indicators for all tickers
-		# Skip if already in context (backtest mode - data loaded by BacktestAgent)
 		data_agent = DataAgent(f"DataAgent[{self.strategy_name}]", self.context)
 		self.add_step(data_agent, step_name="data", required=True)
-
-		# In backtest mode, filter watchlist BEFORE signals to reduce computation
-		# This significantly speeds up backtests (filters 258 → ~20 before signal analysis)
-		is_backtest = self.context.get("backtest_id") is not None
 
 		# Alphas step - calculate alpha factors from strategy config
 		# Adds named alpha columns to data_history for feature engineering
 		alphas_agent = WatchlistAlphasAgent("WatchlistAlphasAgent", self.context)
 		self.add_step(alphas_agent, step_name="alphas", required=False)
-
-		# Watchlist step - filter tickers based on strategy criteria and signal scores
-		watchlist_agent = WatchListAgent("WatchListAgent", self.context)
-		self.add_step(watchlist_agent, step_name="watchlist", required=True)
-
-
-		# Signals step - generate trading signals on all tickers
-		signals_agent = SignalsAgent("SignalsAgent", self.context)
-		self.add_step(signals_agent, step_name="signals", required=True)
-
-		# Ranking step - rank watchlist tickers using LGBM model (walk-forward validated)
+		
+		# Ranking step - train LGBM model with walk-forward validation
 		ranking_agent = WatchlistRankingAgent("WatchlistRankingAgent", self.context)
-		self.add_step(ranking_agent, step_name="ranking", required=False)
-
-		# Note: Data slicing to target_date must happen BEFORE entry analysis
-		# so that entry_filter evaluates on the correct date's data
-		# This is handled explicitly in process() method
+		self.add_step(ranking_agent, step_name="ranking", required=True)
 
 
-	def process(self, input_data: Optional[Dict[str, Any]] = None, save: bool = True) -> Dict[str, Any]:
-		"""Process input data through the pre-market flow.
+	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+		"""Process training pipeline.
 
-		Executes strategy, watchlist, data, signals, and save agents sequentially.
-		Generates a watchlist, analyzes signals, and optionally persists to disk.
+		Trains LGBM model on historical data with walk-forward validation.
+		Displays training information at the end.
 
 		Args:
-			input_data: Input dictionary for the flow
-			save: Toggle to enable/disable watchlist saving (default: True)
+			input_data: Input with strategy_name override
 
 		Returns:
-			Final flow result with watchlist and signals
+			Training results with model metrics
 		"""
-		# Prepare input data with save toggle for SaveWatchlistAgent
 		flow_input = input_data or {}
-		flow_input["save_enabled"] = save
+		flow_input["mode"] = "train"  # Set training mode for WatchlistRankingAgent
+		flow_input["strategy_name"] = self.strategy_name
 
-		# Set portfolio name from strategy if not already set
-		# This allows EntryOrderAgent to execute orders in the correct portfolio
-		if "portfolio_name" not in flow_input:
-			# Transform strategy name to portfolio name format (e.g., momentum_cac → Momentum cac)
-			portfolio_name = self._strategy_to_portfolio_name(self.strategy_name)
-			flow_input["portfolio_name"] = portfolio_name
-
-		# Ensure portfolio_name is set in context for sub-agents
-		self.context.set("portfolio_name", flow_input["portfolio_name"])
+		# Set mode in context so all agents can access it
 		self.context.set("strategy_name", self.strategy_name)
+		self.context.set("ranking_mode", "train")
 
-		# Store target date in context for DataAgent and pre-slicing
-		target_date = flow_input.get("date")
-		is_backtest = self.context.get("backtest_id") is not None
-
-		if target_date:
-			self.context.set("target_date", target_date)
-
-		# Execute parent flow logic
+		# Execute training pipeline
 		result = super().process(flow_input)
 
-		# PRE-SLICE DATA IN LIVE MODE (after data loads, before other agents use it)
-		# Note: This check is here as safety, but slicing should happen in DataAgent for live mode
-		# In backtest mode, BacktestAgent already pre-slices before calling premarket
-		if target_date and not is_backtest:
-			# Verify data is sliced to target_date
-			data_history = self.context.get("data_history") or {}
-			if data_history and not self.context.get("_data_sliced_for_entry"):
-				# Data wasn't pre-sliced (shouldn't happen with fix), do it now
-				self._set_data_history_for_date(self.context, target_date)
-				self.logger.warning(f"Pre-slicing data to {target_date} post-execution (should pre-slice earlier)")
-				self.context.set("_data_sliced_for_entry", True)
+		# Extract training result from the ranking step
+		ranking_step = self.get_step("ranking")
+		if ranking_step and ranking_step.get("result"):
+			training_result = ranking_step["result"]
+			result["output"] = training_result.get("output", {})
 
-		# === FINAL OUTPUT: Watchlist and Orders ===
-		# Plus display-essential data for CLI output
-
-		# Extract final watchlist (already sorted by WatchlistRankingAgent)
-		watchlist = self.context.get("watchlist") or []
-		result["watchlist"] = watchlist
-
-		# Extract strategy name (needed for CLI display header)
-		result["strategy"] = self.strategy_name
-
-		# Extract indicators (needed for CLI display header and columns)
-		strategy_config = self.context.get("strategy_config") or {}
-		indicators = strategy_config.get("indicators", [])
-
-		# Add alpha names to indicators list for display
-		alpha_names = self.context.get("alpha_names") or []
-		result["indicators"] = indicators + alpha_names
-
-		# Extract data_history (needed for CLI display indicator values)
-		data_history = self.context.get("data_history") or {}
-		result["data_history"] = data_history
-
-		# Extract target date (needed for CLI display header)
-		if target_date:
-			result["target_date"] = target_date
-
-		print(watchlist)
-
-		# === CLEANUP: Remove unnecessary intermediate context variables ===
-		# Remove: signals, entry_scores, timing_scores, rr_metrics, etc.
-		# Keep: data_history, strategy_config, watchlist (needed for other flows)
-		self._cleanup_context()
+		# === DISPLAY TRAINING INFORMATION ===
+		self._display_training_info(result)
 
 		return result
+
+	def _display_training_info(self, result: Dict[str, Any]) -> None:
+		"""Display training information at the end of flow.
+
+		Shows training metrics like folds, IC, RMSE, model path, etc.
+
+		Args:
+			result: Flow result containing training output
+		"""
+		print("\n" + "="*70)
+		print("TRAINING SUMMARY")
+		print("="*70)
+
+		output = result.get("output", {})
+
+		# Model training metrics
+		folds = output.get("folds", 0)
+		metrics = output.get("metrics", {})
+		if folds > 0:
+			avg_ic = metrics.get("avg_ic")
+			avg_rmse = metrics.get("avg_rmse")
+			positive_ic_pct = metrics.get("positive_ic_pct")
+
+			print(f"\n📊 Walk-Forward Validation Results:")
+			print(f"   Total Folds: {folds}")
+			if avg_ic is not None:
+				print(f"   Average IC (Spearman): {avg_ic:.4f}")
+			if avg_rmse is not None:
+				print(f"   Average RMSE: {avg_rmse:.6f}")
+			if positive_ic_pct is not None:
+				print(f"   Positive IC Folds: {positive_ic_pct:.1f}%")
+
+		# Total samples and features
+		total_samples = output.get("samples")
+		features = output.get("features")
+		if total_samples:
+			print(f"\n📈 Dataset Size:")
+			print(f"   Total Samples: {total_samples:,}")
+			if features:
+				print(f"   Features: {features}")
+
+		# Model path
+		model_path = output.get("model_path")
+		if model_path:
+			print(f"\n💾 Model:")
+			print(f"   Path: {model_path}")
+
+		print("\n" + "="*70)
 
 	def _set_data_history_for_date(self, context: Any, date_str: str) -> None:
 		"""Slice data_history to include only data up to a specific date.

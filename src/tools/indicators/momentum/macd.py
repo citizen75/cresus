@@ -9,6 +9,7 @@ Returns: Dict with 'macd_line', 'macd_signal', 'macd_histogram' Series
 
 import pandas as pd
 from typing import Optional, Dict
+from ..utils.helpers import get_close
 
 
 def calculate(
@@ -41,19 +42,11 @@ def calculate(
         Histogram = MACD Line - Signal Line
     """
     # Get close prices
-    if "CLOSE" in data.columns:
-        close = data["CLOSE"]
-    elif "Close" in data.columns:
-        close = data["Close"]
-    else:
-        close = data.iloc[:, -1]
+    close = get_close(data)
 
     # Use history_df for calculation if provided (to get earlier values)
     if history_df is not None:
-        if "CLOSE" in history_df.columns:
-            hist_close = history_df["CLOSE"]
-        else:
-            hist_close = history_df.iloc[:, -1]
+        hist_close = get_close(history_df)
         # Combine history + current
         combined = pd.concat([hist_close, close], ignore_index=True)
     else:

@@ -14,6 +14,7 @@ if str(src_path) not in sys.path:
 
 from tools.strategy.strategy import StrategyManager
 from tools.strategy.validator import StrategyValidator
+from tools.indicators import IndicatorChecker
 from rich.console import Console
 from rich.table import Table
 from rich.prompt import Prompt, Confirm
@@ -35,6 +36,9 @@ class StrategyCommands:
 		self.project_root = project_root
 		self.strategy_manager = StrategyManager()
 		self.validator = StrategyValidator()
+		self.checker = IndicatorChecker()
+		# Load template for structure comparison
+		self.template = self._load_template()
 
 	def check(self, strategy_name: str, fix: bool = False, template: bool = False) -> Dict[str, Any]:
 		"""Check strategy configuration for compliance.
@@ -74,31 +78,132 @@ class StrategyCommands:
 		errors = validation_result.get("errors", [])
 		warnings = validation_result.get("warnings", [])
 
+		# Validate all formulas
+		formula_errors, invalid_formulas = self.validator.validate_formulas(strategy_data)
+		errors.extend(formula_errors)
+
+		# Extract indicators from formulas
+		extracted_indicators = self.validator.extract_indicators_from_strategy(strategy_data)
+
+		# Filter out data fields (not indicators)
+		data_fields = {'open', 'high', 'low', 'close', 'volume', 'timestamp', 'ticker', 'date'}
+		extracted_indicators_filtered = extracted_indicators - data_fields
+		missing_indicators = extracted_indicators_filtered - set(indicators)
+
+		if missing_indicators:
+			# Display missing indicators clearly
+			missing_list = ', '.join(sorted(missing_indicators))
+			console.print(f"\n[yellow]⚠ Missing indicators used in formulas:[/yellow]")
+			console.print(f"[yellow]{missing_list}[/yellow]\n")
+
+		# Validate all indicators (declared and extracted)
+		indicator_validation = self.validator.validate_all_indicators(strategy_data)
+
+		# Filter out data field errors (they're not really indicators)
+		data_fields = {'open', 'high', 'low', 'close', 'volume', 'timestamp', 'ticker', 'date'}
+
+		declared_errors_filtered = [
+			err for err in indicator_validation.get("declared_errors", [])
+			if not any(field in err.lower() for field in data_fields)
+		]
+
+		extracted_errors_filtered = [
+			err for err in indicator_validation.get("extracted_errors", [])
+			if not any(field in err.lower() for field in data_fields)
+		]
+
+		indicator_errors = declared_errors_filtered + extracted_errors_filtered
+
 		# Combine errors and warnings for display
-		all_issues = errors + warnings
+		all_issues = errors + warnings + indicator_errors
+
+		# Check validity before fixes
+		is_valid = len(errors) == 0 and len(indicator_errors) == 0
 
 		# Apply fixes if requested
-		if fix and all_issues:
-			fix_result = self.strategy_manager.fix_strategy(strategy_name, dry_run=False)
-			if fix_result.get("status") == "success":
-				console.print(f"[green]✓ Strategy fixed ({fix_result.get('change_count', 0)} changes)[/green]\n")
-				return {
-					"status": "success",
-					"strategy": strategy_name,
-					"is_valid": True,
-					"fixed": True,
-					"changes": fix_result.get("changes", [])
-				}
+		if fix:
+			changes = []
+			data_fields = {'open', 'high', 'low', 'close', 'volume', 'timestamp', 'ticker', 'date'}
+
+			# Remove data fields from declared indicators (they're not real indicators)
+			declared_with_data_fields = [ind for ind in indicators if ind.lower() in data_fields]
+			if declared_with_data_fields:
+				new_indicators = [ind for ind in indicators if ind.lower() not in data_fields]
+				strategy_data["indicators"] = new_indicators
+				changes.append(f"Removed {len(declared_with_data_fields)} data field(s) from indicators: {', '.join(sorted(declared_with_data_fields))}")
+				indicators = new_indicators  # Update for the rest of the fix
+
+			# Add missing valid indicators from formulas (only those that exist in registry)
+			if missing_indicators:
+				valid_missing = []
+				invalid_missing = []
+				for ind in missing_indicators:
+					ind_result = self.checker.check(ind, verbose=False)
+					if isinstance(ind_result, dict):
+						ind_result = list(ind_result.values())[0]
+					if ind_result.exists and ind_result.is_valid():
+						valid_missing.append(ind)
+					else:
+						invalid_missing.append(ind)
+
+				if valid_missing:
+					new_indicators = indicators + valid_missing
+					new_indicators.sort()
+					strategy_data["indicators"] = new_indicators
+					changes.append(f"Added {len(valid_missing)} missing valid indicator(s): {', '.join(sorted(valid_missing))}")
+
+				# Report data fields that were skipped
+				if invalid_missing:
+					changes.append(f"Skipped {len(invalid_missing)} data field(s) (not indicators): {', '.join(sorted(invalid_missing))}")
+
+			# Handle extra keys: comment them out and add missing template keys
+			if self.template:
+				extra_key_changes = self._fix_template_structure(strategy_name, strategy_data)
+				if extra_key_changes:
+					changes.extend(extra_key_changes)
+
+			# Apply other fixes (formatting, structure, etc)
+			if changes:
+				# Save the strategy data first (indicators changes)
+				save_result = self.strategy_manager.save_strategy(strategy_name, strategy_data)
+
+				if save_result.get("status") == "success":
+					console.print(f"[green]✓ Strategy fixed ({len(changes)} changes)[/green]\n")
+					console.print("[bold]Changes made:[/bold]")
+					for change in changes:
+						console.print(f"  • {change}")
+					console.print()
+					return {
+						"status": "success",
+						"strategy": strategy_name,
+						"is_valid": False,  # Still has errors (invalid declared indicators)
+						"fixed": True,
+						"changes": changes
+					}
+				else:
+					console.print(f"[red]✗ Failed to save strategy: {save_result.get('message', 'Unknown error')}[/red]")
 			else:
-				console.print(f"[red]✗ Failed to fix strategy: {fix_result.get('message', 'Unknown error')}[/red]")
+				# No changes to make, but show that check was run
+				pass
+
+		# Filter data fields from indicator_validation before display
+		data_fields = {'open', 'high', 'low', 'close', 'volume', 'timestamp', 'ticker', 'date'}
+		indicator_validation_filtered = indicator_validation.copy()
+		indicator_validation_filtered["declared_errors"] = declared_errors_filtered
+		indicator_validation_filtered["extracted_errors"] = extracted_errors_filtered
 
 		# Display results
-		self._display_results(strategy_name, errors, warnings)
-
-		is_valid = len(errors) == 0
+		self._display_results(
+			strategy_name,
+			errors,
+			warnings,
+			formula_errors,
+			missing_indicators,
+			indicator_validation_filtered
+		)
 
 		return {
-			"status": "success" if is_valid else "error",
+			"status": "success",
 			"strategy": strategy_name,
 			"is_valid": is_valid,
 			"errors": errors,
@@ -106,29 +211,287 @@ class StrategyCommands:
 			"issues_found": len(all_issues)
 		}
 
-	def _display_results(self, strategy_name: str, errors: list, warnings: list):
+	def _load_template(self) -> Dict[str, Any]:
+		"""Load the strategy template from the template file.
+
+		Returns:
+			Template configuration dict
+		"""
+		try:
+			# Try init/templates/strategy.yml first
+			template_path = Path(__file__).parent.parent.parent.parent / "init" / "templates" / "strategy.yml"
+			if not template_path.exists():
+				# Fallback to src/config/template.yml
+				template_path = Path(__file__).parent.parent.parent / "config" / "template.yml"
+			if template_path.exists():
+				with open(template_path, 'r') as f:
+					return yaml.safe_load(f) or {}
+			return {}
+		except Exception:
+			return {}
+
+	def _fix_template_structure(self, strategy_name: str, strategy_data: Dict[str, Any]) -> List[str]:
+		"""Synchronize strategy structure with template.
+
+		Adds missing template keys and removes extra keys not in template.
+
+		Args:
+			strategy_name: Strategy name
+			strategy_data: Strategy configuration (modified in place)
+
+		Returns:
+			List of changes made
+		"""
+		if not self.template:
+			return []
+
+		changes = []
+		template = self.template.get("strategies", [{}])[0] if "strategies" in self.template else self.template
+
+		# Find missing keys from template and add them
+		missing_keys = self._find_missing_keys(template, strategy_data)
+		if missing_keys:
+			self._add_missing_keys(strategy_data, template, missing_keys)
+			changes.append(f"Added {len(missing_keys)} missing template key(s)")
+
+		# Find and remove extra keys not in template
+		extra_keys = self._find_extra_keys(strategy_data, template)
+		if extra_keys:
+			removed = self._remove_extra_keys(strategy_data, template, extra_keys)
+			if removed > 0:
+				changes.append(f"Commented out {removed} extra key(s) not in template")
+
+		return changes
+
+	def _find_missing_keys(self, template: Dict, strategy: Dict, path: str = "") -> List[str]:
+		"""Find keys in template but not in strategy.
+
+		Args:
+			template: Template dict
+			strategy: Strategy dict
+			path: Current path in the structure
+
+		Returns:
+			List of missing key paths
+		"""
+		missing = []
+		if not isinstance(template, dict) or not isinstance(strategy, dict):
+			return missing
+
+		for key, value in template.items():
+			current_path = f"{path}.{key}" if path else key
+			if key not in strategy:
+				missing.append(current_path)
+			elif isinstance(value, dict) and isinstance(strategy.get(key), dict):
+				missing.extend(self._find_missing_keys(value, strategy[key], current_path))
+
+		return missing
+
+	def _find_extra_keys(self, strategy: Dict, template: Dict, path: str = "") -> List[str]:
+		"""Find keys in strategy but not in template.
+
+		Args:
+			strategy: Strategy dict
+			template: Template dict
+			path: Current path in the structure
+
+		Returns:
+			List of extra key paths
+		"""
+		extra = []
+		if not isinstance(strategy, dict) or not isinstance(template, dict):
+			return extra
+
+		for key, value in strategy.items():
+			current_path = f"{path}.{key}" if path else key
+			if key not in template:
+				extra.append(current_path)
+			elif isinstance(value, dict) and isinstance(template.get(key), dict):
+				extra.extend(self._find_extra_keys(value, template[key], current_path))
+
+		return extra
+
+	def _add_missing_keys(self, strategy: Dict, template: Dict, missing_keys: List[str]) -> None:
+		"""Add missing keys from template to strategy.
+
+		Args:
+			strategy: Strategy dict to update
+			template: Template dict with defaults
+			missing_keys: List of missing key paths
+		"""
+		for key_path in missing_keys:
+			parts = key_path.split(".")
+			template_ref = template
+			strategy_ref = strategy
+
+			# Navigate to parent and get value from template
+			for i, part in enumerate(parts[:-1]):
+				if part not in strategy_ref:
+					strategy_ref[part] = {}
+				strategy_ref = strategy_ref[part]
+				if part in template_ref:
+					template_ref = template_ref[part]
+
+			# Add the final key
+			final_key = parts[-1]
+			if final_key in template_ref and final_key not in strategy_ref:
+				strategy_ref[final_key] = template_ref[final_key]
+
+	def _remove_extra_keys(self, strategy: Dict, template: Dict, extra_keys: List[str]) -> int:
+		"""Remove extra keys from strategy that aren't in template.
+
+		Note: Values are preserved in comments, keys are removed from structure.
+
+		Args:
+			strategy: Strategy dict to update (modified in place)
+			template: Template dict
+			extra_keys: List of extra key paths
+
+		Returns:
+			Number of keys removed
+		"""
+		removed = 0
+		# Sort by depth (deepest first) to avoid issues with parent removal
+		sorted_keys = sorted(extra_keys, key=lambda x: x.count("."), reverse=True)
+
+		for key_path in sorted_keys:
+			parts = key_path.split(".")
+			strategy_ref = strategy
+
+			# Navigate to parent
+			for part in parts[:-1]:
+				if part not in strategy_ref:
+					break
+				strategy_ref = strategy_ref[part]
+				if not isinstance(strategy_ref, dict):
+					break
+			else:
+				# Remove the final key if it exists
+				final_key = parts[-1]
+				if final_key in strategy_ref:
+					del strategy_ref[final_key]
+					removed += 1
+
+		return removed
+
+	def _comment_extra_keys(self, strategy_name: str, warnings: List[str]) -> Dict[str, Any]:
+		"""Comment out extra keys not in template.
+
+		Args:
+			strategy_name: Strategy name
+			warnings: List of warning messages about extra keys
+
+		Returns:
+			Result dict with list of commented keys
+		"""
+		try:
+			strategy_file = self.strategy_manager._get_strategy_file(strategy_name)
+
+			# Extract key paths from warnings (e.g., "signals.weights.momentum" from warning)
+			extra_keys = []
+			for warning in warnings:
+				if "Extra key not in template:" in warning:
+					# Extract the key path
+					key_path = warning.replace("Extra key not in template:", "").strip()
+					extra_keys.append(key_path)
+
+			if not extra_keys:
+				return {"status": "success", "commented_keys": []}
+
+			# Read the file
+			with open(strategy_file, 'r') as f:
+				content = f.read()
+
+			# Comment out lines containing these keys
+			lines = content.split('\n')
+			commented_lines = []
+			commented_count = 0
+
+			for i, line in enumerate(lines):
+				# Check if this line contains any of the extra keys
+				for key in extra_keys:
+					# Extract the last part of the key path (e.g., "momentum" from "signals.weights.momentum")
+					key_name = key.split('.')[-1]
+					if key_name in line and ':' in line and not line.strip().startswith('#'):
+						# Comment out this line and preserve indentation
+						indent = len(line) - len(line.lstrip())
+						commented_lines.append(' ' * indent + '# ' + line.lstrip())
+						commented_count += 1
+						break
+				else:
+					commented_lines.append(line)
+
+			# Write back
+			with open(strategy_file, 'w') as f:
+				f.write('\n'.join(commented_lines))
+
+			return {
+				"status": "success",
+				"commented_keys": extra_keys[:commented_count],
+				"file": str(strategy_file)
+			}
+
+		except Exception as e:
+			return {
+				"status": "error",
+				"message": f"Failed to comment extra keys: {str(e)}"
+			}
+
+	def _display_results(
+		self,
+		strategy_name: str,
+		errors: list,
+		warnings: list,
+		formula_errors: list = None,
+		missing_indicators: set = None,
+		indicator_validation: dict = None
+	):
 		"""Display validation results with errors and warnings separated.
 
 		Args:
 			strategy_name: Strategy name
 			errors: List of error messages (missing template keys)
 			warnings: List of warning messages (extra keys)
+			formula_errors: List of formula validation errors
+			missing_indicators: Set of indicators used in formulas but not declared
+			indicator_validation: Indicator validation results dict
 		"""
-		if not errors and not warnings:
+		formula_errors = formula_errors or []
+		missing_indicators = missing_indicators or set()
+		indicator_validation = indicator_validation or {}
+		indicator_errors = (
+			indicator_validation.get("declared_errors", []) +
+			indicator_validation.get("extracted_errors", [])
+		)
+
+		if not errors and not warnings and not formula_errors and not missing_indicators and not indicator_errors:
 			console.print("[bold green]✓ Strategy is valid and ready to use[/bold green]\n")
 			return
 
-		# Display errors (missing template keys)
-		if errors:
-			console.print(f"[bold red]✗ {len(errors)} error(s) found:[/bold red]\n")
-			errors_table = Table(title="Errors (Missing Template Keys)", box=box.ROUNDED)
+		# Display errors (missing template keys, formula errors, and indicator errors)
+		all_errors = errors + indicator_errors
+		if all_errors:
+			console.print(f"[bold red]✗ {len(all_errors)} error(s) found:[/bold red]\n")
+			errors_table = Table(title="Errors (Template, Formulas & Indicators)", box=box.ROUNDED)
 			errors_table.add_column("Error", style="red")
-			for error in errors:
+			for error in all_errors:
 				errors_table.add_row(error)
 			console.print(errors_table)
 			console.print()
 
-		# Display warnings (extra keys)
+		# Display indicator validation summary
+		if indicator_validation:
+			decl_count = len(indicator_validation.get("declared_indicators", []))
+			extr_count = len(indicator_validation.get("extracted_indicators", []))
+			missing_from_decl = indicator_validation.get("missing_from_declaration", [])
+
+			if decl_count > 0 or extr_count > 0:
+				indicator_summary = f"Declared: {decl_count}, Extracted from formulas: {extr_count}"
+				if missing_from_decl:
+					indicator_summary += f", Missing from declaration: {len(missing_from_decl)}"
+				console.print(f"[cyan]📊 Indicator Summary:[/cyan] {indicator_summary}\n")
+
+		# Display warnings (extra keys only - missing indicators shown at top)
 		if warnings:
 			console.print(f"[bold yellow]⚠ {len(warnings)} warning(s) found:[/bold yellow]\n")
 			warnings_table = Table(title="Warnings (Extra Keys Not in Template)", box=box.ROUNDED)

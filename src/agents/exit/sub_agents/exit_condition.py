@@ -158,7 +158,7 @@ class ExitConditionAgent(Agent):
 						self.logger.debug(f"    Condition not met")
 
 				except Exception as e:
-					self.logger.debug(f"Error evaluating condition for {ticker}: {e}")
+					self.logger.error(f"Error evaluating condition for {ticker}: {e}")
 					continue
 
 		except Exception as e:

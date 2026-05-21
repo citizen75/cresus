@@ -29,6 +29,7 @@ class FormulaParser:
         'plus', 'minus',  # DMI
         'open', 'high', 'low', 'close',  # Heikin Ashi, Smooth Heikin Ashi, HAMA
         'green', 'red', 'bullish',  # Color and pattern indicators
+        'up', 'down',  # Wick indicators (SHA without top/bottom wick)
         'trend',  # HAMA trend line
     }
 

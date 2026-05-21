@@ -10,6 +10,7 @@ Returns: Series with ATR values
 import pandas as pd
 import numpy as np
 from typing import Optional
+from ..utils.helpers import get_high, get_low, get_close
 
 
 def calculate(
@@ -34,25 +35,19 @@ def calculate(
         ATR = EMA of TR
     """
     # Get OHLC
-    high = data.get("HIGH", data.get("High", None))
-    low = data.get("LOW", data.get("Low", None))
-    close = data.get("CLOSE", data.get("Close", None))
-
-    if high is None or low is None or close is None:
-        return pd.Series([0.0] * len(data))
+    high = get_high(data)
+    low = get_low(data)
+    close = get_close(data)
 
     # Use history if provided
     if history_df is not None:
-        hist_high = history_df.get("HIGH", history_df.get("High", None))
-        hist_low = history_df.get("LOW", history_df.get("Low", None))
-        hist_close = history_df.get("CLOSE", history_df.get("Close", None))
+        hist_high = get_high(history_df)
+        hist_low = get_low(history_df)
+        hist_close = get_close(history_df)
 
-        if hist_high is not None:
-            high = pd.concat([hist_high, high], ignore_index=True)
-        if hist_low is not None:
-            low = pd.concat([hist_low, low], ignore_index=True)
-        if hist_close is not None:
-            close = pd.concat([hist_close, close], ignore_index=True)
+        high = pd.concat([hist_high, high], ignore_index=True)
+        low = pd.concat([hist_low, low], ignore_index=True)
+        close = pd.concat([hist_close, close], ignore_index=True)
 
     # Calculate True Range
     tr1 = high - low

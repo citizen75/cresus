@@ -17,7 +17,6 @@ from agents.strategy.agent import StrategyAgent
 from agents.watchlist.agent import WatchListAgent
 from agents.watchlist.save_agent import SaveWatchlistAgent
 from agents.watchlist_alphas.agent import WatchlistAlphasAgent
-from agents.watchlist_scores.agent import WatchlistScoresAgent
 from agents.data.agent import DataAgent
 from agents.signals.agent import SignalsAgent
 from agents.watchlist_ranking.agent import WatchlistRankingAgent
@@ -52,11 +51,10 @@ class PreMarketFlow(Flow):
 		2. Data - fetch data and calculate indicators
 		3. Alphas - calculate named alpha factors from config for feature engineering
 		4. Watchlist - filter and sort tickers based on strategy criteria
-		5. Scores - calculate composite scores for watchlist tickers
-		6. Signals - generate trading signals on scored watchlist
-		7. Ranking - rank watchlist tickers using LGBM walk-forward validated model
-		8. Entry - apply entry_filter to ranked watchlist tickers
-		9. Entry_order - create executable orders
+		5. Signals - generate trading signals on scored watchlist
+		6. Ranking - rank watchlist tickers using LGBM walk-forward validated model
+		7. Entry - apply entry_filter to ranked watchlist tickers
+		8. Entry_order - create executable orders
 		"""
 		# Strategy step - load tickers and strategy config
 		strategy_agent = StrategyAgent(f"StrategyAgent[{self.strategy_name}]", self.context)
@@ -81,10 +79,6 @@ class PreMarketFlow(Flow):
 			watchlist_agent = WatchListAgent("WatchListAgent", self.context)
 			self.add_step(watchlist_agent, step_name="watchlist", required=True)
 
-			# Scores step - calculate composite scores for watchlist tickers
-			scores_agent = WatchlistScoresAgent("WatchlistScoresAgent", self.context)
-			self.add_step(scores_agent, step_name="scores", required=False)
-
 			# Signals step - generate trading signals on filtered watchlist only
 			signals_agent = SignalsAgent("SignalsAgent", self.context)
 			self.add_step(signals_agent, step_name="signals", required=True)
@@ -93,11 +87,7 @@ class PreMarketFlow(Flow):
 			watchlist_agent = WatchListAgent("WatchListAgent", self.context)
 			self.add_step(watchlist_agent, step_name="watchlist", required=True)
 
-			# Scores step - calculate composite scores for watchlist tickers
-			scores_agent = WatchlistScoresAgent("WatchlistScoresAgent", self.context)
-			self.add_step(scores_agent, step_name="scores", required=False)
-
-			# Live: Signals on all tickers first, then Watchlist
+			# Signals step - generate trading signals on all tickers
 			signals_agent = SignalsAgent("SignalsAgent", self.context)
 			self.add_step(signals_agent, step_name="signals", required=True)
 
@@ -196,7 +186,11 @@ class PreMarketFlow(Flow):
 
 		# Extract indicators (needed for CLI display header and columns)
 		strategy_config = self.context.get("strategy_config") or {}
-		result["indicators"] = strategy_config.get("indicators", [])
+		indicators = strategy_config.get("indicators", [])
+
+		# Add alpha names to indicators list for display
+		alpha_names = self.context.get("alpha_names") or []
+		result["indicators"] = indicators + alpha_names
 
 		# Extract data_history (needed for CLI display indicator values)
 		data_history = self.context.get("data_history") or {}

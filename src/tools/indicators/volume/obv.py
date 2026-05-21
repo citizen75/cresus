@@ -8,6 +8,7 @@ Returns: Series with OBV values
 
 import pandas as pd
 from typing import Optional
+from ..utils.helpers import get_close, get_volume
 
 
 def calculate(
@@ -31,30 +32,13 @@ def calculate(
         OBV = previous OBV (if close == previous close)
     """
     # Get close and volume
-    if "CLOSE" in data.columns:
-        close = data["CLOSE"]
-    elif "Close" in data.columns:
-        close = data["Close"]
-    else:
-        close = data.iloc[:, -2]  # Assume second to last is close
-
-    if "VOLUME" in data.columns:
-        volume = data["VOLUME"]
-    elif "Volume" in data.columns:
-        volume = data["Volume"]
-    else:
-        volume = data.iloc[:, -1]  # Assume last is volume
+    close = get_close(data)
+    volume = get_volume(data)
 
     # Use history if provided
     if history_df is not None:
-        if "CLOSE" in history_df.columns:
-            hist_close = history_df["CLOSE"]
-        else:
-            hist_close = history_df.iloc[:, -2]
-        if "VOLUME" in history_df.columns:
-            hist_volume = history_df["VOLUME"]
-        else:
-            hist_volume = history_df.iloc[:, -1]
+        hist_close = get_close(history_df)
+        hist_volume = get_volume(history_df)
 
         close = pd.concat([hist_close, close], ignore_index=True)
         volume = pd.concat([hist_volume, volume], ignore_index=True)

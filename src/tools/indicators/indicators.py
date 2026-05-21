@@ -269,9 +269,12 @@ def _register_all_indicators():
 
     try:
         # Volatility indicators
-        from .volatility import atr, bb, parkinson, rogers_satchell
+        from .volatility import atr, bb, bb_lower, bb_middle, bb_upper, parkinson, rogers_satchell
         register_indicator("atr", atr.calculate)
         register_indicator("bb", bb.calculate)
+        register_indicator("bb_lower", bb_lower.calculate)
+        register_indicator("bb_middle", bb_middle.calculate)
+        register_indicator("bb_upper", bb_upper.calculate)
         register_indicator("bollinger_bands", bb.calculate)
         register_indicator("parkinson", parkinson.calculate)
         register_indicator("rs", rogers_satchell.calculate)
@@ -312,9 +315,13 @@ def _register_all_indicators():
 
     try:
         # Core indicators
-        from .core import heikin_ashi
+        from .core import heikin_ashi, sha_green, sha_red, sha_up, sha_down
         register_indicator("ha", heikin_ashi.calculate)
         register_indicator("sha", heikin_ashi.calculate_smooth)
+        register_indicator("sha_green", sha_green.calculate)
+        register_indicator("sha_red", sha_red.calculate)
+        register_indicator("sha_up", sha_up.calculate)
+        register_indicator("sha_down", sha_down.calculate)
     except ImportError:
         pass
 
@@ -383,14 +390,20 @@ def _register_indicator_modules(indicator_names: set) -> None:
 			pass
 	
 	# Volatility indicators
-	if any(ind in indicator_names for ind in ["atr", "bb", "bollinger_bands", "parkinson", "rs"]):
+	if any(ind in indicator_names for ind in ["atr", "bb", "bollinger_bands", "bb_lower", "bb_middle", "bb_upper", "parkinson", "rs"]):
 		try:
-			from .volatility import atr, bb, parkinson, rogers_satchell
+			from .volatility import atr, bb, bb_lower, bb_middle, bb_upper, parkinson, rogers_satchell
 			if "atr" in indicator_names:
 				register_indicator("atr", atr.calculate)
 			if "bb" in indicator_names or "bollinger_bands" in indicator_names:
 				register_indicator("bb", bb.calculate)
 				register_indicator("bollinger_bands", bb.calculate)
+			if "bb_lower" in indicator_names:
+				register_indicator("bb_lower", bb_lower.calculate)
+			if "bb_middle" in indicator_names:
+				register_indicator("bb_middle", bb_middle.calculate)
+			if "bb_upper" in indicator_names:
+				register_indicator("bb_upper", bb_upper.calculate)
 			if "parkinson" in indicator_names:
 				register_indicator("parkinson", parkinson.calculate)
 			if "rs" in indicator_names:
@@ -447,13 +460,21 @@ def _register_indicator_modules(indicator_names: set) -> None:
 			pass
 	
 	# Core indicators
-	if any(ind in indicator_names for ind in ["ha", "sha"]):
+	if any(ind in indicator_names for ind in ["ha", "sha", "sha_green", "sha_red", "sha_up", "sha_down"]):
 		try:
-			from .core import heikin_ashi
+			from .core import heikin_ashi, sha_green, sha_red, sha_up, sha_down
 			if "ha" in indicator_names:
 				register_indicator("ha", heikin_ashi.calculate)
 			if "sha" in indicator_names:
 				register_indicator("sha", heikin_ashi.calculate_smooth)
+			if "sha_green" in indicator_names:
+				register_indicator("sha_green", sha_green.calculate)
+			if "sha_red" in indicator_names:
+				register_indicator("sha_red", sha_red.calculate)
+			if "sha_up" in indicator_names:
+				register_indicator("sha_up", sha_up.calculate)
+			if "sha_down" in indicator_names:
+				register_indicator("sha_down", sha_down.calculate)
 		except ImportError:
 			pass
 

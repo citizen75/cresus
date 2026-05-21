@@ -20,6 +20,13 @@ from .indicators import (
 )
 from .parser import parse_formula, validate_formula
 from .validator import DataValidator
+from .checker import (
+    check_indicator,
+    check_all_indicators,
+    print_checker_report,
+    IndicatorChecker,
+    CheckResult,
+)
 from .utils import (
     IndicatorError,
     InvalidFormulaError,
@@ -42,6 +49,12 @@ __all__ = [
 	"validate_formula",
 	# Validator
 	"DataValidator",
+	# Checker
+	"check_indicator",
+	"check_all_indicators",
+	"print_checker_report",
+	"IndicatorChecker",
+	"CheckResult",
 	# Errors
 	"IndicatorError",
 	"InvalidFormulaError",

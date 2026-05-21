@@ -9,6 +9,7 @@ Returns: Series with support/resistance levels
 
 import pandas as pd
 from typing import Optional
+from ..utils.helpers import get_high, get_low
 
 
 def calculate(
@@ -32,21 +33,22 @@ def calculate(
         Support/Resistance = (High + Low) / 2 from lookback period
     """
     # Get HIGH and LOW
-    high = data.get("HIGH", data.get("High", None))
-    low = data.get("LOW", data.get("Low", None))
-
-    if high is None or low is None:
+    try:
+        high = get_high(data)
+        low = get_low(data)
+    except Exception:
         return pd.Series([0.0] * len(data))
 
     # Use history if provided
     if history_df is not None:
-        hist_high = history_df.get("HIGH", history_df.get("High", None))
-        hist_low = history_df.get("LOW", history_df.get("Low", None))
+        try:
+            hist_high = get_high(history_df)
+            hist_low = get_low(history_df)
 
-        if hist_high is not None:
             high = pd.concat([hist_high, high], ignore_index=True)
-        if hist_low is not None:
             low = pd.concat([hist_low, low], ignore_index=True)
+        except Exception:
+            pass
 
     # Calculate pivot levels (average of high and low)
     hl_avg = (high + low) / 2

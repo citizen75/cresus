@@ -10,6 +10,7 @@ Returns: Series with volatility estimates
 import pandas as pd
 import numpy as np
 from typing import Optional
+from ..utils.helpers import get_high, get_low
 
 
 def calculate(
@@ -33,21 +34,22 @@ def calculate(
         Parkinson = sqrt(1/(4*n*ln(2)) * sum(ln(H/L)^2))
     """
     # Get HIGH and LOW
-    high = data.get("HIGH", data.get("High", None))
-    low = data.get("LOW", data.get("Low", None))
-
-    if high is None or low is None:
+    try:
+        high = get_high(data)
+        low = get_low(data)
+    except Exception:
         return pd.Series([0.0] * len(data))
 
     # Use history if provided
     if history_df is not None:
-        hist_high = history_df.get("HIGH", history_df.get("High", None))
-        hist_low = history_df.get("LOW", history_df.get("Low", None))
+        try:
+            hist_high = get_high(history_df)
+            hist_low = get_low(history_df)
 
-        if hist_high is not None:
             high = pd.concat([hist_high, high], ignore_index=True)
-        if hist_low is not None:
             low = pd.concat([hist_low, low], ignore_index=True)
+        except Exception:
+            pass
 
     # Calculate log returns
     hl_ratio = high / low

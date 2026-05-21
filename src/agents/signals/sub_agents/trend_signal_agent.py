@@ -59,7 +59,7 @@ class TrendSignalAgent(Agent):
 		# Analyze trend for each ticker
 		trend_tickers = []
 		for ticker, ticker_data in data_history.items():
-			if self._matches_trend_formula(ticker_data, trend_formula):
+			if self._matches_trend_formula(ticker_data, trend_formula, ticker):
 				trend_tickers.append(ticker)
 
 		strength = len(trend_tickers) / len(data_history) if data_history else 0
@@ -75,7 +75,7 @@ class TrendSignalAgent(Agent):
 			}
 		}
 
-	def _matches_trend_formula(self, ticker_data: Any, formula: str) -> bool:
+	def _matches_trend_formula(self, ticker_data: Any, formula: str, ticker: str = "") -> bool:
 		"""Evaluate trend formula on latest row.
 
 		Args:
@@ -112,7 +112,8 @@ class TrendSignalAgent(Agent):
 			return evaluate(formula, data)
 
 		except Exception as e:
-			self.logger.debug(f"Error evaluating trend formula: {e}")
+			ticker_str = f" for {ticker}" if ticker else ""
+			self.logger.error(f"Error evaluating trend formula{ticker_str}: {e}")
 			return False
 
 	def _extract_indicators(self, formula: str) -> List[str]:

@@ -11,12 +11,14 @@ Returns: Dict with 'open', 'high', 'low', 'close', 'ma_line' Series
 
 import pandas as pd
 from typing import Optional, Dict
+from ..utils.helpers import get_ohlc
 
 
 def calculate(
     data: pd.DataFrame,
     length_open: int = 25,
     length_close: int = 20,
+    length_hl: int = 20,
     ema_line: int = 55,
     open_type: str = "EMA",
     close_type: str = "EMA",
@@ -39,6 +41,7 @@ def calculate(
         data: OHLCV DataFrame
         length_open: Period for open MA (default: 25)
         length_close: Period for close MA (default: 20)
+        length_hl: Period for high/low MA (default: 20)
         ema_line: Period for trend line MA (default: 55)
         open_type: Type of MA for open - "EMA", "SMA", "WMA" (default: "EMA")
         close_type: Type of MA for close - "EMA", "SMA", "WMA" (default: "EMA")
@@ -56,16 +59,7 @@ def calculate(
         df = data.copy()
 
     # Get OHLC
-    if "Open" in df.columns:
-        opens = df["Open"].reset_index(drop=True)
-        highs = df["High"].reset_index(drop=True)
-        lows = df["Low"].reset_index(drop=True)
-        closes = df["Close"].reset_index(drop=True)
-    else:
-        opens = df.iloc[:, 0].reset_index(drop=True)
-        highs = df.iloc[:, 1].reset_index(drop=True)
-        lows = df.iloc[:, 2].reset_index(drop=True)
-        closes = df.iloc[:, 3].reset_index(drop=True)
+    opens, highs, lows, closes = get_ohlc(df)
 
     # === HAMA Open ===
     # SourceOpen = (open[1] + close[1]) / 2 (previous bar's (O+C)/2)
@@ -75,12 +69,12 @@ def calculate(
     # === HAMA High ===
     # SourceHigh = max(high, close)
     source_high = pd.concat([highs, closes], axis=1).max(axis=1)
-    hama_high = _apply_ma(source_high, 20, "EMA")  # Pine script uses fixed 20
+    hama_high = _apply_ma(source_high, length_hl, "EMA")
 
     # === HAMA Low ===
     # SourceLow = min(low, close)
     source_low = pd.concat([lows, closes], axis=1).min(axis=1)
-    hama_low = _apply_ma(source_low, 20, "EMA")  # Pine script uses fixed 20
+    hama_low = _apply_ma(source_low, length_hl, "EMA")
 
     # === HAMA Close ===
     # SourceClose = (open + high + low + close) / 4

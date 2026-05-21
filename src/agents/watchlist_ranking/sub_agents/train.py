@@ -83,8 +83,14 @@ class TrainAgent(Agent):
 		self.logger.info(f"[TRAIN] Building cross-sectional dataset for {strategy_name}")
 
 		try:
+			# Get prediction horizon from strategy config
+			strategy_config = self.context.get("strategy_config") or {}
+			predict_config = strategy_config.get("predict", {})
+			prediction_days = predict_config.get("days", 10)
+			self.logger.info(f"[TRAIN] Using prediction horizon: {prediction_days} days (from strategy config)")
+
 			# Build full cross-sectional dataset
-			full_df = self._build_cross_sectional_dataset(data_history)
+			full_df = self._build_cross_sectional_dataset(data_history, prediction_days=prediction_days)
 
 			self.logger.info(f"[TRAIN] After building dataset: shape={full_df.shape}")
 			self.logger.info(f"[TRAIN] Columns: {list(full_df.columns)}")
@@ -280,7 +286,7 @@ class TrainAgent(Agent):
 		self.logger.info(f"[TRAIN] Built dataset: {len(full_df)} rows, {len([c for c in full_df.columns if c not in ['date', 'future_date', 'ticker', 'label', 'period']])} features, {prediction_days}-day labels")
 		return full_df
 
-	def _walk_forward_validate(self, full_df: pd.DataFrame, train_months: int = 3, test_months: int = 1) -> List[Dict[str, Any]]:
+	def _walk_forward_validate(self, full_df: pd.DataFrame, train_months: int = 4, test_months: int = 1) -> List[Dict[str, Any]]:
 		"""Run walk-forward validation: train on past N months, test on next month.
 
 		Args:
