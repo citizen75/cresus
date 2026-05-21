@@ -90,12 +90,13 @@ class CresusCLI(cmd2.Cmd):
 		console.print("[dim]Command history is saved to ~/.cresus/history[/dim]\n")
 
 	def _find_project_root(self) -> Path:
-		"""Find project root by looking for config/cresus.yml."""
+		"""Find project root by looking for config/cresus.yml or default to ~/.cresus."""
 		cwd = Path.cwd().resolve()
 		for p in [cwd, cwd.parent, cwd.parent.parent]:
 			if (p / "config" / "cresus.yml").exists():
 				return p
-		return cwd
+		# Default to ~/.cresus if config not found
+		return Path.home() / ".cresus"
 
 	def _setup_history(self):
 		"""Set up persistent command history."""
@@ -1179,6 +1180,9 @@ class CresusCLI(cmd2.Cmd):
 				("Closed Trades", f"{metrics.get('closed_trades', 0):.0f}", ""),
 				("Open Trades", f"{metrics.get('open_trades', 0):.0f}", ""),
 				("Open Trade PnL", f"${metrics.get('open_trade_pnl', 0):.2f}", ""),
+				("Max Open Positions", f"{metrics.get('max_open_positions', 0):.0f}", ""),
+				("Avg Open Positions", f"{metrics.get('avg_open_positions', 0):.1f}", ""),
+				("Days with Positions", f"{metrics.get('days_with_positions', 0):.0f}", ""),
 				("", "", ""),
 				("Win Rate", f"{metrics.get('win_rate_pct', 0):.2f}", "%"),
 				("Best Trade", f"{metrics.get('best_trade_pct', 0):.2f}", "%"),

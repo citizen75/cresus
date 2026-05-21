@@ -110,10 +110,13 @@ class PortfolioMetrics(PortfolioManager):
         
         # Calculate exposure
         max_exposure = self._calculate_max_exposure(completed_trades, history_df, actual_start_value)
-        
+
         # Open trades
         open_trades = df[df['status'] == 'open'].copy()
         open_pnl = self._calculate_open_pnl(open_trades, history_df)
+
+        # Calculate position statistics
+        position_stats = self._calculate_position_stats(df, actual_start_dt, actual_end_dt)
         
         return {
             # Dates and period
@@ -151,7 +154,12 @@ class PortfolioMetrics(PortfolioManager):
             # Trade duration
             "avg_winning_trade_duration_days": trades_analysis["avg_winning_duration"],
             "avg_losing_trade_duration_days": trades_analysis["avg_losing_duration"],
-            
+
+            # Position statistics
+            "max_open_positions": position_stats["max_open"],
+            "avg_open_positions": position_stats["avg_open"],
+            "days_with_positions": position_stats["days_with_positions"],
+
             # Ratios
             "profit_factor": trades_analysis["profit_factor"],
             "expectancy_pct": trades_analysis["expectancy"],
@@ -416,6 +424,66 @@ class PortfolioMetrics(PortfolioManager):
             entry_value += float(trade['quantity']) * float(trade['price'])
         
         return float(current_value - entry_value)
+
+    def _calculate_position_stats(self, journal_df: pd.DataFrame, start_dt, end_dt) -> Dict[str, float]:
+        """Calculate max and average open positions."""
+        if journal_df.empty:
+            return {"max_open": 0, "avg_open": 0.0, "days_with_positions": 0}
+
+        # Convert dates
+        journal_df = journal_df.copy()
+        journal_df['created_at'] = pd.to_datetime(journal_df['created_at'], errors='coerce')
+        journal_df['status_at'] = pd.to_datetime(journal_df['status_at'], errors='coerce')
+
+        # Filter to completed trades only
+        journal_df = journal_df[journal_df['status'] == 'completed'].copy()
+        if journal_df.empty:
+            return {"max_open": 0, "avg_open": 0.0, "days_with_positions": 0}
+
+        # Create date range
+        date_range = pd.date_range(start_dt, end_dt, freq='D')
+        positions_by_day = {}
+
+        for day in date_range:
+            day_date = day.date()
+            open_count = 0
+
+            # Count positions open on this day
+            for _, trade in journal_df.iterrows():
+                buy_date = trade['created_at'].date()
+
+                # Find matching sell date
+                sell_date = None
+                if trade['operation'] == 'BUY':
+                    # Look for corresponding SELL
+                    sell_records = journal_df[
+                        (journal_df['ticker'] == trade['ticker']) &
+                        (journal_df['operation'] == 'SELL') &
+                        (journal_df['created_at'] > trade['created_at'])
+                    ]
+                    if len(sell_records) > 0:
+                        sell_date = sell_records.iloc[0]['created_at'].date()
+
+                # Position is open if bought before/on this day and not sold or sold after this day
+                if trade['operation'] == 'BUY' and buy_date <= day_date:
+                    if sell_date is None or sell_date > day_date:
+                        open_count += 1
+
+            if open_count > 0:
+                positions_by_day[day_date] = open_count
+
+        if not positions_by_day:
+            return {"max_open": 0, "avg_open": 0.0, "days_with_positions": 0}
+
+        max_open = max(positions_by_day.values())
+        avg_open = sum(positions_by_day.values()) / len(positions_by_day)
+        days_with_positions = len(positions_by_day)
+
+        return {
+            "max_open": int(max_open),
+            "avg_open": float(round(avg_open, 1)),
+            "days_with_positions": int(days_with_positions)
+        }
 
     def get_daily_metrics(self, name: str):
         """Get daily metrics for portfolio."""
