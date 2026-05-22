@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { LineChart, Line, AreaChart, Area, ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { LineChart, Line, AreaChart, Area, BarChart, ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { api } from '@/services/api'
 import { useBacktestRun, useBacktestDistribution } from '@/hooks/usePortfolio'
 import { useBacktestWebSocket } from '@/hooks/useBacktestWebSocket'
@@ -710,38 +710,33 @@ export default function BacktestDetail() {
           {yearList.length > 0 && (
             <div className="bg-slate-900/50 rounded-lg p-6 border border-slate-800 shadow-lg">
               <h2 className="text-sm font-bold text-white mb-4">MONTHLY RETURNS (%)</h2>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs text-slate-300">
-                  <thead>
-                    <tr className="border-b border-slate-700">
-                      <th className="px-2 py-2 text-left text-slate-400">Month</th>
-                      {yearList.map(year => (
-                        <th key={year} className="px-2 py-2 text-right text-slate-400">{year}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {monthNames.map((month, idx) => (
-                      <tr key={idx} className="border-b border-slate-700">
-                        <td className="px-2 py-2 text-slate-400 font-medium">{month}</td>
-                        {yearList.map(year => {
-                          const value = monthlyReturns[idx]?.[year]
-                          return (
-                            <td
-                              key={`${idx}-${year}`}
-                              className={`px-2 py-2 text-right font-mono ${
-                                value === undefined ? 'text-slate-600' :
-                                value >= 0 ? 'text-green-400 bg-green-950/20' : 'text-red-400 bg-red-950/20'
-                              }`}
-                            >
-                              {value !== undefined ? `${value.toFixed(2)}%` : '-'}
-                            </td>
-                          )
-                        })}
-                      </tr>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={monthNames.map((month, idx) => ({
+                      month,
+                      ...Object.fromEntries(yearList.map(year => [year.toString(), monthlyReturns[idx]?.[year] ?? null]))
+                    }))}
+                    margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.2} />
+                    <XAxis dataKey="month" stroke="#94a3b8" style={{ fontSize: '11px' }} />
+                    <YAxis stroke="#94a3b8" style={{ fontSize: '11px' }} label={{ value: 'Return (%)', angle: -90, position: 'insideLeft' }} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }}
+                      formatter={(value: any) => value !== null ? `${value.toFixed(2)}%` : '-'}
+                    />
+                    <Legend />
+                    {yearList.map((year, idx) => (
+                      <Bar
+                        key={year}
+                        dataKey={year.toString()}
+                        fill={['#a78bfa', '#10b981', '#f59e0b', '#ef4444', '#06b6d4'][idx % 5]}
+                        name={year.toString()}
+                      />
                     ))}
-                  </tbody>
-                </table>
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             </div>
           )}
