@@ -90,11 +90,19 @@ class CresusCLI(cmd2.Cmd):
 		console.print("[dim]Command history is saved to ~/.cresus/history[/dim]\n")
 
 	def _find_project_root(self) -> Path:
-		"""Find project root by looking for config/cresus.yml or default to ~/.cresus."""
+		"""Find project root by looking for config/cresus.yml or CRESUS_PROJECT_ROOT env var."""
+		# First check environment variable (set during installation)
+		if "CRESUS_PROJECT_ROOT" in os.environ:
+			env_root = Path(os.environ["CRESUS_PROJECT_ROOT"]).resolve()
+			if (env_root / "config" / "cresus.yml").exists() or (env_root / "init" / "config" / "cresus.yml").exists():
+				return env_root
+
+		# Then check current directory and parents
 		cwd = Path.cwd().resolve()
 		for p in [cwd, cwd.parent, cwd.parent.parent]:
 			if (p / "config" / "cresus.yml").exists():
 				return p
+
 		# Default to ~/.cresus if config not found
 		return Path.home() / ".cresus"
 
