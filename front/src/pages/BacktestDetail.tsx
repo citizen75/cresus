@@ -445,7 +445,8 @@ export default function BacktestDetail() {
       best_trade_pct: backtest?.best_trade_pct ?? 0,
       worst_trade_pct: backtest?.worst_trade_pct ?? 0,
     }
-  const baseEquity = realtimeEquity.length > 0 ? realtimeEquity : (backtest?.equity_curve || [])
+  // Use realtimeEquity only while backtest is running, use full equity_curve when complete
+  const baseEquity = (isRunning && realtimeEquity.length > 0) ? realtimeEquity : (backtest?.equity_curve || [])
 
   // Ensure equity data includes drawdown as positive magnitude
   const equity = baseEquity.map((point: any, idx: number) => {
@@ -502,19 +503,8 @@ export default function BacktestDetail() {
         const end = values[values.length - 1]
         const ret = start > 0 ? ((end - start) / start) * 100 : 0
         months[month][year] = ret
-
-        // Debug specific months
-        if (month >= 8) { // Sep, Oct, Nov, Dec
-          console.log(`Month ${month} (year ${year}): ${values.length} points, start=${start.toFixed(2)}, end=${end.toFixed(2)}, return=${ret.toFixed(2)}%`)
-        }
       }
     }
-
-    console.log('=== MONTHLY RETURNS DEBUG ===')
-    console.log('months[8] (Sep):', months[8])
-    console.log('months[9] (Oct):', months[9])
-    console.log('months[10] (Nov):', months[10])
-    console.log('months[11] (Dec):', months[11])
 
     return { monthlyData: months, monthNames, years: Array.from(allYears).sort() }
   }
