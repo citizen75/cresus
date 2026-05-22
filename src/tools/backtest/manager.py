@@ -526,7 +526,15 @@ class BacktestManager:
 		if not portfolios_dir.exists():
 			return None
 
-		journal_files = list(portfolios_dir.glob("*_journal.csv"))
+		# Look for journal in multiple locations:
+		# 1. Root level: portfolios/journal.csv (current format)
+		# 2. Root level: portfolios/*_journal.csv (legacy format)
+		# 3. Subdirectories: portfolios/*/journal.csv (alternative format)
+		journal_files = list(portfolios_dir.glob("journal.csv"))
+		if not journal_files:
+			journal_files = list(portfolios_dir.glob("*_journal.csv"))
+		if not journal_files:
+			journal_files = list(portfolios_dir.glob("*/journal.csv"))
 		if not journal_files:
 			return None
 
