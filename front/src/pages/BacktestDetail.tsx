@@ -261,16 +261,29 @@ export default function BacktestDetail() {
         if (lastMessage.data?.results) {
           setRealtimeMetrics(lastMessage.data.results)
         }
-        setDaysProcessed(prev => {
-          const newCount = prev + 1
-          const newPercentage = totalDays > 0 ? Math.round((newCount / totalDays) * 100) : Math.min((prev / Math.max(1, prev + 1)) * 100 + 5, 95)
+        // Use progress from websocket if available, otherwise count messages
+        if (lastMessage.data?.progress) {
+          const prog = lastMessage.data.progress
           setProgress({
-            current: newCount,
-            total: totalDays,
-            percentage: newPercentage,
+            current: prog.current,
+            total: prog.total,
+            percentage: prog.percentage
           })
-          return newCount
-        })
+          setDaysProcessed(prog.current)
+          setTotalDays(prog.total)
+        } else {
+          // Fallback: count messages for progress
+          setDaysProcessed(prev => {
+            const newCount = prev + 1
+            const newPercentage = totalDays > 0 ? Math.round((newCount / totalDays) * 100) : Math.min((prev / Math.max(1, prev + 1)) * 100 + 5, 95)
+            setProgress({
+              current: newCount,
+              total: totalDays,
+              percentage: newPercentage,
+            })
+            return newCount
+          })
+        }
       } else if (lastMessage.type === 'error') {
         setIsRunning(false)
       }
