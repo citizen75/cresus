@@ -320,6 +320,7 @@ export default function BacktestDetail() {
             const equityCurve = historyData.history.map((h: any) => ({
               date: h.date,
               value: h.value,
+              return_pct: h.return_pct,
               drawdown_pct: h.drawdown_pct,
             }))
             setRealtimeEquity(equityCurve)
@@ -628,17 +629,17 @@ export default function BacktestDetail() {
           <div className="grid grid-cols-12 gap-4">
             {/* Charts - Left Side (9 cols) */}
             <div className="col-span-9 space-y-4">
-          {/* Equity Curve */}
+          {/* Return % Chart */}
           <div className="bg-slate-900/50 rounded-lg p-6 border border-slate-800 shadow-lg">
-            <h2 className="text-sm font-bold text-white mb-4">EQUITY CURVE</h2>
+            <h2 className="text-sm font-bold text-white mb-4">RETURN %</h2>
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={equity} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.2} />
                   <XAxis dataKey="date" stroke="#94a3b8" style={{ fontSize: '11px' }} />
-                  <YAxis stroke="#94a3b8" style={{ fontSize: '11px' }} />
-                  <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }} />
-                  <Line type="monotone" dataKey="value" stroke="#a78bfa" strokeWidth={2.5} dot={false} />
+                  <YAxis stroke="#94a3b8" style={{ fontSize: '11px' }} label={{ value: '%', angle: -90, position: 'insideLeft' }} />
+                  <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }} formatter={(value: any) => [(value as number).toFixed(2) + '%', 'Return']} />
+                  <Line type="monotone" dataKey="return_pct" stroke="#10b981" strokeWidth={2.5} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>

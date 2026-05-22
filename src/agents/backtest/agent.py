@@ -92,17 +92,19 @@ class BacktestAgent(Agent):
 	Flows are optional - the agent continues if flows are not set.
 	"""
 
-	def __init__(self, name: str = "backtest", context: Optional[AgentContext] = None):
+	def __init__(self, name: str = "backtest", context: Optional[AgentContext] = None, websocket: bool = True):
 		"""Initialize BacktestAgent.
 
 		Args:
 			name: Agent identifier
 			context: Optional shared AgentContext
+			websocket: Enable WebSocket broadcasts and real-time metrics (default: True)
 		"""
 		super().__init__(name, context)
 		self.pre_market_flow: Optional[Flow] = None
 		self.market_flow: Optional[Flow] = None
 		self.post_market_flow: Optional[Flow] = None
+		self.websocket_enabled = websocket
 
 	def set_premarket_flow(self, flow: Flow) -> None:
 		"""Set the pre-market flow.
@@ -149,7 +151,7 @@ class BacktestAgent(Agent):
 
 			result = {
 				"date": current_date.isoformat(),
-				"total_return_pct": 0.0,
+				"return_pct": 0.0,
 				"portfolio_value": initial_capital,
 				"total_trades": 0,
 				"closed_trades": 0,
@@ -160,6 +162,10 @@ class BacktestAgent(Agent):
 				"best_trade_pct": 0.0,
 				"worst_trade_pct": 0.0,
 			}
+
+			if not portfolio_name:
+				self.logger.error(f"portfolio_name is None or empty for date {current_date}")
+				return result
 
 			# Load journal and count trades up to current date
 			journal = Journal(portfolio_name, context=self.context.__dict__)
@@ -181,34 +187,66 @@ class BacktestAgent(Agent):
 
 			# Calculate trade-level metrics from completed trades
 			if len(completed) > 0:
-				pnl_pct = pd.to_numeric(completed['pnl_pct'], errors='coerce').fillna(0)
-				pnl = pd.to_numeric(completed['pnl'], errors='coerce').fillna(0)
+				# Calculate PnL from buy/sell pairs (matching PortfolioMetrics logic)
+				trade_pnl_list = []
+				winning_trades_list = []
+				losing_trades_list = []
 
-				# Win rate
-				winning = (pnl_pct > 0).sum()
-				result["win_rate_pct"] = float((winning / len(completed) * 100) if len(completed) > 0 else 0.0)
+				# Group by ticker
+				for ticker in completed['ticker'].unique():
+					ticker_trades = completed[completed['ticker'] == ticker].copy()
+					ticker_trades = ticker_trades.sort_values('created_at')
 
-				# Best and worst trades
-				if len(pnl_pct) > 0:
-					result["best_trade_pct"] = float(pnl_pct.max())
-					result["worst_trade_pct"] = float(pnl_pct.min())
+					buys = ticker_trades[ticker_trades['operation'].str.upper() == 'BUY']
+					sells = ticker_trades[ticker_trades['operation'].str.upper() == 'SELL']
 
-				# Average winning and losing trades
-				winning_trades = pnl_pct[pnl_pct > 0]
-				losing_trades = pnl_pct[pnl_pct < 0]
+					# Pair buys with sells
+					for _, buy in buys.iterrows():
+						# Find next sell
+						next_sells = sells[sells['created_at'] > buy['created_at']]
+						if not next_sells.empty:
+							sell = next_sells.iloc[0]
+							buy_price = float(buy.get('price', 0))
+							sell_price = float(sell.get('price', 0))
+							quantity = float(buy.get('quantity', 0))
 
-				if len(winning_trades) > 0:
-					result["avg_winning_trade_pct"] = float(winning_trades.mean())
-				if len(losing_trades) > 0:
-					result["avg_losing_trade_pct"] = float(losing_trades.mean())
+							if buy_price > 0 and quantity > 0:
+								# Calculate P&L
+								pnl = (sell_price - buy_price) * quantity
+								pnl_pct = ((sell_price - buy_price) / buy_price * 100)
 
-				# Profit factor (sum of wins / absolute value of losses)
-				sum_wins = pnl[pnl > 0].sum()
-				sum_losses = pnl[pnl < 0].sum()
-				if sum_losses != 0:
-					result["profit_factor"] = float(sum_wins / abs(sum_losses))
-				elif sum_wins > 0:
-					result["profit_factor"] = float('inf')
+								trade_pnl_list.append(pnl_pct)
+
+								if pnl_pct > 0:
+									winning_trades_list.append(pnl_pct)
+								else:
+									losing_trades_list.append(pnl_pct)
+
+				# Calculate metrics from paired trades
+				if trade_pnl_list:
+					total_closed = len(trade_pnl_list)
+					win_count = len(winning_trades_list)
+
+					# Win rate
+					result["win_rate_pct"] = float((win_count / total_closed * 100) if total_closed > 0 else 0.0)
+
+					# Best and worst trades
+					result["best_trade_pct"] = float(max(trade_pnl_list) if trade_pnl_list else 0.0)
+					result["worst_trade_pct"] = float(min(trade_pnl_list) if trade_pnl_list else 0.0)
+
+					# Average winning and losing trades
+					if winning_trades_list:
+						result["avg_winning_trade_pct"] = float(sum(winning_trades_list) / len(winning_trades_list))
+					if losing_trades_list:
+						result["avg_losing_trade_pct"] = float(sum(losing_trades_list) / len(losing_trades_list))
+
+					# Profit factor
+					gross_profit = sum(winning_trades_list) if winning_trades_list else 0
+					gross_loss = abs(sum(losing_trades_list)) if losing_trades_list else 0
+					if gross_loss > 0:
+						result["profit_factor"] = float(gross_profit / gross_loss)
+					elif gross_profit > 0:
+						result["profit_factor"] = float('inf')
 
 			# Try to calculate portfolio value from history (with error handling)
 			try:
@@ -226,18 +264,18 @@ class BacktestAgent(Agent):
 						if len(history_up_to_date) > 0:
 							current_value = history_up_to_date.iloc[-1].get('value', initial_capital)
 							result["portfolio_value"] = float(current_value)
-							result["total_return_pct"] = float((current_value - initial_capital) / initial_capital * 100) if initial_capital > 0 else 0.0
+							result["return_pct"] = float((current_value - initial_capital) / initial_capital * 100) if initial_capital > 0 else 0.0
 			except Exception as e:
 				self.logger.debug(f"Could not calculate portfolio history: {str(e)}")
 				# Fallback: estimate from trades PnL
 				if len(completed) > 0:
 					total_pnl = pd.to_numeric(completed.get('pnl', pd.Series()), errors='coerce').fillna(0).sum()
 					result["portfolio_value"] = initial_capital + total_pnl
-					result["total_return_pct"] = float((total_pnl / initial_capital * 100) if initial_capital > 0 else 0.0)
+					result["return_pct"] = float((total_pnl / initial_capital * 100) if initial_capital > 0 else 0.0)
 
 			return result
 		except Exception as e:
-			self.logger.debug(f"Failed to calculate daily metrics: {str(e)}")
+			self.logger.error(f"Failed to calculate daily metrics for {portfolio_name} on {current_date}: {str(e)}", exc_info=True)
 			return {"date": current_date.isoformat()}
 
 	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -454,27 +492,32 @@ class BacktestAgent(Agent):
 			except Exception as e:
 				self.logger.warning(f"Failed to flush journal/orders for {portfolio_name}: {str(e)}")
 
-			# Calculate daily metrics for this date
-			daily_result = self._calculate_daily_metrics(portfolio_name, next_date, start_date, initial_capital=initial_capital)
+			# Calculate daily metrics for this date (skip if websocket disabled to improve performance)
+			if self.websocket_enabled:
+				daily_result = self._calculate_daily_metrics(portfolio_name, next_date, start_date, initial_capital=initial_capital)
+			else:
+				daily_result = {"date": next_date.isoformat()}
+
 			backtest["daily_results"].append(daily_result)
 
-			# Broadcast daily progress to WebSocket clients
-			try:
-				ws_manager = get_websocket_manager()
-				ws_manager.broadcast_daily_results_sync(
-					backtest_id=backtest_id,
-					strategy_name=strategy_name,
-					date=next_date.isoformat(),
-					daily_results=daily_result,
-					progress={
-						"current": i + 1,
-						"total": len(trading_days_to_process),
-						"percentage": int((i + 1) / len(trading_days_to_process) * 100)
-					}
-				)
-				self.logger.debug(f"Broadcast daily_results for {next_date}: day {i+1}/{len(trading_days_to_process)}")
-			except Exception as e:
-				self.logger.error(f"WebSocket broadcast failed: {str(e)}", exc_info=True)
+			# Broadcast daily progress to WebSocket clients (only if enabled)
+			if self.websocket_enabled:
+				try:
+					ws_manager = get_websocket_manager()
+					ws_manager.broadcast_daily_results_sync(
+						backtest_id=backtest_id,
+						strategy_name=strategy_name,
+						date=next_date.isoformat(),
+						daily_results=daily_result,
+						progress={
+							"current": i + 1,
+							"total": len(trading_days_to_process),
+							"percentage": int((i + 1) / len(trading_days_to_process) * 100)
+						}
+					)
+					self.logger.debug(f"Broadcast daily_results for {next_date}: day {i+1}/{len(trading_days_to_process)}")
+				except Exception as e:
+					self.logger.error(f"WebSocket broadcast failed: {str(e)}", exc_info=True)
 
 		backtest["days_processed"] = len(backtest["daily_results"])
 		self.logger.info(f"Backtest completed: {backtest['days_processed']} days processed")

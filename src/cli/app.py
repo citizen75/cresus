@@ -1108,7 +1108,7 @@ class CresusCLI(cmd2.Cmd):
 				# Update Python dependencies
 				print("▸ Updating Python dependencies...", flush=True)
 				pip_result = subprocess.run(
-					["pip", "install", "-e", str(self.project_root)],
+					["pip", "install", "--upgrade", "-e", str(repo_path)],
 					timeout=300
 				)
 
