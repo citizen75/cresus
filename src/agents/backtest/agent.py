@@ -364,6 +364,11 @@ class BacktestAgent(Agent):
 				trading_days_to_process = trading_days[:-1]
 				self.logger.info(f"Including final trading day {last_day} (using {next_available_date} for execution)")
 
+		# Get initial capital from strategy config
+		strategy_config = self.context.get("strategy_config") or {}
+		initial_capital = strategy_config.get("backtest", {}).get("initial_capital", 100000.0)
+		self.logger.info(f"Using initial capital: ${initial_capital:.2f}")
+
 		# Use progress bar if tqdm is available
 		iterator = tqdm(enumerate(trading_days_to_process), total=len(trading_days_to_process), desc="Backtest Progress") if HAS_TQDM else enumerate(trading_days_to_process)
 
@@ -418,7 +423,7 @@ class BacktestAgent(Agent):
 				self.logger.warning(f"Failed to flush journal/orders for {portfolio_name}: {str(e)}")
 
 			# Calculate daily metrics for this date
-			daily_result = self._calculate_daily_metrics(portfolio_name, next_date, start_date, initial_capital=100000.0)
+			daily_result = self._calculate_daily_metrics(portfolio_name, next_date, start_date, initial_capital=initial_capital)
 			backtest["daily_results"].append(daily_result)
 
 			# Broadcast daily progress to WebSocket clients
@@ -455,7 +460,7 @@ class BacktestAgent(Agent):
 				portfolio_name,
 				start_date,
 				end_date,
-				100000.0  # Default initial capital
+				initial_capital
 			)
 
 			if metrics_result:
