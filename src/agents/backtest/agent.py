@@ -131,6 +131,8 @@ class BacktestAgent(Agent):
 	def _calculate_daily_metrics(self, portfolio_name: str, current_date: date, start_date: date, initial_capital: float = 100000.0) -> Dict[str, Any]:
 		"""Calculate daily metrics snapshot for WebSocket broadcast.
 
+		Extracts quick metrics from journal without expensive portfolio history replay.
+
 		Args:
 			portfolio_name: Portfolio name
 			current_date: Current date for metrics calculation
@@ -138,32 +140,70 @@ class BacktestAgent(Agent):
 			initial_capital: Initial capital amount
 
 		Returns:
-			Dict with daily metrics (total_return_pct, trades, etc.)
+			Dict with daily metrics (trade count, simple returns, etc.)
 		"""
 		try:
-			metrics = PortfolioMetrics(context=self.context.__dict__)
-			metrics_result = metrics.calculate_backtest_metrics(
-				portfolio_name,
-				start_date=start_date.isoformat(),
-				end_date=current_date.isoformat(),
-				start_value=initial_capital
-			)
+			from tools.portfolio.journal import Journal
+			import pandas as pd
 
-			if not metrics_result:
-				return {"date": current_date.isoformat()}
-
-			# Extract key metrics for broadcast
-			return {
+			result = {
 				"date": current_date.isoformat(),
-				"total_return_pct": metrics_result.get("total_return_pct", 0.0),
-				"portfolio_value": metrics_result.get("end_value", initial_capital),
-				"total_trades": metrics_result.get("total_trades", 0),
-				"closed_trades": metrics_result.get("closed_trades", 0),
-				"win_rate_pct": metrics_result.get("win_rate_pct", 0.0),
-				"sharpe_ratio": metrics_result.get("sharpe_ratio", 0.0),
-				"max_drawdown_pct": metrics_result.get("max_drawdown_pct", 0.0),
-				"calmar_ratio": metrics_result.get("calmar_ratio", 0.0),
+				"total_return_pct": 0.0,
+				"portfolio_value": initial_capital,
+				"total_trades": 0,
+				"closed_trades": 0,
+				"win_rate_pct": 0.0,
 			}
+
+			# Load journal and count trades up to current date
+			journal = Journal(portfolio_name, context=self.context.__dict__)
+			df = journal.load_df()
+			if df.empty:
+				return result
+
+			# Convert dates
+			df['created_at'] = pd.to_datetime(df['created_at'], errors='coerce')
+			current_date_ts = pd.Timestamp(current_date)
+
+			# Count completed trades by current date
+			completed = df[(df['status'] == 'completed') & (df['created_at'] <= current_date_ts)]
+			result["closed_trades"] = len(completed)
+
+			# Count all trades (buy + sell operations)
+			all_trades = df[(df['created_at'] <= current_date_ts) & (df['operation'].isin(['BUY', 'SELL']))]
+			result["total_trades"] = len(all_trades)
+
+			# Calculate win rate from completed trades
+			if len(completed) > 0:
+				winning = len(completed[completed.get('pnl_pct', pd.Series()).astype(float) > 0])
+				result["win_rate_pct"] = (winning / len(completed) * 100) if len(completed) > 0 else 0.0
+
+			# Try to calculate portfolio value from history (with error handling)
+			try:
+				from tools.portfolio.portfolio_history import PortfolioHistory
+				history = PortfolioHistory(portfolio_name, initial_capital=initial_capital, context=self.context.__dict__)
+				history_result = history.calculate(recalculate=False, use_cache_only=True)
+
+				if history_result.get("status") == "success":
+					history_list = history_result.get("history", [])
+					if history_list:
+						history_df = pd.DataFrame(history_list)
+						history_df['date'] = pd.to_datetime(history_df['date']).dt.date
+						history_up_to_date = history_df[history_df['date'] <= current_date]
+
+						if len(history_up_to_date) > 0:
+							current_value = history_up_to_date.iloc[-1].get('value', initial_capital)
+							result["portfolio_value"] = float(current_value)
+							result["total_return_pct"] = float((current_value - initial_capital) / initial_capital * 100) if initial_capital > 0 else 0.0
+			except Exception as e:
+				self.logger.debug(f"Could not calculate portfolio history: {str(e)}")
+				# Fallback: estimate from trades PnL
+				if len(completed) > 0:
+					total_pnl = completed.get('pnl', pd.Series()).astype(float).sum()
+					result["portfolio_value"] = initial_capital + total_pnl
+					result["total_return_pct"] = (total_pnl / initial_capital * 100) if initial_capital > 0 else 0.0
+
+			return result
 		except Exception as e:
 			self.logger.debug(f"Failed to calculate daily metrics: {str(e)}")
 			return {"date": current_date.isoformat()}
