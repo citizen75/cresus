@@ -10,6 +10,7 @@ export default function BacktestBuilder() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [loading, setLoading] = useState(false)
+  const [selectedPeriod, setSelectedPeriod] = useState<'ytd' | '1y' | '2y' | '5y' | null>('1y')
 
   useEffect(() => {
     // Set default date range (1 full year back)
@@ -40,6 +41,7 @@ export default function BacktestBuilder() {
     const end = new Date(Date.UTC(currentYear - 1, 11, 31))
     setStartDate(start.toISOString().split('T')[0])
     setEndDate(end.toISOString().split('T')[0])
+    setSelectedPeriod(`${years}y` as '1y' | '2y' | '5y')
   }
 
   const handleYTD = () => {
@@ -49,6 +51,7 @@ export default function BacktestBuilder() {
     const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()))
     setStartDate(start.toISOString().split('T')[0])
     setEndDate(todayUTC.toISOString().split('T')[0])
+    setSelectedPeriod('ytd')
   }
 
   const handleSubmit = async () => {
@@ -131,7 +134,11 @@ export default function BacktestBuilder() {
                 <div className="flex gap-2">
                   <button
                     onClick={handleYTD}
-                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition"
+                    className={`px-4 py-2 rounded-lg transition ${
+                      selectedPeriod === 'ytd'
+                        ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                        : 'bg-slate-800 hover:bg-slate-700 text-white'
+                    }`}
                   >
                     YTD
                   </button>
@@ -139,7 +146,11 @@ export default function BacktestBuilder() {
                     <button
                       key={years}
                       onClick={() => handleQuickDate(years)}
-                      className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition"
+                      className={`px-4 py-2 rounded-lg transition ${
+                        selectedPeriod === `${years}y`
+                          ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                          : 'bg-slate-800 hover:bg-slate-700 text-white'
+                      }`}
                     >
                       {years}Y
                     </button>
@@ -153,7 +164,10 @@ export default function BacktestBuilder() {
                   <input
                     type="date"
                     value={startDate}
-                    onChange={e => setStartDate(e.target.value)}
+                    onChange={e => {
+                      setStartDate(e.target.value)
+                      setSelectedPeriod(null)
+                    }}
                     className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-4 py-2 focus:border-purple-600 focus:outline-none"
                   />
                 </div>
@@ -162,7 +176,10 @@ export default function BacktestBuilder() {
                   <input
                     type="date"
                     value={endDate}
-                    onChange={e => setEndDate(e.target.value)}
+                    onChange={e => {
+                      setEndDate(e.target.value)
+                      setSelectedPeriod(null)
+                    }}
                     className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-4 py-2 focus:border-purple-600 focus:outline-none"
                   />
                 </div>
