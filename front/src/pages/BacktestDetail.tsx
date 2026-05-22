@@ -447,15 +447,18 @@ export default function BacktestDetail() {
     }
   const baseEquity = realtimeEquity.length > 0 ? realtimeEquity : (backtest?.equity_curve || [])
 
-  // Ensure equity data includes drawdown
+  // Ensure equity data includes drawdown as positive magnitude
   const equity = baseEquity.map((point: any, idx: number) => {
-    if ('drawdown_pct' in point && point.drawdown_pct !== null) {
-      return point
+    let drawdown_pct = point.drawdown_pct
+
+    if (drawdown_pct === undefined || drawdown_pct === null) {
+      // Calculate if not present
+      const peak = Math.max(...baseEquity.slice(0, idx + 1).map((p: any) => p.value))
+      drawdown_pct = (point.value - peak) / peak * 100
     }
-    const peak = Math.max(...baseEquity.slice(0, idx + 1).map((p: any) => p.value))
-    // Drawdown as magnitude (positive number representing % below peak)
-    const drawdown = Math.abs((point.value - peak) / peak * 100)
-    return { ...point, drawdown_pct: drawdown }
+
+    // Always use absolute value (magnitude of drawdown)
+    return { ...point, drawdown_pct: Math.abs(drawdown_pct) }
   })
 
   const MetricRow = ({ label, value, color = 'text-white' }: { label: string; value: string | number; color?: string }) => (
