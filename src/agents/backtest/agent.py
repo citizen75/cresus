@@ -145,6 +145,7 @@ class BacktestAgent(Agent):
 		try:
 			from tools.portfolio.journal import Journal
 			import pandas as pd
+			import numpy as np
 
 			result = {
 				"date": current_date.isoformat(),
@@ -153,6 +154,11 @@ class BacktestAgent(Agent):
 				"total_trades": 0,
 				"closed_trades": 0,
 				"win_rate_pct": 0.0,
+				"profit_factor": 0.0,
+				"avg_winning_trade_pct": 0.0,
+				"avg_losing_trade_pct": 0.0,
+				"best_trade_pct": 0.0,
+				"worst_trade_pct": 0.0,
 			}
 
 			# Load journal and count trades up to current date
@@ -173,10 +179,36 @@ class BacktestAgent(Agent):
 			all_trades = df[(df['created_at'] <= current_date_ts) & (df['operation'].isin(['BUY', 'SELL']))]
 			result["total_trades"] = len(all_trades)
 
-			# Calculate win rate from completed trades
+			# Calculate trade-level metrics from completed trades
 			if len(completed) > 0:
-				winning = len(completed[completed.get('pnl_pct', pd.Series()).astype(float) > 0])
-				result["win_rate_pct"] = (winning / len(completed) * 100) if len(completed) > 0 else 0.0
+				pnl_pct = pd.to_numeric(completed['pnl_pct'], errors='coerce').fillna(0)
+				pnl = pd.to_numeric(completed['pnl'], errors='coerce').fillna(0)
+
+				# Win rate
+				winning = (pnl_pct > 0).sum()
+				result["win_rate_pct"] = float((winning / len(completed) * 100) if len(completed) > 0 else 0.0)
+
+				# Best and worst trades
+				if len(pnl_pct) > 0:
+					result["best_trade_pct"] = float(pnl_pct.max())
+					result["worst_trade_pct"] = float(pnl_pct.min())
+
+				# Average winning and losing trades
+				winning_trades = pnl_pct[pnl_pct > 0]
+				losing_trades = pnl_pct[pnl_pct < 0]
+
+				if len(winning_trades) > 0:
+					result["avg_winning_trade_pct"] = float(winning_trades.mean())
+				if len(losing_trades) > 0:
+					result["avg_losing_trade_pct"] = float(losing_trades.mean())
+
+				# Profit factor (sum of wins / absolute value of losses)
+				sum_wins = pnl[pnl > 0].sum()
+				sum_losses = pnl[pnl < 0].sum()
+				if sum_losses != 0:
+					result["profit_factor"] = float(sum_wins / abs(sum_losses))
+				elif sum_wins > 0:
+					result["profit_factor"] = float('inf')
 
 			# Try to calculate portfolio value from history (with error handling)
 			try:
@@ -199,9 +231,9 @@ class BacktestAgent(Agent):
 				self.logger.debug(f"Could not calculate portfolio history: {str(e)}")
 				# Fallback: estimate from trades PnL
 				if len(completed) > 0:
-					total_pnl = completed.get('pnl', pd.Series()).astype(float).sum()
+					total_pnl = pd.to_numeric(completed.get('pnl', pd.Series()), errors='coerce').fillna(0).sum()
 					result["portfolio_value"] = initial_capital + total_pnl
-					result["total_return_pct"] = (total_pnl / initial_capital * 100) if initial_capital > 0 else 0.0
+					result["total_return_pct"] = float((total_pnl / initial_capital * 100) if initial_capital > 0 else 0.0)
 
 			return result
 		except Exception as e:
