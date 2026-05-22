@@ -17,6 +17,18 @@ export default function BacktestDetail() {
     console.log('useBacktestRun response:', { response, isLoading, error, has_data: !!response })
   }, [response, isLoading, error])
 
+  // Initialize totalDays from backtest data
+  useEffect(() => {
+    const backtest = response?.data
+    if (backtest && !isRunning) {
+      // Get total days from backtest data
+      const days = backtest.period_days || backtest.daily_results?.length || 0
+      if (days > 0) {
+        setTotalDays(days)
+      }
+    }
+  }, [response, isRunning])
+
   // Real-time data tracking
   const [isRunning, setIsRunning] = useState(false)
   const [progress, setProgress] = useState({ current: 0, total: 0, percentage: 0 })
@@ -260,6 +272,7 @@ export default function BacktestDetail() {
         // Extract metrics from daily results (they're in data.results)
         if (lastMessage.data?.results) {
           setRealtimeMetrics(lastMessage.data.results)
+          console.log('📊 Updated metrics:', lastMessage.data.results)
         }
         // Use progress from websocket if available, otherwise count messages
         if (lastMessage.data?.progress) {
@@ -271,6 +284,7 @@ export default function BacktestDetail() {
           })
           setDaysProcessed(prog.current)
           setTotalDays(prog.total)
+          console.log(`📈 Progress: ${prog.current}/${prog.total} (${prog.percentage}%)`)
         } else {
           // Fallback: count messages for progress
           setDaysProcessed(prev => {
