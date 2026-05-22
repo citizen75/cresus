@@ -474,46 +474,38 @@ export default function BacktestDetail() {
 
     if (equity.length < 2) return { monthlyData: {}, monthNames, years: [] }
 
-    // Initialize data structures
-    const months: { [year: number]: number }[] = []
-    for (let i = 0; i < 12; i++) {
-      months[i] = {}
-    }
-    const years = new Set<number>()
-
-    // Process equity curve
-    const byYearMonth: { [key: string]: { first: number; last: number } } = {}
+    // Group points by year-month
+    const monthData: { [key: string]: number[] } = {}
+    const allYears = new Set<number>()
 
     for (const point of equity) {
       const date = new Date(point.date)
       const year = date.getFullYear()
-      const month = date.getMonth() + 1 // 1-12
+      const month = date.getMonth() // 0-11
       const key = `${year}-${month}`
 
-      if (!byYearMonth[key]) {
-        byYearMonth[key] = { first: point.value, last: point.value }
+      allYears.add(year)
+      if (!monthData[key]) monthData[key] = []
+      monthData[key].push(point.value)
+    }
+
+    // Calculate returns for each month
+    const months: { [year: number]: number }[] = []
+    for (let i = 0; i < 12; i++) {
+      months[i] = {}
+    }
+
+    for (const [key, values] of Object.entries(monthData)) {
+      const [year, month] = key.split('-').map(Number)
+      if (values.length > 0) {
+        const start = values[0]
+        const end = values[values.length - 1]
+        const ret = start > 0 ? ((end - start) / start) * 100 : 0
+        months[month][year] = ret
       }
-      byYearMonth[key].last = point.value
-      years.add(year)
     }
 
-    // Calculate monthly returns
-    for (const [key, data] of Object.entries(byYearMonth)) {
-      const [yearStr, monthStr] = key.split('-')
-      const year = parseInt(yearStr)
-      const month = parseInt(monthStr)
-      const monthIdx = month - 1 // Convert to 0-11
-
-      const ret = data.first > 0 ? ((data.last - data.first) / data.first) * 100 : 0
-      months[monthIdx][year] = ret
-    }
-
-    // Debug: log October, November, December for verification
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Oct (idx=9):', months[9], 'Nov (idx=10):', months[10], 'Dec (idx=11):', months[11])
-    }
-
-    return { monthlyData: months, monthNames, years: Array.from(years).sort() }
+    return { monthlyData: months, monthNames, years: Array.from(allYears).sort() }
   }
 
   const { monthlyData: monthlyReturns, monthNames, years: yearList } = calculateMonthlyReturns()
