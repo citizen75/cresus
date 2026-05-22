@@ -264,9 +264,11 @@ export default function BacktestDetail() {
   }, [lastMessage, totalDays, refetch])
 
 
-  // Fetch portfolio history with evolving metrics - only while running
+  // Fetch portfolio history with evolving metrics - poll until backtest completes
   useEffect(() => {
-    if (!strategy || !runId || !isRunning) return
+    if (!strategy || !runId) return
+    // Always poll while we don't have final backtest data
+    if (backtest) return
 
     const fetchInterval = setInterval(async () => {
       try {
@@ -284,7 +286,7 @@ export default function BacktestDetail() {
             const latest = historyData.history[historyData.history.length - 1]
             if (latest) {
               setRealtimeMetrics({
-                total_return_pct: latest.return_pct,
+                total_return_pct: latest.return_pct ?? 0,
                 max_drawdown_pct: historyData.max_drawdown_pct ?? (Math.min(...historyData.history.map((h: any) => h.drawdown_pct)) || 0),
               })
             }
@@ -297,10 +299,10 @@ export default function BacktestDetail() {
       } catch (e) {
         // Silently fail
       }
-    }, 1000)
+    }, 500)
 
     return () => clearInterval(fetchInterval)
-  }, [strategy, runId, isRunning])
+  }, [strategy, runId, backtest])
 
   // response has { status, data }, we need the inner data object
   const backtest = response?.data
