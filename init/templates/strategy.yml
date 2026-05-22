@@ -28,7 +28,7 @@ watchlist:
     ranking:
       metric: score
       description: Metric to rank tickers (score, gain, etc.)
-    trend:
+    filter:
       formula: close[0] > ema_10[0] && ema_10[0] > ema_20[0]
       description: Formula to filter tickers - include only if True
     volatility:

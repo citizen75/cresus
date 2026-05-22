@@ -65,15 +65,15 @@ class TrendAgent(Agent):
 				"message": "No data history available for trend analysis"
 			}
 
-		# Get trend formula from strategy config
+		# Get filter formula from strategy config
 		trend_formula = None
 		if strategy_config:
 			watchlist_config = strategy_config.get("watchlist", {})
-			trend_config = watchlist_config.get("parameters", {}).get("trend", {})
+			trend_config = watchlist_config.get("parameters", {}).get("filter", {})
 			trend_formula = trend_config.get("formula")
 
 		if not trend_formula:
-			self.logger.warning("No trend formula found in strategy config")
+			self.logger.warning("No filter formula found in strategy config")
 			return {
 				"status": "success",
 				"input": input_data,
