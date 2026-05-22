@@ -12,12 +12,13 @@ export default function BacktestBuilder() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    // Set default date range (1 year back)
-    const end = new Date()
-    const start = new Date(end.getFullYear() - 1, end.getMonth(), end.getDate())
+    // Set default date range (1 full year back)
+    const currentYear = new Date().getFullYear()
+    const start = new Date(currentYear - 1, 0, 1)
+    const end = new Date(currentYear - 1, 11, 31)
 
-    setEndDate(end.toISOString().split('T')[0])
     setStartDate(start.toISOString().split('T')[0])
+    setEndDate(end.toISOString().split('T')[0])
   }, [])
 
   useEffect(() => {
@@ -34,8 +35,9 @@ export default function BacktestBuilder() {
   }, [])
 
   const handleQuickDate = (years: number) => {
-    const end = new Date()
-    const start = new Date(end.getFullYear() - years, end.getMonth(), end.getDate())
+    const currentYear = new Date().getFullYear()
+    const start = new Date(currentYear - years, 0, 1)
+    const end = new Date(currentYear - 1, 11, 31)
     setStartDate(start.toISOString().split('T')[0])
     setEndDate(end.toISOString().split('T')[0])
   }
