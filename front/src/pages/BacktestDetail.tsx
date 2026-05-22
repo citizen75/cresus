@@ -516,6 +516,14 @@ export default function BacktestDetail() {
 
   const { monthlyData: monthlyReturns, monthNames, years: yearList } = calculateMonthlyReturns()
 
+  // Debug monthly returns
+  if (yearList.length > 0 && Object.keys(monthlyReturns).length > 0) {
+    console.log('monthlyReturns:', monthlyReturns)
+    console.log('yearList:', yearList)
+    console.log('Sample month 1 (Feb, idx=1):', monthlyReturns[1])
+    console.log('Sample month 9 (Oct, idx=9):', monthlyReturns[9])
+  }
+
   return (
     <div className="space-y-4">
       {/* Header */}
