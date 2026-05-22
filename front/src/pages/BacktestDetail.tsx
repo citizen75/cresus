@@ -470,39 +470,42 @@ export default function BacktestDetail() {
 
   // Calculate monthly returns matrix
   const calculateMonthlyReturns = () => {
-    const monthlyData: { [key: string]: { [key: number]: number } } = {}
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
     if (equity.length < 2) return { monthlyData: {}, monthNames, years: [] }
 
-    // Group by year-month
-    const yearMonthMap: { [key: string]: { start: number; end: number } } = {}
-    let prevDate: string | null = null
-    let prevValue = equity[0].value
+    // Group by year-month with start of month value
+    const monthlyValues: { [key: string]: { dates: string[]; values: number[] } } = {}
 
-    for (let i = 1; i < equity.length; i++) {
-      const point = equity[i]
+    for (const point of equity) {
       const date = new Date(point.date)
-      const yearMonth = `${date.getFullYear()}-${String(date.getMonth()).padStart(2, '0')}`
+      const yearMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 
-      if (!yearMonthMap[yearMonth]) {
-        yearMonthMap[yearMonth] = { start: prevValue, end: point.value }
+      if (!monthlyValues[yearMonth]) {
+        monthlyValues[yearMonth] = { dates: [], values: [] }
       }
-      yearMonthMap[yearMonth].end = point.value
-      prevValue = point.value
+      monthlyValues[yearMonth].dates.push(point.date)
+      monthlyValues[yearMonth].values.push(point.value)
     }
 
-    // Convert to matrix format
+    // Convert to matrix format (month indexed 0-11, year as key)
     const years = new Set<number>()
     const months: { [key: number]: { [key: number]: number } } = {}
 
-    Object.entries(yearMonthMap).forEach(([yearMonth, { start, end }]) => {
-      const [year, month] = yearMonth.split('-').map(Number)
-      years.add(year)
+    Object.entries(monthlyValues).forEach(([yearMonth, { values }]) => {
+      const [year, monthStr] = yearMonth.split('-')
+      const yearNum = Number(year)
+      const monthIdx = Number(monthStr) - 1 // Convert to 0-11
 
-      if (!months[month]) months[month] = {}
-      const ret = ((end - start) / start) * 100
-      months[month][year] = ret
+      years.add(yearNum)
+      if (!months[monthIdx]) months[monthIdx] = {}
+
+      if (values.length >= 2) {
+        const start = values[0]
+        const end = values[values.length - 1]
+        const ret = start > 0 ? ((end - start) / start) * 100 : 0
+        months[monthIdx][yearNum] = ret
+      }
     })
 
     return { monthlyData: months, monthNames, years: Array.from(years).sort() }
