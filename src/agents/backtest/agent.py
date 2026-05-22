@@ -465,9 +465,14 @@ class BacktestAgent(Agent):
 					backtest_id=backtest_id,
 					strategy_name=strategy_name,
 					date=next_date.isoformat(),
-					daily_results=daily_result
+					daily_results=daily_result,
+					progress={
+						"current": i + 1,
+						"total": len(trading_days_to_process),
+						"percentage": int((i + 1) / len(trading_days_to_process) * 100)
+					}
 				)
-				self.logger.debug(f"Broadcast daily_results for {next_date}: {len(daily_result)} metrics")
+				self.logger.debug(f"Broadcast daily_results for {next_date}: day {i+1}/{len(trading_days_to_process)}")
 			except Exception as e:
 				self.logger.error(f"WebSocket broadcast failed: {str(e)}", exc_info=True)
 

@@ -249,7 +249,8 @@ class WebSocketManager:
 		backtest_id: str,
 		strategy_name: str,
 		date: str,
-		daily_results: Dict[str, Any]
+		daily_results: Dict[str, Any],
+		progress: Optional[Dict[str, Any]] = None
 	) -> None:
 		"""Synchronous queue of daily results for broadcasting.
 
@@ -260,17 +261,23 @@ class WebSocketManager:
 			strategy_name: Strategy name
 			date: Trading date
 			daily_results: Daily results dict
+			progress: Optional progress dict with current, total, percentage
 		"""
+		data = {
+			"date": date,
+			"results": daily_results,
+			"timestamp": datetime.utcnow().isoformat()
+		}
+
+		if progress:
+			data["progress"] = progress
+
 		message = WebSocketMessage(
 			type="daily_results",
 			backtest_id=backtest_id,
 			strategy_name=strategy_name,
 			timestamp=datetime.utcnow().isoformat(),
-			data={
-				"date": date,
-				"results": daily_results,
-				"timestamp": datetime.utcnow().isoformat()
-			}
+			data=data
 		)
 
 		# Queue message to be sent later
