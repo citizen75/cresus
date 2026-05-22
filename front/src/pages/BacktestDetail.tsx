@@ -412,7 +412,8 @@ export default function BacktestDetail() {
     )
   }
 
-  if (!backtest && isConnected) {
+  // Show running view if no backtest data yet AND either running or just connected
+  if (!backtest && (isRunning || (isConnected && !response))) {
     return (
       <div className="space-y-6">
         <div className="flex items-baseline justify-between">
