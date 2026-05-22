@@ -620,11 +620,16 @@ class BacktestManager:
 
 				daily_equity.append({
 					"date": str(trade_date),
-					"value": equity,
-					"drawdown_pct": drawdown_pct,
+					"value": float(equity),
+					"drawdown_pct": float(drawdown_pct),
 				})
 
-			return daily_equity
+			# Convert all numpy types to Python types for JSON serialization
+			return [{
+				"date": point["date"],
+				"value": float(point["value"]),
+				"drawdown_pct": float(point["drawdown_pct"]),
+			} for point in daily_equity]
 
 		except Exception as e:
 			self.logger.debug(f"Error computing equity curve: {e}")
