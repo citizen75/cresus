@@ -17,18 +17,6 @@ export default function BacktestDetail() {
     console.log('useBacktestRun response:', { response, isLoading, error, has_data: !!response })
   }, [response, isLoading, error])
 
-  // Initialize totalDays from backtest data
-  useEffect(() => {
-    const backtest = response?.data
-    if (backtest && !isRunning) {
-      // Get total days from backtest data
-      const days = backtest.period_days || backtest.daily_results?.length || 0
-      if (days > 0) {
-        setTotalDays(days)
-      }
-    }
-  }, [response, isRunning])
-
   // Real-time data tracking
   const [isRunning, setIsRunning] = useState(false)
   const [progress, setProgress] = useState({ current: 0, total: 0, percentage: 0 })
@@ -67,6 +55,17 @@ export default function BacktestDetail() {
       setActiveTab(tabParam as 'performance' | 'distribution' | 'transactions' | 'trades' | 'watchlist')
     }
   }, [tabParam])
+
+  // Initialize totalDays from backtest response data
+  useEffect(() => {
+    const backtest = response?.data
+    if (backtest && totalDays === 0) {
+      const days = backtest.period_days || backtest.daily_results?.length || 0
+      if (days > 0) {
+        setTotalDays(days)
+      }
+    }
+  }, [response, totalDays])
 
   // Update URL based on backtest completion
   useEffect(() => {
