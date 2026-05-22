@@ -262,7 +262,8 @@ export default function BacktestDetail() {
       }
     }
   }, [lastMessage, totalDays, refetch])
-
+  // response has { status, data }, we need the inner data object
+  const backtest = response?.data
 
   // Fetch portfolio history with evolving metrics - poll until backtest completes
   useEffect(() => {
@@ -303,9 +304,6 @@ export default function BacktestDetail() {
 
     return () => clearInterval(fetchInterval)
   }, [strategy, runId, backtest])
-
-  // response has { status, data }, we need the inner data object
-  const backtest = response?.data
   const hasData = backtest && (backtest.equity_curve?.length > 0 || Object.keys(backtest.portfolio_metrics || {}).length > 0)
 
   // Generate synthetic equity curve from metrics if not available
