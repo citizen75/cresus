@@ -203,7 +203,8 @@ order:
   enabled: true
   parameters:
     position_sizing:
-      formula: 2000 / close[0]
+      type: capital
+      formula: 2000 
       description: Fixed €2,000 per position
     max_daily_orders:
       formula: 2
