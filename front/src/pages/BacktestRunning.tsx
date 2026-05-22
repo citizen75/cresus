@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { useBacktestWebSocket } from '@/hooks/useBacktestWebSocket'
+import { api } from '@/services/api'
 
 export default function BacktestRunning() {
   const [searchParams] = useSearchParams()
@@ -23,6 +24,7 @@ export default function BacktestRunning() {
   const [daysProcessed, setDaysProcessed] = useState(0)
   const [totalDays, setTotalDays] = useState(0)
   const [trades, setTrades] = useState<any[]>([])
+  const [interimMetrics, setInterimMetrics] = useState<any>(null)
 
   // WebSocket connection for real-time updates
   const { isConnected, lastMessage } = useBacktestWebSocket({
@@ -94,10 +96,34 @@ export default function BacktestRunning() {
     }
   }, [backtest_id])
 
-  // Real progress is tracked via WebSocket messages, no simulation needed
+  // Poll API for interim metrics while backtest is running
+  useEffect(() => {
+    if (status !== 'running' || !strategy || !backtest_id) return
+
+    const pollMetrics = async () => {
+      try {
+        const response = await api.getBacktest(strategy, backtest_id)
+        if (response.status === 'success' && response.data?.metrics) {
+          setInterimMetrics(response.data.metrics)
+          if (response.data.metrics?.period_days) {
+            setTotalDays(response.data.metrics.period_days)
+          }
+        }
+      } catch (err) {
+        // Silently skip polling errors
+      }
+    }
+
+    // Poll every 500ms for responsive UI updates
+    const interval = setInterval(pollMetrics, 500)
+    return () => clearInterval(interval)
+  }, [status, strategy, backtest_id])
 
   const isSuccess = status === 'completed'
   const isFailed = status === 'error'
+
+  // Use interim metrics while running, final metrics on completion
+  const displayMetrics = isSuccess ? metrics : interimMetrics
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-slate-950">
@@ -160,35 +186,35 @@ export default function BacktestRunning() {
               </div>
             )}
 
-            {/* Metrics Preview (on success) */}
-            {isSuccess && metrics && (
+            {/* Metrics Preview (while running or on success) */}
+            {displayMetrics && (
               <div className="space-y-3">
-                <div className="text-sm text-slate-400 font-semibold">Results Preview:</div>
+                <div className="text-sm text-slate-400 font-semibold">{isSuccess ? 'Final Results:' : 'Live Metrics:'}</div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-slate-800/50 rounded p-3">
                     <div className="text-slate-500 text-xs mb-1">Total Return</div>
                     <div className={`text-lg font-bold ${
-                      (metrics.total_return_pct || 0) >= 0 ? 'text-green-400' : 'text-red-400'
+                      (displayMetrics.total_return_pct || 0) >= 0 ? 'text-green-400' : 'text-red-400'
                     }`}>
-                      {(metrics.total_return_pct || 0).toFixed(2)}%
+                      {(displayMetrics.total_return_pct || 0).toFixed(2)}%
                     </div>
                   </div>
                   <div className="bg-slate-800/50 rounded p-3">
                     <div className="text-slate-500 text-xs mb-1">Sharpe Ratio</div>
                     <div className="text-lg font-bold text-white">
-                      {(metrics.sharpe_ratio || 0).toFixed(3)}
+                      {(displayMetrics.sharpe_ratio || 0).toFixed(3)}
                     </div>
                   </div>
                   <div className="bg-slate-800/50 rounded p-3">
                     <div className="text-slate-500 text-xs mb-1">Max Drawdown</div>
                     <div className="text-lg font-bold text-red-400">
-                      {(metrics.max_drawdown_pct || 0).toFixed(2)}%
+                      {(displayMetrics.max_drawdown_pct || 0).toFixed(2)}%
                     </div>
                   </div>
                   <div className="bg-slate-800/50 rounded p-3">
                     <div className="text-slate-500 text-xs mb-1">Win Rate</div>
                     <div className="text-lg font-bold text-white">
-                      {(metrics.win_rate_pct || 0).toFixed(1)}%
+                      {(displayMetrics.win_rate_pct || 0).toFixed(1)}%
                     </div>
                   </div>
                 </div>
