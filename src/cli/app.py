@@ -1017,10 +1017,17 @@ class CresusCLI(cmd2.Cmd):
 		print("Updating cresus from git repository...", flush=True)
 
 		try:
+			# First, sync config with template
+			from core.init import InitManager
+			init_mgr = InitManager(self.project_root)
+			sync_result = init_mgr.sync_config()
+			if sync_result.get("status") == "success":
+				print(f"✓ Configuration synced: {sync_result['config_path']}", flush=True)
+
 			# Determine repo path: check config first, then use project_root
 			repo_path = self.project_root
 
-			# Try to load repo_path from cresus.yml
+			# Try to load repo.path from cresus.yml
 			config_file = self.project_root / "config" / "cresus.yml"
 			if not config_file.exists():
 				config_file = Path.home() / ".cresus" / "config" / "cresus.yml"
@@ -1029,7 +1036,7 @@ class CresusCLI(cmd2.Cmd):
 				try:
 					with open(config_file) as f:
 						config = yaml.safe_load(f) or {}
-						repo_path_str = config.get("update", {}).get("repo_path", "")
+						repo_path_str = config.get("repo", {}).get("path", "")
 
 						# Expand environment variables
 						if repo_path_str:
@@ -1038,7 +1045,7 @@ class CresusCLI(cmd2.Cmd):
 						if repo_path_str:
 							repo_path = Path(repo_path_str).expanduser()
 				except Exception as e:
-					print(f"⚠ Could not read repo_path from config: {e}", file=sys.stderr, flush=True)
+					print(f"⚠ Could not read repo.path from config: {e}", file=sys.stderr, flush=True)
 
 			if not repo_path.exists():
 				print(f"✗ Repo path does not exist: {repo_path}", file=sys.stderr, flush=True)

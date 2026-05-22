@@ -1,5 +1,5 @@
-update:
-  repo_path: "${CRESUS_REPO_PATH:}"  # Path to git repository for updates (empty = use installation dir)
+repo:
+  path: "${CRESUS_REPO_PATH:}"  # Path to git repository for updates (empty = use installation dir)
 
 servers:
   api:
@@ -26,3 +26,4 @@ db:
 gsheet:
   credentials_path: "~/.config/cresus/gsheet_credentials.json"
   token_path: "~/.config/cresus/gsheet_token.json"
+
