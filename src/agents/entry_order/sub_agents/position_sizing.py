@@ -13,6 +13,11 @@ class PositionSizingAgent(Agent):
 
 	Uses portfolio metrics and risk tolerance to determine shares/contracts
 	for each trade based on selected sizing method.
+
+	Supports three sizing approaches:
+	- formula: Legacy formula-based sizing (backwards compatible)
+	- capital: Fixed capital per position (e.g., €5,000)
+	- quantity: Fixed share quantity per position (e.g., 100 shares)
 	"""
 
 	def __init__(self, name: str = "PositionSizingAgent", sizing_method: str = "fractional", risk_percent: float = 2.0):
@@ -30,7 +35,7 @@ class PositionSizingAgent(Agent):
 	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
 		"""Calculate position sizes for entry recommendations.
 
-		Uses strategy config position_size formula if available, otherwise
+		Uses strategy config position_sizing if available, otherwise
 		falls back to portfolio-based sizing methods.
 
 		Args:
@@ -54,9 +59,9 @@ class PositionSizingAgent(Agent):
 				"message": "No entry recommendations to size"
 			}
 
-		# Try to load strategy config for position sizing formula
+		# Try to load strategy config for position sizing
 		strategy_name = self.context.get("strategy_name") if self.context else None
-		position_size_formula = None
+		position_sizing_config = None
 
 		if strategy_name:
 			try:
@@ -65,10 +70,14 @@ class PositionSizingAgent(Agent):
 				if strategy_result.get("status") == "success":
 					strategy_data = strategy_result.get("data", {})
 					entry_config = strategy_data.get("entry", {}).get("parameters", {})
-					if "position_size" in entry_config:
-						position_size_formula = entry_config["position_size"].get("formula")
-						if position_size_formula:
-							self.logger.info(f"Using position_size formula from strategy: {position_size_formula}")
+					if "position_sizing" in entry_config:
+						position_sizing_config = entry_config["position_sizing"]
+						if position_sizing_config:
+							self.logger.info(f"Using position_sizing config from strategy: {position_sizing_config}")
+					elif "position_size" in entry_config:
+						# Backward compatibility: legacy formula-based sizing
+						position_sizing_config = {"type": "formula", "formula": entry_config["position_size"].get("formula")}
+						self.logger.info(f"Using legacy position_size formula: {position_sizing_config['formula']}")
 			except Exception as e:
 				self.logger.debug(f"Could not load strategy config: {e}")
 
@@ -119,17 +128,39 @@ class PositionSizingAgent(Agent):
 					self.logger.debug(f"{ticker}: Cannot convert current_price to float, skipping")
 					continue
 
-				# Try to calculate position size from strategy config formula first
+				# Calculate position size based on config type
 				shares = None
-				if position_size_formula:
-					data_context = {"close": current_price}
-					shares = evaluate_position_size(
-						position_size_formula, data_context, max_shares=None
-					)
-					if shares and shares > 0:
-						self.logger.debug(f"{ticker}: Using formula-based shares={shares}")
+				sizing_method_used = self.sizing_method
 
-				# Fall back to portfolio-based sizing if formula didn't work
+				if position_sizing_config:
+					sizing_type = position_sizing_config.get("type", "formula")
+
+					if sizing_type == "capital":
+						# Capital-based sizing: shares = capital / current_price
+						capital = position_sizing_config.get("value")
+						if capital and capital > 0:
+							shares = capital / current_price
+							sizing_method_used = f"capital ({capital})"
+							self.logger.debug(f"{ticker}: Capital-based sizing: {capital} / {current_price:.2f} = {shares:.0f} shares")
+
+					elif sizing_type == "quantity":
+						# Quantity-based sizing: use value directly as shares
+						shares = position_sizing_config.get("value")
+						if shares and shares > 0:
+							sizing_method_used = f"quantity ({shares})"
+							self.logger.debug(f"{ticker}: Quantity-based sizing: {shares} shares")
+
+					elif sizing_type == "formula":
+						# Legacy formula-based sizing
+						formula = position_sizing_config.get("formula")
+						if formula:
+							data_context = {"close": current_price}
+							shares = evaluate_position_size(formula, data_context, max_shares=None)
+							if shares and shares > 0:
+								sizing_method_used = "formula"
+								self.logger.debug(f"{ticker}: Formula-based sizing: {shares} shares")
+
+				# Fall back to portfolio-based sizing if no config or config didn't work
 				if not shares or shares <= 0:
 					# Calculate position size based on method
 					if self.sizing_method == "fractional":
@@ -154,7 +185,7 @@ class PositionSizingAgent(Agent):
 							"entry_price": entry_price,
 							"order_value": shares_int * current_price,
 							"risk_amount": abs(shares_int * (entry_price - stop_loss)),
-							"sizing_method": "strategy_config" if position_size_formula else self.sizing_method,
+							"sizing_method": sizing_method_used,
 						})
 					except (ValueError, TypeError, OverflowError) as e:
 						self.logger.debug(f"{ticker}: Failed to convert shares to int: {e}, skipping")
@@ -192,7 +223,7 @@ class PositionSizingAgent(Agent):
 			Number of shares to trade
 		"""
 		import math
-		
+
 		# Validate inputs
 		if math.isnan(current_price) or math.isnan(entry_price) or math.isnan(stop_loss):
 			return 0
@@ -200,7 +231,7 @@ class PositionSizingAgent(Agent):
 			return 0
 		if current_price <= 0 or cash <= 0:
 			return 0
-			
+
 		risk_amount = cash * (self.risk_percent / 100.0)
 		price_risk = abs(entry_price - stop_loss)
 
@@ -233,7 +264,7 @@ class PositionSizingAgent(Agent):
 			Number of shares to trade
 		"""
 		import math
-		
+
 		# Validate inputs
 		if math.isnan(current_price) or math.isnan(rr_ratio) or math.isnan(win_rate):
 			return 0
@@ -241,7 +272,7 @@ class PositionSizingAgent(Agent):
 			return 0
 		if current_price <= 0 or cash <= 0:
 			return 0
-			
+
 		if rr_ratio <= 0 or win_rate <= 0:
 			return 0
 
@@ -275,7 +306,7 @@ class PositionSizingAgent(Agent):
 			Number of shares to trade
 		"""
 		import math
-		
+
 		# Validate inputs
 		if math.isnan(current_price) or math.isnan(volatility):
 			return 0
@@ -283,7 +314,7 @@ class PositionSizingAgent(Agent):
 			return 0
 		if current_price <= 0 or cash <= 0:
 			return 0
-			
+
 		# Adjust risk percent inversely with volatility
 		base_risk = self.risk_percent / 100.0
 		adjusted_risk = base_risk / (1 + volatility * 10)
