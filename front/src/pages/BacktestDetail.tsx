@@ -444,20 +444,20 @@ export default function BacktestDetail() {
           <div className="bg-slate-800/50 rounded p-4 border border-slate-700">
             <div className="text-slate-500 text-xs mb-1">Return</div>
             <div className={`text-2xl font-bold ${
-              (realtimeMetrics?.total_return_pct || 0) >= 0 ? 'text-green-400' : 'text-red-400'
+              ((realtimeMetrics?.total_return_pct ?? response?.metrics?.total_return_pct) || 0) >= 0 ? 'text-green-400' : 'text-red-400'
             }`}>
-              {(realtimeMetrics?.total_return_pct || 0).toFixed(1)}%
+              {((realtimeMetrics?.total_return_pct ?? response?.metrics?.total_return_pct) || 0).toFixed(1)}%
             </div>
           </div>
           <div className="bg-slate-800/50 rounded p-4 border border-slate-700">
             <div className="text-slate-500 text-xs mb-1">Drawdown</div>
             <div className="text-2xl font-bold text-red-400">
-              {(realtimeMetrics?.max_drawdown_pct || 0).toFixed(1)}%
+              {((realtimeMetrics?.max_drawdown_pct ?? response?.metrics?.max_drawdown_pct) || 0).toFixed(1)}%
             </div>
           </div>
           <div className="bg-slate-800/50 rounded p-4 border border-slate-700">
             <div className="text-slate-500 text-xs mb-1">Days</div>
-            <div className="text-2xl font-bold text-white">{daysProcessed}</div>
+            <div className="text-2xl font-bold text-white">{daysProcessed || response?.metrics?.period_days || 0}</div>
           </div>
         </div>
 
