@@ -78,7 +78,14 @@ class BacktestManager:
 
 		result = self._load_backtest_summary(strategy_name, backtest_id)
 		if not result:
-			return {"status": "error", "message": "Failed to load backtest"}
+			# Backtest is running in memory - return minimal response indicating it's processing
+			return {
+				"status": "success",
+				"backtest_id": backtest_id,
+				"strategy_name": strategy_name,
+				"data": {},
+				"message": "Backtest in progress - results not finalized yet"
+			}
 
 		# Load full metrics from metrics.json, or calculate from portfolio history
 		metrics_file = backtest_dir / "metrics.json"
@@ -669,7 +676,13 @@ class BacktestManager:
 		# Load equity curve (already calculated by BacktestAgent)
 		equity_curve = self._compute_equity_curve(strategy_name, backtest_id)
 		if not equity_curve:
-			return {"status": "error", "message": "No equity curve data available"}
+			# Return empty history while backtest is in progress
+			return {
+				"status": "success",
+				"history": [],
+				"max_drawdown_pct": 0,
+				"message": "Backtest in progress - data not available yet"
+			}
 
 		# Get initial capital from metrics.json
 		initial_capital = 10000.0  # default

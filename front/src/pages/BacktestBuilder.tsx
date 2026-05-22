@@ -68,8 +68,8 @@ export default function BacktestBuilder() {
       })
 
       if (response.backtest_id) {
-        // Navigate directly to detail page
-        navigate(`/backtests/${strategy}/${response.backtest_id}`)
+        // Navigate to /running view while backtest executes
+        navigate(`/backtests/${strategy}/${response.backtest_id}/running`)
       }
     } catch (err) {
       console.error('Failed to start backtest:', err)

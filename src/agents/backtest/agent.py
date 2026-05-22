@@ -128,6 +128,46 @@ class BacktestAgent(Agent):
 		"""
 		self.post_market_flow = flow
 
+	def _calculate_daily_metrics(self, portfolio_name: str, current_date: date, start_date: date, initial_capital: float = 100000.0) -> Dict[str, Any]:
+		"""Calculate daily metrics snapshot for WebSocket broadcast.
+
+		Args:
+			portfolio_name: Portfolio name
+			current_date: Current date for metrics calculation
+			start_date: Start date of backtest
+			initial_capital: Initial capital amount
+
+		Returns:
+			Dict with daily metrics (total_return_pct, trades, etc.)
+		"""
+		try:
+			metrics = PortfolioMetrics(context=self.context.__dict__)
+			metrics_result = metrics.calculate_backtest_metrics(
+				portfolio_name,
+				start_date=start_date.isoformat(),
+				end_date=current_date.isoformat(),
+				start_value=initial_capital
+			)
+
+			if not metrics_result:
+				return {"date": current_date.isoformat()}
+
+			# Extract key metrics for broadcast
+			return {
+				"date": current_date.isoformat(),
+				"total_return_pct": metrics_result.get("total_return_pct", 0.0),
+				"portfolio_value": metrics_result.get("end_value", initial_capital),
+				"total_trades": metrics_result.get("total_trades", 0),
+				"closed_trades": metrics_result.get("closed_trades", 0),
+				"win_rate_pct": metrics_result.get("win_rate_pct", 0.0),
+				"sharpe_ratio": metrics_result.get("sharpe_ratio", 0.0),
+				"max_drawdown_pct": metrics_result.get("max_drawdown_pct", 0.0),
+				"calmar_ratio": metrics_result.get("calmar_ratio", 0.0),
+			}
+		except Exception as e:
+			self.logger.debug(f"Failed to calculate daily metrics: {str(e)}")
+			return {"date": current_date.isoformat()}
+
 	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
 		"""Execute backtest loop over trading days.
 
@@ -337,7 +377,8 @@ class BacktestAgent(Agent):
 			except Exception as e:
 				self.logger.warning(f"Failed to flush journal/orders for {portfolio_name}: {str(e)}")
 
-			daily_result = {"date": next_date.isoformat()}
+			# Calculate daily metrics for this date
+			daily_result = self._calculate_daily_metrics(portfolio_name, next_date, start_date, initial_capital=100000.0)
 			backtest["daily_results"].append(daily_result)
 
 			# Broadcast daily progress to WebSocket clients

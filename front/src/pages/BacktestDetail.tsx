@@ -25,6 +25,13 @@ export default function BacktestDetail() {
   const [daysProcessed, setDaysProcessed] = useState(0)
   const [totalDays, setTotalDays] = useState(0)
 
+  // WebSocket connection for real-time updates (must be declared before useEffects that use lastMessage)
+  const { isConnected, lastMessage } = useBacktestWebSocket({
+    backtest_id: runId || '',
+    strategy_name: strategy || '',
+    enabled: !!runId && !!strategy,
+  })
+
   // Tab state - read from URL path param
   const [activeTab, setActiveTab] = useState<'performance' | 'distribution' | 'transactions' | 'trades' | 'watchlist'>('performance')
   const [transactionSort, setTransactionSort] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'entry_date', direction: 'desc' })
@@ -48,6 +55,16 @@ export default function BacktestDetail() {
       setActiveTab(tabParam as 'performance' | 'distribution' | 'transactions' | 'trades' | 'watchlist')
     }
   }, [tabParam])
+
+  // Update URL based on backtest completion
+  useEffect(() => {
+    if (!strategy || !runId) return
+
+    // Only redirect when we explicitly receive backtest_complete message
+    if (lastMessage?.type === 'backtest_complete' && tabParam === 'running') {
+      navigate(`/backtests/${strategy}/${runId}`, { replace: true })
+    }
+  }, [strategy, runId, tabParam, lastMessage, navigate])
 
   const handleTabChange = (tab: 'performance' | 'distribution' | 'transactions' | 'trades' | 'watchlist') => {
     navigate(`/backtests/${strategy}/${runId}/${tab}`)
@@ -178,13 +195,6 @@ export default function BacktestDetail() {
   // Distribution data - declare early for dependency arrays
   const { data: distributionResponse, isLoading: distLoading, error: distError } = useBacktestDistribution(strategy || '', runId || '')
 
-  // WebSocket connection for real-time updates
-  const { isConnected, lastMessage } = useBacktestWebSocket({
-    backtest_id: runId || '',
-    strategy_name: strategy || '',
-    enabled: !!runId && !!strategy,
-  })
-
   // Debug distribution response
   useEffect(() => {
     console.log('=== DISTRIBUTION DEBUG ===')
@@ -244,9 +254,13 @@ export default function BacktestDetail() {
         setDaysProcessed(lastMessage.data.days_processed || daysProcessed)
         setTotalDays(lastMessage.data.days_processed || daysProcessed)
         // Refetch backtest data to show full dashboard with tabs
-        refetch()
+        setTimeout(() => refetch(), 500)
       } else if (lastMessage.type === 'daily_results') {
         setIsRunning(true)
+        // Extract metrics from daily results (they're in data.results)
+        if (lastMessage.data?.results) {
+          setRealtimeMetrics(lastMessage.data.results)
+        }
         setDaysProcessed(prev => {
           const newCount = prev + 1
           const newPercentage = totalDays > 0 ? Math.round((newCount / totalDays) * 100) : Math.min((prev / Math.max(1, prev + 1)) * 100 + 5, 95)
@@ -412,76 +426,6 @@ export default function BacktestDetail() {
     )
   }
 
-  // Show running view if no backtest data yet AND either running or just connected
-  if (!backtest && (isRunning || (isConnected && !response))) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-baseline justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-white">{strategy}</h1>
-            <p className="text-xs text-slate-500 font-mono">{runId}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="px-3 py-1 bg-blue-900/30 border border-blue-800 rounded text-blue-400 text-xs font-medium">
-              🔄 Running
-            </div>
-            <Link to="/backtests" className="text-slate-400 hover:text-slate-300 text-xs">
-              Back
-            </Link>
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden border border-slate-700">
-            <div
-              className="h-full bg-gradient-to-r from-purple-600 to-violet-600 transition-all duration-300"
-              style={{ width: `${progress.percentage}%` }}
-            />
-          </div>
-          <div className="text-center text-slate-400 text-xs">
-            {Math.round(progress.percentage)}% {daysProcessed > 0 && totalDays > 0 && `(${daysProcessed}/${totalDays})`}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-3">
-          <div className="bg-slate-800/50 rounded p-4 border border-slate-700">
-            <div className="text-slate-500 text-xs mb-1">Return</div>
-            <div className={`text-2xl font-bold ${
-              ((realtimeMetrics?.total_return_pct ?? response?.metrics?.total_return_pct) || 0) >= 0 ? 'text-green-400' : 'text-red-400'
-            }`}>
-              {((realtimeMetrics?.total_return_pct ?? response?.metrics?.total_return_pct) || 0).toFixed(1)}%
-            </div>
-          </div>
-          <div className="bg-slate-800/50 rounded p-4 border border-slate-700">
-            <div className="text-slate-500 text-xs mb-1">Drawdown</div>
-            <div className="text-2xl font-bold text-red-400">
-              {((realtimeMetrics?.max_drawdown_pct ?? response?.metrics?.max_drawdown_pct) || 0).toFixed(1)}%
-            </div>
-          </div>
-          <div className="bg-slate-800/50 rounded p-4 border border-slate-700">
-            <div className="text-slate-500 text-xs mb-1">Days</div>
-            <div className="text-2xl font-bold text-white">{daysProcessed || response?.metrics?.period_days || 0}</div>
-          </div>
-        </div>
-
-        {realtimeEquity.length > 0 && (
-          <div className="bg-slate-900/50 rounded p-6 border border-slate-800">
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={realtimeEquity} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.2} />
-                  <XAxis dataKey="date" stroke="#94a3b8" style={{ fontSize: '11px' }} />
-                  <YAxis stroke="#94a3b8" style={{ fontSize: '11px' }} />
-                  <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '6px' }} />
-                  <Line type="monotone" dataKey="value" stroke="#a78bfa" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        )}
-      </div>
-    )
-  }
 
   // Use real-time metrics first, then portfolio_metrics, then fallback to top-level metrics from API
   // Build metrics from available sources
@@ -520,6 +464,48 @@ export default function BacktestDetail() {
     </div>
   )
 
+  // Calculate monthly returns matrix
+  const calculateMonthlyReturns = () => {
+    const monthlyData: { [key: string]: { [key: number]: number } } = {}
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+    if (equity.length < 2) return { monthlyData: {}, monthNames, years: [] }
+
+    // Group by year-month
+    const yearMonthMap: { [key: string]: { start: number; end: number } } = {}
+    let prevDate: string | null = null
+    let prevValue = equity[0].value
+
+    for (let i = 1; i < equity.length; i++) {
+      const point = equity[i]
+      const date = new Date(point.date)
+      const yearMonth = `${date.getFullYear()}-${String(date.getMonth()).padStart(2, '0')}`
+
+      if (!yearMonthMap[yearMonth]) {
+        yearMonthMap[yearMonth] = { start: prevValue, end: point.value }
+      }
+      yearMonthMap[yearMonth].end = point.value
+      prevValue = point.value
+    }
+
+    // Convert to matrix format
+    const years = new Set<number>()
+    const months: { [key: number]: { [key: number]: number } } = {}
+
+    Object.entries(yearMonthMap).forEach(([yearMonth, { start, end }]) => {
+      const [year, month] = yearMonth.split('-').map(Number)
+      years.add(year)
+
+      if (!months[month]) months[month] = {}
+      const ret = ((end - start) / start) * 100
+      months[month][year] = ret
+    })
+
+    return { monthlyData: months, monthNames, years: Array.from(years).sort() }
+  }
+
+  const { monthlyData: monthlyReturns, monthNames, years: yearList } = calculateMonthlyReturns()
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -547,16 +533,16 @@ export default function BacktestDetail() {
       </div>
 
       {/* Progress Bar */}
-      {isRunning && (
+      {(isRunning || tabParam === 'running') && (
         <div className="space-y-2">
           <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden border border-slate-700">
             <div
               className="h-full bg-gradient-to-r from-purple-600 to-violet-600 transition-all duration-300"
-              style={{ width: `${progress.percentage}%` }}
+              style={{ width: `${progress.percentage || 5}%` }}
             />
           </div>
           <div className="text-center text-slate-400 text-xs">
-            {Math.round(progress.percentage)}% {daysProcessed > 0 && totalDays > 0 && `(${daysProcessed}/${totalDays} days)`}
+            {Math.round(progress.percentage || 5)}% {daysProcessed > 0 && totalDays > 0 && `(${daysProcessed}/${totalDays} days)`}
           </div>
         </div>
       )}
@@ -719,6 +705,46 @@ export default function BacktestDetail() {
             </div>
             </div>
           </div>
+
+          {/* Monthly Returns Matrix */}
+          {yearList.length > 0 && (
+            <div className="bg-slate-900/50 rounded-lg p-6 border border-slate-800 shadow-lg">
+              <h2 className="text-sm font-bold text-white mb-4">MONTHLY RETURNS (%)</h2>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-slate-300">
+                  <thead>
+                    <tr className="border-b border-slate-700">
+                      <th className="px-2 py-2 text-left text-slate-400">Month</th>
+                      {yearList.map(year => (
+                        <th key={year} className="px-2 py-2 text-right text-slate-400">{year}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {monthNames.map((month, idx) => (
+                      <tr key={idx} className="border-b border-slate-700">
+                        <td className="px-2 py-2 text-slate-400 font-medium">{month}</td>
+                        {yearList.map(year => {
+                          const value = monthlyReturns[idx]?.[year]
+                          return (
+                            <td
+                              key={`${idx}-${year}`}
+                              className={`px-2 py-2 text-right font-mono ${
+                                value === undefined ? 'text-slate-600' :
+                                value >= 0 ? 'text-green-400 bg-green-950/20' : 'text-red-400 bg-red-950/20'
+                              }`}
+                            >
+                              {value !== undefined ? `${value.toFixed(2)}%` : '-'}
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* Distribution Section */}
           <div>

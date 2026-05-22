@@ -320,6 +320,7 @@ class TrainAgent(Agent):
 			"num_leaves": 31,
 			"learning_rate": 0.05,
 			"verbose": -1,
+			"random_state": 42,
 		}
 
 		# Walk-forward loop
@@ -414,6 +415,7 @@ class TrainAgent(Agent):
 			"num_leaves": 31,
 			"learning_rate": 0.05,
 			"verbose": -1,
+			"random_state": 42,
 		}
 
 		train_data = lgb.Dataset(X, label=y)

@@ -98,6 +98,7 @@ class TrainDiagnostic(Agent):
 			"num_leaves": 31,
 			"learning_rate": 0.05,
 			"verbose": -1,
+			"random_state": 42,
 		}
 
 		try:

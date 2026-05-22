@@ -2,7 +2,6 @@
 
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional, Dict, Any
-from functools import lru_cache
 import sys
 import threading
 from pathlib import Path
@@ -20,21 +19,18 @@ from tools.portfolio.portfolio_distribution import PortfolioDistribution
 router = APIRouter(prefix="/backtests", tags=["backtests"])
 
 
-@lru_cache(maxsize=1)
 def _get_backtest_manager() -> BacktestManager:
-	"""Get cached BacktestManager instance."""
+	"""Get BacktestManager instance."""
 	return BacktestManager()
 
 
-@lru_cache(maxsize=1)
 def _get_strategy_manager() -> StrategyManager:
-	"""Get cached StrategyManager instance."""
+	"""Get StrategyManager instance."""
 	return StrategyManager()
 
 
-@lru_cache(maxsize=1)
 def _get_backtest_flow() -> BacktestFlow:
-	"""Get cached BacktestFlow instance."""
+	"""Get fresh BacktestFlow instance for each backtest."""
 	return BacktestFlow()
 
 
@@ -56,26 +52,6 @@ async def list_backtests(strategy: Optional[str] = Query(None)) -> Dict[str, Any
 		"backtests": backtests,
 		"total": len(backtests),
 	}
-
-
-@router.get("/{strategy_name}/{backtest_id}")
-async def get_backtest(strategy_name: str, backtest_id: str) -> Dict[str, Any]:
-	"""Get detailed backtest results.
-
-	Args:
-		strategy_name: Strategy name
-		backtest_id: Backtest ID
-
-	Returns:
-		Detailed backtest data
-	"""
-	manager = _get_backtest_manager()
-	result = manager.get_backtest(strategy_name, backtest_id)
-
-	if result.get("status") != "success":
-		raise HTTPException(status_code=404, detail=result.get("message", "Not found"))
-
-	return result
 
 
 @router.post("")
@@ -296,7 +272,18 @@ async def get_backtest_distribution(strategy_name: str, backtest_id: str) -> Dic
 		calc_result = distributor.calculate()
 
 		if calc_result.get("status") != "success":
-			raise HTTPException(status_code=400, detail=calc_result.get("message"))
+			# Return empty distribution while backtest is in progress
+			return {
+				"status": "success",
+				"data": {
+					"strategy_name": strategy_name,
+					"backtest_id": backtest_id,
+					"distribution": [],
+					"statistics": {},
+					"trades": [],
+					"message": "Backtest in progress - distribution not available yet"
+				}
+			}
 
 		# Return in same format as other backtest endpoints
 		return {
@@ -462,3 +449,26 @@ async def regenerate_backtest_watchlist(strategy_name: str, backtest_id: str) ->
 		logger = logging.getLogger(__name__)
 		logger.error(f"Error loading watchlist: {str(e)}", exc_info=True)
 		raise HTTPException(status_code=500, detail=f"Error loading watchlist: {str(e)}")
+
+
+@router.get("/{strategy_name}/{backtest_id}")
+async def get_backtest(strategy_name: str, backtest_id: str) -> Dict[str, Any]:
+	"""Get detailed backtest results.
+
+	NOTE: This is a catch-all route and MUST be last in the router definition
+	to allow more specific sub-routes like /history, /metrics, /distribution to match first.
+
+	Args:
+		strategy_name: Strategy name
+		backtest_id: Backtest ID
+
+	Returns:
+		Detailed backtest data
+	"""
+	manager = _get_backtest_manager()
+	result = manager.get_backtest(strategy_name, backtest_id)
+
+	if result.get("status") != "success":
+		raise HTTPException(status_code=404, detail=result.get("message", "Not found"))
+
+	return result
