@@ -520,15 +520,6 @@ export default function BacktestDetail() {
 
   const { monthlyData: monthlyReturns, monthNames, years: yearList } = calculateMonthlyReturns()
 
-  // Debug: log chart data
-  useEffect(() => {
-    const chartData = monthNames.map((month, idx) => ({
-      month,
-      ...Object.fromEntries(yearList.map(year => [year.toString(), monthlyReturns[idx]?.[year] ?? null]))
-    }))
-    console.log('Chart data:', chartData)
-  }, [monthlyReturns, monthNames, yearList])
-
   return (
     <div className="space-y-4">
       {/* Header */}
