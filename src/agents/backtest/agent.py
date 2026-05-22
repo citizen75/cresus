@@ -467,8 +467,9 @@ class BacktestAgent(Agent):
 					date=next_date.isoformat(),
 					daily_results=daily_result
 				)
+				self.logger.debug(f"Broadcast daily_results for {next_date}: {len(daily_result)} metrics")
 			except Exception as e:
-				self.logger.debug(f"WebSocket broadcast failed: {str(e)}")
+				self.logger.error(f"WebSocket broadcast failed: {str(e)}", exc_info=True)
 
 		backtest["days_processed"] = len(backtest["daily_results"])
 		self.logger.info(f"Backtest completed: {backtest['days_processed']} days processed")
