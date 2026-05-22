@@ -506,6 +506,11 @@ export default function BacktestDetail() {
       months[monthIdx][year] = ret
     }
 
+    // Debug: log October, November, December for verification
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Oct (idx=9):', months[9], 'Nov (idx=10):', months[10], 'Dec (idx=11):', months[11])
+    }
+
     return { monthlyData: months, monthNames, years: Array.from(years).sort() }
   }
 
