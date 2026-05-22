@@ -1010,16 +1010,47 @@ class CresusCLI(cmd2.Cmd):
 		"""Update cresus from git repository."""
 		import subprocess
 		import sys
+		from pathlib import Path
+		import yaml
+		import os
 
 		print("Updating cresus from git repository...", flush=True)
 
 		try:
+			# Determine repo path: check config first, then use project_root
+			repo_path = self.project_root
+
+			# Try to load repo_path from cresus.yml
+			config_file = self.project_root / "config" / "cresus.yml"
+			if not config_file.exists():
+				config_file = Path.home() / ".cresus" / "config" / "cresus.yml"
+
+			if config_file.exists():
+				try:
+					with open(config_file) as f:
+						config = yaml.safe_load(f) or {}
+						repo_path_str = config.get("update", {}).get("repo_path", "")
+
+						# Expand environment variables
+						if repo_path_str:
+							repo_path_str = os.path.expandvars(repo_path_str)
+
+						if repo_path_str:
+							repo_path = Path(repo_path_str).expanduser()
+				except Exception as e:
+					print(f"⚠ Could not read repo_path from config: {e}", file=sys.stderr, flush=True)
+
+			if not repo_path.exists():
+				print(f"✗ Repo path does not exist: {repo_path}", file=sys.stderr, flush=True)
+				return
+
+			print(f"▸ Using repo path: {repo_path}", flush=True)
 			print("▸ Checking remote for updates...", flush=True)
 
 			# Fetch
 			fetch_result = subprocess.run(
 				["git", "fetch"],
-				cwd=str(self.project_root),
+				cwd=str(repo_path),
 				timeout=30
 			)
 
@@ -1032,7 +1063,7 @@ class CresusCLI(cmd2.Cmd):
 			# Check how many commits to pull
 			log_result = subprocess.run(
 				["git", "log", "--oneline", "--decorate", "HEAD..@{u}"],
-				cwd=str(self.project_root),
+				cwd=str(repo_path),
 				capture_output=True,
 				text=True,
 				timeout=10
@@ -1051,7 +1082,7 @@ class CresusCLI(cmd2.Cmd):
 			# Execute pull
 			pull_result = subprocess.run(
 				["git", "pull"],
-				cwd=str(self.project_root),
+				cwd=str(repo_path),
 				timeout=60
 			)
 

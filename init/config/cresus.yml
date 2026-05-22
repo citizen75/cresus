@@ -1,3 +1,6 @@
+update:
+  repo_path: "${CRESUS_REPO_PATH:}"  # Path to git repository for updates (empty = use installation dir)
+
 servers:
   api:
     host: "${API_HOST:127.0.0.1}"     # Set via API_HOST env var
