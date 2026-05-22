@@ -11,7 +11,6 @@ class InitManager:
     Syncs ~/.cresus/config/cresus.yml with init/config/cresus.yml template:
     - Preserves user values
     - Adds new keys from template
-    - Comments out keys removed from template
     """
 
     def __init__(self, project_root: Optional[Path] = None):
@@ -44,6 +43,8 @@ class InitManager:
     def sync_config(self) -> Dict[str, Any]:
         """Sync user config with template.
 
+        Reads YAML template, merges with YAML user config.
+
         Returns:
             Result dict with status and details
         """
@@ -53,19 +54,24 @@ class InitManager:
                 "message": f"Template not found: {self.template_path}"
             }
 
-        # Load template and user config
+        # Load template from YAML
         with open(self.template_path) as f:
             template = yaml.safe_load(f) or {}
 
+        # Load user config from YAML (if exists)
         user_config = {}
         if self.user_config_path.exists():
-            with open(self.user_config_path) as f:
-                user_config = yaml.safe_load(f) or {}
+            try:
+                with open(self.user_config_path) as f:
+                    user_config = yaml.safe_load(f) or {}
+            except yaml.YAMLError:
+                # If YAML is invalid, start fresh
+                user_config = {}
 
         # Merge configs
         merged = self._merge_configs(template, user_config)
 
-        # Save merged config
+        # Save merged config as YAML
         self.user_config_dir.mkdir(parents=True, exist_ok=True)
         with open(self.user_config_path, "w") as f:
             yaml.dump(merged, f, default_flow_style=False, sort_keys=False)
