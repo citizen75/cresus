@@ -14,8 +14,8 @@ export default function BacktestBuilder() {
   useEffect(() => {
     // Set default date range (1 full year back)
     const currentYear = new Date().getFullYear()
-    const start = new Date(currentYear - 1, 0, 1)
-    const end = new Date(currentYear - 1, 11, 31)
+    const start = new Date(Date.UTC(currentYear - 1, 0, 1))
+    const end = new Date(Date.UTC(currentYear - 1, 11, 31))
 
     setStartDate(start.toISOString().split('T')[0])
     setEndDate(end.toISOString().split('T')[0])
@@ -36,8 +36,8 @@ export default function BacktestBuilder() {
 
   const handleQuickDate = (years: number) => {
     const currentYear = new Date().getFullYear()
-    const start = new Date(currentYear - years, 0, 1)
-    const end = new Date(currentYear - 1, 11, 31)
+    const start = new Date(Date.UTC(currentYear - years, 0, 1))
+    const end = new Date(Date.UTC(currentYear - 1, 11, 31))
     setStartDate(start.toISOString().split('T')[0])
     setEndDate(end.toISOString().split('T')[0])
   }
@@ -45,9 +45,10 @@ export default function BacktestBuilder() {
   const handleYTD = () => {
     const today = new Date()
     const currentYear = today.getFullYear()
-    const start = new Date(currentYear, 0, 1)
+    const start = new Date(Date.UTC(currentYear, 0, 1))
+    const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()))
     setStartDate(start.toISOString().split('T')[0])
-    setEndDate(today.toISOString().split('T')[0])
+    setEndDate(todayUTC.toISOString().split('T')[0])
   }
 
   const handleSubmit = async () => {
