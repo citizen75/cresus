@@ -511,10 +511,6 @@ export default function BacktestDetail() {
       }
     })
 
-    // Debug: log months object
-    console.log('calculateMonthlyReturns - months object:', months)
-    console.log('calculateMonthlyReturns - years:', Array.from(years).sort())
-
     return { monthlyData: months, monthNames, years: Array.from(years).sort() }
   }
 
