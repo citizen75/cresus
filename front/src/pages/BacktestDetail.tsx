@@ -474,42 +474,37 @@ export default function BacktestDetail() {
 
     if (equity.length < 2) return { monthlyData: {}, monthNames, years: [] }
 
-    // Group by year-month with start of month value
-    const monthlyValues: { [key: string]: { dates: string[]; values: number[] } } = {}
+    // Initialize data structures
+    type MonthlyData = { [year: number]: number }
+    const months: MonthlyData[] = Array(12).fill(null).map(() => ({}))
+    const years = new Set<number>()
+
+    // Process equity curve
+    const byYearMonth: { [key: string]: { first: number; last: number } } = {}
 
     for (const point of equity) {
       const date = new Date(point.date)
-      const yearMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+      const year = date.getFullYear()
+      const month = date.getMonth() + 1 // 1-12
+      const key = `${year}-${month}`
 
-      if (!monthlyValues[yearMonth]) {
-        monthlyValues[yearMonth] = { dates: [], values: [] }
+      if (!byYearMonth[key]) {
+        byYearMonth[key] = { first: point.value, last: point.value }
       }
-      monthlyValues[yearMonth].dates.push(point.date)
-      monthlyValues[yearMonth].values.push(point.value)
+      byYearMonth[key].last = point.value
+      years.add(year)
     }
 
-    // Convert to matrix format (month indexed 0-11, year as key)
-    const years = new Set<number>()
-    const months: { [key: number]: { [key: number]: number } } = {}
+    // Calculate monthly returns
+    for (const [key, data] of Object.entries(byYearMonth)) {
+      const [yearStr, monthStr] = key.split('-')
+      const year = parseInt(yearStr)
+      const month = parseInt(monthStr)
+      const monthIdx = month - 1 // Convert to 0-11
 
-    Object.entries(monthlyValues).forEach(([yearMonth, { values }]) => {
-      const [year, monthStr] = yearMonth.split('-')
-      const yearNum = Number(year)
-      const monthIdx = Number(monthStr) - 1 // Convert to 0-11
-
-      years.add(yearNum)
-      if (!months[monthIdx]) months[monthIdx] = {}
-
-      // Calculate return from first to last value in month
-      if (values.length > 0) {
-        const start = values[0]
-        const end = values[values.length - 1]
-        const ret = start > 0 ? ((end - start) / start) * 100 : 0
-        months[monthIdx][yearNum] = ret
-      } else {
-        months[monthIdx][yearNum] = 0
-      }
-    })
+      const ret = data.first > 0 ? ((data.last - data.first) / data.first) * 100 : 0
+      months[monthIdx][year] = ret
+    }
 
     return { monthlyData: months, monthNames, years: Array.from(years).sort() }
   }
