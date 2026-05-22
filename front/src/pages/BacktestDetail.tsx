@@ -453,7 +453,8 @@ export default function BacktestDetail() {
       return point
     }
     const peak = Math.max(...baseEquity.slice(0, idx + 1).map((p: any) => p.value))
-    const drawdown = ((point.value - peak) / peak) * 100
+    // Drawdown as magnitude (positive number representing % below peak)
+    const drawdown = Math.abs((point.value - peak) / peak * 100)
     return { ...point, drawdown_pct: drawdown }
   })
 
