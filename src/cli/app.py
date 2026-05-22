@@ -1115,40 +1115,14 @@ class CresusCLI(cmd2.Cmd):
 				if pip_result.returncode == 0:
 					print("✓ Dependencies updated successfully", flush=True)
 
-					# Restart existing services
+					# Restart services using service manager
 					print("▸ Restarting services...", flush=True)
 					try:
-						# Get list of running services and restart them
-						restart_services = ["gateway", "api", "mcp", "front"]
-						restarted_count = 0
-
-						for service in restart_services:
-							# Check if service is running
-							ps_result = subprocess.run(
-								f"pgrep -f '{service}' > /dev/null 2>&1",
-								shell=True,
-								timeout=5
-							)
-
-							if ps_result.returncode == 0:  # Service is running
-								print(f"▸ Restarting {service}...", flush=True)
-								# Kill the service process
-								subprocess.run(
-									f"pkill -f '{service}' || true",
-									shell=True,
-									timeout=5
-								)
-								restarted_count += 1
-
-						if restarted_count > 0:
-							print(f"✓ Restarted {restarted_count} service(s)", flush=True)
-							print("[dim]Services will restart automatically when accessed[/dim]", flush=True)
-						else:
-							print("ℹ No running services to restart", flush=True)
+						self.service_manager.restart_services("all")
+						print("✓ Update completed successfully", flush=True)
 					except Exception as e:
 						print(f"⚠ Warning: Could not restart services: {e}", file=sys.stderr, flush=True)
-
-					print("✓ Update completed successfully", flush=True)
+						print("✓ Update completed (manual service restart may be needed)", flush=True)
 				else:
 					print(f"✗ Dependency update failed with exit code {pip_result.returncode}", file=sys.stderr, flush=True)
 			else:
