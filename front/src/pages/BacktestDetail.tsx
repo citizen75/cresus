@@ -500,18 +500,34 @@ export default function BacktestDetail() {
       years.add(yearNum)
       if (!months[monthIdx]) months[monthIdx] = {}
 
-      if (values.length >= 2) {
+      // Calculate return from first to last value in month
+      if (values.length > 0) {
         const start = values[0]
         const end = values[values.length - 1]
         const ret = start > 0 ? ((end - start) / start) * 100 : 0
         months[monthIdx][yearNum] = ret
+      } else {
+        months[monthIdx][yearNum] = 0
       }
     })
+
+    // Debug: log months object
+    console.log('calculateMonthlyReturns - months object:', months)
+    console.log('calculateMonthlyReturns - years:', Array.from(years).sort())
 
     return { monthlyData: months, monthNames, years: Array.from(years).sort() }
   }
 
   const { monthlyData: monthlyReturns, monthNames, years: yearList } = calculateMonthlyReturns()
+
+  // Debug: log chart data
+  useEffect(() => {
+    const chartData = monthNames.map((month, idx) => ({
+      month,
+      ...Object.fromEntries(yearList.map(year => [year.toString(), monthlyReturns[idx]?.[year] ?? null]))
+    }))
+    console.log('Chart data:', chartData)
+  }, [monthlyReturns, monthNames, yearList])
 
   return (
     <div className="space-y-4">
