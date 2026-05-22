@@ -42,6 +42,14 @@ export default function BacktestBuilder() {
     setEndDate(end.toISOString().split('T')[0])
   }
 
+  const handleYTD = () => {
+    const today = new Date()
+    const currentYear = today.getFullYear()
+    const start = new Date(currentYear, 0, 1)
+    setStartDate(start.toISOString().split('T')[0])
+    setEndDate(today.toISOString().split('T')[0])
+  }
+
   const handleSubmit = async () => {
     if (!strategy || !startDate || !endDate) {
       return
@@ -120,6 +128,12 @@ export default function BacktestBuilder() {
               <div>
                 <label className="block text-slate-400 text-sm font-medium mb-2">Quick Select</label>
                 <div className="flex gap-2">
+                  <button
+                    onClick={handleYTD}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition"
+                  >
+                    YTD
+                  </button>
                   {[1, 2, 5].map(years => (
                     <button
                       key={years}
