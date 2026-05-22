@@ -10,7 +10,7 @@ import CardChart from '@/components/CardChart'
 export default function BacktestDetail() {
   const { strategy, runId, tab: tabParam } = useParams<{ strategy: string; runId: string; tab?: string }>()
   const navigate = useNavigate()
-  const { data: response, isLoading, error } = useBacktestRun(strategy || '', runId || '')
+  const { data: response, isLoading, error, refetch } = useBacktestRun(strategy || '', runId || '')
 
   // Debug hook response
   useEffect(() => {
@@ -243,6 +243,8 @@ export default function BacktestDetail() {
         setRealtimeMetrics(lastMessage.data.metrics)
         setDaysProcessed(lastMessage.data.days_processed || daysProcessed)
         setTotalDays(lastMessage.data.days_processed || daysProcessed)
+        // Refetch backtest data to show full dashboard with tabs
+        refetch()
       } else if (lastMessage.type === 'daily_results') {
         setIsRunning(true)
         setDaysProcessed(prev => {
@@ -259,7 +261,7 @@ export default function BacktestDetail() {
         setIsRunning(false)
       }
     }
-  }, [lastMessage, totalDays])
+  }, [lastMessage, totalDays, refetch])
 
 
   // Fetch portfolio history with evolving metrics - only while running
