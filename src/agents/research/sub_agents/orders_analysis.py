@@ -207,8 +207,29 @@ class OrdersAnalysisAgent(Agent):
 		expected_size = None
 		if strategy_config:
 			entry_params = strategy_config.get("entry", {}).get("parameters", {})
-			pos_size_formula = entry_params.get("position_size", {}).get("formula", "")
-			expected_size = f"~1000 / price" if "1000" in pos_size_formula else None
+
+			# Check new position_sizing format first
+			if "position_sizing" in entry_params:
+				sizing_config = entry_params["position_sizing"]
+				if isinstance(sizing_config, dict):
+					sizing_type = sizing_config.get("type", "")
+					value = sizing_config.get("value", "")
+					if sizing_type == "capital":
+						expected_size = f"~{value} / price"
+					elif sizing_type == "quantity":
+						expected_size = f"{value} shares"
+					elif sizing_type == "formula" and "formula" in sizing_config:
+						formula = sizing_config.get("formula", "")
+						if isinstance(formula, str) and "1000" in formula:
+							expected_size = f"~1000 / price"
+
+			# Fall back to old position_size.formula format
+			if not expected_size and "position_size" in entry_params:
+				pos_size_obj = entry_params.get("position_size", {})
+				if isinstance(pos_size_obj, dict):
+					pos_size_formula = pos_size_obj.get("formula", "")
+					if isinstance(pos_size_formula, str) and "1000" in pos_size_formula:
+						expected_size = f"~1000 / price"
 
 		return {
 			"avg_buy_size": float(avg_buy_size),
