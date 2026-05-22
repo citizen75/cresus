@@ -671,8 +671,21 @@ class BacktestManager:
 		if not equity_curve:
 			return {"status": "error", "message": "No equity curve data available"}
 
+		# Get initial capital from metrics.json
+		initial_capital = 10000.0  # default
+		metrics_file = backtest_dir / "metrics.json"
+		if metrics_file.exists():
+			try:
+				import re
+				with open(metrics_file) as f:
+					text = f.read()
+					text = re.sub(r"\bNaN\b", "null", text)
+					metrics = json.loads(text)
+					initial_capital = metrics.get("start_value", 10000.0)
+			except Exception:
+				pass
+
 		# Calculate metrics at each point in time
-		initial_capital = 100000.0
 		history = []
 		peak_value = initial_capital
 		max_drawdown = 0.0
