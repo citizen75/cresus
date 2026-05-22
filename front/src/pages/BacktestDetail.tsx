@@ -475,8 +475,10 @@ export default function BacktestDetail() {
     if (equity.length < 2) return { monthlyData: {}, monthNames, years: [] }
 
     // Initialize data structures
-    type MonthlyData = { [year: number]: number }
-    const months: MonthlyData[] = Array(12).fill(null).map(() => ({}))
+    const months: { [year: number]: number }[] = []
+    for (let i = 0; i < 12; i++) {
+      months[i] = {}
+    }
     const years = new Set<number>()
 
     // Process equity curve
