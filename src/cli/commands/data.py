@@ -574,22 +574,49 @@ class DataCommands:
 
 		# Add alphas if available
 		if alphas:
+			# Keywords that indicate boolean/condition alphas
+			boolean_keywords = ('touch', 'breakout', 'confirmation', 'absorption', 'cluster', 'climax',
+							   'reversal', 'squeeze', 'expansion', 'signal', 'overbought', 'oversold',
+							   'contraction', 'single_print', 'above', 'below', 'uptrend')
+
 			for alpha_name, alpha_value in sorted(alphas.items()):
+				# Check if this is a boolean/condition alpha
+				is_boolean_alpha = any(keyword in alpha_name for keyword in boolean_keywords)
+
 				if isinstance(alpha_value, (int, float)):
-					if abs(alpha_value) >= 100 or alpha_name.startswith("vol"):
+					if is_boolean_alpha:
+						# Boolean alphas: show as 1/0 or label them
+						if alpha_value in (0.0, 1.0):
+							formatted = f"{int(alpha_value)}"
+						else:
+							formatted = f"{alpha_value:.4f}"
+					elif abs(alpha_value) >= 100 or alpha_name.startswith("vol"):
 						formatted = f"{alpha_value:.2f}"
 					elif alpha_name.startswith("rsi") or alpha_name.startswith("adx") or alpha_name.startswith("bb"):
 						formatted = f"{alpha_value:.4f}"
-					elif isinstance(alpha_value, bool) or alpha_value in (0, 1):
-						formatted = f"{int(alpha_value)}"
 					else:
 						formatted = f"{alpha_value:.4f}"
 				else:
 					formatted = str(alpha_value)
-				table.add_row(f"[dim]{alpha_name}[/dim]", f"[dim]{formatted}[/dim]")
+
+				# Use different styling for boolean alphas
+				if is_boolean_alpha:
+					table.add_row(f"[yellow]{alpha_name}[/yellow]", f"{formatted}")
+				else:
+					table.add_row(f"[dim]{alpha_name}[/dim]", f"[dim]{formatted}[/dim]")
 
 		console.print(table)
-		console.print(f"\n[dim]Total columns: {len(df.columns)}, Total rows: {len(df)}, Alphas shown: {len(alphas)}[/dim]")
+
+		# Count boolean vs numeric alphas
+		boolean_keywords = ('touch', 'breakout', 'confirmation', 'absorption', 'cluster', 'climax',
+						   'reversal', 'squeeze', 'expansion', 'signal', 'overbought', 'oversold',
+						   'contraction', 'single_print', 'above', 'below', 'uptrend')
+		boolean_count = sum(1 for name in alphas.keys() if any(keyword in name for keyword in boolean_keywords))
+		numeric_count = len(alphas) - boolean_count
+
+		console.print(f"\n[dim]Total: {len(df.columns)} columns, {len(df)} rows[/dim]")
+		console.print(f"[dim]Alphas: {len(alphas)} total ({numeric_count} numeric + {boolean_count} boolean conditions)[/dim]")
+		console.print("[yellow]●[/yellow] [yellow]Boolean alphas[/yellow] show 1=True/0=False (conditions for entry/exit)")
 
 	def _print_result(self, result):
 		"""Print simple result."""
