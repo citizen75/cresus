@@ -3,8 +3,16 @@
 from rich.console import Console
 from rich.table import Table
 from rich import box
+import pandas as pd
 
 console = Console()
+
+DEFAULT_INDICATORS = [
+	"adx_14", "adx_20", "atr_14", "atr_5", "bb_20_lower", "bb_20_middle",
+	"bb_20_upper", "ema_10", "ema_20", "ema_5", "ema_50", "macd_12_26",
+	"roc_10", "roc_5", "rsi_14", "rsi_7", "sha_10", "sha_10_green",
+	"sha_10_red", "sha_10_up", "sha_10_down", "sha_5", "volume_sma_20"
+]
 
 
 class DataCommands:
@@ -37,9 +45,11 @@ class DataCommands:
 			self._handle_stats()
 		elif cmd == "universes":
 			self._handle_universes()
+		elif cmd == "indicators":
+			self._handle_indicators(parts)
 		else:
 			console.print(f"[red]✗[/red] Unknown command: {cmd}")
-			console.print("Try: data fetch|show|list|clear|stats|universes")
+			console.print("Try: data fetch|show|list|clear|stats|universes|indicators")
 
 	def _show_help(self):
 		"""Show help for data commands."""
@@ -57,6 +67,7 @@ class DataCommands:
 		table.add_row("data clear [type] [ticker]", "Clear cache (types: history, fundamentals, all)")
 		table.add_row("data stats", "Show cache statistics")
 		table.add_row("data universes", "List available universes")
+		table.add_row("data indicators <ticker> [ind1] [ind2]...", "Show technical indicators for ticker (default: all)")
 		console.print(table)
 
 	def _handle_fetch(self, parts):
@@ -232,6 +243,128 @@ class DataCommands:
 		for u in universes:
 			table.add_row(u)
 		console.print(table)
+
+	def _handle_indicators(self, parts):
+		"""Handle data indicators command to show technical indicators."""
+		if len(parts) < 2:
+			console.print("[red]✗[/red] Usage: data indicators <ticker> [ind1] [ind2]...")
+			console.print("[yellow]Note:[/yellow] If no indicators specified, shows all default indicators")
+			return
+
+		ticker = parts[1]
+
+		# Get requested indicators or use defaults
+		requested_indicators = parts[2:] if len(parts) > 2 else DEFAULT_INDICATORS
+
+		try:
+			# Try to load from cache
+			from pathlib import Path
+			cresus_home = Path.home() / ".cresus"
+
+			# Try parquet first (cached)
+			parquet_file = cresus_home / "db" / "cache" / "history" / f"{ticker}.parquet"
+			if parquet_file.exists():
+				df = pd.read_parquet(parquet_file)
+			else:
+				# Fall back to fetching if not cached
+				result = self.data_manager.fetch_history(ticker)
+				if result.get("status") != "success":
+					console.print(f"[red]✗[/red] {result.get('message')}")
+					return
+
+				# Try again after fetch
+				if parquet_file.exists():
+					df = pd.read_parquet(parquet_file)
+				else:
+					console.print(f"[red]✗[/red] Data file not found: {parquet_file}")
+					return
+
+			if df.empty:
+				console.print(f"[red]✗[/red] No data available for {ticker}")
+				return
+
+			# Calculate indicators
+			from tools.indicators.indicators import calculate
+
+			# Convert column names to lowercase for indicator engine
+			df_lower = df.copy()
+			df_lower.columns = [col.lower() for col in df_lower.columns]
+
+			# Calculate all requested indicators
+			try:
+				indicators_result = calculate(requested_indicators, df_lower)
+			except Exception as e:
+				console.print(f"[yellow]⚠[/yellow] Error calculating indicators: {e}")
+				console.print("[dim]Some indicators may not be available. Use 'data indicators' without args to see defaults.[/dim]")
+				return
+
+			# Add calculated indicators to the dataframe
+			for ind_name, ind_series in indicators_result.items():
+				df[ind_name] = ind_series.values
+
+			# Display the latest values in a table
+			self._display_indicators_table(ticker, df, requested_indicators)
+
+		except Exception as e:
+			console.print(f"[red]✗[/red] Error: {e}")
+			import traceback
+			console.print(f"[dim]{traceback.format_exc()}[/dim]")
+
+	def _display_indicators_table(self, ticker: str, df: pd.DataFrame, indicators: list):
+		"""Display indicators in a formatted table."""
+		if df.empty:
+			console.print(f"[yellow]⚠[/yellow] No data available")
+			return
+
+		# Get the latest row
+		latest = df.iloc[-1]
+
+		# Get the date from the dataframe (try different column names)
+		date_val = None
+		for col in ['Date', 'date', 'timestamp', 'Timestamp']:
+			if col in df.columns:
+				date_val = latest[col]
+				break
+
+		if date_val is not None:
+			# Format the date nicely
+			if hasattr(date_val, 'strftime'):
+				date_str = date_val.strftime('%Y-%m-%d')
+			else:
+				date_str = str(date_val).split(' ')[0]  # Extract just the date part if it's a timestamp
+		else:
+			date_str = "N/A"
+
+		# Create two columns: Indicator and Value
+		table = Table(title=f"Indicators for {ticker} ({date_str})", box=box.ROUNDED)
+		table.add_column("Indicator", style="cyan")
+		table.add_column("Value", justify="right")
+
+		# Add each indicator to the table
+		for ind in indicators:
+			if ind in df.columns:
+				value = latest[ind]
+				# Format the value nicely
+				if pd.isna(value):
+					formatted = "[yellow]N/A[/yellow]"
+				elif isinstance(value, (int, float)):
+					if abs(value) >= 100 or ind.startswith("vol") or ind.startswith("atr"):
+						formatted = f"{value:.2f}"
+					elif ind.startswith("rsi") or ind.startswith("adx"):
+						formatted = f"{value:.2f}"
+					elif ind.endswith("_up") or ind.endswith("_down") or ind.endswith("_red") or ind.endswith("_green"):
+						formatted = f"{int(value)}"
+					else:
+						formatted = f"{value:.4f}"
+				else:
+					formatted = str(value)
+
+				table.add_row(ind, formatted)
+			else:
+				table.add_row(ind, "[red]N/A[/red]")
+
+		console.print(table)
+		console.print(f"\n[dim]Total columns: {len(df.columns)}, Total rows: {len(df)}[/dim]")
 
 	def _print_result(self, result):
 		"""Print simple result."""
