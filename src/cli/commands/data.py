@@ -263,9 +263,7 @@ class DataCommands:
 					else:
 						df_enriched[ind_name] = ind_series
 
-			# IMPORTANT: Reverse the DataFrame because formula engine expects newest-first (index 0 = latest)
-			# Must reverse AFTER adding indicators to preserve alignment
-			df_enriched = df_enriched.iloc[::-1].reset_index(drop=True)
+			# NOTE: Formula engine now auto-detects and normalizes DataFrame sort order
 
 			# Load alpha definitions from strategy template
 			template_path = Path(__file__).parent.parent.parent.parent / "init" / "templates" / "strategy.yml"

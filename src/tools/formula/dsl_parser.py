@@ -280,9 +280,12 @@ class Indicator(ASTNode):
                 raise KeyError(f"Indicator '{self.name}' not found")
             return data[self.name]
         else:  # DataFrame
+            # Normalize sort order if needed (newest-first for this engine)
+            data = _normalize_dataframe_sort(data)
+
             if self.name not in data.columns:
                 raise KeyError(f"Indicator '{self.name}' not found")
-            
+
             # Data is sorted newest-first (index 0 = most recent)
             # shift 0 = current bar (index 0)
             # shift -1 = previous bar (index 1)
@@ -290,7 +293,7 @@ class Indicator(ASTNode):
             idx = abs(self.shift)
             if idx >= len(data):
                 raise ValueError(f"Not enough data for shift [{self.shift}]")
-            
+
             return data[self.name].iloc[idx]
 
 
@@ -414,8 +417,48 @@ def parse_formula(formula: str) -> ASTNode:
     return parser.parse()
 
 
+def _normalize_dataframe_sort(df: pd.DataFrame) -> pd.DataFrame:
+	"""Auto-detect and normalize DataFrame sort order.
+
+	Formula engine expects newest-first (index 0 = latest).
+	Detects if DataFrame is oldest-first and reverses if needed.
+	"""
+	if len(df) < 2:
+		return df
+
+	# Try to find a date/timestamp column
+	date_col = None
+	for col in df.columns:
+		col_lower = str(col).lower()
+		if col_lower in ('timestamp', 'date', 'datetime'):
+			date_col = col
+			break
+
+	if date_col is None:
+		# No date column, assume data is in correct order
+		return df
+
+	try:
+		# Compare first and last row dates
+		first_date = pd.to_datetime(df[date_col].iloc[0])
+		last_date = pd.to_datetime(df[date_col].iloc[-1])
+
+		# If first < last, DataFrame is oldest-first, need to reverse
+		if first_date < last_date:
+			return df.iloc[::-1].reset_index(drop=True)
+	except (ValueError, TypeError):
+		# If date comparison fails, assume correct order
+		pass
+
+	return df
+
+
 def evaluate_dsl(formula: str, data: Union[dict, pd.DataFrame]) -> bool:
-    """Parse and evaluate a DSL formula."""
-    ast = parse_formula(formula)
-    result = ast.evaluate(data)
-    return bool(result)
+	"""Parse and evaluate a DSL formula."""
+	# Normalize DataFrame sort order if needed (newest-first for formula engine)
+	if isinstance(data, pd.DataFrame):
+		data = _normalize_dataframe_sort(data)
+
+	ast = parse_formula(formula)
+	result = ast.evaluate(data)
+	return bool(result)
