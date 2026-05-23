@@ -244,43 +244,64 @@ class DataCommands:
 			table.add_row(u)
 		console.print(table)
 
-	def _calculate_alphas(self, df: pd.DataFrame, indicators: list) -> dict:
-		"""Calculate feature alphas from base indicators - sample alphas that work."""
+	def _calculate_alphas(self, df: pd.DataFrame, indicators: list, indicators_result: dict = None) -> dict:
+		"""Calculate all feature alphas from base indicators using formula engine."""
+		import yaml
+		from pathlib import Path
+		from tools.formula.dsl_parser import parse_formula
+
 		alphas_dict = {}
 		try:
-			latest = df.iloc[-1]
+			# Create enriched DataFrame with calculated indicators
+			df_enriched = df.copy()
 
-			# Momentum alphas
-			if 'roc_5' in df.columns:
-				alphas_dict['mom_roc5'] = float(latest['roc_5'])
-			if 'roc_20' in df.columns:
-				alphas_dict['mom_roc20'] = float(latest['roc_20'])
-			if 'rsi_14' in df.columns:
-				alphas_dict['mom_rsi14'] = float(latest['rsi_14'])
+			# Add calculated indicators to the DataFrame
+			if indicators_result:
+				for ind_name, ind_series in indicators_result.items():
+					if isinstance(ind_series, pd.Series):
+						df_enriched[ind_name] = ind_series.values
+					else:
+						df_enriched[ind_name] = ind_series
 
-			# Volatility alphas
-			if 'atr_14' in df.columns and 'close' in df.columns:
-				alphas_dict['vol_atr14'] = float(latest['atr_14'])
-				alphas_dict['vol_atr_pct'] = float(latest['atr_14'] / latest['close'] * 100)
+			# Load alpha definitions from strategy template
+			template_path = Path(__file__).parent.parent.parent.parent / "init" / "templates" / "strategy.yml"
+			with open(template_path) as f:
+				template = yaml.safe_load(f)
 
-			# Trend alphas
-			if 'adx_14' in df.columns:
-				alphas_dict['trend_adx14'] = float(latest['adx_14'])
-			if 'ema_10' in df.columns and 'ema_20' in df.columns:
-				alphas_dict['mom_ema_spread'] = float(latest['ema_10'] - latest['ema_20'])
-				alphas_dict['mom_ema_uptrend'] = float(1 if latest['ema_10'] > latest['ema_20'] else 0)
+			if "features" not in template or "alphas" not in template["features"]:
+				return alphas_dict
 
-			# Volume alphas
-			if 'volume_sma_20' in df.columns and 'volume' in df.columns:
-				alphas_dict['vol_expansion'] = float(latest['volume'] / latest['volume_sma_20'])
+			alphas_section = template["features"]["alphas"]
 
-			# Bollinger Bands alphas
-			if 'bb_20_upper' in df.columns and 'bb_20_lower' in df.columns and 'close' in df.columns:
-				bb_width = latest['bb_20_upper'] - latest['bb_20_lower']
-				alphas_dict['bb_width'] = float(bb_width)
-				if 'bb_20_middle' in df.columns:
-					alphas_dict['bb_percent_b'] = float((latest['close'] - latest['bb_20_lower']) / bb_width) if bb_width > 0 else 0.5
-		except Exception as e:
+			# Iterate through all alpha categories
+			for category, alphas_list in alphas_section.items():
+				if not isinstance(alphas_list, list):
+					continue
+
+				for alpha in alphas_list:
+					alpha_name = alpha.get("name")
+					formula = alpha.get("formula")
+
+					if not alpha_name or not formula:
+						continue
+
+					try:
+						# Parse and evaluate formula using DSL parser (returns raw value, not bool)
+						ast = parse_formula(formula)
+						result = ast.evaluate(df_enriched)
+
+						# Convert result to float (handle Series and scalar results)
+						if isinstance(result, pd.Series):
+							result = result.iloc[-1]  # Get latest value from Series
+						if isinstance(result, (bool, int, float)):
+							alphas_dict[alpha_name] = float(result)
+						elif result is not None:
+							alphas_dict[alpha_name] = float(result)
+					except Exception:
+						# Skip alphas that can't be calculated
+						pass
+
+		except Exception:
 			pass
 
 		return alphas_dict
@@ -385,10 +406,31 @@ class DataCommands:
 				df[ind_name] = ind_series.values
 
 			# Calculate alphas if no specific indicators requested (show all)
-			alphas_to_show = []
+			alphas_to_show = {}
 			if not indicator_args:
 				try:
-					alphas_to_show = self._calculate_alphas(df, requested_indicators)
+					# Get all indicator names needed for alphas from template
+					import yaml
+					from pathlib import Path
+					template_path = Path(__file__).parent.parent.parent.parent / "init" / "templates" / "strategy.yml"
+					with open(template_path) as f:
+						template = yaml.safe_load(f)
+
+					# Extract all indicator names from template
+					all_indicators_in_template = template.get("indicators", [])
+
+					# Calculate any missing indicators
+					missing_indicators = [ind for ind in all_indicators_in_template if ind not in indicators_result]
+					if missing_indicators:
+						try:
+							extra_indicators = calculate(missing_indicators, df_lower)
+							indicators_result.update(extra_indicators)
+							for ind_name, ind_series in extra_indicators.items():
+								df[ind_name] = ind_series.values
+						except Exception:
+							pass  # Some indicators may not be available
+
+					alphas_to_show = self._calculate_alphas(df, requested_indicators, indicators_result)
 				except Exception as e:
 					console.print(f"[dim]Note: Could not calculate alphas: {e}[/dim]")
 
