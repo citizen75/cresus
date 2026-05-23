@@ -34,18 +34,13 @@ class StrategyManager:
 			context: Optional context (AgentContext object or dict) for sharing strategy_config and other state.
 		"""
 		self.context = context
+		self.project_root = Path(project_root) if project_root else self._find_project_root()
 
-		if project_root:
-			self.project_root = Path(project_root)
-			# Use db/strategies for consistency (not db/local/strategies)
-			self.strategies_dir = self.project_root / "db" / "strategies"
-		else:
-			# Find project root by looking for config directory
-			self.project_root = self._find_project_root()
-			# For normal operation, use ~/.cresus/db/strategies
-			from utils.env import get_db_root
-			db_root = get_db_root()
-			self.strategies_dir = db_root / "strategies"
+		# Always use ~/.cresus/db/strategies for strategy files (user data directory)
+		# regardless of project_root (which is for code, not data)
+		from utils.env import get_db_root
+		db_root = get_db_root()
+		self.strategies_dir = db_root / "strategies"
 
 		self._ensure_strategies_dir()
 
