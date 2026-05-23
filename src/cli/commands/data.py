@@ -247,14 +247,55 @@ class DataCommands:
 	def _handle_indicators(self, parts):
 		"""Handle data indicators command to show technical indicators."""
 		if len(parts) < 2:
-			console.print("[red]✗[/red] Usage: data indicators <ticker> [ind1] [ind2]...")
+			console.print("[red]✗[/red] Usage: data indicators <ticker> [options] [ind1] [ind2]...")
+			console.print("[yellow]Options:[/yellow]")
+			console.print("  -offset N      Show indicators from N days ago")
+			console.print("               0 = latest (default), -1 = previous day, -2 = 2 days ago, etc.")
+			console.print("  \"YYYY-MM-DD\"   Show indicators for specific date (e.g., \"2026-05-21\")")
+			console.print("[yellow]Examples:[/yellow]")
+			console.print("  cresus data indicators SU.PA")
+			console.print("  cresus data indicators SU.PA -offset -1 sha_10_green sha_10_red")
+			console.print("  cresus data indicators SU.PA \"2026-05-21\"")
 			console.print("[yellow]Note:[/yellow] If no indicators specified, shows all default indicators")
 			return
 
 		ticker = parts[1]
 
-		# Get requested indicators or use defaults
-		requested_indicators = parts[2:] if len(parts) > 2 else DEFAULT_INDICATORS
+		# Parse options and indicators
+		offset = None
+		target_date = None
+		indicator_args = []
+
+		i = 2
+		while i < len(parts):
+			arg = parts[i]
+			if arg == "-offset" and i + 1 < len(parts):
+				try:
+					offset = int(parts[i + 1])
+					i += 2
+					continue
+				except ValueError:
+					console.print(f"[red]✗[/red] Invalid offset value: {parts[i + 1]}")
+					return
+
+			# Check if it's a date string (YYYY-MM-DD format, with or without quotes)
+			date_candidate = arg.strip('\'"')
+			if len(date_candidate) == 10 and date_candidate.count('-') == 2:
+				# Validate it's a proper date
+				try:
+					from datetime import datetime
+					datetime.strptime(date_candidate, '%Y-%m-%d')
+					target_date = date_candidate
+					i += 1
+					continue
+				except ValueError:
+					pass
+
+			# It's an indicator name
+			indicator_args.append(arg)
+			i += 1
+
+		requested_indicators = indicator_args if indicator_args else DEFAULT_INDICATORS
 
 		try:
 			# Try to load from cache
@@ -302,38 +343,111 @@ class DataCommands:
 			for ind_name, ind_series in indicators_result.items():
 				df[ind_name] = ind_series.values
 
-			# Display the latest values in a table
-			self._display_indicators_table(ticker, df, requested_indicators)
+			# Display the requested values in a table
+			self._display_indicators_table(ticker, df, requested_indicators, offset=offset, target_date=target_date)
 
 		except Exception as e:
 			console.print(f"[red]✗[/red] Error: {e}")
 			import traceback
 			console.print(f"[dim]{traceback.format_exc()}[/dim]")
 
-	def _display_indicators_table(self, ticker: str, df: pd.DataFrame, indicators: list):
+	def _display_indicators_table(self, ticker: str, df: pd.DataFrame, indicators: list, offset: int = None, target_date: str = None):
 		"""Display indicators in a formatted table."""
 		if df.empty:
 			console.print(f"[yellow]⚠[/yellow] No data available")
 			return
 
-		# Get the latest row
-		latest = df.iloc[-1]
+		# Determine which row to display
+		if target_date:
+			# Find row by specific date
+			date_col = None
+			for col in ['Date', 'date', 'timestamp', 'Timestamp']:
+				if col in df.columns:
+					date_col = col
+					break
 
-		# Get the date from the dataframe (try different column names)
-		date_val = None
-		for col in ['Date', 'date', 'timestamp', 'Timestamp']:
-			if col in df.columns:
-				date_val = latest[col]
-				break
+			if date_col is None:
+				console.print(f"[red]✗[/red] No date column found in data")
+				return
 
-		if date_val is not None:
-			# Format the date nicely
-			if hasattr(date_val, 'strftime'):
-				date_str = date_val.strftime('%Y-%m-%d')
+			# Convert target_date to pandas Timestamp for comparison
+			import pandas as pd_timestamp
+			target = pd_timestamp.to_datetime(target_date).date()
+
+			# Find matching row
+			matching_rows = []
+			for idx, row in df.iterrows():
+				row_date = row[date_col]
+				if hasattr(row_date, 'date'):
+					row_date = row_date.date()
+				else:
+					row_date = pd_timestamp.to_datetime(row_date).date()
+
+				if row_date == target:
+					matching_rows.append(idx)
+
+			if not matching_rows:
+				console.print(f"[red]✗[/red] No data available for date: {target_date}")
+				return
+
+			# Use the last matching row (in case there are duplicates)
+			row_idx = matching_rows[-1]
+			latest = df.iloc[row_idx]
+			date_str = target_date
+
+		elif offset is not None:
+			# Use offset from the end
+			# offset 0 or no offset = latest (df.iloc[-1])
+			# offset -1 = 1 day ago (df.iloc[-2])
+			# offset -2 = 2 days ago (df.iloc[-3]), etc.
+			# offset 1 = 1 day ahead (df.iloc[0] - oldest), etc. (rarely used)
+			if offset == 0:
+				idx = -1  # Latest
+			elif offset < 0:
+				idx = offset - 1  # Convert -1 to -2, -2 to -3, etc.
 			else:
-				date_str = str(date_val).split(' ')[0]  # Extract just the date part if it's a timestamp
+				idx = offset  # Positive offset counts from beginning
+
+			if abs(idx) > len(df):
+				console.print(f"[red]✗[/red] Offset {offset} out of range (data has {len(df)} rows)")
+				return
+
+			latest = df.iloc[idx]
+
+			# Get the date from the dataframe
+			date_val = None
+			for col in ['Date', 'date', 'timestamp', 'Timestamp']:
+				if col in df.columns:
+					date_val = latest[col]
+					break
+
+			if date_val is not None:
+				if hasattr(date_val, 'strftime'):
+					date_str = date_val.strftime('%Y-%m-%d')
+				else:
+					date_str = str(date_val).split(' ')[0]
+			else:
+				date_str = f"Row {offset}"
+
 		else:
-			date_str = "N/A"
+			# Get the latest row (default behavior)
+			latest = df.iloc[-1]
+
+			# Get the date from the dataframe (try different column names)
+			date_val = None
+			for col in ['Date', 'date', 'timestamp', 'Timestamp']:
+				if col in df.columns:
+					date_val = latest[col]
+					break
+
+			if date_val is not None:
+				# Format the date nicely
+				if hasattr(date_val, 'strftime'):
+					date_str = date_val.strftime('%Y-%m-%d')
+				else:
+					date_str = str(date_val).split(' ')[0]  # Extract just the date part if it's a timestamp
+			else:
+				date_str = "N/A"
 
 		# Create two columns: Indicator and Value
 		table = Table(title=f"Indicators for {ticker} ({date_str})", box=box.ROUNDED)
