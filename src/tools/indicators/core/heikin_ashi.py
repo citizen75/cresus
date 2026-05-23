@@ -41,7 +41,7 @@ Wick signals (trend strength):
 """
 
 import pandas as pd
-import pandas_ta
+import pandas_ta_classic as pandas_ta
 from typing import Optional, Dict
 
 
