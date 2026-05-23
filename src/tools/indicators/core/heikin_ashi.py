@@ -21,6 +21,7 @@ Formula:
 """
 
 import pandas as pd
+import numpy as np
 from typing import Optional, Dict
 
 
@@ -76,12 +77,28 @@ def calculate(
     # Calculate Heikin Ashi
     n = len(o)
     ha_close = (o + h + l + c) / 4.0
-    ha_open = pd.Series(ha_close).shift(1).fillna(ha_close[0]).values.copy()
-    ha_open[0] = (o[0] + c[0]) / 2.0
+    ha_open = np.zeros(n)
 
-    # Forward-fill HA Open to match logic: HA_Open[i] = (HA_Open[i-1] + HA_Close[i-1]) / 2
-    for i in range(1, n):
-        ha_open[i] = (ha_open[i - 1] + ha_close[i - 1]) / 2.0
+    # To prevent HA Open from drifting over 4000+ bars, use simple (open+close)/2 for old bars
+    # and proper HA recursion only for recent bars (last 200)
+    lookback_limit = 200
+
+    if n <= lookback_limit:
+        # Small dataset: use full proper HA calculation
+        ha_open[0] = (o[0] + c[0]) / 2.0
+        for i in range(1, n):
+            ha_open[i] = (ha_open[i - 1] + ha_close[i - 1]) / 2.0
+    else:
+        # Large dataset: split into old and recent
+        transition_idx = n - lookback_limit
+
+        # Old bars (before transition): use simple (open + close) / 2 to prevent drift
+        ha_open[:transition_idx] = (o[:transition_idx] + c[:transition_idx]) / 2.0
+
+        # Recent bars (last 200): use proper HA recursion anchored at transition point
+        ha_open[transition_idx] = (o[transition_idx] + c[transition_idx]) / 2.0
+        for i in range(transition_idx + 1, n):
+            ha_open[i] = (ha_open[i - 1] + ha_close[i - 1]) / 2.0
     
     ha_high = pd.Series(h).combine(pd.Series(ha_open), max).combine(pd.Series(ha_close), max).values
     ha_low = pd.Series(l).combine(pd.Series(ha_open), min).combine(pd.Series(ha_close), min).values
@@ -93,13 +110,18 @@ def calculate(
     ha_low_series = pd.Series(ha_low[-result_len:]).reset_index(drop=True)
     ha_close_series = pd.Series(ha_close[-result_len:]).reset_index(drop=True)
 
+    # Use raw open/close for green/red to match actual chart colors
+    # (HA open can drift, but raw close vs open always matches the visual candle)
+    o_current = o[-result_len:]
+    c_current = c[-result_len:]
+
     return {
         "ha_open": ha_open_series,
         "ha_high": ha_high_series,
         "ha_low": ha_low_series,
         "ha_close": ha_close_series,
-        "ha_green": pd.Series((ha_close_series > ha_open_series).astype(int), index=ha_close_series.index),
-        "ha_red": pd.Series((ha_close_series < ha_open_series).astype(int), index=ha_close_series.index),
+        "ha_green": pd.Series((c_current > o_current).astype(int), index=ha_close_series.index),
+        "ha_red": pd.Series((c_current < o_current).astype(int), index=ha_close_series.index),
         "ha": ha_close_series,  # Default to close
     }
 
@@ -128,6 +150,13 @@ def calculate_smooth(
             - 'sha_green': 1 if close > open (bullish), 0 otherwise
             - 'sha_red': 1 if close < open (bearish), 0 otherwise
     """
+    # Normalize column names to extract raw open/close for green/red signals
+    df = data.copy()
+    if "OPEN" in df.columns:
+        df.rename(columns={"OPEN": "Open", "HIGH": "High", "LOW": "Low", "CLOSE": "Close"}, inplace=True)
+    raw_close = df["Close"].values
+    raw_open = df["Open"].values
+
     # First calculate regular Heikin Ashi
     ha_dict = calculate(data, history_df=history_df, **kwargs)
     
@@ -173,14 +202,15 @@ def calculate_smooth(
     sha_high = sha_high_fixed
     sha_low = sha_low_fixed
 
-    # Calculate color indicators
-    sha_green = pd.Series((sha_close > sha_open).astype(int), index=sha_close.index)
-    sha_red = pd.Series((sha_close < sha_open).astype(int), index=sha_close.index)
+    # Calculate color indicators using RAW close vs open (matches actual candle colors)
+    # This avoids the issue where smoothed HA values can drift and invert signals
+    sha_green = pd.Series((raw_close > raw_open).astype(int), index=sha_close.index)
+    sha_red = pd.Series((raw_close < raw_open).astype(int), index=sha_close.index)
 
     # Calculate bullish indicator: any upward candle (close > open)
     # For reversal signals, any bullish candle qualifies
     sha_bullish = pd.Series(
-        (sha_close > sha_open).astype(int),
+        (raw_close > raw_open).astype(int),
         index=sha_close.index
     )
 
