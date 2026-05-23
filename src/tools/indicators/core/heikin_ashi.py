@@ -1,7 +1,7 @@
 """
 Heikin Ashi (HA) and Smooth Heikin Ashi (SHA) Indicators
 
-Canonical implementation following standard quantitative finance formulas.
+Industry-standard implementation using pandas-ta library.
 
 Syntax:
   - ha for Heikin Ashi
@@ -41,7 +41,7 @@ Wick signals (trend strength):
 """
 
 import pandas as pd
-import numpy as np
+import pandas_ta
 from typing import Optional, Dict
 
 
@@ -51,7 +51,7 @@ def calculate(
     **kwargs
 ) -> Dict[str, pd.Series]:
     """
-    Calculate Heikin Ashi candlesticks.
+    Calculate Heikin Ashi candlesticks using pandas-ta.
 
     Args:
         data: OHLCV DataFrame with columns: Open, High, Low, Close (or OPEN, HIGH, LOW, CLOSE)
@@ -64,17 +64,14 @@ def calculate(
             - 'ha_high': Heikin Ashi High
             - 'ha_low': Heikin Ashi Low
             - 'ha_close': Heikin Ashi Close
+            - 'ha_green': 1 if close > open, 0 otherwise
+            - 'ha_red': 1 if close < open, 0 otherwise
+            - 'ha': Heikin Ashi Close (default)
     """
     # Normalize column names
     df = data.copy()
     if "OPEN" in df.columns:
         df.rename(columns={"OPEN": "Open", "HIGH": "High", "LOW": "Low", "CLOSE": "Close"}, inplace=True)
-
-    # Extract OHLC
-    o = df["Open"].values
-    h = df["High"].values
-    l = df["Low"].values
-    c = df["Close"].values
 
     # Combine with history if provided
     if history_df is not None:
@@ -83,38 +80,20 @@ def calculate(
             hist.rename(columns={"OPEN": "Open", "HIGH": "High", "LOW": "Low", "CLOSE": "Close"}, inplace=True)
         else:
             hist = history_df.copy()
-        
-        hist_o = hist["Open"].values
-        hist_h = hist["High"].values
-        hist_l = hist["Low"].values
-        hist_c = hist["Close"].values
-        
-        o = pd.concat([pd.Series(hist_o), pd.Series(o)], ignore_index=True).values
-        h = pd.concat([pd.Series(hist_h), pd.Series(h)], ignore_index=True).values
-        l = pd.concat([pd.Series(hist_l), pd.Series(l)], ignore_index=True).values
-        c = pd.concat([pd.Series(hist_c), pd.Series(c)], ignore_index=True).values
 
-    # Calculate Heikin Ashi (canonical recursive formulas)
-    n = len(o)
-    ha_close = (o + h + l + c) / 4.0
-    ha_open = np.zeros(n)
+        df = pd.concat([hist, df], ignore_index=True)
 
-    # Canonical HA recursion (no truncation or drift prevention)
-    ha_open[0] = (o[0] + c[0]) / 2.0
-    for i in range(1, n):
-        ha_open[i] = (ha_open[i - 1] + ha_close[i - 1]) / 2.0
-
-    ha_high = np.maximum(np.maximum(h, ha_open), ha_close)
-    ha_low = np.minimum(np.minimum(l, ha_open), ha_close)
+    # Calculate HA using pandas-ta
+    ha = pandas_ta.ha(df["Open"], df["High"], df["Low"], df["Close"])
 
     # Extract only current period
     result_len = len(data)
-    ha_open_series = pd.Series(ha_open[-result_len:]).reset_index(drop=True)
-    ha_high_series = pd.Series(ha_high[-result_len:]).reset_index(drop=True)
-    ha_low_series = pd.Series(ha_low[-result_len:]).reset_index(drop=True)
-    ha_close_series = pd.Series(ha_close[-result_len:]).reset_index(drop=True)
+    ha_open_series = pd.Series(ha["HA_open"].values[-result_len:]).reset_index(drop=True)
+    ha_high_series = pd.Series(ha["HA_high"].values[-result_len:]).reset_index(drop=True)
+    ha_low_series = pd.Series(ha["HA_low"].values[-result_len:]).reset_index(drop=True)
+    ha_close_series = pd.Series(ha["HA_close"].values[-result_len:]).reset_index(drop=True)
 
-    # HA candle color based on HA values (not raw)
+    # HA candle color based on HA values
     ha_green = (ha_close_series > ha_open_series).astype(int)
     ha_red = (ha_close_series < ha_open_series).astype(int)
 
@@ -136,7 +115,7 @@ def calculate_smooth(
     **kwargs
 ) -> Dict[str, pd.Series]:
     """
-    Calculate Smooth Heikin Ashi (canonical: EMA-smoothed HA values).
+    Calculate Smooth Heikin Ashi (canonical: EMA-smoothed HA values) using pandas-ta.
 
     Args:
         data: OHLCV DataFrame
@@ -155,46 +134,61 @@ def calculate_smooth(
             - 'sha_bullish': 1 if sha_close > sha_open (same as green)
             - 'sha_up': 1 if bullish with no bottom wick
             - 'sha_down': 1 if bearish with no top wick
+            - 'sha': Smooth HA Close (default)
     """
-    # First calculate regular Heikin Ashi
-    ha_dict = calculate(data, history_df=history_df, **kwargs)
+    # Normalize column names
+    df = data.copy()
+    if "OPEN" in df.columns:
+        df.rename(columns={"OPEN": "Open", "HIGH": "High", "LOW": "Low", "CLOSE": "Close"}, inplace=True)
 
-    # Extract HA values
-    ha_open = ha_dict["ha_open"]
-    ha_high = ha_dict["ha_high"]
-    ha_low = ha_dict["ha_low"]
-    ha_close = ha_dict["ha_close"]
+    # Combine with history if provided
+    if history_df is not None:
+        if "OPEN" in history_df.columns:
+            hist = history_df.copy()
+            hist.rename(columns={"OPEN": "Open", "HIGH": "High", "LOW": "Low", "CLOSE": "Close"}, inplace=True)
+        else:
+            hist = history_df.copy()
 
-    # Apply canonical EMA smoothing to HA components
-    sha_open = ha_open.ewm(span=period, adjust=False).mean()
-    sha_high = ha_high.ewm(span=period, adjust=False).mean()
-    sha_low = ha_low.ewm(span=period, adjust=False).mean()
-    sha_close = ha_close.ewm(span=period, adjust=False).mean()
+        df = pd.concat([hist, df], ignore_index=True)
+
+    # Calculate HA using pandas-ta
+    ha = pandas_ta.ha(df["Open"], df["High"], df["Low"], df["Close"])
+
+    # Apply EMA smoothing to HA components
+    sha_open = pandas_ta.ema(ha["HA_open"], length=period)
+    sha_high = pandas_ta.ema(ha["HA_high"], length=period)
+    sha_low = pandas_ta.ema(ha["HA_low"], length=period)
+    sha_close = pandas_ta.ema(ha["HA_close"], length=period)
+
+    # Extract only current period
+    result_len = len(data)
+    sha_open_series = pd.Series(sha_open.values[-result_len:]).reset_index(drop=True)
+    sha_high_series = pd.Series(sha_high.values[-result_len:]).reset_index(drop=True)
+    sha_low_series = pd.Series(sha_low.values[-result_len:]).reset_index(drop=True)
+    sha_close_series = pd.Series(sha_close.values[-result_len:]).reset_index(drop=True)
 
     # SHA candle color based on smoothed HA values
-    sha_green = (sha_close > sha_open).astype(int)
-    sha_red = (sha_close < sha_open).astype(int)
+    sha_green = (sha_close_series > sha_open_series).astype(int)
+    sha_red = (sha_close_series < sha_open_series).astype(int)
 
     # Bullish indicator (same logic as green, for consistency)
-    sha_bullish = (sha_close > sha_open).astype(int)
+    sha_bullish = (sha_close_series > sha_open_series).astype(int)
 
     # Wick indicators: trend strength without counter-trend wicks
-    # sha_up: Bullish candle (close > open) with no lower wick (low >= open)
-    # sha_down: Bearish candle (close < open) with no upper wick (high <= open)
-    sha_up = ((sha_close > sha_open) & (sha_low >= sha_open)).astype(int)
-    sha_down = ((sha_close < sha_open) & (sha_high <= sha_open)).astype(int)
+    sha_up = ((sha_close_series > sha_open_series) & (sha_low_series >= sha_open_series)).astype(int)
+    sha_down = ((sha_close_series < sha_open_series) & (sha_high_series <= sha_open_series)).astype(int)
 
     # Include period in key names for proper formula reference
     period_suffix = f"_{period}" if period else ""
     return {
-        f"sha{period_suffix}_open": sha_open,
-        f"sha{period_suffix}_high": sha_high,
-        f"sha{period_suffix}_low": sha_low,
-        f"sha{period_suffix}_close": sha_close,
+        f"sha{period_suffix}_open": sha_open_series,
+        f"sha{period_suffix}_high": sha_high_series,
+        f"sha{period_suffix}_low": sha_low_series,
+        f"sha{period_suffix}_close": sha_close_series,
         f"sha{period_suffix}_green": sha_green,
         f"sha{period_suffix}_red": sha_red,
         f"sha{period_suffix}_bullish": sha_bullish,
         f"sha{period_suffix}_up": sha_up,
         f"sha{period_suffix}_down": sha_down,
-        f"sha{period_suffix}": sha_close,  # Default to close
+        f"sha{period_suffix}": sha_close_series,  # Default to close
     }

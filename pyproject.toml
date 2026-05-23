@@ -22,6 +22,7 @@ dependencies = [
     "pandas==3.0.3",
     "numpy>=1.24.0",
     "yfinance>=0.2.0",
+    "pandas-ta>=0.3.14",
     "gspread>=6.0.0",
     "google-auth-oauthlib>=1.0.0",
     "google-auth-httplib2>=0.2.0",
