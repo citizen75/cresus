@@ -290,6 +290,54 @@ features:
         formula: volume[0] > volume_sma_20[0] && (high[0] - close[0]) < atr_14[0] * 0.3
         description: Volume absorption (high volume absorbed with small wick)
 
+    # Bollinger Bands alphas - band distance, squeeze/expansion, and breakout signals
+    bollinger_bands:
+      - name: bb_distance_upper
+        formula: (bb_20_upper[0] - close[0]) / close[0]
+        description: Distance to upper band as percentage (positive = below band)
+      - name: bb_distance_lower
+        formula: (close[0] - bb_20_lower[0]) / close[0]
+        description: Distance to lower band as percentage (positive = above band)
+      - name: bb_percent_b
+        formula: (close[0] - bb_20_lower[0]) / (bb_20_upper[0] - bb_20_lower[0])
+        description: "%B: price position within bands (0=lower, 0.5=middle, 1=upper)"
+      - name: bb_width
+        formula: bb_20_upper[0] - bb_20_lower[0]
+        description: Bollinger Band width (volatility expansion measure)
+      - name: bb_width_ratio
+        formula: (bb_20_upper[0] - bb_20_lower[0]) / atr_14[0]
+        description: Band width relative to ATR (normalized volatility)
+      - name: bb_width_pct
+        formula: (bb_20_upper[0] - bb_20_lower[0]) / bb_20_middle[0]
+        description: Band width as percentage of middle band (SMA)
+      - name: bb_squeeze
+        formula: (bb_20_upper[0] - bb_20_lower[0]) < (sma_20[0] * 0.05)
+        description: Band squeeze (tight bands, low volatility <5% of price)
+      - name: bb_expansion
+        formula: (bb_20_upper[0] - bb_20_lower[0]) > (sma_20[0] * 0.15)
+        description: Band expansion (wide bands, high volatility >15% of price)
+      - name: bb_upper_touch
+        formula: close[0] > (bb_20_upper[0] - (bb_20_upper[0] - bb_20_middle[0]) * 0.1)
+        description: Price touching/near upper band (within 10% of band width)
+      - name: bb_lower_touch
+        formula: close[0] < (bb_20_lower[0] + (bb_20_middle[0] - bb_20_lower[0]) * 0.1)
+        description: Price touching/near lower band (within 10% of band width)
+      - name: bb_breakout_above
+        formula: close[0] > bb_20_upper[0] && close[-1] <= bb_20_upper[-1]
+        description: Price breakout above upper band (bullish signal)
+      - name: bb_breakout_below
+        formula: close[0] < bb_20_lower[0] && close[-1] >= bb_20_lower[-1]
+        description: Price breakout below lower band (bearish signal)
+      - name: bb_mean_reversion_upper
+        formula: close[0] > bb_20_upper[0] && close[0] < close[-1]
+        description: Price above band but declining (mean reversion setup)
+      - name: bb_mean_reversion_lower
+        formula: close[0] < bb_20_lower[0] && close[0] > close[-1]
+        description: Price below band but rising (mean reversion setup)
+      - name: bb_volatility_contraction
+        formula: (bb_20_upper[0] - bb_20_lower[0]) < ((bb_20_upper[-5] - bb_20_lower[-5]))
+        description: Band contraction over 5 days (compression before breakout)
+
     # Cross-asset correlation alphas
     correlations:
       - name: corr_volume_trend
