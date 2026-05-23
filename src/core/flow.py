@@ -157,6 +157,18 @@ class Flow:
 					else:
 						self.logger.warning(f"Optional step '{step['name']}' failed, continuing")
 
+				# Check for exit signal (step succeeded but wants flow to stop)
+				elif result.get("status") == "exit":
+					self.logger.info(f"Step '{step['name']}' signaled exit: {result.get('message')}")
+					self.end_time = datetime.now()
+					return {
+						"status": "success",
+						"flow": self.name,
+						"message": f"Flow exited at step '{step['name']}': {result.get('message')}",
+						"output": result.get("output", {}),
+						"execution_history": self.execution_history,
+					}
+
 				# Update input for next step
 				current_input = result.get("output", {})
 

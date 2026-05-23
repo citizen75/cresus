@@ -4,6 +4,7 @@ from typing import Any, Dict, Optional
 from core.agent import Agent
 from core.flow import Flow
 from agents.entry_order.sub_agents import (
+	CheckCashAgent,
 	PositionSizingAgent,
 	EntryTimingAgent,
 	RiskGuardAgent,
@@ -103,6 +104,13 @@ class EntryOrderAgent(Agent):
 		# Create order processing flow with sub-agents
 		order_flow = Flow("EntryOrderFlow", context=self.context)
 
+		# Add cash validation step (must run first)
+		order_flow.add_step(
+			CheckCashAgent("CheckCashStep"),
+			step_name="check_cash",
+			required=True
+		)
+
 		# Add position sizing step
 		order_flow.add_step(
 			PositionSizingAgent(
@@ -134,6 +142,20 @@ class EntryOrderAgent(Agent):
 		# Execute the flow
 		flow_result = order_flow.process(input_data)
 
+		# Check if flow exited due to insufficient cash (exit signal handled by Flow)
+		if flow_result.get("message", "").startswith("Flow exited at step 'check_cash'"):
+			self.logger.info(f"[ENTRY-ORDER] {flow_result.get('message')}")
+			return {
+				"status": "success",
+				"input": input_data,
+				"output": {
+					"orders": [],
+					"orders_count": 0,
+					"message": flow_result.get('message', 'Cash validation failed')
+				},
+				"message": flow_result.get('message', 'Cash validation failed')
+			}
+
 		# Check flow execution
 		if flow_result.get("status") != "success":
 			return {
@@ -148,7 +170,7 @@ class EntryOrderAgent(Agent):
 
 		# Apply max_daily_orders constraint if specified in strategy config
 		strategy_config = self.context.get("strategy_config") or {}
-		entry_config = strategy_config.get("entry", {})
+		entry_config = strategy_config.get("order", {})
 		max_daily_orders_param = entry_config.get("parameters", {}).get("max_daily_orders")
 
 		if max_daily_orders_param and executable_orders:
