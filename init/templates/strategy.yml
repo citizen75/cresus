@@ -206,6 +206,36 @@ features:
         formula: (volume[0] + volume[-1] + volume[-2]) / 3 / volume_sma_20[0]
         description: Volume clustering ratio (recent vol vs average)
 
+    # Point of Control (POC) alphas - identify volume-weighted price levels and support/resistance
+    point_of_control:
+      - name: poc_vwap_distance
+        formula: abs(close[0] - vwap[0]) / vwap[0]
+        description: Distance from Point of Control (VWAP) as percentage
+      - name: poc_vwap_support
+        formula: close[0] > vwap[0] - atr_14[0] * 0.5
+        description: Price near VWAP support (within 0.5 ATR below)
+      - name: poc_vwap_resistance
+        formula: close[0] < vwap[0] + atr_14[0] * 0.5
+        description: Price near VWAP resistance (within 0.5 ATR above)
+      - name: poc_price_acceptance
+        formula: (close[0] - low[0]) / (high[0] - low[0])
+        description: Price acceptance at current level (0=low, 1=high)
+      - name: poc_volume_profile_shift
+        formula: vwap[0] - vwap[-10]
+        description: POC shift over 10 days (positive = uptrend in volume)
+      - name: poc_value_area_width
+        formula: (sma_20[0] - sma_50[0]) / sma_50[0]
+        description: Value area width (price range where volume concentrates)
+      - name: poc_institutional_level
+        formula: (close[0] - (high[-20] + low[-20]) / 2) / atr_14[0]
+        description: Price distance from 20-day institutional entry level
+      - name: poc_volume_weighted_midpoint
+        formula: (vwap[0] + close[0]) / 2
+        description: Volume-weighted midpoint between VWAP and close
+      - name: poc_single_print
+        formula: volume[0] > volume_sma_20[0] * 1.5 && (high[0] - low[0]) < atr_14[0] * 0.5
+        description: Single print setup (high volume, small range at POC)
+
     # Cross-asset correlation alphas
     correlations:
       - name: corr_volume_trend
