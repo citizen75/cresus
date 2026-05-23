@@ -5,10 +5,12 @@ Syntax: rsi_<period>
 Example: rsi_14
 
 Returns: Series with RSI values (0-100)
+
+Uses pandas-ta library for canonical implementation.
 """
 
 import pandas as pd
-import numpy as np
+import pandas_ta
 from typing import Optional
 from ..utils.helpers import get_close, validate_rsi_output
 
@@ -20,7 +22,7 @@ def calculate(
     **kwargs
 ) -> pd.Series:
     """
-    Calculate RSI (Relative Strength Index).
+    Calculate RSI (Relative Strength Index) using pandas-ta.
 
     Args:
         data: OHLCV DataFrame
@@ -29,31 +31,26 @@ def calculate(
 
     Returns:
         Series with RSI values (0-100)
-
-    Formula:
-        RS = Average Gain / Average Loss
-        RSI = 100 - (100 / (1 + RS))
     """
     # Get close prices
     close = get_close(data)
 
-    # Calculate price changes
-    delta = close.diff()
-    gain = delta.where(delta > 0, 0.0)
-    loss = -delta.where(delta < 0, 0.0)
+    # Use history if provided
+    if history_df is not None:
+        hist_close = get_close(history_df)
+        combined = pd.concat([hist_close, close], ignore_index=True)
+    else:
+        combined = close
 
-    # Calculate average gain/loss (exponential moving average)
-    avg_gain = gain.ewm(span=period, adjust=False).mean()
-    avg_loss = loss.ewm(span=period, adjust=False).mean()
+    # Calculate RSI using pandas-ta
+    rsi = pandas_ta.rsi(combined, length=period)
 
-    # Avoid division by zero
-    rs = avg_gain / avg_loss.replace(0, np.nan)
+    # Extract only current period
+    result_len = len(data)
+    rsi = rsi.iloc[-result_len:].reset_index(drop=True)
 
-    # Calculate RSI
-    rsi = 100 - (100 / (1 + rs))
-    rsi = rsi.fillna(50)  # Fill NaN with 50 (neutral)
+    # Fill NaN with 50 (neutral)
+    rsi = rsi.fillna(50)
+    validate_rsi_output(rsi)
 
-    result = rsi.reset_index(drop=True)
-    validate_rsi_output(result)
-
-    return result
+    return rsi

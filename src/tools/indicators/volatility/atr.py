@@ -5,10 +5,12 @@ Syntax: atr_<period>
 Example: atr_14
 
 Returns: Series with ATR values
+
+Uses pandas-ta library for canonical implementation.
 """
 
 import pandas as pd
-import numpy as np
+import pandas_ta
 from typing import Optional
 from ..utils.helpers import get_high, get_low, get_close
 
@@ -20,7 +22,7 @@ def calculate(
     **kwargs
 ) -> pd.Series:
     """
-    Calculate ATR (Average True Range).
+    Calculate ATR (Average True Range) using pandas-ta.
 
     Args:
         data: OHLCV DataFrame with HIGH, LOW, CLOSE columns
@@ -29,10 +31,6 @@ def calculate(
 
     Returns:
         Series with ATR values
-
-    Formula:
-        TR = max(High - Low, abs(High - Close[prev]), abs(Low - Close[prev]))
-        ATR = EMA of TR
     """
     # Get OHLC
     high = get_high(data)
@@ -49,14 +47,8 @@ def calculate(
         low = pd.concat([hist_low, low], ignore_index=True)
         close = pd.concat([hist_close, close], ignore_index=True)
 
-    # Calculate True Range
-    tr1 = high - low
-    tr2 = (high - close.shift(1)).abs()
-    tr3 = (low - close.shift(1)).abs()
-    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-
-    # Calculate ATR (EMA of TR)
-    atr = tr.ewm(span=period, adjust=False).mean()
+    # Calculate ATR using pandas-ta
+    atr = pandas_ta.atr(high, low, close, length=period)
 
     # Extract only current period
     result_len = len(data)

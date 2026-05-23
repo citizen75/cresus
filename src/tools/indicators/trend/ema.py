@@ -5,9 +5,12 @@ Syntax: ema_<period>
 Example: ema_20
 
 Returns: Series with EMA values
+
+Uses pandas-ta library for canonical implementation.
 """
 
 import pandas as pd
+import pandas_ta
 from typing import Optional
 from ..utils.helpers import get_close
 
@@ -19,7 +22,7 @@ def calculate(
     **kwargs
 ) -> pd.Series:
     """
-    Calculate EMA (Exponential Moving Average).
+    Calculate EMA (Exponential Moving Average) using pandas-ta.
 
     Args:
         data: OHLCV DataFrame
@@ -28,9 +31,6 @@ def calculate(
 
     Returns:
         Series with EMA values
-
-    Formula:
-        EMA = Price * (2 / (period + 1)) + EMA[previous] * (1 - (2 / (period + 1)))
     """
     # Get close prices
     close = get_close(data)
@@ -42,8 +42,8 @@ def calculate(
     else:
         combined = close
 
-    # Calculate EMA
-    ema = combined.ewm(span=period, adjust=False).mean()
+    # Calculate EMA using pandas-ta
+    ema = pandas_ta.ema(combined, length=period)
 
     # Extract only current period
     result_len = len(data)

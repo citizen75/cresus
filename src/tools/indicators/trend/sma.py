@@ -5,9 +5,12 @@ Syntax: sma_<period>
 Example: sma_50
 
 Returns: Series with SMA values
+
+Uses pandas-ta library for canonical implementation.
 """
 
 import pandas as pd
+import pandas_ta
 from typing import Optional
 from ..utils.helpers import get_close
 
@@ -19,7 +22,7 @@ def calculate(
     **kwargs
 ) -> pd.Series:
     """
-    Calculate SMA (Simple Moving Average).
+    Calculate SMA (Simple Moving Average) using pandas-ta.
 
     Args:
         data: OHLCV DataFrame
@@ -28,9 +31,6 @@ def calculate(
 
     Returns:
         Series with SMA values
-
-    Formula:
-        SMA = Sum of prices over period / period
     """
     # Get close prices
     close = get_close(data)
@@ -42,8 +42,8 @@ def calculate(
     else:
         combined = close
 
-    # Calculate SMA
-    sma = combined.rolling(window=period, min_periods=1).mean()
+    # Calculate SMA using pandas-ta
+    sma = pandas_ta.sma(combined, length=period)
 
     # Extract only current period
     result_len = len(data)

@@ -5,9 +5,12 @@ Syntax: roc_<period>
 Example: roc_12
 
 Returns: Series with ROC values (percentage change)
+
+Uses pandas-ta library for canonical implementation.
 """
 
 import pandas as pd
+import pandas_ta
 from typing import Optional
 from ..utils.helpers import get_close
 
@@ -19,7 +22,7 @@ def calculate(
     **kwargs
 ) -> pd.Series:
     """
-    Calculate ROC (Rate of Change) / Momentum.
+    Calculate ROC (Rate of Change) / Momentum using pandas-ta.
 
     Args:
         data: OHLCV DataFrame
@@ -28,9 +31,6 @@ def calculate(
 
     Returns:
         Series with ROC values (percentage change)
-
-    Formula:
-        ROC = ((Close - Close[n periods ago]) / Close[n periods ago]) * 100
     """
     # Get close prices
     close = get_close(data)
@@ -42,8 +42,8 @@ def calculate(
     else:
         combined = close
 
-    # Calculate ROC
-    roc = ((combined - combined.shift(period)) / combined.shift(period) * 100)
+    # Calculate ROC using pandas-ta
+    roc = pandas_ta.roc(combined, length=period)
 
     # Extract only current period
     result_len = len(data)

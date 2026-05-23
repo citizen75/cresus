@@ -5,10 +5,12 @@ Syntax: adx_<period>
 Example: adx_14
 
 Returns: Series with ADX values (0-100)
+
+Uses pandas-ta library for canonical implementation.
 """
 
 import pandas as pd
-import numpy as np
+import pandas_ta
 from typing import Optional
 from ..utils.helpers import get_high, get_low, get_close
 
@@ -20,7 +22,7 @@ def calculate(
     **kwargs
 ) -> pd.Series:
     """
-    Calculate ADX (Average Directional Index).
+    Calculate ADX (Average Directional Index) using pandas-ta.
 
     Args:
         data: OHLCV DataFrame with HIGH, LOW, CLOSE columns
@@ -29,15 +31,6 @@ def calculate(
 
     Returns:
         Series with ADX values (0-100, trend strength)
-
-    Formula:
-        +DM = High - High[previous] (if positive and > -DM)
-        -DM = Low[previous] - Low (if positive and > +DM)
-        TR = max(High - Low, abs(High - Close[prev]), abs(Low - Close[prev]))
-        +DI = 100 * (+DM / TR) smoothed
-        -DI = 100 * (-DM / TR) smoothed
-        DX = 100 * |+DI - -DI| / (+DI + -DI)
-        ADX = EMA of DX
     """
     # Get OHLC
     try:
@@ -61,35 +54,12 @@ def calculate(
         except Exception:
             pass
 
-    # Calculate True Range
-    tr1 = high - low
-    tr2 = (high - close.shift(1)).abs()
-    tr3 = (low - close.shift(1)).abs()
-    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    # Calculate ADX using pandas-ta
+    adx_df = pandas_ta.adx(high, low, close, length=period)
 
-    # Calculate Directional Movements
-    up = high - high.shift(1)
-    down = low.shift(1) - low
-
-    # Determine positive and negative directional movements
-    plus_dm = np.where((up > down) & (up > 0), up, 0)
-    minus_dm = np.where((down > up) & (down > 0), down, 0)
-
-    # Calculate Directional Indicators
-    tr_smooth = tr.rolling(window=period, min_periods=1).sum()
-    plus_dm_smooth = pd.Series(plus_dm).rolling(window=period, min_periods=1).sum()
-    minus_dm_smooth = pd.Series(minus_dm).rolling(window=period, min_periods=1).sum()
-
-    plus_di = 100 * (plus_dm_smooth / tr_smooth)
-    minus_di = 100 * (minus_dm_smooth / tr_smooth)
-
-    # Calculate DX
-    dx_denom = plus_di + minus_di
-    dx = 100 * ((plus_di - minus_di).abs() / dx_denom)
-    dx = dx.fillna(0)
-
-    # Calculate ADX (EMA of DX)
-    adx = dx.ewm(span=period, adjust=False).mean()
+    # pandas-ta returns DataFrame with ADX_<period>, DMP_<period>, DMN_<period>
+    adx_col = f"ADX_{period}"
+    adx = adx_df[adx_col]
 
     # Extract only current period
     result_len = len(data)
