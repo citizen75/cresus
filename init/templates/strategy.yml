@@ -18,6 +18,8 @@ indicators:
   - obv_ema_10
   - vwap
   - mfi_14
+  - cmf
+  - ad
   - roc_5
   - roc_10
   - roc_20
@@ -176,6 +178,33 @@ features:
       - name: vol_mfi14
         formula: mfi_14
         description: Money Flow Index - RSI weighted by volume
+
+    # Volume profile alphas - capture volume concentration and distribution patterns
+    volume_profile:
+      - name: vp_cmf
+        formula: cmf
+        description: Chaikin Money Flow - volume-weighted momentum accumulation
+      - name: vp_cmf_signal
+        formula: cmf > 0
+        description: Bullish CMF signal (positive money flow)
+      - name: vp_ad
+        formula: ad
+        description: Accumulation/Distribution Line - cumulative money flow
+      - name: vp_volume_at_high
+        formula: volume[0] * (high[0] - close[0]) / (high[0] - low[0])
+        description: Volume concentration at daily highs (supply)
+      - name: vp_volume_at_low
+        formula: volume[0] * (close[0] - low[0]) / (high[0] - low[0])
+        description: Volume concentration at daily lows (demand)
+      - name: vp_volume_profile_ratio
+        formula: vp_volume_at_low[0] / (vp_volume_at_high[0] + 0.001)
+        description: Demand/Supply ratio from volume distribution
+      - name: vp_price_volume_correlation
+        formula: (close[0] - close[-5]) * volume[0] / close[0]
+        description: Price-volume correlation strength over 5 days
+      - name: vp_volume_cluster
+        formula: (volume[0] + volume[-1] + volume[-2]) / 3 / volume_sma_20[0]
+        description: Volume clustering ratio (recent vol vs average)
 
     # Cross-asset correlation alphas
     correlations:
