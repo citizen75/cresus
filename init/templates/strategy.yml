@@ -14,6 +14,23 @@ indicators:
   - adx_14
   - adx_20
   - macd_12_26
+  - obv
+  - obv_ema_10
+  - vwap
+  - mfi_14
+  - roc_5
+  - roc_10
+  - roc_20
+  - roc_60
+  - roc_120
+  - roc_250
+  - rsi_14
+  - sma_20
+  - sma_50
+  - sma_200
+  - bb_20_upper
+  - bb_20_lower
+  - volume_sma_20
 
 # Watchlist configuration - which tickers to trade
 watchlist:
@@ -138,6 +155,27 @@ features:
       - name: trend_ema_slope
         formula: sma_20[0] - sma_50[0]
         description: Short MA vs medium MA slope
+
+    # Volume analysis alphas - capture volume patterns and price-volume relationships
+    volume:
+      - name: vol_obv
+        formula: obv
+        description: On-Balance Volume - cumulative volume flow indicator
+      - name: vol_obv_ema10
+        formula: obv_ema_10
+        description: OBV smoothed with 10-day EMA for trend confirmation
+      - name: vol_vwap
+        formula: vwap
+        description: Volume Weighted Average Price - volume-weighted price level
+      - name: vol_vwap_deviation
+        formula: (close[0] - vwap[0]) / vwap[0]
+        description: Price deviation from VWAP as percentage
+      - name: vol_price_above_vwap
+        formula: close[0] > vwap[0]
+        description: Price trading above VWAP (bullish volume signal)
+      - name: vol_mfi14
+        formula: mfi_14
+        description: Money Flow Index - RSI weighted by volume
 
     # Cross-asset correlation alphas
     correlations:
