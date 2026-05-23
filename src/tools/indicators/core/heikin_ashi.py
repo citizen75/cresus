@@ -165,12 +165,16 @@ def calculate_smooth(
     ha_high = ha_dict["ha_high"]
     ha_low = ha_dict["ha_low"]
     ha_close = ha_dict["ha_close"]
-    
-    # Apply EMA smoothing to all components
-    sha_open = ha_open.ewm(span=period, adjust=False).mean()
+
+    # Apply EMA smoothing to components
+    # For open/close, use RAW values smoothed to avoid drift
+    # (smoothing raw values prevents the accumulated drift of HA Open over thousands of bars)
+    sha_open = pd.Series(raw_open).ewm(span=period, adjust=False).mean()
+    sha_close = pd.Series(raw_close).ewm(span=period, adjust=False).mean()
+
+    # For high/low, smooth the HA values as they provide better wicks
     sha_high_ema = ha_high.ewm(span=period, adjust=False).mean()
     sha_low_ema = ha_low.ewm(span=period, adjust=False).mean()
-    sha_close = ha_close.ewm(span=period, adjust=False).mean()
 
     # Ensure basic geometric validity
     sha_high = pd.concat([sha_open, sha_high_ema, sha_close], axis=1).max(axis=1)
