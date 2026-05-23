@@ -168,11 +168,22 @@ async def get_ticker_historical(
 		# Normalize column names to lowercase for consistency
 		df.columns = df.columns.str.lower()
 
-		# Calculate EMA_20 and EMA_50
+		# Calculate indicators using centralized indicators module
 		if 'close' in df.columns:
-			close = pd.to_numeric(df['close'], errors='coerce')
-			df['ema_20'] = close.ewm(span=20, adjust=False).mean()
-			df['ema_50'] = close.ewm(span=50, adjust=False).mean()
+			from tools.indicators.indicators import calculate
+
+			try:
+				# Calculate EMA_20 and EMA_50 using indicators module
+				indicators_result = calculate(['ema_20', 'ema_50'], df)
+				for ind_name, ind_series in indicators_result.items():
+					df[ind_name] = ind_series.values
+			except Exception as e:
+				# Fall back to direct calculation if indicators fail
+				from loguru import logger
+				logger.warning(f"Indicator calculation failed for {ticker}: {e}, using fallback")
+				close = pd.to_numeric(df['close'], errors='coerce')
+				df['ema_20'] = close.ewm(span=20, adjust=False).mean()
+				df['ema_50'] = close.ewm(span=50, adjust=False).mean()
 
 		# Convert to list of dicts
 		records = []
