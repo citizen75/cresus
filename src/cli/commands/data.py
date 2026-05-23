@@ -244,6 +244,47 @@ class DataCommands:
 			table.add_row(u)
 		console.print(table)
 
+	def _calculate_alphas(self, df: pd.DataFrame, indicators: list) -> dict:
+		"""Calculate feature alphas from base indicators - sample alphas that work."""
+		alphas_dict = {}
+		try:
+			latest = df.iloc[-1]
+
+			# Momentum alphas
+			if 'roc_5' in df.columns:
+				alphas_dict['mom_roc5'] = float(latest['roc_5'])
+			if 'roc_20' in df.columns:
+				alphas_dict['mom_roc20'] = float(latest['roc_20'])
+			if 'rsi_14' in df.columns:
+				alphas_dict['mom_rsi14'] = float(latest['rsi_14'])
+
+			# Volatility alphas
+			if 'atr_14' in df.columns and 'close' in df.columns:
+				alphas_dict['vol_atr14'] = float(latest['atr_14'])
+				alphas_dict['vol_atr_pct'] = float(latest['atr_14'] / latest['close'] * 100)
+
+			# Trend alphas
+			if 'adx_14' in df.columns:
+				alphas_dict['trend_adx14'] = float(latest['adx_14'])
+			if 'ema_10' in df.columns and 'ema_20' in df.columns:
+				alphas_dict['mom_ema_spread'] = float(latest['ema_10'] - latest['ema_20'])
+				alphas_dict['mom_ema_uptrend'] = float(1 if latest['ema_10'] > latest['ema_20'] else 0)
+
+			# Volume alphas
+			if 'volume_sma_20' in df.columns and 'volume' in df.columns:
+				alphas_dict['vol_expansion'] = float(latest['volume'] / latest['volume_sma_20'])
+
+			# Bollinger Bands alphas
+			if 'bb_20_upper' in df.columns and 'bb_20_lower' in df.columns and 'close' in df.columns:
+				bb_width = latest['bb_20_upper'] - latest['bb_20_lower']
+				alphas_dict['bb_width'] = float(bb_width)
+				if 'bb_20_middle' in df.columns:
+					alphas_dict['bb_percent_b'] = float((latest['close'] - latest['bb_20_lower']) / bb_width) if bb_width > 0 else 0.5
+		except Exception as e:
+			pass
+
+		return alphas_dict
+
 	def _handle_indicators(self, parts):
 		"""Handle data indicators command to show technical indicators."""
 		if len(parts) < 2:
@@ -343,16 +384,26 @@ class DataCommands:
 			for ind_name, ind_series in indicators_result.items():
 				df[ind_name] = ind_series.values
 
+			# Calculate alphas if no specific indicators requested (show all)
+			alphas_to_show = []
+			if not indicator_args:
+				try:
+					alphas_to_show = self._calculate_alphas(df, requested_indicators)
+				except Exception as e:
+					console.print(f"[dim]Note: Could not calculate alphas: {e}[/dim]")
+
 			# Display the requested values in a table
-			self._display_indicators_table(ticker, df, requested_indicators, offset=offset, target_date=target_date)
+			self._display_indicators_table(ticker, df, requested_indicators, alphas=alphas_to_show, offset=offset, target_date=target_date)
 
 		except Exception as e:
 			console.print(f"[red]✗[/red] Error: {e}")
 			import traceback
 			console.print(f"[dim]{traceback.format_exc()}[/dim]")
 
-	def _display_indicators_table(self, ticker: str, df: pd.DataFrame, indicators: list, offset: int = None, target_date: str = None):
-		"""Display indicators in a formatted table."""
+	def _display_indicators_table(self, ticker: str, df: pd.DataFrame, indicators: list, alphas: dict = None, offset: int = None, target_date: str = None):
+		"""Display indicators and alphas in a formatted table."""
+		if alphas is None:
+			alphas = {}
 		if df.empty:
 			console.print(f"[yellow]⚠[/yellow] No data available")
 			return
@@ -477,8 +528,24 @@ class DataCommands:
 			else:
 				table.add_row(ind, "[red]N/A[/red]")
 
+		# Add alphas if available
+		if alphas:
+			for alpha_name, alpha_value in sorted(alphas.items()):
+				if isinstance(alpha_value, (int, float)):
+					if abs(alpha_value) >= 100 or alpha_name.startswith("vol"):
+						formatted = f"{alpha_value:.2f}"
+					elif alpha_name.startswith("rsi") or alpha_name.startswith("adx") or alpha_name.startswith("bb"):
+						formatted = f"{alpha_value:.4f}"
+					elif isinstance(alpha_value, bool) or alpha_value in (0, 1):
+						formatted = f"{int(alpha_value)}"
+					else:
+						formatted = f"{alpha_value:.4f}"
+				else:
+					formatted = str(alpha_value)
+				table.add_row(f"[dim]{alpha_name}[/dim]", f"[dim]{formatted}[/dim]")
+
 		console.print(table)
-		console.print(f"\n[dim]Total columns: {len(df.columns)}, Total rows: {len(df)}[/dim]")
+		console.print(f"\n[dim]Total columns: {len(df.columns)}, Total rows: {len(df)}, Alphas shown: {len(alphas)}[/dim]")
 
 	def _print_result(self, result):
 		"""Print simple result."""
