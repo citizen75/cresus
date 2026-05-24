@@ -70,10 +70,18 @@ class PositionSizingAgent(Agent):
 				if strategy_result.get("status") == "success":
 					strategy_data = strategy_result.get("data", {})
 					entry_config = strategy_data.get("entry", {}).get("parameters", {})
-					if "position_sizing" in entry_config:
+					order_config = strategy_data.get("order", {}).get("parameters", {})
+
+					# Check order.parameters first (preferred location)
+					if "position_sizing" in order_config:
+						position_sizing_config = order_config["position_sizing"]
+						if position_sizing_config:
+							self.logger.info(f"Using position_sizing config from order: {position_sizing_config}")
+					# Fall back to entry.parameters (legacy location)
+					elif "position_sizing" in entry_config:
 						position_sizing_config = entry_config["position_sizing"]
 						if position_sizing_config:
-							self.logger.info(f"Using position_sizing config from strategy: {position_sizing_config}")
+							self.logger.info(f"Using position_sizing config from entry: {position_sizing_config}")
 					elif "position_size" in entry_config:
 						# Backward compatibility: legacy formula-based sizing
 						position_sizing_config = {"type": "formula", "formula": entry_config["position_size"].get("formula")}
