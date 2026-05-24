@@ -38,10 +38,6 @@ class EntryFilterAgent(Agent):
 		data_history = self.context.get("data_history") or {}
 		strategy_name = self.context.get("strategy_name")
 
-		#print(f"[ENTRY-FILTER] Starting with {len(watchlist)} tickers in watchlist")
-		#watchlist_tickers = watchlist.keys()
-		#print(f"[ENTRY-FILTER] Watchlist: {watchlist_tickers}...")
-
 		if not watchlist:
 			self.logger.debug("[ENTRY-FILTER] No tickers in watchlist to filter")
 			return {
@@ -115,51 +111,10 @@ class EntryFilterAgent(Agent):
 					filtered_watchlist[ticker] = ticker_data
 					continue
 
-				# Get last 5 days of data for evaluation (supports shift notation like [-1], [-2])
-				# Data is sorted newest-first, so [:5] gets the most recent 5 days
-				last_5_days = df.iloc[:5].copy() if len(df) >= 5 else df.copy()
-
-				#print(f"[ENTRY-FILTER] {ticker}: Evaluating with {len(last_5_days)} rows of data")
-				#print(f"[ENTRY-FILTER] {ticker}: Data columns: {list(last_5_days.columns)}")
-				#print(f"[ENTRY-FILTER] {ticker}: Data sample:\n{last_5_days.head(5)}")
-
-				#print(f"[ENTRY-FILTER] {ticker}: {data_history.get(ticker, 'No data in context').columns if ticker in data_history else 'No data in context'}")
-				#print(f"[ENTRY-FILTER] {ticker}: {data_history.get(ticker, 'No data in context')}")
-
-				# Debug: Show available columns and values for first few rows
-				if len(last_5_days) > 0:
-					available_cols = list(last_5_days.columns)
-					self.logger.debug(f"[ENTRY-FILTER] {ticker}: Available columns: {available_cols}")
-					if 'sha_10_red' in available_cols and 'sha_10_green' in available_cols:
-						for i in range(min(3, len(last_5_days))):
-							row = last_5_days.iloc[i]
-							self.logger.debug(f"[ENTRY-FILTER] {ticker}[{i}]: sha_10_red={row.get('sha_10_red')}, sha_10_green={row.get('sha_10_green')}, sha_10_bullish={row.get('sha_10_bullish')}")
-
-				# Evaluate entry_filter formula
+				# Evaluate entry_filter formula (evaluate() handles sorting and shift notation)
 				try:
-					self.logger.info(f"[ENTRY-FILTER] {ticker}: Evaluating formula '{entry_filter_formula}' on {len(last_5_days)} rows")
-
-					# Debug: Show actual values at each index
-					if len(last_5_days) > 0 and 'sha_10_red' in last_5_days.columns:
-						self.logger.info(f"[ENTRY-FILTER] {ticker}: sha_10_red values: {list(last_5_days['sha_10_red'].iloc[:3].values)}")
-					if len(last_5_days) > 0 and 'sha_10_bullish' in last_5_days.columns:
-						self.logger.info(f"[ENTRY-FILTER] {ticker}: sha_10_bullish values: {list(last_5_days['sha_10_bullish'].iloc[:3].values)}")
-
-					# Debug: Check individual parts
-					if len(last_5_days) > 0:
-						try:
-							red_prev = evaluate("sha_10_red[-1] == 1", last_5_days)
-							self.logger.info(f"[ENTRY-FILTER] {ticker}: sha_10_red[-1] == 1 evaluates to {red_prev}")
-						except Exception as e:
-							self.logger.info(f"[ENTRY-FILTER] {ticker}: sha_10_red[-1] error: {e}")
-						try:
-							bullish_now = evaluate("sha_10_bullish[0] == 1", last_5_days)
-							self.logger.info(f"[ENTRY-FILTER] {ticker}: sha_10_bullish[0] == 1 evaluates to {bullish_now}")
-						except Exception as e:
-							self.logger.info(f"[ENTRY-FILTER] {ticker}: sha_10_bullish[0] error: {e}")
-
-					passes_filter = evaluate(entry_filter_formula, last_5_days)
-					self.logger.info(f"[ENTRY-FILTER] {ticker}: Combined formula result = {passes_filter}")
+					self.logger.debug(f"[ENTRY-FILTER] {ticker}: Evaluating formula '{entry_filter_formula}'")
+					passes_filter = evaluate(entry_filter_formula, df)
 					if passes_filter:
 						self.logger.debug(f"[ENTRY-FILTER] {ticker}: PASS")
 						passed_tickers.append(ticker)

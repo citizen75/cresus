@@ -157,11 +157,15 @@ class WatchlistManager:
 
 					# Handle both DataFrame and empty cases
 					if isinstance(ticker_data, pd.DataFrame) and not ticker_data.empty:
-						# Get latest row
-						latest = ticker_data.iloc[-1]
-
-						# Extract OHLCV columns (handle both cases)
-						date = latest.get("timestamp", latest.name) if hasattr(latest, "get") else latest.get("timestamp", latest.index)
+						# Get latest row by timestamp (not by position, which depends on sort order)
+						if "timestamp" in ticker_data.columns:
+							latest_idx = ticker_data["timestamp"].idxmax()
+							latest = ticker_data.loc[latest_idx]
+							date = latest.get("timestamp") if hasattr(latest, "get") else latest["timestamp"]
+						else:
+							# Fallback: use iloc[-1] if no timestamp column
+							latest = ticker_data.iloc[-1]
+							date = latest.get("timestamp", latest.name) if hasattr(latest, "get") else latest.get("timestamp", latest.index)
 
 						row = {
 							"ticker": ticker,

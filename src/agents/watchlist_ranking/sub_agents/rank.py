@@ -125,7 +125,7 @@ class RankAgent(Agent):
 		for col, weight in indicator_weights.items():
 			if col in X.columns:
 				# Normalize column to 0-1
-				col_data = X[col]
+				col_data = X[col].values
 				col_min = col_data.min()
 				col_max = col_data.max()
 
@@ -134,6 +134,6 @@ class RankAgent(Agent):
 				else:
 					normalized = np.zeros(len(col_data))
 
-				scores += normalized.values * weight
+				scores += normalized * weight
 
 		return scores / sum(indicator_weights.values())

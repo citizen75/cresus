@@ -48,6 +48,17 @@ class WatchlistRankingAgent(Agent):
 		watchlist_before = self.context.get("watchlist")
 		self.logger.debug(f"[WATCHLIST-RANKING] Watchlist at start: {type(watchlist_before)} with {len(watchlist_before) if watchlist_before else 0} items")
 
+		# In rank mode, skip if watchlist is empty
+		watchlist = self.context.get("watchlist")
+		if mode == "rank" and not watchlist:
+			self.logger.info(f"[WATCHLIST-RANKING] Watchlist is empty, skipping ranking")
+			return {
+				"status": "success",
+				"input": input_data,
+				"output": {"scores": {}, "ranked": []},
+				"message": "No tickers to rank"
+			}
+
 		# Step 1: Extract features
 		features_agent = FeaturesAgent("FeaturesStep", self.context)
 		features_result = features_agent.process(input_data)
@@ -110,14 +121,7 @@ class WatchlistRankingAgent(Agent):
 		# Update watchlist with ranking scores and sort
 		watchlist = self.context.get("watchlist")
 		watchlist_len = len(watchlist) if isinstance(watchlist, (dict, list)) else 0
-		self.logger.warning(f"[WATCHLIST-RANKING] Watchlist before update: {type(watchlist).__name__} with {watchlist_len} items (watchlist bool={bool(watchlist)})")
-
-		# Force update even if watchlist appears empty but scores exist
-		if watchlist or scores:
-			if not watchlist:
-				# Watchlist is empty but we have scores - create it from scores
-				self.logger.warning(f"[WATCHLIST-RANKING] Watchlist is empty, creating from {len(scores)} ranking scores")
-				watchlist = {ticker: {} for ticker in scores.keys()}
+		self.logger.debug(f"[WATCHLIST-RANKING] Watchlist before update: {type(watchlist).__name__} with {watchlist_len} items")
 
 		if watchlist:
 			if isinstance(watchlist, dict):

@@ -41,7 +41,7 @@ class PostMarketFlow(Flow):
 		"""Set up post-market flow steps (called once at init)."""
 		# Add OrdersAgent to expire pending orders
 		orders_agent = OrdersAgent("OrdersExpireStep", self.context)
-		self.add_step(orders_agent, required=False)
+		self.add_step(orders_agent, required=True)
 
 	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
 		"""Execute post-market flow at end of trading day.

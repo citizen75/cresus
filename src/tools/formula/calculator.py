@@ -55,7 +55,7 @@ def evaluate(formula: str, data: Union[dict, pd.DataFrame]) -> bool:
 		formula: DSL or traditional pandas formula string
 		data: Dictionary of column values or DataFrame for the formula
 		      - dict: evaluates current bar (shift notation not supported)
-		      - DataFrame: supports shift notation (data must be sorted newest-first)
+		      - DataFrame: supports shift notation (automatically sorted newest-first if needed)
 
 	Returns:
 		Boolean result of the formula evaluation
@@ -68,6 +68,24 @@ def evaluate(formula: str, data: Union[dict, pd.DataFrame]) -> bool:
 		raise ValueError("Formula cannot be empty")
 
 	try:
+		# Ensure DataFrame is sorted newest-first (descending by timestamp) for shift notation
+		if isinstance(data, pd.DataFrame) and not data.empty:
+			# Check if data is sorted newest-first by comparing first and last timestamps
+			if 'timestamp' in data.columns:
+				first_ts = pd.to_datetime(data['timestamp'].iloc[0])
+				last_ts = pd.to_datetime(data['timestamp'].iloc[-1])
+				if first_ts < last_ts:
+					# Data is sorted oldest-first (ascending), reverse it
+					data = data.sort_values('timestamp', ascending=False).reset_index(drop=True)
+			else:
+				# No timestamp, check index order
+				if len(data) > 1 and data.index[0] > data.index[-1]:
+					# Index is descending, which means data is newest-first
+					pass
+				else:
+					# Index is ascending, reverse by index
+					data = data.sort_index(ascending=False)
+
 		# Try DSL parsing first
 		if is_dsl_formula(formula):
 			# If using dict data, convert bare indicator names to [0] notation for consistency

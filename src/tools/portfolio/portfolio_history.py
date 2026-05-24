@@ -27,6 +27,7 @@ class PortfolioHistory:
             data_manager: Optional DataManager for centralized data fetching
         """
         self.portfolio_name = portfolio_name
+        self.context = context
         self.journal = Journal(portfolio_name, context=context)
         self.initial_capital = initial_capital
         self.data_manager = data_manager or DataManager(Path.cwd())
@@ -93,9 +94,23 @@ class PortfolioHistory:
         ticker_history = {}
         failed_tickers = []
 
+        # Check if data_history is already in context (backtest mode)
+        context_data_history = None
+        if self.context:
+            context_data_history = self.context.get("data_history") or {}
+
         from tools.data import DataHistory
 
         for ticker in tickers:
+            # Try to load from context first (if available and in backtest mode)
+            if context_data_history and ticker in context_data_history:
+                df_all = context_data_history[ticker]
+                if df_all is not None and not df_all.empty:
+                    ticker_history[ticker] = df_all
+                    logger.debug(f"  Loaded {len(df_all)} rows for {ticker} (context)")
+                    continue
+
+            # Fall back to disk cache
             dh = DataHistory(ticker)
 
             if use_cache_only:

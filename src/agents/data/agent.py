@@ -133,8 +133,14 @@ class DataAgent(Agent):
 		# Skip recalculation if indicators already exist in all tickers
 		indicators_calculated = {}
 		if indicators and data_history:
-			# Check if all indicators already exist in all tickers
-			missing_indicators = self._find_missing_indicators(data_history, indicators)
+			# If data_history was already in context, indicators are already calculated in memory
+			# Only recalculate if data was freshly loaded from cache
+			if existing_data_history:
+				self.logger.debug(f"Data already in context, skipping indicator recalculation")
+				missing_indicators = []
+			else:
+				# Check if all indicators already exist in all tickers
+				missing_indicators = self._find_missing_indicators(data_history, indicators)
 
 			if missing_indicators:
 				self.logger.info(f"Calculating {len(missing_indicators)} missing indicators for {len(data_history)} tickers: {missing_indicators}")

@@ -1,6 +1,7 @@
 """Strategy agent for executing trading strategies."""
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
+import re
 from core.agent import Agent
 from tools.strategy.strategy import StrategyManager
 from tools.strategy.validator import StrategyValidator
@@ -54,6 +55,9 @@ class StrategyAgent(Agent):
 								"validation_errors": validation_errors
 							}
 
+						# Extract indicators from filter formula and add to strategy config
+						self._add_filter_indicators_to_config(strategy_config)
+
 						self.context.set("strategy_config", strategy_config)
 						self.logger.info(f"Loaded and validated strategy: {strategy_name}")
 					else:
@@ -75,12 +79,17 @@ class StrategyAgent(Agent):
 
 		tickers = input_data.get("tickers", [])
 
-		# If no tickers in input, load from strategy universe
+		# If no tickers in input, load from strategy universe or direct tickers
 		if not tickers and strategy_config:
 			universe = strategy_config.get("universe")
 			if universe:
 				tickers = self._load_tickers_from_source(universe)
 				self.logger.info(f"Loaded {len(tickers)} tickers from universe '{universe}'")
+			else:
+				# Fallback: check for direct tickers in strategy config
+				tickers = strategy_config.get("tickers", [])
+				if tickers:
+					self.logger.info(f"Loaded {len(tickers)} tickers directly from strategy config: {tickers}")
 
 		# Store tickers in context for downstream agents
 		self.context.set("tickers", tickers)
@@ -93,6 +102,46 @@ class StrategyAgent(Agent):
 				"tickers": tickers,
 			},
 		}
+
+	def _add_filter_indicators_to_config(self, config: Dict[str, Any]) -> None:
+		"""Extract indicators from filter formula and add to strategy config.
+
+		Finds all indicator references in the watchlist filter formula and ensures
+		they're included in the strategy config's indicators list so they're
+		calculated by DataAgent before FilterAgent runs.
+
+		Note: Indicators are usually already in the config, so this is a safety net.
+		Most indicators should be declared upfront in the strategy config.
+
+		Args:
+			config: Strategy configuration dict (modified in-place)
+		"""
+		watchlist_config = config.get("watchlist", {})
+		filter_config = watchlist_config.get("parameters", {}).get("filter", {})
+		filter_formula = filter_config.get("formula")
+
+		if not filter_formula:
+			return
+
+		# Extract only from the filter formula (DSL syntax: bare indicator names)
+		# Only extract identifiers that look like indicator names (contain underscore or all lowercase)
+		pattern = r'\b([a-z_][a-z0-9_]*)\b'
+		matches = re.findall(pattern, filter_formula.lower())
+
+		# Filter out common non-indicator words
+		non_indicators = {"and", "or", "not", "if", "else"}
+		required_indicators = [m for m in set(matches) if m not in non_indicators and "_" in m]
+
+		if not required_indicators:
+			return
+
+		# Add to strategy config indicators if not already there
+		current_indicators = config.get("indicators", [])
+		added_indicators = [ind for ind in required_indicators if ind not in current_indicators]
+
+		if added_indicators:
+			config["indicators"] = current_indicators + added_indicators
+			self.logger.debug(f"Added filter indicators to strategy config: {added_indicators}")
 
 	def _load_tickers_from_source(self, source: str) -> list:
 		"""Load tickers from universe CSV file.

@@ -10,17 +10,17 @@ from tools.formula import evaluate
 from tools.strategy.strategy import StrategyManager
 
 
-class TrendAgent(Agent):
-	"""Analyze trends using formula from strategy configuration.
+class FilterAgent(Agent):
+	"""Filter watchlist using formula from strategy configuration.
 
-	Reads tickers, data_history, and trend formula from context.
-	Filters tickers where the trend formula evaluates to True.
+	Reads tickers, data_history, and filter formula from context.
+	Filters tickers where the filter formula evaluates to True.
 	Formula is a Python expression evaluated on each row of data.
 
 	Example formula: "data['close'] > data['ema_20'] and data['ema_20'] > data['ema_50'] and data['adx_14'] > 25"
 	"""
 
-	def __init__(self, name: str = "TrendAgent"):
+	def __init__(self, name: str = "FilterAgent"):
 		"""Initialize trend agent.
 
 		Args:
@@ -29,10 +29,10 @@ class TrendAgent(Agent):
 		super().__init__(name)
 
 	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-		"""Analyze trends using formula from strategy config.
+		"""Filter watchlist using formula from strategy config.
 
-		Reads 'watchlist', 'data_history', and trend formula from context.
-		Evaluates trend formula on latest row of each ticker's data.
+		Reads 'watchlist', 'data_history', and filter formula from context.
+		Evaluates filter formula on latest row of each ticker's data.
 		Stores filtered tickers back in context.
 
 		Args:
@@ -41,6 +41,7 @@ class TrendAgent(Agent):
 		Returns:
 			Response with trend analysis results
 		"""
+		self.logger.debug("[WATCHLIST][FILTER] Starting trend analysis")
 		if input_data is None:
 			input_data = {}
 
@@ -49,6 +50,7 @@ class TrendAgent(Agent):
 		strategy_config = self.context.get("strategy_config")
 
 		if not watchlist:
+			self.logger.error("No watchlist available in context for filter analysis")
 			return {
 				"status": "error",
 				"input": input_data,
@@ -84,20 +86,6 @@ class TrendAgent(Agent):
 				}
 			}
 
-		# Extract and add required indicators to strategy config
-		required_indicators = self._extract_indicators(trend_formula)
-		if required_indicators and strategy_config:
-			current_indicators = strategy_config.get("indicators", [])
-			added_indicators = [ind for ind in required_indicators if ind not in current_indicators]
-			if added_indicators:
-				strategy_config["indicators"] = current_indicators + added_indicators
-				self.context.set("strategy_config", strategy_config)
-
-				# Save updated config to file
-				strategy_name = strategy_config.get("name")
-				if strategy_name:
-					self._save_strategy_config(strategy_name, strategy_config)
-				self.logger.debug(f"Added indicators to strategy config: {added_indicators}")
 
 		# Analyze trend for each ticker in watchlist
 		trending_watchlist = {}
@@ -106,35 +94,35 @@ class TrendAgent(Agent):
 		for ticker in list(watchlist.keys()):
 			if ticker in data_history:
 				ticker_data = data_history[ticker]
-				if self._matches_trend_formula(ticker_data, trend_formula):
+				if self._matches_filter_formula(ticker_data, trend_formula):
 					trending_watchlist[ticker] = watchlist[ticker]
 					pass_count += 1
-					self.logger.info(f"[TREND] {ticker}: PASS")
+					self.logger.info(f"[FILTER] {ticker}: PASS")
 				else:
 					fail_count += 1
-					self.logger.info(f"[TREND] {ticker}: FAIL")
+					self.logger.info(f"[FILTER] {ticker}: FAIL")
 
 		removed_count = len(watchlist) - len(trending_watchlist)
 		self.context.set("watchlist", trending_watchlist)
-
+		self.logger.debug(f"[FILTER] filtered watchlist: {len(trending_watchlist)} tickers passed, {removed_count} removed")
 		return {
 			"status": "success",
 			"input": input_data,
 			"output": {
-				"trend_count": len(trending_watchlist),
+				"filtered_count": len(trending_watchlist),
 				"removed_count": removed_count,
 				"formula_available": True
 			}
 		}
 
-	def _matches_trend_formula(self, ticker_data: Any, formula: str) -> bool:
-		"""Evaluate trend formula on latest row of ticker data.
+	def _matches_filter_formula(self, ticker_data: Any, formula: str) -> bool:
+		"""Evaluate filter formula on latest row of ticker data.
 
 		Supports both traditional 'data[col]' notation and DSL shift notation like 'col[0]', 'col[-1]'.
 
 		Args:
 			ticker_data: Price history DataFrame
-			formula: Python expression to evaluate (e.g., "sha_10_bullish[0] == 1")
+			formula: Python expression to evaluate (e.g., "sha_10_up[0] == 1")
 
 		Returns:
 			True if formula evaluates to True on latest row
@@ -143,62 +131,12 @@ class TrendAgent(Agent):
 			if not hasattr(ticker_data, 'iloc') or len(ticker_data) == 0:
 				return False
 
-			# Get last 5 bars for shift notation support (data is sorted newest-first)
-			last_5_days = ticker_data.iloc[:5].copy() if len(ticker_data) >= 5 else ticker_data.copy()
-
-			# Debug: show data timestamps
-			if 'timestamp' in last_5_days.columns:
-				timestamps = list(last_5_days['timestamp'].iloc[:3].values)
-				sha_bullish_vals = list(last_5_days['sha_10_bullish'].iloc[:3].values) if 'sha_10_bullish' in last_5_days.columns else []
-				self.logger.debug(f"[TREND] Data timestamps: {timestamps}, sha_10_bullish: {sha_bullish_vals}")
-
-			# Evaluate formula on DataFrame (supports shift notation like [0], [-1])
-			result = evaluate(formula, last_5_days)
-			self.logger.debug(f"[TREND] Formula '{formula}' evaluated to {result}")
+			# Pass full data to evaluate, which handles sorting and shift notation
+			result = evaluate(formula, ticker_data)
+			self.logger.debug(f"[FILTER] Formula '{formula}' evaluated to {result}")
 			return result
 
 		except Exception as e:
-			self.logger.info(f"[TREND] Error evaluating trend formula '{formula}': {e}")
+			self.logger.error(f"[FILTER] Error evaluating filter formula '{formula}': {e}")
 			return False
 
-	def _extract_indicators(self, formula: str) -> List[str]:
-		"""Extract indicator names from formula string.
-
-		Looks for patterns like data['indicator_name'] in the formula.
-
-		Args:
-			formula: Formula string
-
-		Returns:
-			List of unique indicator names found in formula
-		"""
-		# Find all patterns like data['xxx'] or data["xxx"]
-		pattern = r"data\[[\'\"]([^\)\'\"]+)[\'\"]"
-		matches = re.findall(pattern, formula)
-
-		# Filter out non-indicator columns (close, open, high, low, volume)
-		non_indicators = {"close", "open", "high", "low", "volume", "timestamp", "ticker"}
-		indicators = [m for m in matches if m.lower() not in non_indicators]
-
-		# Return unique indicators
-		return list(set(indicators))
-
-	def _save_strategy_config(self, strategy_name: str, config: Dict[str, Any]) -> None:
-		"""Save updated strategy config to file.
-
-		Args:
-			strategy_name: Name of the strategy
-			config: Updated strategy configuration
-		"""
-		try:
-			project_root = Path(os.environ.get("CRESUS_PROJECT_ROOT", "."))
-			strategy_manager = StrategyManager(project_root)
-			result = strategy_manager.save_strategy(strategy_name, config)
-
-			if result.get("status") == "success":
-				self.logger.info(f"Saved strategy config: {strategy_name}")
-			else:
-				self.logger.warning(f"Failed to save strategy config: {result.get('message')}")
-
-		except Exception as e:
-			self.logger.warning(f"Error saving strategy config: {e}")

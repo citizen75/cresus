@@ -283,7 +283,8 @@ def _register_all_indicators():
 
     try:
         # Volume indicators
-        from .volume import obv, mfi, cmf, volume_ratio, vwap, volume_ma
+        from .volume import ad, obv, mfi, cmf, volume_ratio, vwap, volume_ma
+        register_indicator("ad", ad.calculate)
         register_indicator("obv", obv.calculate)
         register_indicator("mfi", mfi.calculate)
         register_indicator("cmf", cmf.calculate)
@@ -412,9 +413,11 @@ def _register_indicator_modules(indicator_names: set) -> None:
 			pass
 	
 	# Volume indicators
-	if any(ind in indicator_names for ind in ["obv", "mfi", "cmf", "vratio", "vwap", "volume_sma"]):
+	if any(ind in indicator_names for ind in ["ad", "obv", "mfi", "cmf", "vratio", "vwap", "volume_sma"]):
 		try:
-			from .volume import obv, mfi, cmf, volume_ratio, vwap, volume_ma
+			from .volume import ad, obv, mfi, cmf, volume_ratio, vwap, volume_ma
+			if "ad" in indicator_names:
+				register_indicator("ad", ad.calculate)
 			if "obv" in indicator_names:
 				register_indicator("obv", obv.calculate)
 			if "mfi" in indicator_names:

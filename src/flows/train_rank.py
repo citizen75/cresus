@@ -63,7 +63,7 @@ class TrainRankFlow(Flow):
 		# Alphas step - calculate alpha factors from strategy config
 		# Adds named alpha columns to data_history for feature engineering
 		alphas_agent = WatchlistAlphasAgent("WatchlistAlphasAgent", self.context)
-		self.add_step(alphas_agent, step_name="alphas", required=False)
+		self.add_step(alphas_agent, step_name="alphas", required=True)
 		
 		# Ranking step - train LGBM model with walk-forward validation
 		ranking_agent = WatchlistRankingAgent("WatchlistRankingAgent", self.context)

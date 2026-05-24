@@ -153,27 +153,20 @@ class EntryAgent(Agent):
 		if input_data is None:
 			input_data = {}
 
-		# Get watchlist from context, fall back to signal-scored tickers if empty
+		# Get watchlist from context
 		watchlist = self.context.get("watchlist")
 		if not watchlist:
-			# Fall back to all signal-scored tickers if watchlist is empty
-			ticker_scores = self.context.get("ticker_scores") or {}
-			if ticker_scores:
-				# Use ALL signal-scored tickers, not just top 20
-				# This ensures entry_filter can evaluate reversal patterns which may have lower signal scores
-				watchlist = {t: {} for t in ticker_scores.keys()}
-				ticker_list = list(watchlist.keys())
-				self.logger.info(f"[ENTRY] Watchlist empty, using {len(watchlist)} signal-scored tickers: {ticker_list[:5]}{'...' if len(watchlist) > 5 else ''}")
-			else:
-				return {
-					"status": "error",
-					"input": input_data,
-					"output": {},
-					"message": "No watchlist or signal-scored tickers in context"
-				}
-		else:
-			ticker_list = list(watchlist.keys())
-			self.logger.info(f"[ENTRY] Starting entry analysis with {len(watchlist)} tickers: {ticker_list[:10]}{'...' if len(watchlist) > 10 else ''}")
+			# Watchlist is empty, respect the filter decision and return empty
+			self.logger.info(f"[ENTRY] Watchlist is empty after filtering, no entry analysis")
+			return {
+				"status": "success",
+				"input": input_data,
+				"output": {"filtered_count": 0, "entry_count": 0},
+				"message": "No tickers in watchlist"
+			}
+
+		ticker_list = list(watchlist.keys())
+		self.logger.info(f"[ENTRY] Starting entry analysis with {len(watchlist)} tickers: {ticker_list[:10]}{'...' if len(watchlist) > 10 else ''}")
 
 		# Set watchlist in context for sub-agents
 		self.context.set("watchlist", watchlist)

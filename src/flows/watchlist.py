@@ -73,7 +73,7 @@ class WatchlistFlow(Flow):
 		# Alphas step - calculate alpha factors from strategy config
 		# Adds named alpha columns to data_history for feature engineering
 		alphas_agent = WatchlistAlphasAgent("WatchlistAlphasAgent", self.context)
-		self.add_step(alphas_agent, step_name="alphas", required=False)
+		self.add_step(alphas_agent, step_name="alphas", required=True)
 
 		# Watchlist step - filter tickers based on strategy criteria and signal scores
 		watchlist_agent = WatchListAgent("WatchListAgent", self.context)
@@ -86,7 +86,7 @@ class WatchlistFlow(Flow):
 
 		# Ranking step - rank watchlist tickers using LGBM model (walk-forward validated)
 		ranking_agent = WatchlistRankingAgent("WatchlistRankingAgent", self.context)
-		self.add_step(ranking_agent, step_name="ranking", required=False)
+		self.add_step(ranking_agent, step_name="ranking", required=True)
 
 		# Note: Data slicing to target_date must happen BEFORE entry analysis
 		# so that entry_filter evaluates on the correct date's data

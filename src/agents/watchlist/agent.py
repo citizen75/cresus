@@ -4,7 +4,7 @@ from typing import Any, Dict, Optional
 from core.agent import Agent
 from core.flow import Flow
 from agents.data.agent import DataAgent
-from agents.watchlist.sub_agents import MaxTickersAgent, FilterVolumeAgent, RankTickersAgent, TrendAgent, VolatilityAgent, FilterStaleDataAgent, FilterOpenPositionsAgent
+from agents.watchlist.sub_agents import MaxTickersAgent, FilterVolumeAgent, RankTickersAgent, FilterAgent, VolatilityAgent, FilterStaleDataAgent, FilterOpenPositionsAgent
 
 
 class WatchListAgent(Agent):
@@ -38,27 +38,16 @@ class WatchListAgent(Agent):
 		self.context.set("watchlist", {})
 		self.logger.debug("Cleared watchlist at start of process")
 
-		# Step 1: Get tickers using DataAgent (skip if data already loaded in backtest)
-		data_result = DataAgent(self.name, self.context).process(input_data)
-
-		if data_result['status'] != 'success':
-			return {
-				'status': 'error',
-				'input': input_data,
-				'output': {'watchlist': [], 'count': 0},
-				'message': data_result['message']
-			}
-
-		# Ensure data_history is in context
+		# Verify data is already loaded by upstream DataAgent
 		if not self.context.get("data_history"):
 			return {
 				'status': 'error',
 				'input': input_data,
 				'output': {'watchlist': [], 'count': 0},
-				'message': "No data_history in context"
+				'message': "No data_history in context (DataAgent must run first)"
 			}
 
-		# Step 2: Get watchlist parameters from context strategy config
+		# Get watchlist parameters from context strategy config
 		watchlist_params = self._get_watchlist_parameters()
 
 		# Step 3: Initialize watchlist from tickers
@@ -86,18 +75,10 @@ class WatchListAgent(Agent):
 
 		if watchlist_params.get("trend_enabled", True):
 			watchlist_flow.add_step(
-				TrendAgent(
-					"TrendStep"
+				FilterAgent(
+					"FilterStep"
 				),
-				required=False
-			)
-
-		if watchlist_params.get("volatility_enabled", True):
-			watchlist_flow.add_step(
-				VolatilityAgent(
-					"VolatilityStep"
-				),
-				required=False
+				required=True
 			)
 
 		if watchlist_params.get("ranking_enabled", True):
@@ -182,7 +163,7 @@ class WatchListAgent(Agent):
 		params = watchlist_config.get("parameters", {})
 
 		# Check which filters are actually defined in the strategy config
-		has_trend = "trend" in params
+		has_filter = "filter" in params
 		has_volatility = "volatility" in params
 		has_ranking = "ranking" in params
 
@@ -195,7 +176,7 @@ class WatchListAgent(Agent):
 
 		return {
 			"volume_enabled": "volume" in params,
-			"trend_enabled": has_trend,
+			"trend_enabled": has_filter,
 			"volatility_enabled": has_volatility,
 			"ranking_enabled": has_ranking,
 			"metric": params.get("ranking", {}).get("metric", defaults["metric"]) if has_ranking else defaults["metric"],

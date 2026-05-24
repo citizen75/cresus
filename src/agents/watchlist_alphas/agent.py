@@ -48,6 +48,9 @@ class WatchlistAlphasAgent(Agent):
 				"message": "No data_history in context"
 			}
 
+		# Extract indicators to calculate from strategy config
+		required_indicators = strategy_config.get("indicators", [])
+
 		# Extract alphas from strategy config
 		features = strategy_config.get("features", {})
 		alphas_config = features.get("alphas", {})
@@ -62,9 +65,9 @@ class WatchlistAlphasAgent(Agent):
 			}
 
 		# Flatten alpha definitions from all categories
-		alpha_definitions = self._extract_alpha_definitions(alphas_config)
+		all_alpha_definitions = self._extract_alpha_definitions(alphas_config)
 
-		if not alpha_definitions:
+		if not all_alpha_definitions:
 			return {
 				"status": "success",
 				"input": input_data,
@@ -72,7 +75,11 @@ class WatchlistAlphasAgent(Agent):
 				"message": "No valid alphas extracted"
 			}
 
-		self.logger.info(f"[ALPHAS] Processing {len(alpha_definitions)} alphas for {len(data_history)} tickers")
+		# Optimization 3: Filter alphas to only those actually used
+		alpha_definitions = self._filter_used_alphas(all_alpha_definitions, strategy_config)
+
+		self.logger.info(f"[ALPHAS] Processing {len(alpha_definitions)}/{len(all_alpha_definitions)} alphas (filtered) for {len(data_history)} tickers")
+		self.logger.debug(f"[ALPHAS] Pre-calculating {len(required_indicators)} required indicators")
 
 		# Calculate alphas for each ticker
 		alphas_added = 0
@@ -84,24 +91,36 @@ class WatchlistAlphasAgent(Agent):
 				continue
 
 			try:
+				# Optimization 4: Cache pre-calculated indicators - check if already present
+				data_enriched = self._ensure_indicators_calculated(data, required_indicators, ticker)
+
+				# Collect calculated alphas to add all at once (avoid fragmentation)
+				alphas_to_add = {}
+
 				# Calculate each alpha for this ticker
 				for alpha_name, alpha_formula in alpha_definitions.items():
 					try:
-						# Skip if alpha already exists in the data
-						if alpha_name in data.columns:
-							self.logger.debug(f"[ALPHAS] Skipping {alpha_name} for {ticker} - already exists")
+						# Skip if alpha already exists in the data (cache)
+						if alpha_name in data_enriched.columns:
+							self.logger.debug(f"[ALPHAS] Skipping {alpha_name} for {ticker} - already cached")
 							alphas_skipped += 1
 							continue
 
-						# Evaluate the formula with the data
-						result = self._evaluate_formula(alpha_formula, data, ticker)
-
-						# Add alpha column to data
-						data[alpha_name] = result
+						# Evaluate the formula with the enriched data
+						result = self._evaluate_formula(alpha_formula, data_enriched, ticker)
+						alphas_to_add[alpha_name] = result
 						alphas_added += 1
 					except Exception as e:
 						errors.append(f"{alpha_name}: {str(e)}")
 						self.logger.debug(f"[ALPHAS] Error calculating {alpha_name} for {ticker}: {str(e)}")
+
+				# Add all alphas at once using pd.concat (avoid DataFrame fragmentation)
+				if alphas_to_add:
+					alpha_df = pd.DataFrame(alphas_to_add, index=data_enriched.index)
+					data_enriched = pd.concat([data_enriched, alpha_df], axis=1)
+
+				# Update the data_history with enriched data (includes calculated indicators and alphas)
+				data_history[ticker] = data_enriched
 
 			except Exception as e:
 				self.logger.error(f"[ALPHAS] Error processing {ticker}: {str(e)}")
@@ -117,7 +136,7 @@ class WatchlistAlphasAgent(Agent):
 		if errors:
 			self.logger.warning(f"[ALPHAS] {len(errors)} calculation errors")
 
-		self.logger.info(f"[ALPHAS] Added {alphas_added} alpha values, skipped {alphas_skipped} existing alphas across {len(data_history)} tickers")
+		self.logger.info(f"[ALPHAS] Added {alphas_added} alpha values, skipped {alphas_skipped} cached alphas across {len(data_history)} tickers")
 
 		return {
 			"status": "success",
@@ -126,12 +145,84 @@ class WatchlistAlphasAgent(Agent):
 				"alphas_calculated": alphas_added,
 				"alphas_skipped": alphas_skipped,
 				"alpha_count": len(alpha_definitions),
+				"total_alphas_available": len(all_alpha_definitions),
 				"ticker_count": len(data_history),
 				"errors": len(errors),
 				"alpha_names": list(alpha_definitions.keys())
 			},
-			"message": f"Processed {len(alpha_definitions)} alphas: {alphas_added} calculated, {alphas_skipped} skipped (already exist)"
+			"message": f"Processed {len(alpha_definitions)}/{len(all_alpha_definitions)} alphas: {alphas_added} calculated, {alphas_skipped} cached"
 		}
+
+	def _filter_used_alphas(self, all_alphas: Dict[str, str], strategy_config: Dict) -> Dict[str, str]:
+		"""Optimization 3: Filter alphas to only those used in signals or other alphas.
+
+		Args:
+			all_alphas: All defined alphas
+			strategy_config: Strategy configuration
+
+		Returns:
+			Filtered dict of only used alphas
+		"""
+		import re
+
+		# Collect all names that are referenced anywhere
+		referenced_names = set()
+
+		# Check signals
+		signals = strategy_config.get("signals", {})
+		if isinstance(signals, dict):
+			for signal_config in signals.values():
+				if isinstance(signal_config, dict):
+					formula = signal_config.get("formula", "")
+				else:
+					formula = str(signal_config)
+				referenced_names.update(self._extract_referenced_names(formula))
+
+		# Check entry/exit conditions
+		for section in ["entry", "exit", "watchlist"]:
+			section_config = strategy_config.get(section, {})
+			if isinstance(section_config, dict):
+				for key, val in section_config.items():
+					if isinstance(val, dict):
+						formula = val.get("formula", "")
+					else:
+						formula = str(val)
+					referenced_names.update(self._extract_referenced_names(formula))
+
+		# If no references found, return all alphas (safety fallback)
+		if not referenced_names:
+			self.logger.debug("[ALPHAS] No specific alpha references found, using all alphas")
+			return all_alphas
+
+		# Filter to only referenced alphas
+		used_alphas = {name: formula for name, formula in all_alphas.items()
+						if name in referenced_names}
+
+		if used_alphas:
+			self.logger.info(f"[ALPHAS] Filtered to {len(used_alphas)} used alphas (from {len(all_alphas)} total)")
+			return used_alphas
+		else:
+			# If no alphas are directly referenced, use all (for feature engineering)
+			self.logger.debug("[ALPHAS] No alphas directly referenced in signals, using all for features")
+			return all_alphas
+
+	def _extract_referenced_names(self, formula: str) -> set:
+		"""Extract all identifier names from a formula.
+
+		Args:
+			formula: Formula string
+
+		Returns:
+			Set of referenced names
+		"""
+		import re
+		# Match identifiers: start with letter/underscore, followed by alphanumeric/underscore
+		# Exclude numbers and operators
+		pattern = r'\b([a-zA-Z_][a-zA-Z0-9_]*)\b'
+		matches = re.findall(pattern, formula)
+		# Filter out keywords and operators
+		keywords = {'and', 'or', 'not', 'True', 'False'}
+		return {m for m in matches if m not in keywords}
 
 	def _extract_alpha_definitions(self, alphas_config: Dict) -> Dict[str, str]:
 		"""Extract alpha name -> formula mappings from config.
@@ -204,7 +295,9 @@ class WatchlistAlphasAgent(Agent):
 			raise
 
 	def _evaluate_dsl_formula(self, formula: str, data: pd.DataFrame, ticker: str = "") -> pd.Series:
-		"""Evaluate DSL formula using vectorized pandas operations.
+		"""Evaluate DSL formula using vectorized pandas operations (Optimization 1).
+
+		Tries vectorized evaluation first, falls back to row-by-row if shift notation is complex.
 
 		Args:
 			formula: DSL formula (e.g., "rsi_7 < 25", "close > ema_20")
@@ -215,65 +308,115 @@ class WatchlistAlphasAgent(Agent):
 		"""
 		import re
 		import numpy as np
-		from src.tools.indicators import calculate
 
 		try:
-			# Extract all indicator/column references from formula
-			pattern = r'([a-z_]+(?:_\d+)?(?:\[\d+\])?)'
-			matches = set(re.findall(pattern, formula, re.IGNORECASE))
-
-			# Pre-calculate all indicators as columns
-			data_work = data.copy()
-			for match in matches:
-				# Skip OHLCV columns
-				if match.lower() in ['close', 'high', 'low', 'open', 'volume']:
-					if match.upper() not in data_work.columns and match.lower() not in data_work.columns:
-						if match.upper() in data.columns:
-							data_work[match.lower()] = data[match.upper()]
-						elif match in data.columns:
-							data_work[match] = data[match]
-					continue
-
-				# Skip shift notation (handled in vectorized expression)
-				if '[' in match:
-					base_name = match.split('[')[0]
-					if base_name not in matches or base_name == match:
-						try:
-							result = calculate([base_name], data_work)
-							data_work[base_name] = result[base_name]
-						except Exception:
-							pass
-					continue
-
-				# Calculate indicator
-				if match not in data_work.columns:
-					try:
-						result = calculate([match], data_work)
-						data_work[match] = result[match]
-					except Exception:
-						pass
-
-			# Convert DSL formula to vectorized pandas expression
-			# Replace logical operators and comparisons
-			vectorized_formula = self._convert_dsl_to_vectorized(formula)
-
-			# Evaluate vectorized formula
-			try:
-				result = pd.eval(vectorized_formula, local_dict=data_work)
-				if isinstance(result, pd.Series):
-					return result.fillna(0).astype(float)
-				else:
-					# Handle scalar results
-					return pd.Series([1.0 if result else 0.0] * len(data), index=data.index)
-			except Exception:
-				# Fall back to row-by-row evaluation
-				return self._evaluate_dsl_formula_rowwise(formula, data, ticker)
-
+			# Optimization 1: Try vectorized evaluation with shift preprocessing
+			return self._evaluate_dsl_formula_vectorized(formula, data, ticker)
 		except Exception as e:
-			ticker_str = f" for {ticker}" if ticker else ""
-			self.logger.error(f"[ALPHAS] Failed to vectorize '{formula}'{ticker_str}: {str(e)}")
-			# Fall back to row-by-row
+			# Log as warning (not debug) since vectorization failed
+			error_msg = str(e)
+			if "keyword not valid" in error_msg or "not defined" in error_msg:
+				self.logger.error(f"[ALPHAS] Vectorized eval failed for '{formula}': {error_msg}")
+			else:
+				self.logger.debug(f"[ALPHAS] Vectorized eval failed for '{formula}', using row-by-row: {error_msg}")
 			return self._evaluate_dsl_formula_rowwise(formula, data, ticker)
+
+	def _evaluate_dsl_formula_vectorized(self, formula: str, data: pd.DataFrame, ticker: str = "") -> pd.Series:
+		"""Optimization 1: Vectorized DSL evaluation using pandas shifting.
+
+		Pre-creates shifted columns and evaluates formula on entire DataFrame at once.
+
+		Args:
+			formula: DSL formula with shift notation
+			data: DataFrame
+
+		Returns:
+			Series of results
+		"""
+		import re
+		import numpy as np
+		from src.tools.indicators import calculate
+
+		data_work = data.copy()
+
+		# Normalize column names to lowercase for consistency
+		col_mapping = {}
+		for col in data_work.columns:
+			lower_col = col.lower()
+			if lower_col != col:
+				data_work[lower_col] = data_work[col]
+				col_mapping[lower_col] = col
+
+		# Extract all referenced names (indicators, columns)
+		pattern = r'([a-z_]+(?:_\d+)?)'
+		matches = set(re.findall(pattern, formula, re.IGNORECASE))
+
+		# Pre-calculate missing indicators
+		for match in matches:
+			if match.lower() in ['close', 'high', 'low', 'open', 'volume']:
+				continue
+			if match not in data_work.columns:
+				try:
+					result = calculate([match], data_work)
+					data_work[match] = result[match]
+				except Exception:
+					pass
+
+		# Pre-create shifted columns for shift notation
+		shift_pattern = r'(\w+)\[(-?\d+)\]'
+		shift_pairs = set(re.findall(shift_pattern, formula))
+
+		for col_name, shift_str in shift_pairs:
+			shift = int(shift_str)
+			# Handle [0] case - just reference the column as-is
+			if shift == 0:
+				# Make sure column exists with lowercase name
+				if col_name not in data_work.columns and col_name.upper() in data_work.columns:
+					data_work[col_name] = data_work[col_name.upper()]
+				continue
+
+			# Normalize shift: [-1] = previous, [-2] = 2 bars ago
+			# pandas.shift(1) moves down (future bar), so we negate
+			pandas_shift = -shift  # Negate for pandas semantics
+			# Use absolute value in column name to avoid invalid names like "col_s-20"
+			shifted_col_name = f"{col_name}_sh{abs(shift)}" if shift < 0 else f"{col_name}_s{shift}"
+
+			# Get source column (handle case sensitivity)
+			source_col = None
+			if col_name in data_work.columns:
+				source_col = col_name
+			elif col_name.upper() in data_work.columns:
+				source_col = col_name.upper()
+				data_work[col_name] = data_work[col_name.upper()]  # Copy to lowercase
+				source_col = col_name
+
+			if source_col:
+				data_work[shifted_col_name] = data_work[source_col].shift(pandas_shift)
+
+		# Replace shift notation in formula with shifted column references
+		vectorized_formula = formula
+		for col_name, shift_str in shift_pairs:
+			shift = int(shift_str)
+			if shift == 0:
+				# [0] means current, just use col_name as-is
+				continue
+			# Use same naming scheme as above
+			shifted_col_name = f"{col_name}_sh{abs(shift)}" if shift < 0 else f"{col_name}_s{shift}"
+			pattern = rf'{re.escape(col_name)}\[{re.escape(shift_str)}\]'
+			vectorized_formula = re.sub(pattern, shifted_col_name, vectorized_formula)
+
+		# Convert DSL operators to pandas operators
+		vectorized_formula = self._convert_dsl_to_vectorized(vectorized_formula)
+
+		# Evaluate
+		try:
+			result = pd.eval(vectorized_formula, local_dict=data_work)
+			if isinstance(result, pd.Series):
+				return result.fillna(0).astype(float)
+			else:
+				return pd.Series([1.0 if result else 0.0] * len(data), index=data.index)
+		except Exception as e:
+			raise ValueError(f"Vectorized evaluation failed: {str(e)}")
 
 	def _convert_dsl_to_vectorized(self, formula: str) -> str:
 		"""Convert DSL formula to pandas-compatible vectorized expression.
@@ -287,9 +430,15 @@ class WatchlistAlphasAgent(Agent):
 		import re
 		# Replace DSL operators with pandas operators
 		result = formula
+		# Replace && and 'and' with &
+		result = result.replace('&&', '&')
 		result = result.replace(' and ', ' & ')
+		# Replace || and 'or' with |
+		result = result.replace('||', '|')
 		result = result.replace(' or ', ' | ')
-		result = result.replace(' not ', ' ~')
+		# Replace ! and 'not' with ~
+		result = result.replace('!', '~')
+		result = result.replace(' not ', ' ~ ')
 		result = re.sub(r'\bnot\b', '~', result)
 		return result
 
@@ -395,6 +544,39 @@ class WatchlistAlphasAgent(Agent):
 			ticker_str = f" for {ticker}" if ticker else ""
 			self.logger.error(f"[ALPHAS] Failed to evaluate formula '{formula}'{ticker_str}: {str(e)}")
 			raise
+
+	def _ensure_indicators_calculated(self, data: pd.DataFrame, required_indicators: list, ticker: str = "") -> pd.DataFrame:
+		"""Ensure all required indicators are calculated and added to the DataFrame.
+
+		Args:
+			data: OHLCV DataFrame
+			required_indicators: List of indicator names to calculate
+			ticker: Ticker for error reporting
+
+		Returns:
+			DataFrame with calculated indicators added as columns
+		"""
+		from src.tools.indicators import calculate
+
+		if not required_indicators:
+			return data
+
+		data_enriched = data.copy()
+
+		# Calculate any missing indicators
+		missing_indicators = [ind for ind in required_indicators if ind not in data_enriched.columns]
+
+		if missing_indicators:
+			try:
+				calculated = calculate(missing_indicators, data_enriched)
+				for ind_name, ind_series in calculated.items():
+					data_enriched[ind_name] = ind_series.values
+				self.logger.debug(f"[ALPHAS] Calculated {len(calculated)} indicators for {ticker}")
+			except Exception as e:
+				self.logger.warning(f"[ALPHAS] Failed to calculate some indicators for {ticker}: {str(e)}")
+				# Continue anyway - some indicators may not be available
+
+		return data_enriched
 
 	def _evaluate_expression(self, expr: str, data: pd.DataFrame, ticker: str = "") -> pd.Series:
 		"""Evaluate expression-based alpha (for complex formulas).

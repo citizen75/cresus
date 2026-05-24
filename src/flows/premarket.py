@@ -68,7 +68,7 @@ class PreMarketFlow(Flow):
 		# Alphas step - calculate alpha factors from strategy config
 		# Adds named alpha columns to data_history for feature engineering
 		alphas_agent = WatchlistAlphasAgent("WatchlistAlphasAgent", self.context)
-		self.add_step(alphas_agent, step_name="alphas", required=False)
+		self.add_step(alphas_agent, step_name="alphas", required=True)
 
 		# In backtest mode, filter watchlist BEFORE signals to reduce computation
 		# This significantly speeds up backtests (filters 258 → ~20 before signal analysis)
@@ -93,7 +93,7 @@ class PreMarketFlow(Flow):
 
 		# Ranking step - rank watchlist tickers using LGBM model (walk-forward validated)
 		ranking_agent = WatchlistRankingAgent("WatchlistRankingAgent", self.context)
-		self.add_step(ranking_agent, step_name="ranking", required=False)
+		self.add_step(ranking_agent, step_name="ranking", required=True)
 
 		# Note: Data slicing to target_date must happen BEFORE entry analysis
 		# so that entry_filter evaluates on the correct date's data
@@ -101,20 +101,20 @@ class PreMarketFlow(Flow):
 
 		# Entry step - apply entry_filter to watchlist tickers
 		entry_agent = EntryAgent("EntryAgent", self.context)
-		self.add_step(entry_agent, step_name="entry", required=False)
+		self.add_step(entry_agent, step_name="entry", required=True)
 
 		# Entry order step - convert entry signals to executable orders
 		entry_order_agent = EntryOrderAgent("EntryOrderAgent", self.context)
-		self.add_step(entry_order_agent, step_name="entry_order", required=False)
+		self.add_step(entry_order_agent, step_name="entry_order", required=True)
 
 		# Save watchlist step - persist watchlist to disk with OHLCV and signal data
 		save_agent = SaveWatchlistAgent("SaveWatchlistAgent", self.strategy_name, context=self.context)
-		self.add_step(save_agent, step_name="save_watchlist", required=False)
+		self.add_step(save_agent, step_name="save_watchlist", required=True)
 
 		# Exit analysis step - evaluate exit conditions and generate SELL orders
 		# Runs after entry orders are created
 		exit_agent = ExitAgent("ExitAgent", self.context)
-		self.add_step(exit_agent, step_name="exit", required=False)
+		self.add_step(exit_agent, step_name="exit", required=True)
 
 	def process(self, input_data: Optional[Dict[str, Any]] = None, save: bool = True) -> Dict[str, Any]:
 		"""Process input data through the pre-market flow.
