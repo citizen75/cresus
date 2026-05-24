@@ -1,0 +1,83 @@
+name: test_premarket
+description: 'Test strategy for PreMarketFlow tests'
+tickers: [AAPL.PA, MSFT.PA]
+
+indicators:
+- rsi_7
+- rsi_14
+- ema_10
+- ema_20
+- sma_20
+- adx_14
+- atr_14
+- volume_sma_20
+- sha_10_green
+- macd_12_26
+
+watchlist:
+  enabled: true
+  parameters:
+    tickers:
+      max_count: 10
+      description: Maximum number of tickers
+    filter:
+      formula: close[0] > 0
+      description: 'Basic filter - always pass'
+
+signals:
+  enabled: true
+  weights:
+    momentum: 1.0
+    trend: 0.5
+    volume_anomaly: 0.25
+  parameters:
+    momentum:
+      formula: rsi_7 > 50 and roc_5 > 0
+      description: Momentum signal
+    trend:
+      formula: close[0] > ema_10[0]
+      description: Trend signal
+    volume_anomaly:
+      formula: volume[0] > volume_sma_20[0]
+      description: Volume anomaly signal
+
+entry:
+  enabled: true
+  parameters:
+    score_filter:
+      min: 50
+      description: Minimum composite score
+    entry_filter:
+      formula: close[0] > 0
+      description: Basic entry filter
+    order_type:
+      type: market
+      description: Market orders
+
+order:
+  enabled: true
+  parameters:
+    position_sizing:
+      type: capital
+      value: 2000
+      description: Fixed €2,000 per position
+    max_daily_orders:
+      formula: 3
+      description: Max 3 orders per day
+    max_positions:
+      formula: 5
+      description: Max 5 positions
+
+exit:
+  enabled: true
+  parameters:
+    stop:
+      type: trailing
+      formula: close[0] - atr_14[0] * 1.5
+      description: Stop loss
+    take_profit:
+      formula: close[0] + atr_14[0] * 2.0
+      description: Take profit
+    holding_period:
+      formula: 20
+      description: Max holding period
