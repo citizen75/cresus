@@ -439,6 +439,32 @@ class BacktestAgent(Agent):
 		initial_capital = strategy_config.get("backtest", {}).get("initial_capital", 100000.0)
 		self.logger.info(f"Using initial capital: ${initial_capital:.2f}")
 
+		# Initialize portfolio with correct initial_capital before backtest loop
+		from tools.portfolio import PortfolioManager
+		try:
+			pm = PortfolioManager(context=self.context.__dict__)
+			# Check if portfolio already exists
+			portfolio_path = pm.portfolios_dir / pm._normalize_portfolio_name(portfolio_name)
+			if not portfolio_path.exists():
+				# Create portfolio with correct initial_capital
+				create_result = pm.create_portfolio(
+					name=portfolio_name,
+					portfolio_type="paper",
+					currency="EUR",
+					description=f"Backtest for {strategy_name}",
+					initial_capital=initial_capital
+				)
+				self.logger.info(f"Created portfolio '{portfolio_name}' with initial capital ${initial_capital:.2f}")
+			else:
+				# Portfolio exists - update initial_capital if different
+				metadata = pm._get_portfolio_metadata(portfolio_name)
+				if metadata.get("initial_capital") != initial_capital:
+					metadata["initial_capital"] = initial_capital
+					pm._save_portfolio_metadata(portfolio_name, metadata)
+					self.logger.info(f"Updated portfolio '{portfolio_name}' initial capital to ${initial_capital:.2f}")
+		except Exception as e:
+			self.logger.warning(f"Could not initialize portfolio metadata: {e}")
+
 		# Use progress bar if tqdm is available
 		iterator = tqdm(enumerate(trading_days_to_process), total=len(trading_days_to_process), desc="Backtest Progress") if HAS_TQDM else enumerate(trading_days_to_process)
 

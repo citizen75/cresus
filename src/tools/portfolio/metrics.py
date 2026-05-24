@@ -32,51 +32,96 @@ class PortfolioMetrics(PortfolioManager):
         start_dt = pd.to_datetime(start_date) if start_date else None
         end_dt = pd.to_datetime(end_date) if end_date else None
         
-        # Get portfolio value history
-        history = PortfolioHistory(name, initial_capital=start_value, context=self.context)
-        history_result = history.calculate()
-        
-        # Handle error case
-        if history_result.get("status") != "success":
-            return self._empty_metrics(start_date, end_date, start_value)
-        
-        # Convert history list to DataFrame
-        history_list = history_result.get("history", [])
-        if not history_list:
-            return self._empty_metrics(start_date, end_date, start_value)
-        
-        history_df = pd.DataFrame(history_list)
-        if history_df.empty:
-            return self._empty_metrics(start_date, end_date, start_value)
-        
-        # Determine actual date range - use provided dates if available, otherwise from history
-        history_df['date'] = pd.to_datetime(history_df['date'])
-        # Rename 'value' column to 'portfolio_value' for consistency
-        if 'value' in history_df.columns:
-            history_df.rename(columns={'value': 'portfolio_value'}, inplace=True)
-        
-        # Use provided dates if available, otherwise use history dates
+        # Determine actual date range first
         if start_dt:
             actual_start_dt = start_dt
         else:
-            actual_start_dt = history_df['date'].min()
-            
+            actual_start_dt = pd.to_datetime(df['created_at'].min()) if not df.empty else pd.Timestamp.now()
+
         if end_dt:
             actual_end_dt = end_dt
         else:
-            actual_end_dt = history_df['date'].max()
-        
-        # Get values for start and end (from history if available)
-        history_in_range = history_df[(history_df['date'] >= actual_start_dt) & (history_df['date'] <= actual_end_dt)]
-        
-        if len(history_in_range) > 0:
-            actual_start_value = history_in_range['portfolio_value'].iloc[0] if len(history_in_range) > 0 else start_value
-            actual_end_value = history_in_range['portfolio_value'].iloc[-1] if len(history_in_range) > 0 else start_value
+            actual_end_dt = pd.to_datetime(df['created_at'].max()) if not df.empty else pd.Timestamp.now()
+
+        # Calculate portfolio value directly from journal (more reliable than PortfolioHistory)
+        df['created_at'] = pd.to_datetime(df['created_at'], errors='coerce')
+        df['price'] = pd.to_numeric(df['price'], errors='coerce')
+        df['quantity'] = pd.to_numeric(df['quantity'], errors='coerce')
+
+        # Filter to date range
+        df_range = df[(df['created_at'] >= actual_start_dt) & (df['created_at'] <= actual_end_dt)].copy()
+        df_range = df_range.sort_values('created_at')
+
+        # Calculate final portfolio value from trades
+        actual_start_value = start_value
+        cash = start_value
+        positions = {}  # {ticker: {qty, entry_price}}
+
+        for _, row in df_range.iterrows():
+            op = row['operation'].upper() if isinstance(row['operation'], str) else ''
+            ticker = row['ticker']
+            price = row['price']
+            qty = row['quantity']
+
+            if op == 'BUY':
+                cash -= (price * qty)
+                if ticker not in positions:
+                    positions[ticker] = {'qty': 0, 'entry_price': 0}
+                positions[ticker]['qty'] += qty
+                positions[ticker]['entry_price'] = price
+            elif op == 'SELL':
+                cash += (price * qty)
+                if ticker in positions:
+                    positions[ticker]['qty'] -= qty
+                    if positions[ticker]['qty'] == 0:
+                        del positions[ticker]
+
+        # Calculate open position values at end date using current market prices
+        open_position_value = 0
+        data_history = self.context.get("data_history") or {}
+
+        for ticker, pos in positions.items():
+            # Try to get current price from data_history (use latest available price)
+            current_price = None
+            if ticker in data_history:
+                ticker_data = data_history[ticker]
+                if isinstance(ticker_data, pd.DataFrame) and not ticker_data.empty:
+                    # Get the last close price (sorted by timestamp if available)
+                    if 'timestamp' in ticker_data.columns:
+                        ticker_data_sorted = ticker_data.sort_values('timestamp', ascending=False)
+                        current_price = ticker_data_sorted['close'].iloc[0]
+                    else:
+                        current_price = ticker_data['close'].iloc[-1]
+
+            # Fallback to last trade price if no current price available
+            # Use last BUY price for open positions (most recent entry)
+            if current_price is None:
+                ticker_trades = df_range[df_range['ticker'] == ticker].sort_values('created_at', ascending=False)
+                # Find the most recent BUY (entry price) since position is still open
+                buy_trades = ticker_trades[ticker_trades['operation'].str.upper() == 'BUY']
+                if not buy_trades.empty:
+                    current_price = buy_trades.iloc[0]['price']
+                else:
+                    # Fallback to any trade price
+                    current_price = ticker_trades.iloc[0]['price'] if not ticker_trades.empty else pos['entry_price']
+
+            open_position_value += (current_price * pos['qty'])
+
+        actual_end_value = cash + open_position_value
+
+        # Create history_df for other calculations (daily returns, drawdown, etc.)
+        history = PortfolioHistory(name, initial_capital=start_value, context=self.context)
+        history_result = history.calculate()
+        history_list = history_result.get("history", []) if history_result.get("status") == "success" else []
+
+        if history_list:
+            history_df = pd.DataFrame(history_list)
+            history_df['date'] = pd.to_datetime(history_df['date'])
+            if 'value' in history_df.columns:
+                history_df.rename(columns={'value': 'portfolio_value'}, inplace=True)
+            history_in_range = history_df[(history_df['date'] >= actual_start_dt) & (history_df['date'] <= actual_end_dt)]
         else:
-            # No transaction history in the provided date range, use start value
-            actual_start_value = start_value
-            actual_end_value = start_value
-            history_in_range = history_df
+            history_in_range = pd.DataFrame()
         
         # Calculate basic metrics
         period_duration = actual_end_dt - actual_start_dt
@@ -111,7 +156,16 @@ class PortfolioMetrics(PortfolioManager):
         # Calculate exposure
         max_exposure = self._calculate_max_exposure(completed_trades, history_df, actual_start_value)
 
-        # Open trades
+        # Open trades (unpaired BUYs - more accurate than status='open')
+        # Count BUYs that don't have matching SELLs
+        open_positions_count = 0
+        for ticker in df['ticker'].unique():
+            ticker_df = df[df['ticker'] == ticker].copy()
+            buys = len(ticker_df[ticker_df['operation'].str.upper() == 'BUY'])
+            sells = len(ticker_df[ticker_df['operation'].str.upper() == 'SELL'])
+            if buys > sells:
+                open_positions_count += buys - sells
+
         open_trades = df[df['status'] == 'open'].copy()
         open_pnl = self._calculate_open_pnl(open_trades, history_df)
 
@@ -141,7 +195,7 @@ class PortfolioMetrics(PortfolioManager):
             # Trade stats
             "total_trades": trades_analysis["total_trades"],
             "closed_trades": trades_analysis["closed_trades"],
-            "open_trades": len(open_trades),
+            "open_trades": open_positions_count,
             "open_trade_pnl": open_pnl,
             
             # Win rate
@@ -228,41 +282,49 @@ class PortfolioMetrics(PortfolioManager):
                 "profit_factor": 0.0,
                 "expectancy": 0.0,
             }
-        
+
         # Calculate P&L per trade
         trade_pnl = []
         winning_trades = []
         losing_trades = []
         winning_durations = []
         losing_durations = []
-        
-        # Group by ticket/entry-exit pairs
+
+        # Group by ticker/entry-exit pairs
         for ticker in completed_trades['ticker'].unique():
             ticker_trades = completed_trades[completed_trades['ticker'] == ticker].copy()
             ticker_trades = ticker_trades.sort_values('created_at')
-            
+
             buys = ticker_trades[ticker_trades['operation'].str.upper() == 'BUY']
             sells = ticker_trades[ticker_trades['operation'].str.upper() == 'SELL']
-            
-            # Pair buys with sells
+
+            # Track which sells have been paired to prevent duplicate matching
+            paired_sell_ids = set()
+
+            # Pair buys with sells (FIFO: each buy matches with next available sell)
             for _, buy in buys.iterrows():
-                # Find next sell
-                next_sells = sells[sells['created_at'] > buy['created_at']]
+                # Find next sell that hasn't been paired yet (>= allows same-day buy-sell pairs)
+                next_sells = sells[
+                    (sells['created_at'] >= buy['created_at']) &
+                    (~sells['id'].isin(paired_sell_ids))
+                ]
                 if not next_sells.empty:
                     sell = next_sells.iloc[0]
+                    paired_sell_ids.add(sell['id'])  # Mark this sell as used
+
                     buy_price = float(buy['price'])
                     sell_price = float(sell['price'])
                     quantity = float(buy['quantity'])
-                    
+
                     # Calculate P&L
                     pnl = (sell_price - buy_price) * quantity
                     pnl_pct = ((sell_price - buy_price) / buy_price * 100) if buy_price > 0 else 0
-                    
+
                     trade_pnl.append(pnl_pct)
-                    
+
                     # Duration
                     duration = (pd.to_datetime(sell['created_at']) - pd.to_datetime(buy['created_at'])).days
-                    
+
                     if pnl_pct > 0:
                         winning_trades.append(pnl_pct)
                         winning_durations.append(duration)
@@ -271,8 +333,12 @@ class PortfolioMetrics(PortfolioManager):
                         losing_durations.append(duration)
         
         if not trade_pnl:
+            # Count BUY records (total entry attempts)
+            total_buys = sum(1 for ticker in completed_trades['ticker'].unique()
+                            for _ in completed_trades[(completed_trades['ticker'] == ticker) &
+                                                     (completed_trades['operation'].str.upper() == 'BUY')].iterrows())
             return {
-                "total_trades": len(completed_trades),
+                "total_trades": total_buys,
                 "closed_trades": 0,
                 "win_rate": 0.0,
                 "best_trade": 0.0,
@@ -288,17 +354,22 @@ class PortfolioMetrics(PortfolioManager):
         win_count = len(winning_trades)
         loss_count = len(losing_trades)
         total_closed = win_count + loss_count
-        
+
+        # Total trades = number of buy records (trades initiated)
+        total_buys = sum(1 for ticker in completed_trades['ticker'].unique()
+                        for _ in completed_trades[(completed_trades['ticker'] == ticker) &
+                                                 (completed_trades['operation'].str.upper() == 'BUY')].iterrows())
+
         win_rate = (win_count / total_closed * 100) if total_closed > 0 else 0
-        
+
         gross_profit = sum(winning_trades) if winning_trades else 0
         gross_loss = abs(sum(losing_trades)) if losing_trades else 0
         profit_factor = (gross_profit / gross_loss) if gross_loss > 0 else (1.0 if gross_profit > 0 else 0.0)
-        
+
         expectancy = (sum(trade_pnl) / len(trade_pnl)) if trade_pnl else 0
-        
+
         return {
-            "total_trades": len(completed_trades),
+            "total_trades": total_buys,
             "closed_trades": total_closed,
             "win_rate": win_rate,
             "best_trade": max(trade_pnl) if trade_pnl else 0.0,

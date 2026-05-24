@@ -1,6 +1,7 @@
 """Position duplicate filter sub-agent for preventing duplicate position entries."""
 
 from typing import Any, Dict, Optional
+import pandas as pd
 from core.agent import Agent
 from tools.portfolio import PortfolioManager
 
@@ -48,22 +49,52 @@ class PositionDuplicateFilterAgent(Agent):
 		portfolio_name = self.context.get("portfolio_name") or "default"
 		self.logger.debug(f"[ENTRY-DUP-FILTER] Checking portfolio: {portfolio_name}")
 
-		# Always load fresh portfolio details to reflect recent trades
-		pm = PortfolioManager(context=self.context.__dict__)
-		portfolio_details = pm.get_portfolio_details(portfolio_name)
+		# For backtest: check journal for open positions (more reliable than disk state)
+		existing_tickers = set()
+		is_backtest = self.context.get("backtest_id") is not None
 
-		if not portfolio_details:
-			self.logger.warning(f"[ENTRY-DUP-FILTER] Portfolio '{portfolio_name}' not found")
-			return {
-				"status": "error",
-				"input": input_data,
-				"output": {},
-				"message": f"Portfolio '{portfolio_name}' not found"
-			}
+		if is_backtest:
+			# During backtest, get open positions from journal (most up-to-date)
+			from tools.portfolio.journal import Journal
+			try:
+				journal = Journal(portfolio_name, context=self.context.__dict__)
+				df = journal.load_df()
 
-		# Get existing open positions (case-insensitive)
-		existing_positions = portfolio_details.get("positions", [])
-		existing_tickers = {pos["ticker"].upper() for pos in existing_positions}
+				if not df.empty:
+					# Get all buy/sell operations
+					df['created_at'] = pd.to_datetime(df['created_at'], errors='coerce')
+					df['operation'] = df['operation'].str.upper()
+
+					# Find open positions: buys without matching sells
+					for ticker in df['ticker'].unique():
+						ticker_trades = df[df['ticker'] == ticker].sort_values('created_at')
+						buys = len(ticker_trades[ticker_trades['operation'] == 'BUY'])
+						sells = len(ticker_trades[ticker_trades['operation'] == 'SELL'])
+
+						if buys > sells:
+							# More buys than sells = open position
+							existing_tickers.add(ticker.upper())
+
+					self.logger.debug(f"[ENTRY-DUP-FILTER] Journal analysis found {len(existing_tickers)} open positions: {existing_tickers}")
+			except Exception as e:
+				self.logger.warning(f"[ENTRY-DUP-FILTER] Could not analyze journal: {e}")
+
+		# If not in backtest or journal check failed, load from disk
+		if not existing_tickers:
+			pm = PortfolioManager(context=self.context.__dict__)
+			portfolio_details = pm.get_portfolio_details(portfolio_name)
+
+			if not portfolio_details:
+				self.logger.warning(f"[ENTRY-DUP-FILTER] Portfolio '{portfolio_name}' not found")
+				return {
+					"status": "error",
+					"input": input_data,
+					"output": {},
+					"message": f"Portfolio '{portfolio_name}' not found"
+				}
+
+			existing_positions = portfolio_details.get("positions", [])
+			existing_tickers = {pos["ticker"].upper() if isinstance(pos, dict) else pos.ticker.upper() for pos in existing_positions}
 
 		self.logger.debug(f"[ENTRY-DUP-FILTER] Portfolio has {len(existing_tickers)} open positions: {list(existing_tickers)[:5]}{'...' if len(existing_tickers) > 5 else ''}")
 
