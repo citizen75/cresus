@@ -638,6 +638,16 @@ class CresusCLI(cmd2.Cmd):
 			console.print("[red]✗[/red] At least one ticker required")
 			return
 
+		# Validate that tickers don't contain operators (indicates formula parsing failed)
+		operators = {'>', '<', '>=', '<=', '==', '!=', '&&', '||', '!', '+', '-', '*', '/'}
+		for ticker in tickers:
+			if ticker in operators or ticker.startswith('>') or ticker.startswith('<'):
+				console.print(f"[red]✗[/red] Formula appears to have unquoted operators.")
+				console.print(f"[yellow]Use single quotes to preserve the formula:[/yellow]")
+				console.print(f"  cresus analyze 'rsi_7 > 50' TTE.PA 2026-01-01")
+				console.print(f"  cresus analyze 'close[0] > ema_5[0]' TTE.PA 2026-05-01 2026-05-31")
+				return
+
 		# Run analysis
 		try:
 			from flows.analyze import AnalyzeFlow
