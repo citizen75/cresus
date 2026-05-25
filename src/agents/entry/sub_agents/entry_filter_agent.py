@@ -111,7 +111,7 @@ class EntryFilterAgent(Agent):
 						blocked_count += 1
 				except Exception as e:
 						error_msg = str(e)
-						available_cols = list(last_5_days.columns) if len(last_5_days) > 0 else []
+						available_cols = list(df.columns) if len(df) > 0 else []
 						# Check if this is a syntax error in the formula
 						if "unexpected token" in error_msg.lower() or "syntax error" in error_msg.lower():
 							# Could be syntax error OR missing column - check if it's a known column
