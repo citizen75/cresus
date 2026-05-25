@@ -100,8 +100,8 @@ class FormulaParser:
         """
         Find the actual indicator name by checking against defined indicators.
 
-        Handles multi-word indicators like "bollinger_bands" by trying to match
-        the longest possible indicator name in the guess.
+        Handles multi-word indicators like "bollinger_bands" or "adx_force" by trying to match
+        the longest possible indicator name first, then falling back to shorter matches.
 
         Args:
             indicator_guess: Initial indicator name guess (e.g., "bollinger")
@@ -110,16 +110,12 @@ class FormulaParser:
         Returns:
             Tuple of (matched_indicator_name, remaining_param_str), or (None, None) if not found
         """
-        # First, try the guess directly
-        if indicator_guess in INDICATOR_PARAMS:
-            return indicator_guess, param_str
-
-        # If guess not found and param_str exists, try progressively longer indicators
-        # by moving parts from param_str to indicator_name
+        # If param_str exists, try progressively longer indicators first
+        # by moving parts from param_str to indicator_name (longest match first)
         if param_str:
             parts = param_str.split('_')
             # Try combining indicator_guess with param parts to find multi-word indicator
-            # Go in reverse order to find longest match first
+            # Go in reverse order to find longest match first (e.g., try "adx_force" before "adx")
             for i in range(len(parts) - 1, -1, -1):
                 # Try: indicator_guess_part1, indicator_guess_part1_part2, etc.
                 potential_name = indicator_guess + '_' + '_'.join(parts[:i+1])
@@ -127,6 +123,10 @@ class FormulaParser:
                     # Return the matched name and remaining params
                     remaining_params = '_'.join(parts[i+1:]) if i+1 < len(parts) else None
                     return potential_name, remaining_params
+
+        # Then try the guess directly (shorter matches last)
+        if indicator_guess in INDICATOR_PARAMS:
+            return indicator_guess, param_str
 
         return None, None
 
