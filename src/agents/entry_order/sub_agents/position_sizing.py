@@ -92,9 +92,14 @@ class PositionSizingAgent(Agent):
 				"message": f"Portfolio '{portfolio_name}' not found"
 			}
 
+		# Ensure cash is a valid number
+		if cash is None or not isinstance(cash, (int, float)):
+			cash = 0.0
+			self.logger.warning(f"Portfolio cash is invalid ({cash}), using 0")
+
 		# Calculate position sizes - drop orders if insufficient cash
 		sized_orders = []
-		remaining_cash = cash
+		remaining_cash = float(cash)
 		dropped_orders = []
 
 		for rec in entry_recommendations:
