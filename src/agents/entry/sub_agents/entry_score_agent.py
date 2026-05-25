@@ -76,10 +76,13 @@ class EntryScoreAgent(Agent):
 		self.context.set("entry_scores", entry_scores)
 
 		# Log summary
-		avg_score = sum(entry_scores.values()) / len(entry_scores) if entry_scores else 0
+		valid_scores = [s for s in entry_scores.values() if s is not None]
+		avg_score = sum(valid_scores) / len(valid_scores) if valid_scores else 0
 		self.logger.info(f"[ENTRY-SCORE] Scored {scored_count}/{len(watchlist)} tickers (skipped: {len(skipped_tickers)})")
 		self.logger.debug(f"[ENTRY-SCORE] Skipped: {skipped_tickers}")
-		self.logger.debug(f"[ENTRY-SCORE] Scores - avg: {avg_score:.1f}, min: {min(entry_scores.values()):.1f}, max: {max(entry_scores.values()):.1f}")
+		min_score = min(valid_scores) if valid_scores else 0
+		max_score = max(valid_scores) if valid_scores else 0
+		self.logger.debug(f"[ENTRY-SCORE] Scores - avg: {avg_score:.1f}, min: {min_score:.1f}, max: {max_score:.1f}")
 
 		return {
 			"status": "success",
@@ -88,8 +91,8 @@ class EntryScoreAgent(Agent):
 				"tickers_scored": scored_count,
 				"total_tickers": len(watchlist),
 				"average_score": avg_score,
-				"max_score": max(entry_scores.values()) if entry_scores else 0,
-				"min_score": min(entry_scores.values()) if entry_scores else 0,
+				"max_score": max_score,
+				"min_score": min_score,
 			}
 		}
 

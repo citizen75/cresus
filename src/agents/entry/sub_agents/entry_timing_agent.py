@@ -72,8 +72,9 @@ class EntryTimingAgent(Agent):
 		self.context.set("timing_scores", timing_scores)
 
 		# Log summary
-		avg_timing = sum(timing_scores.values()) / len(timing_scores) if timing_scores else 0
-		optimal_count = sum(1 for s in timing_scores.values() if s > 70)
+		valid_scores = [s for s in timing_scores.values() if s is not None]
+		avg_timing = sum(valid_scores) / len(valid_scores) if valid_scores else 0
+		optimal_count = sum(1 for s in valid_scores if s > 70)
 		self.logger.info(f"[ENTRY-TIMING] Scored {scored_count}/{len(watchlist)} tickers (skipped: {len(skipped_tickers)}, optimal: {optimal_count})")
 		self.logger.debug(f"[ENTRY-TIMING] Skipped: {skipped_tickers}")
 		self.logger.debug(f"[ENTRY-TIMING] Timing avg: {avg_timing:.1f}")
