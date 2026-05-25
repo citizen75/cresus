@@ -564,6 +564,127 @@ class CresusCLI(cmd2.Cmd):
 		"""Manage historical and fundamental data: fetch|list|clear|stats|show [options]"""
 		self.data_commands.handle(args)
 
+	# ==================== Analysis Commands ====================
+	def do_analyze(self, args):
+		"""Analyze formula evaluation: analyze <formula> <ticker1> [ticker2...] <start_date> [end_date]"""
+		args_str = str(args).strip() if args else ""
+
+		if not args_str:
+			table = Table(title="Formula Analysis Commands", box=box.ROUNDED)
+			table.add_column("Command", style="cyan")
+			table.add_column("Description")
+			table.add_row("analyze <formula> <tickers...> <start_date> [end_date]", "Evaluate formula on each day for tickers")
+			table.add_row("Example", 'analyze "close[0] > ema_5[0]" TTE.PA 2026-05-01 2026-05-10')
+			table.add_row("Example", 'analyze "rsi_7 > 50" TTE.PA ENGI.PA 2026-05-01')
+			console.print(table)
+			return
+
+		# Parse arguments
+		# Format: analyze "formula" ticker1 [ticker2 ...] start_date [end_date]
+		parts = args_str.split()
+
+		if len(parts) < 3:
+			console.print("[red]✗[/red] Usage: analyze <formula> <ticker1> [ticker2...] <start_date> [end_date]")
+			return
+
+		# First argument is formula (may be quoted)
+		if args_str.startswith('"'):
+			# Formula is quoted, find the closing quote
+			end_quote = args_str.index('"', 1)
+			formula = args_str[1:end_quote]
+			remaining = args_str[end_quote+1:].strip()
+		else:
+			# No quotes, first token is formula
+			formula = parts[0]
+			remaining = " ".join(parts[1:])
+
+		# Parse remaining: tickers..., start_date, [end_date]
+		remaining_parts = remaining.split()
+
+		if len(remaining_parts) < 2:
+			console.print("[red]✗[/red] Usage: analyze <formula> <ticker1> [ticker2...] <start_date> [end_date]")
+			return
+
+		# Last 1-2 parts are dates
+		end_date = None
+		start_date = remaining_parts[-1]
+		if len(remaining_parts) >= 2 and self._looks_like_date(remaining_parts[-2]):
+			start_date = remaining_parts[-2]
+			end_date = remaining_parts[-1]
+			tickers = remaining_parts[:-2]
+		else:
+			tickers = remaining_parts[:-1]
+
+		if not tickers:
+			console.print("[red]✗[/red] At least one ticker required")
+			return
+
+		# Run analysis
+		try:
+			from flows.analyze import AnalyzeFlow
+			from core.context import AgentContext
+
+			ctx = AgentContext()
+			flow = AnalyzeFlow(ctx)
+			result = flow.process(
+				formula=formula,
+				tickers=tickers,
+				start_date=start_date,
+				end_date=end_date
+			)
+
+			if result.get("status") == "success":
+				output = result.get("output", {})
+				summary = output.get("summary", {})
+
+				console.print(f"\n[cyan]Formula Analysis[/cyan]")
+				console.print(f"Formula: [yellow]{formula}[/yellow]")
+				console.print(f"Indicators: {', '.join(output.get('indicators', []))}")
+				console.print(f"Date range: {output.get('date_range')}")
+				console.print(f"Tickers: {', '.join(tickers)}\n")
+
+				# Summary metrics
+				pass_pct = summary.get("pass_pct", 0)
+				pass_color = "green" if pass_pct > 50 else "yellow" if pass_pct > 0 else "red"
+				console.print(f"[{pass_color}]{summary['pass']} PASS[/{pass_color}] | "
+					f"[red]{summary['fail']} FAIL[/red] | "
+					f"[yellow]{summary['error']} ERROR[/yellow] | "
+					f"Total: {summary['total']} ({pass_pct:.1f}% pass)\n")
+
+				# Results table
+				if output.get("results"):
+					results_table = Table(box=box.ROUNDED)
+					results_table.add_column("Date", style="cyan")
+					results_table.add_column("Ticker", style="yellow")
+					results_table.add_column("Result", justify="right")
+
+					for r in output["results"]:
+						status = r.get("status", "UNKNOWN")
+						if status == "PASS":
+							status_colored = "[green]✓ PASS[/green]"
+						elif status == "FAIL":
+							status_colored = "[red]✗ FAIL[/red]"
+						else:
+							status_colored = f"[yellow]{status}[/yellow]"
+
+						results_table.add_row(
+							r.get("date", "?"),
+							r.get("ticker", "?"),
+							status_colored
+						)
+
+					console.print(results_table)
+			else:
+				console.print(f"[red]✗[/red] Analysis failed: {result.get('message')}")
+
+		except Exception as e:
+			console.print(f"[red]✗[/red] Error: {str(e)}")
+
+	def _looks_like_date(self, s: str) -> bool:
+		"""Check if string looks like a date (YYYY-MM-DD)."""
+		import re
+		return bool(re.match(r'\d{4}-\d{2}-\d{2}', s))
+
 	# ==================== Portfolio Commands ====================
 	def do_watchlist(self, args):
 		"""Display watchlist: watchlist show|extended <strategy>"""
