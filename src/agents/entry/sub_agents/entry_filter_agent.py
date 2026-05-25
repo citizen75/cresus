@@ -52,7 +52,7 @@ class EntryFilterAgent(Agent):
 			return {
 				"status": "success",
 				"input": input_data,
-				"output": {"filtered_count": 0, "passed_count": len(entry_recommendations)},
+				"output": {"filtered_count": 0, "passed_count": len(watchlist)},
 				"message": "No strategy_name in context, skipping filter"
 			}
 

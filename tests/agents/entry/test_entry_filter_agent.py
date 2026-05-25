@@ -26,7 +26,7 @@ class TestEntryFilterAgent(unittest.TestCase):
 		"""Test process with no recommendations."""
 		self.context.set("strategy_name", "test_strategy")
 		self.context.set("data_history", {})
-		self.context.set("entry_recommendations", [])
+		self.context.set("watchlist", {})
 
 		result = self.agent.process({})
 
@@ -37,7 +37,7 @@ class TestEntryFilterAgent(unittest.TestCase):
 	def test_process_missing_strategy_name(self):
 		"""Test process with missing strategy_name in context."""
 		self.context.set("data_history", {})
-		self.context.set("entry_recommendations", [{"ticker": "TEST"}])
+		self.context.set("watchlist", {"TEST": {}})
 
 		result = self.agent.process({})
 
@@ -49,7 +49,7 @@ class TestEntryFilterAgent(unittest.TestCase):
 	def test_process_missing_data_history(self):
 		"""Test process with missing data_history in context."""
 		self.context.set("strategy_name", "test_strategy")
-		self.context.set("entry_recommendations", [{"ticker": "TEST"}])
+		self.context.set("watchlist", {"TEST": {}})
 
 		result = self.agent.process({})
 
@@ -64,7 +64,7 @@ class TestEntryFilterAgent(unittest.TestCase):
 		result = self.agent.process({})
 
 		self.assertEqual(result["status"], "error")
-		self.assertIn("entry_recommendations", result["message"])
+		self.assertIn("watchlist", result["message"])
 
 	@patch("src.agents.entry.sub_agents.entry_filter_agent.StrategyManager")
 	def test_process_strategy_load_error(self, mock_strategy_manager_class):
@@ -78,7 +78,7 @@ class TestEntryFilterAgent(unittest.TestCase):
 
 		self.context.set("strategy_name", "nonexistent_strategy")
 		self.context.set("data_history", {})
-		self.context.set("entry_recommendations", [{"ticker": "TEST"}])
+		self.context.set("watchlist", {"TEST": {}})
 
 		result = self.agent.process({})
 
@@ -102,7 +102,7 @@ class TestEntryFilterAgent(unittest.TestCase):
 
 		self.context.set("strategy_name", "test_strategy")
 		self.context.set("data_history", {})
-		self.context.set("entry_recommendations", [{"ticker": "TEST"}])
+		self.context.set("watchlist", {"TEST": {}})
 
 		result = self.agent.process({})
 
@@ -336,7 +336,7 @@ class TestEntryFilterAgent(unittest.TestCase):
 
 		self.context.set("strategy_name", "test_strategy")
 		self.context.set("data_history", {"TEST": df})
-		self.context.set("entry_recommendations", [{"ticker": "TEST"}])
+		self.context.set("watchlist", {"TEST": {}})
 
 		result = self.agent.process({})
 
@@ -378,7 +378,7 @@ class TestEntryFilterAgent(unittest.TestCase):
 
 		self.context.set("strategy_name", "test_strategy")
 		self.context.set("data_history", {"TEST": df})
-		self.context.set("entry_recommendations", [{"ticker": "TEST"}])
+		self.context.set("watchlist", {"TEST": {}})
 
 		result = self.agent.process({})
 
