@@ -13,7 +13,37 @@ class AgentContext:
     def get(self, key: str) -> Any:
         """Get a value from the context."""
         return getattr(self, key, None)
-    
+
+    def get_path(self, path: str) -> Optional[Any]:
+        """Get value from nested context using dot notation path.
+
+        Args:
+            path: Dot-separated path (e.g., "watchlist.parameters.filter.formula")
+
+        Returns:
+            Value at the path, or None if path doesn't exist
+        """
+        parts = path.split('.')
+        current = self
+
+        for part in parts:
+            if isinstance(current, dict):
+                # Handle dict-like values
+                if part in current:
+                    current = current[part]
+                else:
+                    return None
+            else:
+                # Handle object attributes
+                try:
+                    current = getattr(current, part, None)
+                    if current is None:
+                        return None
+                except AttributeError:
+                    return None
+
+        return current
+
     def get_agent_metrics(self) -> List[Dict[str, Any]]:
         """Get all recorded agent execution metrics.
         
