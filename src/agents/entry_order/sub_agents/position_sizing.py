@@ -180,6 +180,7 @@ class PositionSizingAgent(Agent):
 							"ticker": ticker,
 							"shares": shares_int,
 							"entry_price": entry_price,
+							"stop_loss": stop_loss,
 							"order_value": shares_int * current_price,
 							"risk_amount": abs(shares_int * (entry_price - stop_loss)),
 							"sizing_method": sizing_method_used,
@@ -191,18 +192,36 @@ class PositionSizingAgent(Agent):
 				self.logger.debug(f"Error processing recommendation for {rec.get('ticker', 'unknown')}: {e}, skipping")
 				continue
 
+		# Apply cash constraint: if total order value exceeds available cash, reduce proportionally
+		total_order_value = sum(o["order_value"] for o in sized_orders)
+		if total_order_value > cash and len(sized_orders) > 0:
+			# Reduce all positions proportionally to fit available cash
+			reduction_factor = cash / total_order_value
+			self.logger.info(f"Reducing position sizes by {(1 - reduction_factor) * 100:.1f}% to fit available cash (€{total_order_value:.0f} → €{cash:.0f})")
+
+			for order in sized_orders:
+				original_shares = order["shares"]
+				order["shares"] = int(order["shares"] * reduction_factor)
+				order["order_value"] = order["shares"] * order["entry_price"]
+				order["risk_amount"] = abs(order["shares"] * (order["entry_price"] - order.get("stop_loss", order["entry_price"])))
+				if order["shares"] != original_shares:
+					self.logger.debug(f"{order['ticker']}: Reduced from {original_shares} to {order['shares']} shares (factor: {reduction_factor:.2f})")
+
 		# Store sized orders in context
 		self.context.set("sized_orders", sized_orders)
 
+		final_total = sum(o["order_value"] for o in sized_orders)
 		return {
 			"status": "success",
 			"input": input_data,
 			"output": {
 				"sized": len(sized_orders),
-				"total_order_value": sum(o["order_value"] for o in sized_orders),
+				"total_order_value": final_total,
 				"total_risk": sum(o["risk_amount"] for o in sized_orders),
+				"cash_available": cash,
+				"utilization_pct": (final_total / cash * 100) if cash > 0 else 0,
 			},
-			"message": f"Sized {len(sized_orders)} entry positions"
+			"message": f"Sized {len(sized_orders)} entry positions (€{final_total:.0f} of €{cash:.0f} available)"
 		}
 
 	def _get_current_price_from_context(self, ticker: str, fallback_price: float) -> float:
