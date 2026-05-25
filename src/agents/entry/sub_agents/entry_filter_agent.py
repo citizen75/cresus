@@ -58,29 +58,16 @@ class EntryFilterAgent(Agent):
 
 		# Load latest strategy to ensure formula changes are picked up
 		try:
-			# Check if strategy_config is already in context
-			strategy_data = self.context.get("strategy_config")
-			entry_config = strategy_data.get("entry", {}).get("parameters", {})
-			entry_filter_config = entry_config.get("entry_filter")
+			# Get entry_filter formula using get_path
+			entry_filter_formula = self.context.get_path("strategy_config.entry.parameters.entry_filter.formula")
 
-			if not entry_filter_config:
+			if not entry_filter_formula:
 				self.logger.debug(f"No entry_filter configured for strategy {strategy_name}")
 				return {
 					"status": "success",
 					"input": input_data,
 					"output": {"filtered_count": 0, "passed_count": len(watchlist)},
 					"message": "No entry_filter configured"
-				}
-
-			entry_filter_formula = entry_filter_config.get("formula")
-
-			if not entry_filter_formula:
-				self.logger.warning(f"No formula in entry_filter config for strategy {strategy_name}")
-				return {
-					"status": "success",
-					"input": input_data,
-					"output": {"filtered_count": 0, "passed_count": len(watchlist)},
-					"message": "No formula in entry_filter config"
 				}
 
 			self.logger.info(f"[ENTRY-FILTER] Applying filter to {len(watchlist)} tickers")
