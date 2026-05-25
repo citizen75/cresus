@@ -3,7 +3,6 @@
 from typing import Any, Dict, Optional
 import pandas as pd
 from core.agent import Agent
-from tools.strategy.strategy import StrategyManager
 from tools.formula.numeric_evaluator import evaluate_numeric_formula
 
 
@@ -126,25 +125,15 @@ class EntryRRAgent(Agent):
 			if current_price <= 0:
 				return None
 
-			# Try to load strategy config for exit formulas
-			strategy_name = self.context.get("strategy_name") if self.context else None
-			exit_config = {}
+			# Get strategy config from context (no disk I/O needed)
+			exit_config = self.context.get_path("strategy_config.exit.parameters") or {}
 			take_profit_disabled = False
-			
-			if strategy_name:
-				try:
-					strategy_manager = StrategyManager()
-					strategy_result = strategy_manager.load_strategy(strategy_name)
-					if strategy_result.get("status") == "success":
-						strategy_data = strategy_result.get("data", {})
-						exit_config = strategy_data.get("exit", {}).get("parameters", {})
-						# Check if take_profit is explicitly disabled
-						if "take_profit" in exit_config:
-							tp_formula = exit_config["take_profit"].get("formula", "").strip().lower()
-							if tp_formula == 'false':
-								take_profit_disabled = True
-				except Exception as e:
-					self.logger.debug(f"Could not load strategy config: {e}")
+
+			# Check if take_profit is explicitly disabled
+			if "take_profit" in exit_config:
+				tp_formula = exit_config["take_profit"].get("formula", "").strip().lower()
+				if tp_formula == 'false':
+					take_profit_disabled = True
 
 			# Prepare data context for formula evaluation
 			data_context = {
