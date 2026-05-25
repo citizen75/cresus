@@ -92,8 +92,11 @@ class PositionSizingAgent(Agent):
 				"message": f"Portfolio '{portfolio_name}' not found"
 			}
 
-		# Calculate position sizes
+		# Calculate position sizes - drop orders if insufficient cash
 		sized_orders = []
+		remaining_cash = cash
+		dropped_orders = []
+
 		for rec in entry_recommendations:
 			try:
 				ticker = rec.get("ticker")
@@ -176,14 +179,30 @@ class PositionSizingAgent(Agent):
 				if shares is not None and not math.isnan(shares) and not math.isinf(shares) and shares > 0:
 					try:
 						shares_int = int(shares)
+						order_value = shares_int * current_price
+
+						# Check if sufficient cash available for this position
+						if order_value > remaining_cash:
+							self.logger.debug(f"{ticker}: Dropped - insufficient cash (need €{order_value:.0f}, available €{remaining_cash:.0f})")
+							dropped_orders.append({
+								"ticker": ticker,
+								"shares": shares_int,
+								"order_value": order_value,
+								"reason": "Insufficient cash",
+							})
+							continue
+
 						sized_orders.append({
 							"ticker": ticker,
 							"shares": shares_int,
 							"entry_price": entry_price,
-							"order_value": shares_int * current_price,
+							"order_value": order_value,
 							"risk_amount": abs(shares_int * (entry_price - stop_loss)),
 							"sizing_method": sizing_method_used,
 						})
+						# Deduct from remaining cash
+						remaining_cash -= order_value
+
 					except (ValueError, TypeError, OverflowError) as e:
 						self.logger.debug(f"{ticker}: Failed to convert shares to int: {e}, skipping")
 						continue
@@ -191,18 +210,23 @@ class PositionSizingAgent(Agent):
 				self.logger.debug(f"Error processing recommendation for {rec.get('ticker', 'unknown')}: {e}, skipping")
 				continue
 
-		# Store sized orders in context
+		# Store sized orders and dropped orders in context
 		self.context.set("sized_orders", sized_orders)
+		self.context.set("dropped_orders", dropped_orders)
 
+		total_order_value = sum(o["order_value"] for o in sized_orders)
 		return {
 			"status": "success",
 			"input": input_data,
 			"output": {
 				"sized": len(sized_orders),
-				"total_order_value": sum(o["order_value"] for o in sized_orders),
+				"dropped": len(dropped_orders),
+				"total_order_value": total_order_value,
 				"total_risk": sum(o["risk_amount"] for o in sized_orders),
+				"remaining_cash": remaining_cash,
+				"cash_utilization_pct": (total_order_value / cash * 100) if cash > 0 else 0,
 			},
-			"message": f"Sized {len(sized_orders)} entry positions"
+			"message": f"Sized {len(sized_orders)} positions, dropped {len(dropped_orders)} (insufficient cash), €{remaining_cash:.0f} remaining"
 		}
 
 	def _get_current_price_from_context(self, ticker: str, fallback_price: float) -> float:
