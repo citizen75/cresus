@@ -171,7 +171,10 @@ class PortfolioMetrics(PortfolioManager):
 
         # Calculate position statistics
         position_stats = self._calculate_position_stats(df, actual_start_dt, actual_end_dt)
-        
+
+        # Calculate exit type breakdown
+        exit_stats = self._calculate_exit_stats(completed_trades)
+
         return {
             # Dates and period
             "start_date": actual_start_dt.strftime('%Y-%m-%d %H:%M:%S%z'),
@@ -221,6 +224,12 @@ class PortfolioMetrics(PortfolioManager):
             "calmar_ratio": calmar,
             "omega_ratio": omega,
             "sortino_ratio": sortino,
+
+            # Exit type breakdown
+            "exit_stop_loss": exit_stats["stop_loss"],
+            "exit_take_profit": exit_stats["take_profit"],
+            "exit_expired": exit_stats["expired"],
+            "exit_manual": exit_stats["manual"],
         }
 
     def _empty_metrics(self, start_date: Optional[str], end_date: Optional[str], start_value: float) -> Dict[str, Any]:
@@ -264,6 +273,10 @@ class PortfolioMetrics(PortfolioManager):
             "calmar_ratio": 0.0,
             "omega_ratio": 0.0,
             "sortino_ratio": 0.0,
+            "exit_stop_loss": 0,
+            "exit_take_profit": 0,
+            "exit_expired": 0,
+            "exit_manual": 0,
         }
 
     def _analyze_trades(self, completed_trades: pd.DataFrame, history_df: pd.DataFrame) -> Dict[str, Any]:
@@ -555,6 +568,49 @@ class PortfolioMetrics(PortfolioManager):
             "avg_open": float(round(avg_open, 1)),
             "days_with_positions": int(days_with_positions)
         }
+
+    def _calculate_exit_stats(self, completed_trades: pd.DataFrame) -> Dict[str, int]:
+        """Calculate exit type breakdown for closed trades."""
+        if completed_trades.empty:
+            return {
+                "stop_loss": 0,
+                "take_profit": 0,
+                "expired": 0,
+                "manual": 0,
+            }
+
+        # Filter to SELL operations only (exits)
+        sells = completed_trades[completed_trades['operation'].str.upper() == 'SELL'].copy()
+
+        if sells.empty:
+            return {
+                "stop_loss": 0,
+                "take_profit": 0,
+                "expired": 0,
+                "manual": 0,
+            }
+
+        # Count by exit_type
+        exit_type_counts = {
+            "stop_loss": 0,
+            "take_profit": 0,
+            "expired": 0,
+            "manual": 0,
+        }
+
+        for _, row in sells.iterrows():
+            exit_type = str(row.get("exit_type", "")).lower().strip() if row.get("exit_type") else ""
+
+            if exit_type == "stop_loss":
+                exit_type_counts["stop_loss"] += 1
+            elif exit_type == "take_profit":
+                exit_type_counts["take_profit"] += 1
+            elif exit_type == "expired":
+                exit_type_counts["expired"] += 1
+            else:
+                exit_type_counts["manual"] += 1
+
+        return exit_type_counts
 
     def get_daily_metrics(self, name: str):
         """Get daily metrics for portfolio."""
