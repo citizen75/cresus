@@ -395,12 +395,14 @@ class WatchlistAlphasAgent(Agent):
 		for col_name, shift_str in shift_pairs:
 			shift = int(shift_str)
 			if shift == 0:
-				# [0] means current, just use col_name as-is
-				continue
-			# Use same naming scheme as above
-			shifted_col_name = f"{col_name}_sh{abs(shift)}" if shift < 0 else f"{col_name}_s{shift}"
-			pattern = rf'{re.escape(col_name)}\[{re.escape(shift_str)}\]'
-			vectorized_formula = re.sub(pattern, shifted_col_name, vectorized_formula)
+				# [0] means current, replace with just the column name
+				pattern = rf'{re.escape(col_name)}\[0\]'
+				vectorized_formula = re.sub(pattern, col_name, vectorized_formula)
+			else:
+				# Use same naming scheme as above
+				shifted_col_name = f"{col_name}_sh{abs(shift)}" if shift < 0 else f"{col_name}_s{shift}"
+				pattern = rf'{re.escape(col_name)}\[{re.escape(shift_str)}\]'
+				vectorized_formula = re.sub(pattern, shifted_col_name, vectorized_formula)
 
 		# Convert DSL operators to pandas operators
 		vectorized_formula = self._convert_dsl_to_vectorized(vectorized_formula)
