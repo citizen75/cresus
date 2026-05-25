@@ -75,8 +75,6 @@ class EntryOrderAgent(Agent):
 		watchlist = self.context.get("watchlist") or {}
 		if not watchlist:
 			# Empty watchlist is valid (all tickers filtered out) - return empty orders
-			self.logger.info(f"[ENTRY-ORDER] Watchlist is empty after filtering, no entry analysis")
-
 			return {
 				"status": "success",
 				"input": input_data,
