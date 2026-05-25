@@ -573,27 +573,31 @@ class CresusCLI(cmd2.Cmd):
 			table = Table(title="Formula Analysis Commands", box=box.ROUNDED)
 			table.add_column("Command", style="cyan")
 			table.add_column("Description")
-			table.add_row("analyze <formula> <tickers...> <start_date> [end_date]", "Evaluate formula on each day for tickers")
-			table.add_row("Example", 'analyze "close[0] > ema_5[0]" TTE.PA 2026-05-01 2026-05-10')
-			table.add_row("Example", 'analyze "rsi_7 > 50" TTE.PA ENGI.PA 2026-05-01')
+			table.add_row("Usage", "analyze 'formula' ticker1 [ticker2...] start_date [end_date]")
+			table.add_row("Note", "Use single quotes for formula (preserves operators and brackets)")
+			table.add_row("Example", "analyze 'close[0] > ema_5[0]' TTE.PA 2026-05-01 2026-05-10")
+			table.add_row("Example", "analyze 'rsi_7 > 50' TTE.PA ENGI.PA 2026-01-01 2026-01-31")
+			table.add_row("Example", "analyze 'rsi_7 > 50 && volume[0] > 1000000' TTE.PA 2026-01-01")
 			console.print(table)
 			return
 
 		# Parse arguments with quote awareness
 		# Format: analyze "formula" ticker1 [ticker2 ...] start_date [end_date]
+		# Supports both single and double quotes: "formula" or 'formula'
 
 		# Extract formula (quoted or unquoted)
 		formula = None
 		remaining = args_str
 
-		if remaining.startswith('"'):
+		if remaining.startswith('"') or remaining.startswith("'"):
 			# Formula is quoted, find closing quote
+			quote_char = remaining[0]
 			try:
-				end_quote = remaining.index('"', 1)
+				end_quote = remaining.index(quote_char, 1)
 				formula = remaining[1:end_quote]
 				remaining = remaining[end_quote+1:].strip()
 			except ValueError:
-				console.print("[red]✗[/red] Unclosed quote in formula")
+				console.print(f"[red]✗[/red] Unclosed {quote_char} in formula")
 				return
 		else:
 			# Unquoted formula - take first word (limited use case)
