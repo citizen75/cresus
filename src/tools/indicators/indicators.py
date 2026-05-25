@@ -100,10 +100,45 @@ def calculate(
     DataValidator.validate_data(data, min_rows=2)
     data = DataValidator.normalize_data(data)
 
+    # Track original data order - system expects newest-first, but indicators need oldest-first
+    was_reversed = False
+    data_for_calc = data.copy()  # Work with a copy to avoid modifying input
+
+    # Find date column (could be 'DATE', 'date', 'timestamp', etc.)
+    date_col = None
+    for col in data_for_calc.columns:
+        col_lower = str(col).lower()
+        if col_lower in ('date', 'timestamp', 'datetime'):
+            date_col = col
+            break
+
+    if date_col:
+        # Check if data is sorted newest-first (descending)
+        if len(data_for_calc) > 1:
+            first_date = pd.to_datetime(data_for_calc[date_col].iloc[0])
+            last_date = pd.to_datetime(data_for_calc[date_col].iloc[-1])
+            if first_date > last_date:
+                # Data is newest-first, reverse for indicator calculation
+                data_for_calc = data_for_calc.sort_values(date_col, ascending=True).reset_index(drop=True)
+                was_reversed = True
+
     # Normalize history_df if provided
     if history_df is not None:
         DataValidator.validate_data(history_df, min_rows=2)
         history_df = DataValidator.normalize_data(history_df)
+        # Ensure history is also sorted oldest-first for calculations
+        date_col_hist = None
+        for col in history_df.columns:
+            col_lower = str(col).lower()
+            if col_lower in ('date', 'timestamp', 'datetime'):
+                date_col_hist = col
+                break
+        if date_col_hist:
+            if len(history_df) > 1:
+                first_date = pd.to_datetime(history_df[date_col_hist].iloc[0])
+                last_date = pd.to_datetime(history_df[date_col_hist].iloc[-1])
+                if first_date > last_date:
+                    history_df = history_df.sort_values(date_col_hist, ascending=True).reset_index(drop=True)
 
     # Register needed indicators
     register_indicators_for_formulas(formulas)
@@ -133,7 +168,7 @@ def calculate(
     calc_results = {}  # Maps (indicator_name, param_tuple) -> result (Series or Dict)
     for (indicator_name, param_tuple), (ind_name, params) in indicators_to_calc.items():
         try:
-            result = _calculate_indicator(ind_name, data, history_df, **params)
+            result = _calculate_indicator(ind_name, data_for_calc, history_df, **params)
             calc_results[(indicator_name, param_tuple)] = result
         except Exception as e:
             raise IndicatorNotFoundError(
@@ -185,16 +220,42 @@ def calculate(
                         f"Component '{component}' not found in {indicator_name} result. "
                         f"Available: {list(calc_result.keys())}"
                     )
-            # No component specified - try formula or indicator name match
-            elif formula in calc_result:
-                results[formula] = calc_result[formula]
-            elif indicator_name in calc_result:
-                results[formula] = calc_result[indicator_name]
+            # No component specified - check if this is a multi-return indicator
             else:
-                # Use first Series from dict
-                results[formula] = next(iter(calc_result.values()))
+                # For multi-return indicators (SHA, HA) without component specified,
+                # return all related columns as separate entries
+                prefix_candidates = [
+                    f"{formula}_",  # For parameterized like 'sha_10' -> 'sha_10_*'
+                    f"{indicator_name}_",  # For indicators like 'sha' -> 'sha_*'
+                ]
+
+                matched_keys = []
+                for prefix in prefix_candidates:
+                    matched_keys = [k for k in calc_result.keys() if k.startswith(prefix)]
+                    if matched_keys:
+                        break
+
+                # If we found multiple keys with the same prefix, add all of them
+                if matched_keys and len(matched_keys) > 1:
+                    for key in matched_keys:
+                        results[key] = calc_result[key]
+                elif formula in calc_result:
+                    # Single formula match
+                    results[formula] = calc_result[formula]
+                elif indicator_name in calc_result:
+                    # Indicator name match
+                    results[formula] = calc_result[indicator_name]
+                else:
+                    # Use first Series from dict as fallback
+                    results[formula] = next(iter(calc_result.values()))
         else:
             results[formula] = calc_result
+
+    # If we reversed data for calculation, reverse indicator results back to newest-first order
+    if was_reversed:
+        for key in results:
+            if isinstance(results[key], pd.Series):
+                results[key] = results[key].reset_index(drop=True).iloc[::-1].reset_index(drop=True)
 
     return results
 
@@ -376,17 +437,15 @@ def _register_indicator_modules(indicator_names: set) -> None:
 			pass
 	
 	# Trend indicators
-	if any(ind in indicator_names for ind in ["ema", "sma", "adx", "dmi", "hama", "adx_force"]):
+	if any(ind in indicator_names for ind in ["ema", "sma", "adx", "dmi", "hama"]):
 		try:
-			from .trend import ema, sma, adx, adx_force, hama
+			from .trend import ema, sma, adx, hama
 			if "ema" in indicator_names:
 				register_indicator("ema", ema.calculate)
 			if "sma" in indicator_names:
 				register_indicator("sma", sma.calculate)
 			if "adx" in indicator_names or "dmi" in indicator_names:
 				register_indicator("adx", adx.calculate)
-			if "adx_force" in indicator_names:
-				register_indicator("adx_force", adx_force.calculate)
 			if "hama" in indicator_names:
 				register_indicator("hama", hama.calculate)
 		except ImportError:

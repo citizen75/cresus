@@ -131,7 +131,22 @@ class FilterAgent(Agent):
 			if not hasattr(ticker_data, 'iloc') or len(ticker_data) == 0:
 				return False
 
-			# Pass full data to evaluate, which handles sorting and shift notation
+			# Debug: check data integrity
+			if len(ticker_data) > 0:
+				first_row = ticker_data.iloc[0]
+				last_row = ticker_data.iloc[-1]
+				self.logger.debug(f"[FILTER] Data shape: {ticker_data.shape}, columns: {list(ticker_data.columns)}")
+				date_col = 'DATE' if 'DATE' in ticker_data.columns else ('TIMESTAMP' if 'TIMESTAMP' in ticker_data.columns else 'Date')
+				first_date = first_row.get(date_col, 'N/A') if date_col in first_row.index else 'N/A'
+				last_date = last_row.get(date_col, 'N/A') if date_col in last_row.index else 'N/A'
+				self.logger.debug(f"[FILTER] First row date: {first_date}, Last row date: {last_date}")
+
+				# Show sha_10_green values if available
+				if 'sha_10_green' in ticker_data.columns:
+					self.logger.debug(f"[FILTER] sha_10_green first={ticker_data['sha_10_green'].iloc[0]}, last={ticker_data['sha_10_green'].iloc[-1]}")
+
+			# For filter evaluation on current bar, pass full history for shift notation support
+			# evaluate() will handle sorting and [0], [-1] shift notation correctly
 			result = evaluate(formula, ticker_data)
 			self.logger.debug(f"[FILTER] Formula '{formula}' evaluated to {result}")
 			return result
