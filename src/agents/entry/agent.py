@@ -239,10 +239,14 @@ class EntryAgent(Agent):
 		rr_metrics = {t: {"rr_ratio": d.get("rr_ratio", 0)} for t, d in watchlist.items()}
 		recommendations = list(watchlist.keys())  # All tickers in merged watchlist are recommendations
 
-		# Log final summary
-		avg_entry = sum(entry_scores.values()) / len(entry_scores) if entry_scores else 0
-		avg_timing = sum(timing_scores.values()) / len(timing_scores) if timing_scores else 0
-		avg_rr = sum(m["rr_ratio"] for m in rr_metrics.values()) / len(rr_metrics) if rr_metrics else 0
+		# Log final summary (filter None values to prevent arithmetic errors)
+		valid_entry = [s for s in entry_scores.values() if s is not None]
+		valid_timing = [s for s in timing_scores.values() if s is not None]
+		valid_rr = [m.get("rr_ratio", 0) for m in rr_metrics.values() if m and m.get("rr_ratio") is not None]
+
+		avg_entry = sum(valid_entry) / len(valid_entry) if valid_entry else 0
+		avg_timing = sum(valid_timing) / len(valid_timing) if valid_timing else 0
+		avg_rr = sum(valid_rr) / len(valid_rr) if valid_rr else 0
 
 		#print(f"[ENTRY-1] Watchlist: {len(watchlist)} tickers")
 
