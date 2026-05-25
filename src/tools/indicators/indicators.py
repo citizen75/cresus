@@ -376,15 +376,17 @@ def _register_indicator_modules(indicator_names: set) -> None:
 			pass
 	
 	# Trend indicators
-	if any(ind in indicator_names for ind in ["ema", "sma", "adx", "dmi", "hama"]):
+	if any(ind in indicator_names for ind in ["ema", "sma", "adx", "dmi", "hama", "adx_force"]):
 		try:
-			from .trend import ema, sma, adx, hama
+			from .trend import ema, sma, adx, adx_force, hama
 			if "ema" in indicator_names:
 				register_indicator("ema", ema.calculate)
 			if "sma" in indicator_names:
 				register_indicator("sma", sma.calculate)
 			if "adx" in indicator_names or "dmi" in indicator_names:
 				register_indicator("adx", adx.calculate)
+			if "adx_force" in indicator_names:
+				register_indicator("adx_force", adx_force.calculate)
 			if "hama" in indicator_names:
 				register_indicator("hama", hama.calculate)
 		except ImportError:
