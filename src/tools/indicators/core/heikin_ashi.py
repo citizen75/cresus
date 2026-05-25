@@ -174,9 +174,10 @@ def calculate_smooth(
     # Bullish indicator (same logic as green, for consistency)
     sha_bullish = (sha_close_series > sha_open_series).astype(int)
 
-    # Wick indicators: trend strength without counter-trend wicks
-    sha_up = ((sha_close_series > sha_open_series) & (sha_low_series >= sha_open_series)).astype(int)
-    sha_down = ((sha_close_series < sha_open_series) & (sha_high_series <= sha_open_series)).astype(int)
+    # Wick indicators: just check bullish/bearish (wick check disabled as always false)
+    # Original conditions (low >= open, high <= open) are mathematically impossible in HA
+    sha_up = (sha_close_series > sha_open_series).astype(int)
+    sha_down = (sha_close_series < sha_open_series).astype(int)
 
     # Include period in key names for proper formula reference
     period_suffix = f"_{period}" if period else ""

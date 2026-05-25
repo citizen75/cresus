@@ -51,7 +51,8 @@ def calculate(
     sha_close = result[close_key]
     sha_low = result[low_key]
 
-    # Bullish candle with no bottom wick: close > open and low == open
-    is_up = (sha_close > sha_open) & (sha_low == sha_open)
+    # Bullish candle: just check close > open
+    # Note: The second condition (low == open / no bottom wick) is too strict and never triggers
+    is_up = sha_close > sha_open
 
     return pd.Series(is_up.astype(int), index=sha_close.index)
