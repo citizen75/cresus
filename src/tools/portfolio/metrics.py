@@ -114,6 +114,7 @@ class PortfolioMetrics(PortfolioManager):
         history_result = history.calculate()
         history_list = history_result.get("history", []) if history_result.get("status") == "success" else []
 
+        history_df = pd.DataFrame()  # Initialize empty dataframe
         if history_list:
             history_df = pd.DataFrame(history_list)
             history_df['date'] = pd.to_datetime(history_df['date'])
@@ -126,10 +127,13 @@ class PortfolioMetrics(PortfolioManager):
         # Calculate basic metrics
         period_duration = actual_end_dt - actual_start_dt
         total_return = ((actual_end_value - actual_start_value) / actual_start_value * 100) if actual_start_value > 0 else 0
-        
+
         # Calculate daily returns (from filtered range)
-        history_in_range['daily_return'] = history_in_range['portfolio_value'].pct_change() * 100
-        daily_returns = history_in_range['daily_return'].fillna(0).values
+        if not history_in_range.empty and 'portfolio_value' in history_in_range.columns:
+            history_in_range['daily_return'] = history_in_range['portfolio_value'].pct_change() * 100
+            daily_returns = history_in_range['daily_return'].fillna(0).values
+        else:
+            daily_returns = []
         
         # Trade analysis (filter trades to requested date range)
         completed_trades = df[df['status'] == 'completed'].copy()

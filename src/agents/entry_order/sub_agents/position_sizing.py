@@ -5,6 +5,7 @@ import pandas as pd
 from core.agent import Agent
 from tools.portfolio import PortfolioManager
 from tools.formula.numeric_evaluator import evaluate_position_size
+from tools.strategy.strategy import StrategyManager
 
 
 class PositionSizingAgent(Agent):
@@ -58,28 +59,25 @@ class PositionSizingAgent(Agent):
 				"message": "No entry recommendations to size"
 			}
 
-		# Get position sizing config from strategy_config in context
-		strategy_config = self.context.get("strategy_config") if self.context else None
+		# Get position sizing config from strategy_config via StrategyManager
+		sm = StrategyManager(self.context)
 		position_sizing_config = None
 
-		if strategy_config:
-			entry_config = strategy_config.get("entry", {}).get("parameters", {})
-			order_config = strategy_config.get("order", {}).get("parameters", {})
-
-			# Check order.parameters first (preferred location)
-			if "position_sizing" in order_config:
-				position_sizing_config = order_config["position_sizing"]
-				if position_sizing_config:
-					self.logger.info(f"Using position_sizing config from order: {position_sizing_config}")
+		# Check order.parameters first (preferred location)
+		position_sizing_config = sm.get_path("order.parameters.position_sizing")
+		if position_sizing_config:
+			self.logger.info(f"Using position_sizing config from order: {position_sizing_config}")
+		else:
 			# Fall back to entry.parameters (legacy location)
-			elif "position_sizing" in entry_config:
-				position_sizing_config = entry_config["position_sizing"]
-				if position_sizing_config:
-					self.logger.info(f"Using position_sizing config from entry: {position_sizing_config}")
-			elif "position_size" in entry_config:
+			position_sizing_config = sm.get_path("entry.parameters.position_sizing")
+			if position_sizing_config:
+				self.logger.info(f"Using position_sizing config from entry: {position_sizing_config}")
+			else:
 				# Backward compatibility: legacy formula-based sizing
-				position_sizing_config = {"type": "formula", "formula": entry_config["position_size"].get("formula")}
-				self.logger.info(f"Using legacy position_size formula: {position_sizing_config['formula']}")
+				position_size_formula = sm.get_path("entry.parameters.position_size.formula")
+				if position_size_formula:
+					position_sizing_config = {"type": "formula", "formula": position_size_formula}
+					self.logger.info(f"Using legacy position_size formula: {position_size_formula}")
 
 		# Get portfolio metrics
 		pm = PortfolioManager(context=self.context.__dict__)

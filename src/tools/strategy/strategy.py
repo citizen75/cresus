@@ -281,6 +281,36 @@ class StrategyManager:
 			except TypeError:
 				pass
 
+	def get_path(self, path: str, data: Optional[Dict[str, Any]] = None) -> Optional[Any]:
+		"""Get value from nested dictionary using dot notation path.
+
+		Args:
+			path: Dot-separated path (e.g., "watchlist.parameters.filter.formula")
+			data: Optional data dict to search. If None, uses loaded strategy_config from context.
+
+		Returns:
+			Value at the path, or None if path doesn't exist
+		"""
+		# If no data provided, try to get strategy_config from context
+		if data is None:
+			data = self.get_strategy_config()
+
+		if data is None:
+			return None
+
+		# Split path by dots and traverse
+		parts = path.split('.')
+		current = data
+
+		for part in parts:
+			if isinstance(current, dict) and part in current:
+				current = current[part]
+			else:
+				# Path doesn't exist
+				return None
+
+		return current
+
 	def set_strategy_config(self, strategy_config: Dict[str, Any]) -> None:
 		"""Set strategy_config in context for reuse across operations.
 

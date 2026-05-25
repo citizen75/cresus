@@ -22,7 +22,12 @@ def main():
     # If arguments provided, use command mode (suppress banner)
     if len(sys.argv) > 1:
         app = CresusCLI(interactive=False)
-        command = " ".join(sys.argv[1:])
+        # For analyze command, preserve formula quotes
+        if sys.argv[1] == 'analyze' and len(sys.argv) > 2:
+            # Re-add quotes around formula (second argument)
+            command = f"analyze '{sys.argv[2]}' " + " ".join(sys.argv[3:])
+        else:
+            command = " ".join(sys.argv[1:])
         app.onecmd(command)
         return 0
 

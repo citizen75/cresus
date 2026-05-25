@@ -4,7 +4,6 @@ from typing import Any, Dict, Optional
 from datetime import datetime
 import hashlib
 from core.agent import Agent
-from tools.strategy.strategy import StrategyManager
 from tools.formula.numeric_evaluator import evaluate_numeric_formula
 
 
@@ -50,24 +49,25 @@ class OrderConstructionAgent(Agent):
 				"message": "No validated orders to construct"
 			}
 
-		# Try to load strategy config for entry and exit parameters
-		strategy_name = self.context.get("strategy_name")
+		# Get strategy config from context
+		strategy_config = self.context.get("strategy_config")
+		strategy_name = self.context.get("strategy_name") or "unknown"
 		exit_config = {}
 		entry_config = {}
 
-		if strategy_name:
-			try:
-				strategy_manager = StrategyManager()
-				strategy_result = strategy_manager.load_strategy(strategy_name)
-				if strategy_result.get("status") == "success":
-					strategy_data = strategy_result.get("data", {})
-					exit_config = strategy_data.get("exit", {}).get("parameters", {})
-					entry_config = strategy_data.get("entry", {}).get("parameters", {})
-			except Exception as e:
-				self.logger.debug(f"Could not load strategy config: {e}")
+		# Exit early if strategy_config not available
+		if not strategy_config:
+			self.logger.warning("No strategy_config in context, cannot construct orders")
+			return {
+				"status": "error",
+				"input": input_data,
+				"output": {"orders": []},
+				"message": "Strategy config not available in context"
+			}
 
-		if strategy_name is None:
-			strategy_name = "unknown"
+		# Extract configs from strategy (no disk I/O needed)
+		exit_config = strategy_config.get("exit", {}).get("parameters", {})
+		entry_config = strategy_config.get("entry", {}).get("parameters", {})
 
 		# Build recommendation lookup
 		rec_lookup = {rec["ticker"]: rec for rec in entry_recommendations}

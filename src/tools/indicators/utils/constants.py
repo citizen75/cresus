@@ -17,7 +17,6 @@ INDICATOR_PARAMS = {
     "ema": {"params": ["period"], "defaults": {"period": 20}},
     "sma": {"params": ["period"], "defaults": {"period": 20}},
     "adx": {"params": ["period"], "defaults": {"period": 14}},
-    "adx_force": {"params": ["period"], "defaults": {"period": 14}},  # ADX trend conviction
     "dmi": {"params": ["period"], "defaults": {"period": 14}},
     "hama": {"params": ["length_open", "length_close", "ema_line"], "defaults": {"length_open": 25, "length_close": 20, "ema_line": 55}},
 
@@ -61,8 +60,8 @@ INDICATOR_PARAMS = {
 }
 
 # Indicator return types
-RETURN_SINGLE = {"rsi", "macd_line", "macd_signal", "macd_histogram", "adx", "adx_force", "obv", "mfi", "cmf", "vwap"}
-RETURN_DICT = {"macd", "bb", "bollinger_bands", "dmi", "pivot", "ha", "sha", "hama"}  # Return multiple series
+RETURN_SINGLE = {"rsi", "macd_line", "macd_signal", "macd_histogram", "obv", "mfi", "cmf", "vwap"}
+RETURN_DICT = {"macd", "bb", "bollinger_bands", "dmi", "pivot", "ha", "sha", "hama", "adx"}  # Return multiple series
 
 # Default periods if not specified
 DEFAULT_FAST_PERIOD = 12

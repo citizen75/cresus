@@ -31,6 +31,7 @@ class FormulaParser:
         'green', 'red', 'bullish',  # Color and pattern indicators
         'up', 'down',  # Wick indicators (SHA without top/bottom wick)
         'trend',  # HAMA trend line
+        'force',  # ADX force (trend conviction)
     }
 
     @staticmethod

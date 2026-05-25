@@ -116,22 +116,31 @@ class AnalyzeFlow(Flow):
 				if df is None or df.empty:
 					continue
 
-				# Filter data to current date
+				# Convert timestamps to date for filtering
 				if "timestamp" in df.columns:
-					df_on_date = df[pd.to_datetime(df["timestamp"]).dt.date == current_date]
+					date_series = pd.to_datetime(df["timestamp"]).dt.date
 				else:
-					df_on_date = df[pd.to_datetime(df.index).date == current_date]
+					date_series = pd.to_datetime(df.index).date
 
-				if df_on_date.empty:
+				# Get data up to and including current date (for shift support)
+				# This allows formulas like [-1] to access previous bars
+				df_up_to_date = df[date_series <= current_date].copy()
+
+				if df_up_to_date.empty:
 					continue
 
-				# Use only the last row for this date (most recent close)
-				row_data = df_on_date.iloc[-1:].copy()
+				# Ensure data is sorted for vectorized evaluation
+				# evaluate_dsl_vectorized requires ascending order for proper shift handling
+				df_up_to_date = df_up_to_date.sort_values('timestamp', ascending=True).reset_index(drop=True)
+
+				# Use only the last row (current date), but keep full context
+				row_data = df_up_to_date.iloc[-1:].copy()
 
 				try:
 					# Evaluate formula using vectorized evaluation
-					result_series = evaluate_dsl_vectorized(formula, row_data)
-					result_value = bool(result_series.iloc[0]) if len(result_series) > 0 else False
+					# Pass full context for shifts, but evaluate on current row
+					result_series = evaluate_dsl_vectorized(formula, df_up_to_date)
+					result_value = bool(result_series.iloc[-1]) if len(result_series) > 0 else False
 
 					if result_value:
 						pass_count += 1

@@ -122,6 +122,13 @@ class IndicatorChecker:
 		"""Check a single indicator."""
 		result = CheckResult(indicator_name=indicator_name)
 
+		# Trigger lazy registration for this indicator
+		try:
+			from .indicators import register_indicators_for_formulas
+			register_indicators_for_formulas([indicator_name])
+		except Exception:
+			pass
+
 		# Try to get indicator - first with full name
 		indicator_fn = get_registered_indicator(indicator_name)
 
@@ -142,6 +149,8 @@ class IndicatorChecker:
 					try:
 						from .parser import parse_formula
 						parsed_base, parsed_params = parse_formula(indicator_name)
+						# Trigger registration for the parsed base indicator
+						register_indicators_for_formulas([indicator_name])
 						indicator_fn = get_registered_indicator(parsed_base)
 						if indicator_fn:
 							result.add_info(f"Parsed as DSL formula: {parsed_base} with params {parsed_params}")
