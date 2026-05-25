@@ -102,7 +102,7 @@ class WatchlistAlphasAgent(Agent):
 					try:
 						# Skip if alpha already exists in the data (cache)
 						if alpha_name in data_enriched.columns:
-							self.logger.debug(f"[ALPHAS] Skipping {alpha_name} for {ticker} - already cached")
+							#self.logger.debug(f"[ALPHAS] Skipping {alpha_name} for {ticker} - already cached")
 							alphas_skipped += 1
 							continue
 
@@ -313,12 +313,9 @@ class WatchlistAlphasAgent(Agent):
 			# Optimization 1: Try vectorized evaluation with shift preprocessing
 			return self._evaluate_dsl_formula_vectorized(formula, data, ticker)
 		except Exception as e:
-			# Log as warning (not debug) since vectorization failed
+			# Log as ERROR since vectorization failed (indicates formula issue or performance problem)
 			error_msg = str(e)
-			if "keyword not valid" in error_msg or "not defined" in error_msg:
-				self.logger.error(f"[ALPHAS] Vectorized eval failed for '{formula}': {error_msg}")
-			else:
-				self.logger.debug(f"[ALPHAS] Vectorized eval failed for '{formula}', using row-by-row: {error_msg}")
+			self.logger.error(f"[ALPHAS] Vectorized eval failed for '{formula}', using row-by-row: {error_msg}")
 			return self._evaluate_dsl_formula_rowwise(formula, data, ticker)
 
 	def _evaluate_dsl_formula_vectorized(self, formula: str, data: pd.DataFrame, ticker: str = "") -> pd.Series:
