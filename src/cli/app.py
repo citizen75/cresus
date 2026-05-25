@@ -579,24 +579,34 @@ class CresusCLI(cmd2.Cmd):
 			console.print(table)
 			return
 
-		# Parse arguments
+		# Parse arguments with quote awareness
 		# Format: analyze "formula" ticker1 [ticker2 ...] start_date [end_date]
-		parts = args_str.split()
 
-		if len(parts) < 3:
-			console.print("[red]✗[/red] Usage: analyze <formula> <ticker1> [ticker2...] <start_date> [end_date]")
-			return
+		# Extract formula (quoted or unquoted)
+		formula = None
+		remaining = args_str
 
-		# First argument is formula (may be quoted)
-		if args_str.startswith('"'):
-			# Formula is quoted, find the closing quote
-			end_quote = args_str.index('"', 1)
-			formula = args_str[1:end_quote]
-			remaining = args_str[end_quote+1:].strip()
+		if remaining.startswith('"'):
+			# Formula is quoted, find closing quote
+			try:
+				end_quote = remaining.index('"', 1)
+				formula = remaining[1:end_quote]
+				remaining = remaining[end_quote+1:].strip()
+			except ValueError:
+				console.print("[red]✗[/red] Unclosed quote in formula")
+				return
 		else:
-			# No quotes, first token is formula
+			# Unquoted formula - take first word (limited use case)
+			parts = remaining.split()
+			if not parts:
+				console.print("[red]✗[/red] Formula required")
+				return
 			formula = parts[0]
 			remaining = " ".join(parts[1:])
+
+		if not formula:
+			console.print("[red]✗[/red] Formula required")
+			return
 
 		# Parse remaining: tickers..., start_date, [end_date]
 		remaining_parts = remaining.split()
@@ -606,13 +616,18 @@ class CresusCLI(cmd2.Cmd):
 			return
 
 		# Last 1-2 parts are dates
+		# Strategy: if last 2 parts both look like dates, they are start and end
+		# If only last part looks like date, it's start_date and end_date defaults to today
 		end_date = None
 		start_date = remaining_parts[-1]
+
 		if len(remaining_parts) >= 2 and self._looks_like_date(remaining_parts[-2]):
+			# Two dates: start_date and end_date
 			start_date = remaining_parts[-2]
 			end_date = remaining_parts[-1]
 			tickers = remaining_parts[:-2]
 		else:
+			# One date: only start_date
 			tickers = remaining_parts[:-1]
 
 		if not tickers:
