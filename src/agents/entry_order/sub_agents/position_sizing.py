@@ -4,7 +4,6 @@ from typing import Any, Dict, Optional
 from core.agent import Agent
 from tools.portfolio import PortfolioManager
 from tools.data import Fundamental
-from tools.strategy.strategy import StrategyManager
 from tools.formula.numeric_evaluator import evaluate_position_size
 
 
@@ -59,35 +58,28 @@ class PositionSizingAgent(Agent):
 				"message": "No entry recommendations to size"
 			}
 
-		# Try to load strategy config for position sizing
-		strategy_name = self.context.get("strategy_name") if self.context else None
+		# Get position sizing config from strategy_config in context
+		strategy_config = self.context.get("strategy_config") if self.context else None
 		position_sizing_config = None
 
-		if strategy_name:
-			try:
-				strategy_manager = StrategyManager()
-				strategy_result = strategy_manager.load_strategy(strategy_name)
-				if strategy_result.get("status") == "success":
-					strategy_data = strategy_result.get("data", {})
-					entry_config = strategy_data.get("entry", {}).get("parameters", {})
-					order_config = strategy_data.get("order", {}).get("parameters", {})
+		if strategy_config:
+			entry_config = strategy_config.get("entry", {}).get("parameters", {})
+			order_config = strategy_config.get("order", {}).get("parameters", {})
 
-					# Check order.parameters first (preferred location)
-					if "position_sizing" in order_config:
-						position_sizing_config = order_config["position_sizing"]
-						if position_sizing_config:
-							self.logger.info(f"Using position_sizing config from order: {position_sizing_config}")
-					# Fall back to entry.parameters (legacy location)
-					elif "position_sizing" in entry_config:
-						position_sizing_config = entry_config["position_sizing"]
-						if position_sizing_config:
-							self.logger.info(f"Using position_sizing config from entry: {position_sizing_config}")
-					elif "position_size" in entry_config:
-						# Backward compatibility: legacy formula-based sizing
-						position_sizing_config = {"type": "formula", "formula": entry_config["position_size"].get("formula")}
-						self.logger.info(f"Using legacy position_size formula: {position_sizing_config['formula']}")
-			except Exception as e:
-				self.logger.debug(f"Could not load strategy config: {e}")
+			# Check order.parameters first (preferred location)
+			if "position_sizing" in order_config:
+				position_sizing_config = order_config["position_sizing"]
+				if position_sizing_config:
+					self.logger.info(f"Using position_sizing config from order: {position_sizing_config}")
+			# Fall back to entry.parameters (legacy location)
+			elif "position_sizing" in entry_config:
+				position_sizing_config = entry_config["position_sizing"]
+				if position_sizing_config:
+					self.logger.info(f"Using position_sizing config from entry: {position_sizing_config}")
+			elif "position_size" in entry_config:
+				# Backward compatibility: legacy formula-based sizing
+				position_sizing_config = {"type": "formula", "formula": entry_config["position_size"].get("formula")}
+				self.logger.info(f"Using legacy position_size formula: {position_sizing_config['formula']}")
 
 		# Get portfolio metrics
 		pm = PortfolioManager(context=self.context.__dict__)
