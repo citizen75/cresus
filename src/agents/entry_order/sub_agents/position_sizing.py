@@ -1,9 +1,9 @@
 """Position sizing sub-agent for calculating order sizes."""
 
 from typing import Any, Dict, Optional
+import pandas as pd
 from core.agent import Agent
 from tools.portfolio import PortfolioManager
-from tools.data import Fundamental
 from tools.formula.numeric_evaluator import evaluate_position_size
 
 
@@ -113,9 +113,8 @@ class PositionSizingAgent(Agent):
 					self.logger.debug(f"{ticker}: Invalid entry_price or stop_loss, skipping")
 					continue
 
-				# Get current price
-				fundamental = Fundamental(ticker)
-				current_price = fundamental.get_current_price() or entry_price
+				# Get current price from data_history in context (already available)
+				current_price = self._get_current_price_from_context(ticker, entry_price)
 
 				# Validate current_price is not NaN/Inf
 				import math
@@ -207,6 +206,37 @@ class PositionSizingAgent(Agent):
 			},
 			"message": f"Sized {len(sized_orders)} entry positions"
 		}
+
+	def _get_current_price_from_context(self, ticker: str, fallback_price: float) -> float:
+		"""Get current price from data_history in context.
+
+		Avoids API calls by using price data already available in context.
+
+		Args:
+			ticker: Ticker symbol
+			fallback_price: Price to use if not found in data_history (e.g., entry_price)
+
+		Returns:
+			Current price or fallback price
+		"""
+		data_history = self.context.get("data_history") if self.context else None
+
+		if not data_history or ticker not in data_history:
+			return fallback_price
+
+		try:
+			ticker_data = data_history[ticker]
+			if not isinstance(ticker_data, pd.DataFrame) or len(ticker_data) == 0:
+				return fallback_price
+
+			# Get latest close price (data is sorted newest-first)
+			latest_close = ticker_data.iloc[0].get("close")
+			if latest_close is None:
+				return fallback_price
+
+			return float(latest_close)
+		except (KeyError, IndexError, ValueError, TypeError):
+			return fallback_price
 
 	def _fractional_sizing(self, cash: float, current_price: float, entry_price: float, stop_loss: float) -> int:
 		"""Calculate shares using fixed fractional method.
