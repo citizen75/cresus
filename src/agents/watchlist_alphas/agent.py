@@ -297,7 +297,8 @@ class WatchlistAlphasAgent(Agent):
 	def _evaluate_dsl_formula(self, formula: str, data: pd.DataFrame, ticker: str = "") -> pd.Series:
 		"""Evaluate DSL formula using vectorized pandas operations (Optimization 1).
 
-		Tries vectorized evaluation first, falls back to row-by-row if shift notation is complex.
+		Delegates to src/tools/formula for proper vectorized evaluation handling shift notation.
+		Falls back to row-by-row if vectorization fails.
 
 		Args:
 			formula: DSL formula (e.g., "rsi_7 < 25", "close > ema_20")
@@ -306,138 +307,17 @@ class WatchlistAlphasAgent(Agent):
 		Returns:
 			Series of boolean values (0.0/1.0) for each row
 		"""
-		import re
-		import numpy as np
+		from src.tools.formula.dsl_parser import evaluate_dsl_vectorized
 
 		try:
-			# Optimization 1: Try vectorized evaluation with shift preprocessing
-			return self._evaluate_dsl_formula_vectorized(formula, data, ticker)
+			# Use vectorized evaluation from formula tools
+			return evaluate_dsl_vectorized(formula, data)
 		except Exception as e:
 			# Log as ERROR since vectorization failed (indicates formula issue or performance problem)
 			error_msg = str(e)
 			self.logger.error(f"[ALPHAS] Vectorized eval failed for '{formula}', using row-by-row: {error_msg}")
 			return self._evaluate_dsl_formula_rowwise(formula, data, ticker)
 
-	def _evaluate_dsl_formula_vectorized(self, formula: str, data: pd.DataFrame, ticker: str = "") -> pd.Series:
-		"""Optimization 1: Vectorized DSL evaluation using pandas shifting.
-
-		Pre-creates shifted columns and evaluates formula on entire DataFrame at once.
-
-		Args:
-			formula: DSL formula with shift notation
-			data: DataFrame
-
-		Returns:
-			Series of results
-		"""
-		import re
-		import numpy as np
-		from src.tools.indicators import calculate
-
-		data_work = data.copy()
-
-		# Normalize column names to lowercase for consistency
-		col_mapping = {}
-		for col in data_work.columns:
-			lower_col = col.lower()
-			if lower_col != col:
-				data_work[lower_col] = data_work[col]
-				col_mapping[lower_col] = col
-
-		# Extract all referenced names (indicators, columns)
-		pattern = r'([a-z_]+(?:_\d+)?)'
-		matches = set(re.findall(pattern, formula, re.IGNORECASE))
-
-		# Pre-calculate missing indicators
-		for match in matches:
-			if match.lower() in ['close', 'high', 'low', 'open', 'volume']:
-				continue
-			if match not in data_work.columns:
-				try:
-					result = calculate([match], data_work)
-					data_work[match] = result[match]
-				except Exception:
-					pass
-
-		# Pre-create shifted columns for shift notation
-		shift_pattern = r'(\w+)\[(-?\d+)\]'
-		shift_pairs = set(re.findall(shift_pattern, formula))
-
-		for col_name, shift_str in shift_pairs:
-			shift = int(shift_str)
-			# Handle [0] case - just reference the column as-is
-			if shift == 0:
-				# Make sure column exists with lowercase name
-				if col_name not in data_work.columns and col_name.upper() in data_work.columns:
-					data_work[col_name] = data_work[col_name.upper()]
-				continue
-
-			# Normalize shift: [-1] = previous, [-2] = 2 bars ago
-			# pandas.shift(1) moves down (future bar), so we negate
-			pandas_shift = -shift  # Negate for pandas semantics
-			# Use absolute value in column name to avoid invalid names like "col_s-20"
-			shifted_col_name = f"{col_name}_sh{abs(shift)}" if shift < 0 else f"{col_name}_s{shift}"
-
-			# Get source column (handle case sensitivity)
-			source_col = None
-			if col_name in data_work.columns:
-				source_col = col_name
-			elif col_name.upper() in data_work.columns:
-				source_col = col_name.upper()
-				data_work[col_name] = data_work[col_name.upper()]  # Copy to lowercase
-				source_col = col_name
-
-			if source_col:
-				data_work[shifted_col_name] = data_work[source_col].shift(pandas_shift)
-
-		# Replace shift notation in formula with shifted column references
-		vectorized_formula = formula
-		for col_name, shift_str in shift_pairs:
-			shift = int(shift_str)
-			if shift == 0:
-				# [0] means current, just use col_name as-is
-				continue
-			# Use same naming scheme as above
-			shifted_col_name = f"{col_name}_sh{abs(shift)}" if shift < 0 else f"{col_name}_s{shift}"
-			pattern = rf'{re.escape(col_name)}\[{re.escape(shift_str)}\]'
-			vectorized_formula = re.sub(pattern, shifted_col_name, vectorized_formula)
-
-		# Convert DSL operators to pandas operators
-		vectorized_formula = self._convert_dsl_to_vectorized(vectorized_formula)
-
-		# Evaluate
-		try:
-			result = pd.eval(vectorized_formula, local_dict=data_work)
-			if isinstance(result, pd.Series):
-				return result.fillna(0).astype(float)
-			else:
-				return pd.Series([1.0 if result else 0.0] * len(data), index=data.index)
-		except Exception as e:
-			raise ValueError(f"Vectorized evaluation failed: {str(e)}")
-
-	def _convert_dsl_to_vectorized(self, formula: str) -> str:
-		"""Convert DSL formula to pandas-compatible vectorized expression.
-
-		Args:
-			formula: DSL formula with logical operators
-
-		Returns:
-			Pandas-compatible expression
-		"""
-		import re
-		# Replace DSL operators with pandas operators
-		result = formula
-		# Replace && and 'and' with &
-		result = result.replace('&&', '&')
-		result = result.replace(' and ', ' & ')
-		# Replace || and 'or' with |
-		result = result.replace('||', '|')
-		result = result.replace(' or ', ' | ')
-		# Replace ! and 'not' with ~
-		result = result.replace('!', '~')
-		result = result.replace(' not ', ' ~ ')
-		result = re.sub(r'\bnot\b', '~', result)
-		return result
 
 	def _evaluate_dsl_formula_rowwise(self, formula: str, data: pd.DataFrame, ticker: str = "") -> pd.Series:
 		"""Fallback row-by-row evaluation for complex DSL formulas.

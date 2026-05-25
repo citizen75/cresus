@@ -462,3 +462,86 @@ def evaluate_dsl(formula: str, data: Union[dict, pd.DataFrame]) -> bool:
 	ast = parse_formula(formula)
 	result = ast.evaluate(data)
 	return bool(result)
+
+
+def evaluate_dsl_vectorized(formula: str, data: pd.DataFrame) -> pd.Series:
+	"""Vectorized DSL evaluation using pandas operations.
+
+	Pre-creates shifted columns and evaluates formula on entire DataFrame using pd.eval.
+
+	Args:
+		formula: DSL formula string (e.g., "close[0] > ema_5[0]")
+		data: DataFrame sorted ascending by date (newest last)
+
+	Returns:
+		pd.Series of boolean/numeric results for each row
+
+	Raises:
+		ValueError: If vectorized evaluation fails
+	"""
+	import re
+	import numpy as np
+
+	if not isinstance(data, pd.DataFrame) or data.empty:
+		raise ValueError("Data must be a non-empty DataFrame")
+
+	# Create working copy with lowercase column names
+	data_work = data.copy()
+	for col in data.columns:
+		lower_col = col.lower()
+		if lower_col != col and lower_col not in data_work.columns:
+			data_work[lower_col] = data_work[col]
+
+	# Extract and pre-create shifted columns
+	# Pattern: column_name[shift_value]
+	shift_pattern = r'(\w+)\[(-?\d+)\]'
+	shift_pairs = set(re.findall(shift_pattern, formula))
+
+	vectorized_formula = formula
+	for col_name, shift_str in shift_pairs:
+		shift = int(shift_str)
+
+		# Ensure column exists (try lowercase, then uppercase)
+		if col_name not in data_work.columns:
+			if col_name.upper() in data_work.columns:
+				data_work[col_name] = data_work[col_name.upper()]
+			else:
+				# Column doesn't exist, this will fail in pd.eval anyway
+				pass
+
+		if shift == 0:
+			# [0] = current bar, just replace with column name
+			pattern = rf'{re.escape(col_name)}\[0\]'
+			vectorized_formula = re.sub(pattern, col_name, vectorized_formula)
+		else:
+			# Create shifted column: shift value -1 = previous (shift down in pandas)
+			pandas_shift_amount = -shift
+			shifted_col_name = f"{col_name}_sh{abs(shift)}" if shift < 0 else f"{col_name}_s{shift}"
+
+			if col_name in data_work.columns:
+				data_work[shifted_col_name] = data_work[col_name].shift(pandas_shift_amount)
+
+			# Replace [shift] notation with shifted column name
+			pattern = rf'{re.escape(col_name)}\[{re.escape(shift_str)}\]'
+			vectorized_formula = re.sub(pattern, shifted_col_name, vectorized_formula)
+
+	# Convert DSL logical operators to pandas operators
+	# Replace && and 'and' with &
+	vectorized_formula = re.sub(r'&&|\band\b', '&', vectorized_formula)
+	# Replace || and 'or' with |
+	vectorized_formula = re.sub(r'\|\||\bor\b', '|', vectorized_formula)
+	# Replace ! and 'not' with ~
+	vectorized_formula = re.sub(r'!|\bnot\b', '~', vectorized_formula)
+
+	try:
+		# Evaluate using pd.eval
+		result = pd.eval(vectorized_formula, local_dict=data_work)
+
+		if isinstance(result, pd.Series):
+			# Fill NaN with 0 and convert to float
+			return result.fillna(0).astype(float)
+		else:
+			# Scalar result, broadcast to all rows
+			return pd.Series([1.0 if result else 0.0] * len(data_work), index=data_work.index)
+	except Exception as e:
+		raise ValueError(f"Vectorized evaluation failed for '{formula}': {str(e)}")
