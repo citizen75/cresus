@@ -5,6 +5,7 @@ from datetime import datetime
 import hashlib
 from core.agent import Agent
 from tools.formula.numeric_evaluator import evaluate_numeric_formula
+from tools.strategy.strategy import StrategyManager
 
 
 class OrderConstructionAgent(Agent):
@@ -49,25 +50,13 @@ class OrderConstructionAgent(Agent):
 				"message": "No validated orders to construct"
 			}
 
-		# Get strategy config from context
-		strategy_config = self.context.get("strategy_config")
+		# Get strategy config via StrategyManager
+		sm = StrategyManager(context=self.context)
 		strategy_name = self.context.get("strategy_name") or "unknown"
-		exit_config = {}
-		entry_config = {}
 
-		# Exit early if strategy_config not available
-		if not strategy_config:
-			self.logger.warning("No strategy_config in context, cannot construct orders")
-			return {
-				"status": "error",
-				"input": input_data,
-				"output": {"orders": []},
-				"message": "Strategy config not available in context"
-			}
-
-		# Extract configs from strategy (no disk I/O needed)
-		exit_config = strategy_config.get("exit", {}).get("parameters", {})
-		entry_config = strategy_config.get("entry", {}).get("parameters", {})
+		# Extract configs from strategy using get_path (use empty dict if not available)
+		exit_config = sm.get_path("exit.parameters") or {}
+		entry_config = sm.get_path("entry.parameters") or {}
 
 		# Build recommendation lookup
 		rec_lookup = {rec["ticker"]: rec for rec in entry_recommendations}

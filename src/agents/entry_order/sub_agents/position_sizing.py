@@ -60,7 +60,7 @@ class PositionSizingAgent(Agent):
 			}
 
 		# Get position sizing config from strategy_config via StrategyManager
-		sm = StrategyManager(self.context)
+		sm = StrategyManager(context=self.context)
 		position_sizing_config = None
 
 		# Check order.parameters first (preferred location)
