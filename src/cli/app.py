@@ -1400,7 +1400,7 @@ class CresusCLI(cmd2.Cmd):
 				("Exit: Stop Loss", f"{metrics.get('exit_stop_loss', 0):.0f}", ""),
 				("Exit: Take Profit", f"{metrics.get('exit_take_profit', 0):.0f}", ""),
 				("Exit: Expired", f"{metrics.get('exit_expired', 0):.0f}", ""),
-				("Exit: Manual", f"{metrics.get('exit_manual', 0):.0f}", ""),
+				("Exit: Condition", f"{metrics.get('exit_condition', 0):.0f}", ""),
 				("", "", ""),
 				("Profit Factor", f"{metrics.get('profit_factor', 0):.6f}", ""),
 				("Expectancy", f"{metrics.get('expectancy_pct', 0):.6f}", "%"),

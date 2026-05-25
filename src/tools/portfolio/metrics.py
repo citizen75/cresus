@@ -229,7 +229,7 @@ class PortfolioMetrics(PortfolioManager):
             "exit_stop_loss": exit_stats["stop_loss"],
             "exit_take_profit": exit_stats["take_profit"],
             "exit_expired": exit_stats["expired"],
-            "exit_manual": exit_stats["manual"],
+            "exit_condition": exit_stats["condition"],
         }
 
     def _empty_metrics(self, start_date: Optional[str], end_date: Optional[str], start_value: float) -> Dict[str, Any]:
@@ -276,7 +276,7 @@ class PortfolioMetrics(PortfolioManager):
             "exit_stop_loss": 0,
             "exit_take_profit": 0,
             "exit_expired": 0,
-            "exit_manual": 0,
+            "exit_condition": 0,
         }
 
     def _analyze_trades(self, completed_trades: pd.DataFrame, history_df: pd.DataFrame) -> Dict[str, Any]:
@@ -576,7 +576,7 @@ class PortfolioMetrics(PortfolioManager):
                 "stop_loss": 0,
                 "take_profit": 0,
                 "expired": 0,
-                "manual": 0,
+                "condition": 0,
             }
 
         # Filter to SELL operations only (exits)
@@ -587,7 +587,7 @@ class PortfolioMetrics(PortfolioManager):
                 "stop_loss": 0,
                 "take_profit": 0,
                 "expired": 0,
-                "manual": 0,
+                "condition": 0,
             }
 
         # Count by exit_type
@@ -595,7 +595,7 @@ class PortfolioMetrics(PortfolioManager):
             "stop_loss": 0,
             "take_profit": 0,
             "expired": 0,
-            "manual": 0,
+            "condition": 0,
         }
 
         for _, row in sells.iterrows():
@@ -607,8 +607,11 @@ class PortfolioMetrics(PortfolioManager):
                 exit_type_counts["take_profit"] += 1
             elif exit_type == "expired":
                 exit_type_counts["expired"] += 1
+            elif exit_type == "condition":
+                exit_type_counts["condition"] += 1
             else:
-                exit_type_counts["manual"] += 1
+                # Default to condition for unknown types
+                exit_type_counts["condition"] += 1
 
         return exit_type_counts
 
