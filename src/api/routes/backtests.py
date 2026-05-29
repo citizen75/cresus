@@ -224,13 +224,14 @@ async def get_backtest_history(strategy_name: str, backtest_id: str) -> Dict[str
 		backtest_id: Backtest ID
 
 	Returns:
-		Historical data with daily metrics
+		Historical data with daily metrics (empty if backtest in progress)
 	"""
 	manager = _get_backtest_manager()
 	result = manager.get_portfolio_history(strategy_name, backtest_id)
 
-	if result.get("status") != "success":
-		raise HTTPException(status_code=404, detail=result.get("message"))
+	# Return 200 even if backtest is in progress (empty history is valid)
+	if result.get("status") == "error":
+		raise HTTPException(status_code=404, detail=result.get("message", "Backtest not found"))
 
 	return result
 

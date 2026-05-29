@@ -19,6 +19,9 @@ import BacktestComparator from '@/pages/BacktestComparator'
 import Chart from '@/pages/Chart'
 import Alerts from '@/pages/Alerts'
 import Insights from '@/pages/Insights'
+import Scheduler from '@/pages/Scheduler'
+import Screener from '@/pages/Screener'
+import ScreenerDetail from '@/pages/ScreenerDetail'
 
 export default function App() {
   useEffect(() => {
@@ -51,6 +54,9 @@ export default function App() {
           <Route path="/chart/:ticker" element={<Layout><Chart /></Layout>} />
           <Route path="/alerts" element={<Layout><Alerts /></Layout>} />
           <Route path="/insights" element={<Layout><Insights /></Layout>} />
+          <Route path="/scheduler" element={<Layout><Scheduler /></Layout>} />
+          <Route path="/screener" element={<Layout><Screener /></Layout>} />
+          <Route path="/screener/:name" element={<Layout><ScreenerDetail /></Layout>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

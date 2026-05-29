@@ -178,6 +178,10 @@ class TransactAgent(Agent):
 	) -> List[Dict[str, Any]]:
 		"""Execute pending SELL orders using market data.
 
+		Handles both market and limit orders:
+		- Market SELL orders: executed immediately at market price
+		- Limit SELL orders: executed only if price condition met (price <= limit_price)
+
 		Args:
 			orders_mgr: Orders manager
 			journal: Journal for recording transactions
@@ -227,15 +231,32 @@ class TransactAgent(Agent):
 				order_id = str(order_row.get("id", ""))
 				ticker = str(order_row.get("ticker", ""))
 				quantity = int(order_row.get("quantity", 0))
+				execution_method = str(order_row.get("execution_method", "market")).lower()
+				limit_price = order_row.get("limit_price")
 
-				# Get market price for the date
-				market_price = self._get_market_price(ticker, day_data)
-				if market_price is None:
+				# Get open price for SELL execution (better price for exits)
+				execution_price = self._get_open_price(ticker, day_data)
+				if execution_price is None:
+					# Fallback to close price if open not available
+					execution_price = self._get_market_price(ticker, day_data)
+				if execution_price is None:
 					self.logger.warning(f"No market price for {ticker}, skipping SELL order")
 					orders_mgr.update_order_status(order_id, "rejected")
 					continue
 
-				execution_price = market_price
+				# Determine execution price based on order type
+				if execution_method == "limit":
+					# For limit SELL: only execute if execution_price <= limit_price
+					if limit_price is None:
+						limit_price = order_row.get("entry_price")  # fallback to entry_price
+
+					if execution_price <= float(limit_price):
+						self.logger.debug(f"Limit SELL {ticker}: price {execution_price:.2f} <= limit {limit_price:.2f}, executing")
+					else:
+						self.logger.debug(f"Limit SELL {ticker}: price {execution_price:.2f} > limit {limit_price:.2f}, skipping")
+						orders_mgr.update_order_status(order_id, "pending")
+						continue
+				# else: Market order - execute at open price (execution_price already set)
 
 				# Convert order for broker
 				broker_order = {
@@ -310,7 +331,7 @@ class TransactAgent(Agent):
 
 					self.logger.info(
 						f"SELL {result.filled_quantity} {ticker} @ {result.filled_price:.2f} "
-						f"(order {order_id[:8]})"
+						f"({execution_method} order {order_id[:8]})"
 					)
 				else:
 					orders_mgr.update_order_status(order_id, "rejected")
@@ -546,6 +567,25 @@ class TransactAgent(Agent):
 		row = day_data[ticker]
 		try:
 			return float(row.get("close")) if "close" in row else None
+		except (ValueError, AttributeError):
+			return None
+
+	def _get_open_price(self, ticker: str, day_data: Dict[str, Any]) -> Optional[float]:
+		"""Get opening price for ticker from day data.
+
+		Args:
+			ticker: Ticker symbol
+			day_data: Pre-sliced market data {ticker: row}
+
+		Returns:
+			Opening price or None
+		"""
+		if ticker not in day_data:
+			return None
+
+		row = day_data[ticker]
+		try:
+			return float(row.get("open")) if "open" in row else None
 		except (ValueError, AttributeError):
 			return None
 

@@ -1,0 +1,114 @@
+"""Indicator caching and management.
+
+Stores calculated indicators in parquet files per ticker.
+Cache is automatically invalidated when OHLCV data changes.
+"""
+
+from pathlib import Path
+from typing import Dict, List, Optional
+import pandas as pd
+import hashlib
+from loguru import logger
+
+from utils.env import get_db_root
+
+
+class IndicatorCache:
+    """Manage cached indicators per ticker."""
+
+    def __init__(self, ticker: str):
+        self.ticker = ticker.upper()
+        self.cache_dir = get_db_root() / "cache" / "indicators"
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self.cache_filepath = self.cache_dir / f"{self.ticker}.parquet"
+
+    def get_cached_indicators(self, ohlcv_df: pd.DataFrame) -> Dict[str, pd.Series]:
+        """Load cached indicators if they match the current OHLCV data.
+
+        Args:
+            ohlcv_df: Current OHLCV data
+
+        Returns:
+            Dict of cached indicators, empty dict if cache is invalid or missing
+        """
+        try:
+            if not self.cache_filepath.exists():
+                logger.debug(f"{self.ticker}: No cache file found")
+                return {}
+
+            # Check if cache is still valid by comparing last row hash
+            data_hash = self._get_data_hash(ohlcv_df)
+            cache_df = pd.read_parquet(self.cache_filepath)
+
+            # Verify cache has metadata column
+            if "_data_hash" not in cache_df.columns:
+                logger.debug(f"{self.ticker}: Cache missing metadata, invalidating")
+                return {}
+
+            cached_hash = cache_df["_data_hash"].iloc[0] if len(cache_df) > 0 else None
+
+            if data_hash == cached_hash:
+                # Cache is valid - return all columns except metadata
+                indicators = {col: cache_df[col] for col in cache_df.columns if col != "_data_hash"}
+                logger.debug(f"{self.ticker}: Cache hit - using {len(indicators)} cached indicators")
+                return indicators
+            else:
+                logger.debug(f"{self.ticker}: Cache invalidated (data hash mismatch: {data_hash} != {cached_hash})")
+                return {}
+
+        except Exception as e:
+            logger.warning(f"{self.ticker}: Error loading cache: {e}")
+            return {}
+
+    def save_indicators(self, indicators: Dict[str, pd.Series], ohlcv_df: pd.DataFrame) -> None:
+        """Save calculated indicators with data hash for validation.
+
+        Args:
+            indicators: Dict of indicator Series
+            ohlcv_df: OHLCV data used for calculation
+        """
+        try:
+            if not indicators:
+                logger.debug(f"{self.ticker}: No indicators to cache")
+                return
+
+            # Create DataFrame with indicators
+            df = pd.DataFrame(indicators)
+
+            # Add data hash as metadata for cache validation
+            data_hash = self._get_data_hash(ohlcv_df)
+            df["_data_hash"] = data_hash
+
+            # Save to cache
+            df.to_parquet(self.cache_filepath, index=False)
+            logger.info(f"{self.ticker}: Saved {len(indicators)} indicators to cache: {list(indicators.keys())}")
+        except Exception as e:
+            logger.warning(f"{self.ticker}: Error saving indicator cache: {e}")
+
+    def invalidate(self) -> None:
+        """Delete cached indicators for this ticker."""
+        try:
+            if self.cache_filepath.exists():
+                self.cache_filepath.unlink()
+                logger.debug(f"{self.ticker}: Invalidated indicator cache")
+        except Exception as e:
+            logger.warning(f"{self.ticker}: Error invalidating cache: {e}")
+
+    @staticmethod
+    def _get_data_hash(ohlcv_df: pd.DataFrame) -> str:
+        """Get hash of OHLCV data last row (date, close, volume) to detect changes."""
+        try:
+            if ohlcv_df.empty:
+                return ""
+
+            # Hash the last row's key fields
+            last_row = ohlcv_df.iloc[-1]
+            # Access UPPERCASE column names (after normalization)
+            timestamp = last_row.get('TIMESTAMP', '')
+            close = last_row.get('CLOSE', 0)
+            volume = last_row.get('VOLUME', 0)
+
+            hash_str = f"{timestamp}:{close}:{volume}"
+            return hashlib.md5(hash_str.encode()).hexdigest()
+        except Exception:
+            return ""

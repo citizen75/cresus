@@ -89,6 +89,8 @@ def calculate(
         >>> results = calculate(["rsi_14", "ema_20", "sma_50"], data)
         >>> print(results["rsi_14"])
     """
+    from loguru import logger
+
     # Validate inputs
     if not formulas:
         raise InvalidFormulaError("Formulas list cannot be empty")
@@ -99,6 +101,21 @@ def calculate(
     # Normalize and validate data
     DataValidator.validate_data(data, min_rows=2)
     data = DataValidator.normalize_data(data)
+
+    # Try to load cached indicators
+    from .cache import IndicatorCache
+    from loguru import logger
+
+    ticker = None
+    if "TICKER" in data.columns:
+        ticker_col = data["TICKER"]
+        if not ticker_col.empty:
+            ticker = ticker_col.iloc[0]
+
+    cached_indicators = {}
+    if ticker:
+        cache = IndicatorCache(ticker)
+        cached_indicators = cache.get_cached_indicators(data)
 
     # Track original data order - system expects newest-first, but indicators need oldest-first
     was_reversed = False
@@ -164,16 +181,36 @@ def calculate(
         if indicator_key not in indicators_to_calc:
             indicators_to_calc[indicator_key] = (indicator_name, params_for_calc)
 
-    # Calculate indicators
+    # Calculate indicators (skip cached ones)
     calc_results = {}  # Maps (indicator_name, param_tuple) -> result (Series or Dict)
+    newly_calculated = {}  # Track newly calculated indicators for caching
+
     for (indicator_name, param_tuple), (ind_name, params) in indicators_to_calc.items():
+        # Check if this indicator is already cached
+        if ind_name in cached_indicators:
+            calc_results[(indicator_name, param_tuple)] = cached_indicators[ind_name]
+            continue
+
         try:
             result = _calculate_indicator(ind_name, data_for_calc, history_df, **params)
             calc_results[(indicator_name, param_tuple)] = result
+
+            # If result is a dict (multi-return indicator), flatten it for caching
+            if isinstance(result, dict):
+                for key, val in result.items():
+                    if isinstance(val, pd.Series):
+                        newly_calculated[key] = val
+            else:
+                newly_calculated[ind_name] = result
         except Exception as e:
             raise IndicatorNotFoundError(
                 f"Error calculating {indicator_name} with params {params}: {str(e)}"
             )
+
+    # Save newly calculated indicators to cache
+    if newly_calculated and ticker:
+        cache = IndicatorCache(ticker)
+        cache.save_indicators(newly_calculated, data)
 
     # Map results back to formula strings
     results = {}

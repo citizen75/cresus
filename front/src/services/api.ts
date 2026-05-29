@@ -210,6 +210,146 @@ class CresusAPI {
     // Run strategy in live mode
     return (await this.client.post(`/backtests`, { strategy })).data
   }
+
+  // Scheduler/Cron management
+  async listCronJobs() {
+    return (await this.client.get('/scheduler/jobs')).data
+  }
+
+  async getCronJob(name: string) {
+    return (await this.client.get(`/scheduler/jobs/${name}`)).data
+  }
+
+  async createCronJob(data: {
+    name: string
+    schedule: string
+    target: string
+    job_type?: string
+    description?: string
+    params?: Record<string, any>
+    enabled?: boolean
+  }) {
+    const params = new URLSearchParams()
+    params.append('name', data.name)
+    params.append('schedule', data.schedule)
+    params.append('target', data.target)
+    if (data.job_type) params.append('job_type', data.job_type)
+    if (data.description) params.append('description', data.description)
+    if (data.params) params.append('params', JSON.stringify(data.params))
+    if (data.enabled !== undefined) params.append('enabled', String(data.enabled))
+
+    return (await this.client.post('/scheduler/jobs', null, { params })).data
+  }
+
+  async updateCronJob(name: string, data: {
+    schedule?: string
+    target?: string
+    job_type?: string
+    description?: string
+    params?: Record<string, any>
+    enabled?: boolean
+  }) {
+    const params = new URLSearchParams()
+    if (data.schedule) params.append('schedule', data.schedule)
+    if (data.target) params.append('target', data.target)
+    if (data.job_type) params.append('job_type', data.job_type)
+    if (data.description) params.append('description', data.description)
+    if (data.params) params.append('params', JSON.stringify(data.params))
+    if (data.enabled !== undefined) params.append('enabled', String(data.enabled))
+
+    return (await this.client.put(`/scheduler/jobs/${name}`, null, { params })).data
+  }
+
+  async enableCronJob(name: string) {
+    return (await this.client.post(`/scheduler/jobs/${name}/enable`)).data
+  }
+
+  async disableCronJob(name: string) {
+    return (await this.client.post(`/scheduler/jobs/${name}/disable`)).data
+  }
+
+  async runCronJob(name: string) {
+    return (await this.client.post(`/scheduler/jobs/${name}/run`)).data
+  }
+
+  async duplicateCronJob(name: string, newName: string) {
+    const params = new URLSearchParams()
+    params.append('new_name', newName)
+    return (await this.client.post(`/scheduler/jobs/${name}/duplicate`, null, { params })).data
+  }
+
+  async deleteCronJob(name: string) {
+    return (await this.client.delete(`/scheduler/jobs/${name}`)).data
+  }
+
+  // Screener management
+  async listScreeners() {
+    return (await this.client.get('/screener/screeners')).data
+  }
+
+  async getScreener(name: string) {
+    return (await this.client.get(`/screener/screeners/${name}`)).data
+  }
+
+  async createScreener(data: {
+    name: string
+    source?: string
+    tickers?: string
+    indicators?: string
+    formula?: string
+    description?: string
+  }) {
+    const params = new URLSearchParams()
+    params.append('name', data.name)
+    if (data.source) params.append('source', data.source)
+    if (data.tickers) params.append('tickers', data.tickers)
+    if (data.indicators) params.append('indicators', data.indicators)
+    if (data.formula) params.append('formula', data.formula)
+    if (data.description) params.append('description', data.description)
+
+    return (await this.client.post('/screener/screeners', null, { params })).data
+  }
+
+  async updateScreener(name: string, data: {
+    source?: string
+    tickers?: string
+    indicators?: string
+    formula?: string
+    description?: string
+  }) {
+    const params = new URLSearchParams()
+    if (data.source) params.append('source', data.source)
+    if (data.tickers) params.append('tickers', data.tickers)
+    if (data.indicators) params.append('indicators', data.indicators)
+    if (data.formula) params.append('formula', data.formula)
+    if (data.description) params.append('description', data.description)
+
+    return (await this.client.put(`/screener/screeners/${name}`, null, { params })).data
+  }
+
+  async deleteScreener(name: string) {
+    return (await this.client.delete(`/screener/screeners/${name}`)).data
+  }
+
+  async runScreener(name: string) {
+    return (await this.client.post(`/screener/screeners/${name}/run`)).data
+  }
+
+  async listScreenerResults(name: string) {
+    return (await this.client.get(`/screener/screeners/${name}/results`)).data
+  }
+
+  async getScreenerResult(name: string, resultId: string) {
+    return (await this.client.get(`/screener/screeners/${name}/results/${resultId}`)).data
+  }
+
+  async deleteScreenerResult(name: string, resultId: string) {
+    return (await this.client.delete(`/screener/screeners/${name}/results/${resultId}`)).data
+  }
+
+  async clearScreenerResults(name: string) {
+    return (await this.client.post(`/screener/screeners/${name}/results/clear`)).data
+  }
 }
 
 export const api = new CresusAPI()

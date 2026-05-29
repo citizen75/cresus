@@ -191,8 +191,11 @@ class FormulaParser:
         # Split parameter string
         parts = param_str.split("_")
 
+        # Check if indicator supports flexible parameter count (like HAMA)
+        is_flexible = indicator_config.get("flexible", False)
+
         # Validate count
-        if len(parts) > len(param_names):
+        if not is_flexible and len(parts) > len(param_names):
             raise InvalidFormulaError(
                 f"Too many parameters for {indicator_name}: "
                 f"expected {len(param_names)}, got {len(parts)}"
@@ -200,19 +203,56 @@ class FormulaParser:
 
         # Build parameters dictionary
         params = defaults.copy()
-        for i, part in enumerate(parts):
-            param_name = param_names[i]
 
-            # Try to parse as number, otherwise keep as string
-            try:
-                # Try int first
-                if "." not in part:
-                    params[param_name] = int(part)
-                else:
-                    params[param_name] = float(part)
-            except ValueError:
-                # Keep as string (e.g., "classic" for pivot method)
-                params[param_name] = part
+        # Special handling for flexible indicators like HAMA
+        if is_flexible and indicator_name == "hama":
+            # Parse HAMA parameters: 1, 2, or 3 numeric values
+            parsed_values = []
+            for part in parts:
+                try:
+                    val = int(part) if "." not in part else float(part)
+                    parsed_values.append(val)
+                except ValueError:
+                    raise InvalidFormulaError(
+                        f"HAMA parameters must be numeric, got: {part}"
+                    )
+
+            if len(parsed_values) == 1:
+                # hama_25 -> use same value for all three
+                params["length_open"] = parsed_values[0]
+                params["length_close"] = parsed_values[0]
+                params["ema_line"] = parsed_values[0]
+            elif len(parsed_values) == 2:
+                # hama_25_20 -> length_open=25, length_close=20, ema_line=default(55)
+                params["length_open"] = parsed_values[0]
+                params["length_close"] = parsed_values[1]
+                # ema_line keeps default (55)
+            elif len(parsed_values) == 3:
+                # hama_25_20_55 -> full specification
+                params["length_open"] = parsed_values[0]
+                params["length_close"] = parsed_values[1]
+                params["ema_line"] = parsed_values[2]
+            else:
+                raise InvalidFormulaError(
+                    f"HAMA expects 1, 2 or 3 parameters, got {len(parsed_values)}"
+                )
+        else:
+            # Standard parameter parsing for other indicators
+            for i, part in enumerate(parts):
+                if i >= len(param_names):
+                    break
+                param_name = param_names[i]
+
+                # Try to parse as number, otherwise keep as string
+                try:
+                    # Try int first
+                    if "." not in part:
+                        params[param_name] = int(part)
+                    else:
+                        params[param_name] = float(part)
+                except ValueError:
+                    # Keep as string (e.g., "classic" for pivot method)
+                    params[param_name] = part
 
         return params
 

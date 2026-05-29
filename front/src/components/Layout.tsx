@@ -9,10 +9,11 @@ const menuItems = [
   { icon: '💼', label: 'Portfolios', path: '/portfolios' },
   { icon: '🎯', label: 'Strategies', path: '/strategies' },
   { icon: '📊', label: 'Insights', path: '/insights' },
-  { icon: '🔍', label: 'Explore', path: '#' },
+  { icon: '🔍', label: 'Screener', path: '/screener' },
   { icon: '🔖', label: 'Watchlist', path: '#' },
   { icon: '⚡', label: 'Backtest', path: '/backtests' },
   { icon: '📈', label: 'Chart', path: '/chart' },
+  { icon: '⏰', label: 'Scheduler', path: '/scheduler' },
   { icon: '🔔', label: 'Alerts', path: '/alerts' },
   { icon: '⚙️', label: 'Settings', path: '#' },
 ]

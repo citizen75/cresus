@@ -1,22 +1,28 @@
 import { usePortfolios } from '@/hooks/usePortfolio'
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { api } from '@/services/api'
 import CreatePortfolioModal from '@/components/portfolio/CreatePortfolioModal'
 import { formatCurrency } from '@/utils/currency'
 
 export default function Portfolios() {
   const { data, isLoading, refetch } = usePortfolios()
+  const navigate = useNavigate()
   const [searchTerm, setSearchTerm] = useState('')
+  const [portfolioType, setPortfolioType] = useState<'real' | 'paper' | 'all'>('real')
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [deletingPortfolio, setDeletingPortfolio] = useState(false)
 
   const portfolios = data?.portfolios || []
-  const livePortfolios = portfolios.filter(p => p.type === 'real')
-  const filtered = livePortfolios.filter(p =>
+  const filteredByType = portfolioType === 'all'
+    ? portfolios
+    : portfolios.filter(p => p.type === portfolioType)
+  const filtered = filteredByType.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   )
+
+  const livePortfolios = portfolios.filter(p => p.type === 'real')
 
   // Calculate metrics from real portfolios only
   const totalNetWorth = livePortfolios.reduce((sum, p) => sum + (p.total_portfolio_value || 0), 0)
@@ -109,11 +115,28 @@ export default function Portfolios() {
           <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500">🔍</span>
         </div>
         <div className="flex gap-2">
+          {/* Portfolio Type Selector */}
+          <div className="flex bg-slate-900 border border-slate-800 rounded-lg p-1">
+            {[
+              { value: 'real' as const, label: '💰 Real', icon: '💰' },
+              { value: 'paper' as const, label: '📄 Paper', icon: '📄' },
+              { value: 'all' as const, label: 'All', icon: '📊' },
+            ].map((type) => (
+              <button
+                key={type.value}
+                onClick={() => setPortfolioType(type.value)}
+                className={`px-3 py-2 rounded text-sm font-medium transition ${
+                  portfolioType === type.value
+                    ? 'bg-purple-600 text-white'
+                    : 'text-slate-400 hover:text-slate-300'
+                }`}
+              >
+                {type.label}
+              </button>
+            ))}
+          </div>
           <button className="px-4 py-3 bg-slate-900 border border-slate-800 rounded-lg text-slate-300 hover:bg-slate-800 transition font-medium">
             Sort by: Total value
-          </button>
-          <button className="px-4 py-3 bg-slate-900 border border-slate-800 rounded-lg text-slate-300 hover:bg-slate-800 transition">
-            Filters
           </button>
         </div>
       </div>
@@ -129,7 +152,11 @@ export default function Portfolios() {
         ) : (
           <div className="space-y-4">
             {filtered.map((portfolio) => (
-              <div key={portfolio.name} className="bg-slate-900 border border-slate-800 rounded-lg p-6 hover:border-purple-600 transition group">
+              <div
+                key={portfolio.name}
+                onClick={() => navigate(`/portfolios/${portfolio.name}`)}
+                className="bg-slate-900 border border-slate-800 rounded-lg p-6 hover:border-purple-600 transition group cursor-pointer"
+              >
                 <div className="grid grid-cols-12 gap-6 items-center">
                   {/* Portfolio Info */}
                   <div className="col-span-3">
@@ -185,14 +212,11 @@ export default function Portfolios() {
 
                   {/* Action Buttons */}
                   <div className="col-span-1 flex gap-2 justify-end">
-                    <Link
-                      to={`/portfolios/${portfolio.name}`}
-                      className="px-4 py-2 bg-gradient-to-r from-purple-600 to-violet-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-violet-700 transition text-sm"
-                    >
-                      Open
-                    </Link>
                     <button
-                      onClick={() => setDeleteConfirm(portfolio.name)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setDeleteConfirm(portfolio.name)
+                      }}
                       className="px-3 py-2 bg-slate-800 text-slate-400 rounded-lg hover:bg-red-900/20 hover:text-red-400 transition text-sm"
                     >
                       🗑️

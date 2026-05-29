@@ -8,12 +8,30 @@ from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
 import json
 import os
+import warnings
+import sys
+from io import StringIO
 
-import pandas as pd
-import yfinance as yf
+# Suppress deprecation warnings BEFORE importing yfinance
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
+# Suppress yfinance output during import
+old_stderr = sys.stderr
+sys.stderr = StringIO()
+
+try:
+	import pandas as pd
+	import yfinance as yf
+finally:
+	sys.stderr = old_stderr
+
 from loguru import logger
-
 from utils.env import get_db_root
+
+# Additional warning filters
+warnings.filterwarnings("ignore", category=pd.errors.PerformanceWarning)
+warnings.filterwarnings("ignore", message=".*Timestamp.utcnow.*")
+warnings.filterwarnings("ignore", message=".*YF deprecation.*")
 
 
 def _get_project_root() -> Path:
@@ -242,13 +260,19 @@ class DataHistory:
 			df_new = df_new.reset_index()
 			if "Date" in df_new.columns and df_new["Date"].dt.tz is not None:
 				df_new["Date"] = df_new["Date"].dt.tz_localize(None)
+			elif df_new.index.tz is not None:
+				df_new.index = df_new.index.tz_localize(None)
 
 			# Prepare new data
 			if "Date" not in df_new.columns and "index" in df_new.columns:
 				df_new.rename(columns={"index": "Date"}, inplace=True)
 
 			df_new["Date"] = pd.to_datetime(df_new["Date"])
-			
+
+			# Remove timezone info from Date column to ensure consistency
+			if df_new["Date"].dt.tz is not None:
+				df_new["Date"] = df_new["Date"].dt.tz_localize(None)
+
 			df_new = df_new.rename(columns={
 				"Date": "timestamp",
 				"Open": "open",
@@ -258,6 +282,11 @@ class DataHistory:
 				"Volume": "volume",
 			})
 			df_new["ticker"] = self.ticker
+
+			# Ensure existing data is also timezone-naive
+			if has_data and "timestamp" in df_existing.columns:
+				if df_existing["timestamp"].dt.tz is not None:
+					df_existing["timestamp"] = df_existing["timestamp"].dt.tz_localize(None)
 
 			# Combine with existing if present
 			if has_data:

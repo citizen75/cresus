@@ -178,6 +178,7 @@ class MarketOrderAgent(Agent):
 				order_id = str(order_row.get("id", ""))
 				ticker = str(order_row.get("ticker", ""))
 				quantity = int(order_row.get("quantity", 0)) if order_row.get("quantity") else 0
+				operation = str(order_row.get("operation", "BUY")).upper()
 
 				# Safe conversion to float with None handling
 				entry_price_val = order_row.get("entry_price")
@@ -206,7 +207,7 @@ class MarketOrderAgent(Agent):
 				broker_order = {
 					"ticker": ticker,
 					"quantity": quantity,
-					"action": "BUY",
+					"action": operation,
 					"price": execution_price,
 					"stop_loss": stop_loss,
 					"target_price": take_profit,
@@ -264,16 +265,16 @@ class MarketOrderAgent(Agent):
 							self.logger.debug(f"Error extracting market metadata for {ticker}: {e}")
 							market_metadata = None
 
-					# Record BUY transaction in journal with stop loss and take profit
+					# Record transaction in journal with stop loss and take profit (for BUY orders only)
 					journal.add_transaction(
-						operation="BUY",
+						operation=operation,
 						ticker=ticker,
 						quantity=result.filled_quantity,
 						price=result.filled_price,
 						fees=0,
 						stop_loss=stop_loss,
 						take_profit=take_profit,
-						notes=f"Market order {order_id[:8]} executed @ {execution_price:.2f}",
+						notes=f"Market order {order_id} executed",
 						created_at=f"{trading_date.isoformat()}T14:00:00.000000",
 						metadata=market_metadata
 					)
@@ -283,7 +284,7 @@ class MarketOrderAgent(Agent):
 					# No separate orders needed in Orders table.
 
 					self.logger.info(
-						f"MARKET BUY {result.filled_quantity} {ticker} @ {result.filled_price:.2f} "
+						f"MARKET {operation} {result.filled_quantity} {ticker} @ {result.filled_price:.2f} "
 						f"[SL: {stop_loss}]"
 					)
 				else:

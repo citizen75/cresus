@@ -13,7 +13,7 @@ interface PortfolioPositions {
 function PortfolioPositionsFetcher({ portfolio, onData }: { portfolio: any; onData: (data: PortfolioPositions) => void }) {
   const { data: priceData } = useCurrentPrices(portfolio.name)
 
-  useMemo(() => {
+  useEffect(() => {
     if (priceData?.positions) {
       onData({
         portfolio: portfolio.name,

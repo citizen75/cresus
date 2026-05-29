@@ -514,12 +514,17 @@ def evaluate_dsl_vectorized(formula: str, data: pd.DataFrame) -> pd.Series:
 			pattern = rf'{re.escape(col_name)}\[0\]'
 			vectorized_formula = re.sub(pattern, col_name, vectorized_formula)
 		else:
-			# Create shifted column: shift value -1 = previous (shift down in pandas)
-			pandas_shift_amount = -shift
+			# Create shifted column
+			# For [-2] (2 days ago), we need shift(2) in pandas (older rows are higher indices)
+			# For [+2] (2 days in future), we need shift(-2) in pandas
+			pandas_shift_amount = -shift  # Negate the shift value for pandas direction
 			shifted_col_name = f"{col_name}_sh{abs(shift)}" if shift < 0 else f"{col_name}_s{shift}"
 
 			if col_name in data_work.columns:
-				data_work[shifted_col_name] = data_work[col_name].shift(pandas_shift_amount)
+				shifted_series = data_work[col_name].shift(pandas_shift_amount)
+				# Important: Do NOT fill NaN with 0 - NaN means insufficient data, should propagate
+				# fillna(0) masks missing data and creates false positives
+				data_work[shifted_col_name] = shifted_series
 
 			# Replace [shift] notation with shifted column name
 			pattern = rf'{re.escape(col_name)}\[{re.escape(shift_str)}\]'
@@ -538,8 +543,11 @@ def evaluate_dsl_vectorized(formula: str, data: pd.DataFrame) -> pd.Series:
 		result = pd.eval(vectorized_formula, local_dict=data_work)
 
 		if isinstance(result, pd.Series):
-			# Fill NaN with 0 and convert to float
-			return result.fillna(0).astype(float)
+			# IMPORTANT: Do NOT fillna(0) - NaN means insufficient data
+			# If any shift referenced non-existent data, the result should be NaN
+			# NaN should evaluate to False, not 0 (which can be truthy in some contexts)
+			# Convert to float and let NaN propagate - it will be false in boolean context
+			return result.astype(float)
 		else:
 			# Scalar result, broadcast to all rows
 			return pd.Series([1.0 if result else 0.0] * len(data_work), index=data_work.index)

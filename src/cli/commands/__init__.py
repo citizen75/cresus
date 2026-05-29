@@ -1,17 +1,23 @@
 """CLI command modules organized by category."""
 
-from .service import ServiceManager
-from .flow import FlowManager
-from .data import DataCommands
-from .portfolio import PortfolioCommands
-from .scheduler import SchedulerCommands
-from .info import InfoCommands
+# Refactored commands (Phase 2-3) - these have directories with __init__.py
+try:
+	from .screener import ScreenerCommand
+except ImportError as e:
+	ScreenerCommand = None
+
+try:
+	from .portfolio import PortfolioCommand
+except ImportError as e:
+	PortfolioCommand = None
+
+try:
+	from .strategy import StrategyCommand
+except ImportError as e:
+	StrategyCommand = None
 
 __all__ = [
-	"ServiceManager",
-	"FlowManager",
-	"DataCommands",
-	"PortfolioCommands",
-	"SchedulerCommands",
-	"InfoCommands",
+	"ScreenerCommand",
+	"PortfolioCommand",
+	"StrategyCommand",
 ]

@@ -133,6 +133,13 @@ class AnalyzeFlow(Flow):
 				# evaluate_dsl_vectorized requires ascending order for proper shift handling
 				df_up_to_date = df_up_to_date.sort_values('timestamp', ascending=True).reset_index(drop=True)
 
+				# CRITICAL: Check that the last row is actually current_date
+				# If not, it means there's no data for current_date (weekend, holiday, etc.)
+				last_date_in_data = pd.to_datetime(df_up_to_date['timestamp']).dt.date.iloc[-1]
+				if last_date_in_data != current_date:
+					# No data for this date, skip it
+					continue
+
 				# Use only the last row (current date), but keep full context
 				row_data = df_up_to_date.iloc[-1:].copy()
 
@@ -140,7 +147,11 @@ class AnalyzeFlow(Flow):
 					# Evaluate formula using vectorized evaluation
 					# Pass full context for shifts, but evaluate on current row
 					result_series = evaluate_dsl_vectorized(formula, df_up_to_date)
-					result_value = bool(result_series.iloc[-1]) if len(result_series) > 0 else False
+					result_value = False
+					if len(result_series) > 0:
+						last_result = result_series.iloc[-1]
+						# NaN means insufficient data (from shifts) - should be False
+						result_value = bool(last_result) if pd.notna(last_result) else False
 
 					if result_value:
 						pass_count += 1

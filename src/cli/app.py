@@ -1309,6 +1309,7 @@ class CresusCLI(cmd2.Cmd):
 			},
 			"📈 Strategy": {
 				"strategy": "Validate strategies (check|calc|train|predict)",
+				"screener": "Manage screeners (create|list|run|results)",
 			},
 			"⚙️  System": {
 				"service": "Manage services (api|mcp|front|all)",
@@ -1438,3 +1439,130 @@ class CresusCLI(cmd2.Cmd):
 
 		except Exception as e:
 			console.print(f"[yellow]⚠ Could not display backtest results: {e}[/yellow]")
+
+	def do_screener(self, args):
+		"""Manage and run screeners.
+
+		Usage:
+		  screener list                                    List all screeners
+		  screener info <name>                             Show screener configuration
+		  screener create <name> <formula> <indicators>    Create new screener
+		  screener delete <name>                           Delete a screener
+		  screener run <name>                              Run a screener
+		  screener results <name> [--limit N]              List screener results
+		  screener result-show <name> <result_id>          Show specific result
+		  screener result-delete <name> <result_id>        Delete a result
+		  screener clear-results <name>                    Clear all results
+		  screener export <name> <result_id> <path>        Export result to file
+
+		Examples:
+		  screener list
+		  screener info momentum
+		  screener create momentum "rsi_14 > 70" "rsi_14,macd"
+		  screener run momentum
+		  screener results momentum --limit 10
+		"""
+		from .commands.screener import ScreenerCommand
+
+		if not args:
+			cmd = ScreenerCommand()
+			cmd.list()
+			return
+
+		parts = args.split()
+		command = parts[0] if parts else None
+
+		try:
+			cmd = ScreenerCommand()
+
+			if command == "list":
+				cmd.list()
+
+			elif command == "info":
+				if len(parts) < 2:
+					console.print("[red]✗ screener_name required[/red]")
+					return
+				cmd.info(parts[1])
+
+			elif command == "create":
+				if len(parts) < 4:
+					console.print("[red]✗ Usage: screener create <name> <formula> <indicators>[/red]")
+					return
+				source = None
+				tickers = None
+				description = None
+
+				# Parse optional parameters
+				i = 4
+				while i < len(parts):
+					if parts[i] == "--source" and i + 1 < len(parts):
+						source = parts[i + 1]
+						i += 2
+					elif parts[i] == "--tickers" and i + 1 < len(parts):
+						tickers = parts[i + 1]
+						i += 2
+					elif parts[i] == "--description" and i + 1 < len(parts):
+						description = parts[i + 1]
+						i += 2
+					else:
+						i += 1
+
+				cmd.create(
+					name=parts[1],
+					formula=parts[2],
+					indicators=parts[3],
+					source=source or "cac40",
+					tickers=tickers,
+					description=description
+				)
+
+			elif command == "delete":
+				if len(parts) < 2:
+					console.print("[red]✗ screener_name required[/red]")
+					return
+				cmd.delete(parts[1])
+
+			elif command == "run":
+				if len(parts) < 2:
+					console.print("[red]✗ screener_name required[/red]")
+					return
+				cmd.run(parts[1])
+
+			elif command == "results":
+				if len(parts) < 2:
+					console.print("[red]✗ screener_name required[/red]")
+					return
+				limit = None
+				if "--limit" in parts and parts.index("--limit") + 1 < len(parts):
+					limit = int(parts[parts.index("--limit") + 1])
+				cmd.results(parts[1], limit=limit)
+
+			elif command == "result-show":
+				if len(parts) < 3:
+					console.print("[red]✗ Usage: screener result-show <name> <result_id>[/red]")
+					return
+				cmd.result_show(parts[1], parts[2])
+
+			elif command == "result-delete":
+				if len(parts) < 3:
+					console.print("[red]✗ Usage: screener result-delete <name> <result_id>[/red]")
+					return
+				cmd.result_delete(parts[1], parts[2])
+
+			elif command == "clear-results":
+				if len(parts) < 2:
+					console.print("[red]✗ screener_name required[/red]")
+					return
+				cmd.clear_results(parts[1])
+
+			elif command == "export":
+				if len(parts) < 4:
+					console.print("[red]✗ Usage: screener export <name> <result_id> <path>[/red]")
+					return
+				cmd.export(parts[1], parts[2], parts[3])
+
+			else:
+				console.print(f"[red]✗ Unknown screener command: {command}[/red]")
+
+		except Exception as e:
+			console.print(f"[red]✗ Error: {e}[/red]")

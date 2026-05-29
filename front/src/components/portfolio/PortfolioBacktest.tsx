@@ -51,6 +51,9 @@ export default function PortfolioBacktest({ name }: PortfolioBacktestProps) {
       try {
         setLoading(true)
         const baseUrl = getApiBaseUrl()
+        // Note: Portfolio name (PEA) != Strategy name (etf_pea_trend1)
+        // Portfolios are containers for positions, strategies are trading rules
+        // To show backtests, we need to know which strategy is associated with this portfolio
         const response = await fetch(`${baseUrl}/api/v1/backtests?strategy=${name}`)
 
         if (!response.ok) {
@@ -61,7 +64,11 @@ export default function PortfolioBacktest({ name }: PortfolioBacktestProps) {
         const backtests = data.backtests || []
 
         if (backtests.length === 0) {
-          setError('No backtests found for this strategy. Create one to view results.')
+          setError(
+            `The "${name}" portfolio has no associated strategy. ` +
+            `Backtests are created for strategies, not portfolios. ` +
+            `Visit the Backtests page to view available strategy backtests.`
+          )
           setBacktest(null)
           setLoading(false)
           return

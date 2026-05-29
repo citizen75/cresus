@@ -6,7 +6,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from loguru import logger
 
-from .config import CronConfig, CronJobConfig
+from tools.cron import CronConfig, CronJobConfig
 
 
 class CronScheduler:

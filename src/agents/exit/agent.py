@@ -169,6 +169,7 @@ class ExitAgent(Agent):
 					quantity = exit_order.get("quantity")
 					exit_price = exit_order.get("exit_price")
 					exit_type = exit_order.get("exit_type", "condition")
+					execution_method = exit_order.get("execution_method", "market")
 
 					# Create metadata for SELL order
 					metadata = {
@@ -190,7 +191,7 @@ class ExitAgent(Agent):
 						ticker=ticker,
 						quantity=int(quantity),
 						entry_price=float(exit_price),
-						execution_method="market",
+						execution_method=execution_method,
 						operation="SELL",
 						metadata=metadata,
 						created_at=created_at,

@@ -549,6 +549,31 @@ class DataCommands:
 		table.add_column("Indicator", style="cyan")
 		table.add_column("Value", justify="right")
 
+		# Add OHLCV values first
+		ohlcv_fields = ['Open', 'High', 'Low', 'Close', 'Volume']
+		ohlcv_cols = {}
+		for col in df.columns:
+			if col.lower() in [f.lower() for f in ohlcv_fields]:
+				ohlcv_cols[col.lower()] = col
+
+		# Display OHLCV in standard order
+		for field in ['open', 'high', 'low', 'close', 'volume']:
+			if field in ohlcv_cols:
+				col_name = ohlcv_cols[field]
+				if col_name in df.columns:
+					value = latest[col_name]
+					if pd.isna(value):
+						formatted = "[yellow]N/A[/yellow]"
+					elif field == 'volume':
+						formatted = f"{int(value):,}"
+					else:
+						formatted = f"{float(value):.2f}"
+					table.add_row(f"[bold]{field.upper()}[/bold]", formatted)
+
+		# Add separator
+		if ohlcv_cols:
+			table.add_row("[dim]─────────────────────────[/dim]", "[dim]─────────────────────────[/dim]")
+
 		# Add each indicator to the table
 		for ind in indicators:
 			if ind in df.columns:

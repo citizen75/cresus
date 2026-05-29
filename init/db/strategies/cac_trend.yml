@@ -1,0 +1,92 @@
+name: cac_trend
+universe: cac40
+description: Heikin Ashi trend-following strategy for CAC40 stocks - 10-day swing
+  trading
+engine: TaModel
+indicators:
+- atr_14
+- rsi_7
+- rsi_14
+- ema_10
+- ema_20
+- ema_50
+- sma_20
+- sma_50
+- adx_14
+- macd_12_26
+- sha_10
+- sha_10_red
+- sha_10_green
+- sha_10_up
+- sha_10_down
+- sha_10_open
+- sha_10_close
+- sha_10_low
+watchlist:
+  enabled: true
+  parameters:
+    tickers:
+      max_count: 15
+      description: Top 15 tickers for swing trading
+    volume:
+      min_volume: 500000
+      description: Minimum daily trading volume
+    ranking:
+      metric: score
+      description: Rank by trend strength
+    trend:
+      formula: sha_10_green[0] == 1 and adx_14[0] > 20
+      description: Trend detection using Heikin Ashi
+    volatility:
+      formula: atr_14[0] > close[0] * 0.012
+      description: Volatility filter - ATR > 1.2% of price
+signals:
+  enabled: true
+  weights:
+    momentum: 0.4
+    trend: 0.5
+    volume_anomaly: 0.1
+    mean_reversion: 0.0
+  parameters:
+    momentum:
+      formula: rsi_7[0] > 50 and rsi_7[0] < 70
+      description: Momentum signal - RSI in bullish zone
+    trend:
+      formula: sha_10_green[0] == 1 and ema_10[0] > ema_20[0]
+      description: Trend signal - Heikin Ashi green with EMA alignment
+    mean_reversion:
+      formula: 'False'
+      description: Mean reversion disabled
+    volume_anomaly:
+      formula: volume[0] > 1000000
+      description: Volume > 1M shares
+entry:
+  enabled: true
+  parameters:
+    max_daily_orders:
+      formula: 2
+      description: Maximum 2 buys per day
+    position_size:
+      formula: 1000 / close[0]
+      description: Fixed capital allocation per trade
+    entry_filter:
+      formula: sha_10_green[0]==1 && close[0] > open[0] && rsi_7[0] < 70
+      description: Entry condition (will be replaced by test formulas)
+    order_type:
+      formula: market
+      description: Market order for entry
+exit:
+  enabled: true
+  parameters:
+    stop:
+      type: trailing
+      formula: close[0] * 0.97
+      description: Trailing stop at 3% below highest price
+    take_profit:
+      formula: close[0] * 1.08
+      description: Take profit at 8% above entry
+    holding_period:
+      formula: 10
+      description: Maximum holding period of 10 trading days
+backtest:
+  initial_capital: 10000

@@ -41,12 +41,14 @@ class ExitConditionAgent(Agent):
 		day_data = input_data.get("day_data") or self.context.get("day_data") or {}
 		data_history = input_data.get("data_history") or self.context.get("data_history") or {}
 
-		# Get exit condition formula from strategy config
+		# Get exit condition formula and order type from strategy config
 		strategy_config = self.context.get("strategy_config") or {}
 		exit_config = strategy_config.get("exit", {}).get("parameters", {})
 		exit_condition_formula = exit_config.get("condition", {}).get("formula")
+		order_type = exit_config.get("order_type", "market").lower()  # market or limit
 
 		self.logger.debug(f"Exit condition formula from config: {repr(exit_condition_formula)}")
+		self.logger.debug(f"Exit order type: {order_type}")
 
 		if not exit_condition_formula or exit_condition_formula.lower() == "false":
 			return {
@@ -57,7 +59,7 @@ class ExitConditionAgent(Agent):
 
 		journal = Journal(portfolio_name, context=self.context.__dict__)
 		exit_orders = self._generate_condition_exit_orders(
-			journal, day_data, data_history, exit_condition_formula
+			journal, day_data, data_history, exit_condition_formula, order_type
 		)
 
 		return {
@@ -73,7 +75,8 @@ class ExitConditionAgent(Agent):
 		journal: Journal,
 		day_data: Dict[str, Any],
 		data_history: Dict[str, Any],
-		exit_condition_formula: str
+		exit_condition_formula: str,
+		order_type: str = "market"
 	) -> List[Dict[str, Any]]:
 		"""Check open positions and generate SELL orders if condition is met.
 
@@ -136,13 +139,14 @@ class ExitConditionAgent(Agent):
 							self.logger.warning(f"  Invalid exit price for {ticker}, skipping")
 							continue
 
-						# Generate SELL order (don't execute directly)
+						# Generate SELL order with configured order type
 						sell_order = {
 							"ticker": ticker,
 							"quantity": quantity,
-							"execution_method": "market",
+							"execution_method": order_type,  # market or limit
 							"exit_type": "condition",
 							"exit_price": exit_price,
+							"order_type": order_type,  # for clarity
 							"metadata": {
 								"formula": exit_condition_formula,
 								"reason": "exit_condition_met"

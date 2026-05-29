@@ -45,6 +45,18 @@ class CronJobConfig:
 
 		return True
 
+	def to_dict(self) -> Dict[str, Any]:
+		"""Convert to dictionary."""
+		return {
+			"name": self.name,
+			"description": self.description,
+			"enabled": self.enabled,
+			"schedule": self.schedule,
+			"type": self.type,
+			"target": self.target,
+			"params": self.params,
+		}
+
 
 class CronConfig:
 	"""Load and manage cron job configurations."""
@@ -96,3 +108,22 @@ class CronConfig:
 			List of enabled job configurations
 		"""
 		return [job for job in self.jobs if job.enabled]
+
+	def get_job(self, name: str) -> Optional[CronJobConfig]:
+		"""Get a job by name.
+
+		Args:
+			name: Job name
+
+		Returns:
+			Job configuration or None if not found
+		"""
+		for job in self.jobs:
+			if job.name == name:
+				return job
+		return None
+
+	def reload(self) -> None:
+		"""Reload configuration from file."""
+		self.jobs = []
+		self._load()
