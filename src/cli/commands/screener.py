@@ -379,13 +379,14 @@ class ScreenerCommand:
 		except Exception as e:
 			console.print(f"[red]✗ Error exporting: {e}[/red]")
 
-	def screen(self, formula: str, universe_or_tickers: Optional[str] = None, portfolio: Optional[str] = None):
+	def screen(self, formula: str, universe_or_tickers: Optional[str] = None, portfolio: Optional[str] = None, alert: bool = False):
 		"""Run adhoc screener with formula and universe/tickers.
 
 		Args:
 			formula: DSL formula string
 			universe_or_tickers: Universe name or comma-separated tickers (optional if portfolio specified)
 			portfolio: Optional portfolio name to filter tickers from open positions, or "all"
+			alert: If True, add alerts to portfolio conversations for matches
 		"""
 		try:
 			import re
@@ -502,15 +503,19 @@ class ScreenerCommand:
 					if portfolio:
 						table.add_column("Portfolio", style="magenta")
 
+					# Track alerts to add
+					alerts_to_add = {}  # portfolio -> list of alert messages
+
 					for row in matches[:100]:
 						close = row.get("close")
 						volume = row.get("volume")
 						ticker = row.get("ticker", "-")
+						name = row.get("name", "-") or "-"
 
 						row_data = [
 							row.get("date", "-"),
 							ticker,
-							(row.get("name", "-") or "-")[:35],
+							name[:35],
 							f"{float(close):.2f}" if close else "-",
 							f"{int(float(volume)):,}" if volume else "-",
 						]
@@ -521,10 +526,32 @@ class ScreenerCommand:
 							portfolio_str = ", ".join(portfolio_list) if portfolio_list else "-"
 							row_data.append(portfolio_str)
 
+							# Prepare alerts if --alert flag is set
+							if alert:
+								alert_msg = f"🚨 ALERT: {ticker} {name} matches screener formula: {formula}"
+								for pf_name in portfolio_list:
+									if pf_name not in alerts_to_add:
+										alerts_to_add[pf_name] = []
+									alerts_to_add[pf_name].append(alert_msg)
+
 						table.add_row(*row_data)
 
 					console.print(table)
 					console.print(f"[dim]Found {result.get('match_count', 0)} match(es)[/dim]")
+
+					# Add alerts to portfolio conversations
+					if alert and alerts_to_add:
+						from tools.conversation import ConversationManager
+						alert_count = 0
+						for pf_name, msgs in alerts_to_add.items():
+							try:
+								conv_mgr = ConversationManager(pf_name)
+								for msg in msgs:
+									conv_mgr.add_alert(msg)
+									alert_count += 1
+							except Exception as e:
+								console.print(f"[yellow]⚠️  Could not add alert to portfolio {pf_name}: {e}[/yellow]")
+						console.print(f"[cyan]✓ Added {alert_count} alert(s) to portfolio conversations[/cyan]")
 				else:
 					console.print("[yellow]No matches found[/yellow]")
 			else:

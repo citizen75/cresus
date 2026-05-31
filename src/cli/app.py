@@ -1444,17 +1444,21 @@ class CresusCLI(cmd2.Cmd):
 		"""Manage and run screeners.
 
 		Usage:
-		  screener list                                                              List all screeners
-		  screener info <name>                                                       Show screener configuration
-		  screener create <name> <formula> <indicators>                              Create new screener
-		  screener delete <name>                                                     Delete a screener
-		  screener run <name>                                                        Run a screener
-		  screener screen <formula> [<universe_or_tickers>] [--portfolio <name>|all] Run adhoc screener
-		  screener results <name> [--limit N]                                        List screener results
-		  screener result-show <name> <result_id>                                    Show specific result
-		  screener result-delete <name> <result_id>                                  Delete a result
-		  screener clear-results <name>                                              Clear all results
-		  screener export <name> <result_id> <path>                                  Export result to file
+		  screener list                                                                      List all screeners
+		  screener info <name>                                                               Show screener configuration
+		  screener create <name> <formula> <indicators>                                      Create new screener
+		  screener delete <name>                                                             Delete a screener
+		  screener run <name>                                                                Run a screener
+		  screener screen <formula> [<universe>] [--portfolio <name>|all] [--alert]          Run adhoc screener
+		  screener results <name> [--limit N]                                                List screener results
+		  screener result-show <name> <result_id>                                            Show specific result
+		  screener result-delete <name> <result_id>                                          Delete a result
+		  screener clear-results <name>                                                      Clear all results
+		  screener export <name> <result_id> <path>                                          Export result to file
+
+		Options:
+		  --portfolio <name>|all  Filter by portfolio holdings (omits universe parameter)
+		  --alert                 Add alerts to portfolio conversations for matches
 
 		Examples:
 		  screener list
@@ -1465,7 +1469,7 @@ class CresusCLI(cmd2.Cmd):
 		  screener screen "sha_10_up[0]==1" enx_large
 		  screener screen "close > 100" AAPL,MSFT,GOOGL
 		  screener screen "sha_10_up[0]==1" --portfolio PEA
-		  screener screen "sha_10_up[0]==1" --portfolio all
+		  screener screen "sha_10_up[0]==1" --portfolio all --alert
 		"""
 		from .commands.screener import ScreenerCommand
 		import shlex
@@ -1541,19 +1545,25 @@ class CresusCLI(cmd2.Cmd):
 				cmd.run(parts[1])
 
 			elif command == "screen":
-				# Parse portfolio option if present
+				# Parse portfolio and alert options if present
 				portfolio = None
+				alert = False
+
 				if "--portfolio" in parts:
 					idx = parts.index("--portfolio")
 					if idx + 1 < len(parts):
 						portfolio = parts[idx + 1]
 						parts = parts[:idx] + parts[idx+2:]  # Remove --portfolio and its value
 
+				if "--alert" in parts:
+					alert = True
+					parts.remove("--alert")
+
 				# Check minimum args: need at least formula
 				# If portfolio is specified, universe_or_tickers is optional
 				min_args = 2 if portfolio else 3
 				if len(parts) < min_args:
-					console.print("[red]✗ Usage: screener screen <formula> [<universe_or_tickers>] [--portfolio <name>|all][/red]")
+					console.print("[red]✗ Usage: screener screen <formula> [<universe_or_tickers>] [--portfolio <name>|all] [--alert][/red]")
 					return
 
 				# Parse formula and universe_or_tickers
@@ -1566,7 +1576,7 @@ class CresusCLI(cmd2.Cmd):
 					universe_or_tickers = parts[-1]
 					formula = " ".join(parts[1:-1])
 
-				cmd.screen(formula, universe_or_tickers, portfolio=portfolio)
+				cmd.screen(formula, universe_or_tickers, portfolio=portfolio, alert=alert)
 
 			elif command == "results":
 				if len(parts) < 2:
