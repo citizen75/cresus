@@ -163,10 +163,27 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
 
     const fetchData = async () => {
       try {
-        const result = await api.getTicker(ticker)
-        if (result && result.data) {
-          const data = result.data
-          setTickerData(data)
+        const [historicalResult, fundamentalResult] = await Promise.all([
+          api.getHistoricalData(ticker, 5),
+          api.getFundamental(ticker)
+        ])
+
+        if (historicalResult && historicalResult.data && historicalResult.data.length >= 2) {
+          const data = historicalResult.data
+          const latestData = data[data.length - 1]
+          const prevData = data[data.length - 2]
+
+          // Create tickerData object with OHLCV values
+          const tickerInfo = {
+            open: latestData.Open || latestData.open,
+            high: latestData.High || latestData.high,
+            low: latestData.Low || latestData.low,
+            close: latestData.Close || latestData.close,
+            volume: latestData.Volume || latestData.volume,
+            company: fundamentalResult?.data?.company
+          }
+
+          setTickerData(tickerInfo)
 
           // Use props if provided, otherwise use fetched data
           if (propsCompanyName || propsCurrentPrice !== undefined) {
@@ -175,17 +192,13 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
             setDailyChange(propsDailyChange)
             setDailyChangePercent(propsDailyChangePercent)
           } else {
-            setCompanyName(data.company?.name || ticker)
-            setCurrentPrice(data.close)
+            setCompanyName(fundamentalResult?.data?.company?.name || ticker)
+            setCurrentPrice(latestData.Close || latestData.close)
 
-            if (data.history && data.history.length >= 2) {
-              const latest = data.history[data.history.length - 1]
-              const previous = data.history[data.history.length - 2]
-              const change = latest.close - previous.close
-              const changePercent = (change / previous.close) * 100
-              setDailyChange(change)
-              setDailyChangePercent(changePercent)
-            }
+            const change = (latestData.Close || latestData.close) - (prevData.Close || prevData.close)
+            const changePercent = (change / (prevData.Close || prevData.close)) * 100
+            setDailyChange(change)
+            setDailyChangePercent(changePercent)
           }
         }
       } catch (err) {
