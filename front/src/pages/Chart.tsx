@@ -37,10 +37,6 @@ export default function ChartPage() {
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [tickerSearch, setTickerSearch] = useState('')
   const [hoverData, setHoverData] = useState<any>(null)
-  const [tickerData, setTickerData] = useState<any>(null)
-  const [currentPrice, setCurrentPrice] = useState<number | undefined>(undefined)
-  const [dailyChange, setDailyChange] = useState<number | undefined>(undefined)
-  const [dailyChangePercent, setDailyChangePercent] = useState<number | undefined>(undefined)
 
   // Handle column sort
   const handleSort = (column: 'ticker' | 'price' | 'score' | 'entry') => {
@@ -195,39 +191,6 @@ export default function ChartPage() {
 
     loadWatchlist()
   }, [activeTab, selectedPortfolio])
-
-  // Fetch ticker data for price display
-  useEffect(() => {
-    if (!selectedTicker) return
-
-    const fetchTickerData = async () => {
-      try {
-        const result = await api.getTicker(selectedTicker)
-        if (result && result.data) {
-          const data = result.data
-          setTickerData(data)
-          setCurrentPrice(data.close)
-
-          if (data.history && data.history.length >= 2) {
-            const latest = data.history[data.history.length - 1]
-            const previous = data.history[data.history.length - 2]
-            const change = latest.close - previous.close
-            const changePercent = (change / previous.close) * 100
-            setDailyChange(change)
-            setDailyChangePercent(changePercent)
-          }
-        }
-      } catch (err) {
-        console.error('Failed to fetch ticker data:', err)
-        setTickerData(null)
-        setCurrentPrice(undefined)
-        setDailyChange(undefined)
-        setDailyChangePercent(undefined)
-      }
-    }
-
-    fetchTickerData()
-  }, [selectedTicker])
 
   return (
     <div className="flex flex-col h-screen bg-slate-950">
@@ -513,50 +476,14 @@ export default function ChartPage() {
         </div>
 
         {/* Center - Chart */}
-        <div className="flex-1 h-full bg-slate-950 flex flex-col overflow-hidden">
-          {/* OHLCV Header */}
-          {tickerData && (
-            <div className="bg-slate-900 border-b border-slate-800 px-4 py-2 flex-shrink-0">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-white font-semibold">{tickerData.company?.name || selectedTicker}</span>
-                  <span className="text-slate-400 ml-2">{selectedTicker}</span>
-                </div>
-                <div className="text-sm text-slate-400 font-mono">
-                  <span className="text-slate-400">O </span>
-                  <span className="text-white">{tickerData.open?.toFixed(3) || '—'}</span>
-                  <span className="text-slate-400 ml-3">H </span>
-                  <span className="text-white">{tickerData.high?.toFixed(3) || '—'}</span>
-                  <span className="text-slate-400 ml-3">L </span>
-                  <span className="text-white">{tickerData.low?.toFixed(3) || '—'}</span>
-                  <span className="text-slate-400 ml-3">C </span>
-                  <span className="text-white">{tickerData.close?.toFixed(3) || '—'}</span>
-                  <span className="text-slate-400 ml-3">Vol </span>
-                  <span className="text-white">{(tickerData.volume / 1000)?.toFixed(1) || '—'}K</span>
-                  {dailyChangePercent !== undefined && (
-                    <span className={`ml-3 ${dailyChangePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {dailyChangePercent >= 0 ? '+' : ''}{dailyChangePercent.toFixed(3)}%
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="flex-1 overflow-hidden">
-            <TradingChart
-              timeframe={timeframe}
-              title={`${selectedTicker} - Price Analysis`}
-              ticker={selectedTicker}
-              companyName={tickerData?.company?.name || selectedTicker}
-              currentPrice={currentPrice}
-              dailyChange={dailyChange}
-              dailyChangePercent={dailyChangePercent}
-              selectedIndicators={selectedIndicators}
-              visibleWindow={visibleWindow}
-              onCursorMove={setHoverData}
-            />
-          </div>
+        <div className="flex-1 h-full bg-slate-950 overflow-hidden">
+          <TradingChart
+            timeframe={timeframe}
+            ticker={selectedTicker}
+            selectedIndicators={selectedIndicators}
+            visibleWindow={visibleWindow}
+            onCursorMove={setHoverData}
+          />
         </div>
 
         {/* Right sidebar - Controls */}

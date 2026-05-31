@@ -25,11 +25,16 @@ interface TradingChartProps {
   dailyChangePercent?: number
 }
 
-export default function TradingChart({ timeframe, title = 'Price Chart', ticker, companyName, entryDate, exitDate, positions, selectedIndicators = new Set(), chartData: externalChartData, visibleWindow = '1Y', onCursorMove, currentPrice, dailyChange, dailyChangePercent }: TradingChartProps) {
+export default function TradingChart({ timeframe, title = 'Price Chart', ticker, companyName: propsCompanyName, entryDate, exitDate, positions, selectedIndicators = new Set(), chartData: externalChartData, visibleWindow = '1Y', onCursorMove, currentPrice: propsCurrentPrice, dailyChange: propsDailyChange, dailyChangePercent: propsDailyChangePercent }: TradingChartProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [chartData, setChartData] = useState<any[]>([])
   const [shaCandles, setShaCandles] = useState<any[]>([])
   const [showSHA10, setShowSHA10] = useState(true)
+  const [tickerData, setTickerData] = useState<any>(null)
+  const [companyName, setCompanyName] = useState<string>('')
+  const [currentPrice, setCurrentPrice] = useState<number | undefined>(undefined)
+  const [dailyChange, setDailyChange] = useState<number | undefined>(undefined)
+  const [dailyChangePercent, setDailyChangePercent] = useState<number | undefined>(undefined)
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<any>(null)
   const shaSeriesRef = useRef<any>(null)
@@ -144,6 +149,51 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
     const volume = generateVolumeData(candles)
     return { candles, volume }
   }
+
+  // Fetch ticker data if not provided via props
+  useEffect(() => {
+    if (!ticker) {
+      setCompanyName('')
+      setCurrentPrice(undefined)
+      setDailyChange(undefined)
+      setDailyChangePercent(undefined)
+      return
+    }
+
+    // Use props if provided, otherwise fetch
+    if (propsCompanyName || propsCurrentPrice !== undefined) {
+      setCompanyName(propsCompanyName || ticker)
+      setCurrentPrice(propsCurrentPrice)
+      setDailyChange(propsDailyChange)
+      setDailyChangePercent(propsDailyChangePercent)
+      return
+    }
+
+    const fetchData = async () => {
+      try {
+        const result = await api.getTicker(ticker)
+        if (result && result.data) {
+          const data = result.data
+          setTickerData(data)
+          setCompanyName(data.company?.name || ticker)
+          setCurrentPrice(data.close)
+
+          if (data.history && data.history.length >= 2) {
+            const latest = data.history[data.history.length - 1]
+            const previous = data.history[data.history.length - 2]
+            const change = latest.close - previous.close
+            const changePercent = (change / previous.close) * 100
+            setDailyChange(change)
+            setDailyChangePercent(changePercent)
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch ticker data:', err)
+      }
+    }
+
+    fetchData()
+  }, [ticker, propsCompanyName, propsCurrentPrice, propsDailyChange, propsDailyChangePercent])
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -584,6 +634,35 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
 
   return (
     <div className="flex flex-col h-full">
+      {/* OHLCV Header */}
+      {ticker && tickerData && (
+        <div className="bg-slate-900 border-b border-slate-800 px-4 py-2 flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-white font-semibold">{companyName}</span>
+              <span className="text-slate-400 ml-2">{ticker}</span>
+            </div>
+            <div className="text-sm text-slate-400 font-mono">
+              <span className="text-slate-400">O </span>
+              <span className="text-white">{tickerData.open?.toFixed(3) || '—'}</span>
+              <span className="text-slate-400 ml-3">H </span>
+              <span className="text-white">{tickerData.high?.toFixed(3) || '—'}</span>
+              <span className="text-slate-400 ml-3">L </span>
+              <span className="text-white">{tickerData.low?.toFixed(3) || '—'}</span>
+              <span className="text-slate-400 ml-3">C </span>
+              <span className="text-white">{tickerData.close?.toFixed(3) || '—'}</span>
+              <span className="text-slate-400 ml-3">Vol </span>
+              <span className="text-white">{(tickerData.volume / 1000)?.toFixed(1) || '—'}K</span>
+              {dailyChangePercent !== undefined && (
+                <span className={`ml-3 ${dailyChangePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {dailyChangePercent >= 0 ? '+' : ''}{dailyChangePercent.toFixed(3)}%
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header with Position Analysis */}
       {ticker && (
         <div className="bg-slate-900 border-b border-slate-800 px-4 py-3">
