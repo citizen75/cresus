@@ -663,24 +663,7 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
     <div className="flex flex-col h-full">
       {/* OHLCV Header with Compact Data */}
       {ticker && tickerData && (
-        <div className="bg-slate-900 border-b border-slate-800 px-4 py-3">
-          <div className="flex justify-between items-center mb-2">
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-bold text-white">
-                {companyName}
-              </h2>
-              <span className="text-sm text-slate-400">{ticker}</span>
-            </div>
-            <div className="text-right">
-              <div className="text-sm text-white">
-                {currentPrice ? `${currentPrice.toFixed(3)}` : 'N/A'}
-              </div>
-              <div className={`text-sm ${dailyChangePercent !== undefined && dailyChangePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {dailyChange !== undefined ? `${dailyChange >= 0 ? '+' : ''}${dailyChange.toFixed(3)}` : 'N/A'}
-                {dailyChangePercent !== undefined ? ` ${dailyChangePercent >= 0 ? '+' : ''}${dailyChangePercent.toFixed(2)}%` : ''}
-              </div>
-            </div>
-          </div>
+        <div className="bg-slate-900 border-b border-slate-800 px-4 py-2">
           {/* OHLCV Data Line - Shows hover data if cursor is over chart, otherwise daily data */}
           <div className="text-xs text-slate-400 font-mono">
             <span>O </span>

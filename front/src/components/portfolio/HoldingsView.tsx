@@ -140,6 +140,17 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
     }
   }, [positions])
 
+  // Handle ESC key to close chart modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && chartPosition) {
+        setChartPosition(null)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [chartPosition])
+
   // Sorting logic
   const getSortedPositions = () => {
     // First, filter by search query and sector
@@ -741,42 +752,12 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
           <div className="bg-slate-900 rounded-lg border border-slate-800 w-full max-w-6xl h-screen max-h-[90vh] flex flex-col">
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
-              <div>
-                <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-bold text-white">
-                    {chartPosition.company_name && (
-                      <span className="text-slate-400 font-normal">{chartPosition.company_name} </span>
-                    )}
-                    {chartPosition.ticker}
-                  </h2>
-                  {(hoverData || fundamentalData[chartPosition.ticker]) && (
-                    <div className="text-sm text-slate-400 font-mono">
-                      <span className="text-slate-400">O </span>
-                      <span className="text-white">{(hoverData?.open || fundamentalData[chartPosition.ticker]?.open)?.toFixed(3) || '—'}</span>
-                      <span className="text-slate-400 ml-3">H </span>
-                      <span className="text-white">{(hoverData?.high || fundamentalData[chartPosition.ticker]?.high)?.toFixed(3) || '—'}</span>
-                      <span className="text-slate-400 ml-3">L </span>
-                      <span className="text-white">{(hoverData?.low || fundamentalData[chartPosition.ticker]?.low)?.toFixed(3) || '—'}</span>
-                      <span className="text-slate-400 ml-3">C </span>
-                      <span className="text-white">{(hoverData?.close || chartPosition.current_price)?.toFixed(3) || '—'}</span>
-                      <span className="text-slate-400 ml-3">Vol </span>
-                      <span className="text-white">{((hoverData?.volume || fundamentalData[chartPosition.ticker]?.volume) / 1000)?.toFixed(1)}K</span>
-                      {(() => {
-                        const dataToUse = hoverData || fundamentalData[chartPosition.ticker]
-                        let variationPct = dataToUse?.daily_change_pct || 0
-                        if (!variationPct && dataToUse?.open && dataToUse?.close) {
-                          variationPct = ((parseFloat(dataToUse.close) - parseFloat(dataToUse.open)) / parseFloat(dataToUse.open)) * 100
-                        }
-                        return variationPct ? (
-                          <span className={`ml-3 ${variationPct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {variationPct >= 0 ? '+' : ''}{variationPct?.toFixed(3)}%
-                          </span>
-                        ) : null
-                      })()}
-                    </div>
-                  )}
-                </div>
-              </div>
+              <h2 className="text-2xl font-bold text-white">
+                {chartPosition.company_name && (
+                  <span className="text-slate-400 font-normal">{chartPosition.company_name} </span>
+                )}
+                {chartPosition.ticker}
+              </h2>
               <button
                 onClick={() => setChartPosition(null)}
                 className="text-slate-400 hover:text-white transition text-2xl"
@@ -787,27 +768,12 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
 
             {/* Chart Container */}
             <div className="flex-1 overflow-hidden">
-              {(() => {
-                // Get latest price data from historical data
-                const latestData = historicalData[chartPosition.ticker]?.[historicalData[chartPosition.ticker].length - 1]
-                const prevData = historicalData[chartPosition.ticker]?.[historicalData[chartPosition.ticker].length - 2]
-                const currentPrice = latestData?.close || chartPosition.current_price
-                const dailyChange = latestData && prevData ? latestData.close - prevData.close : 0
-                const dailyChangePercent = latestData && prevData ? ((latestData.close - prevData.close) / prevData.close) * 100 : 0
-
-                return (
-                  <TradingChart
-                    timeframe="1Y"
-                    title={`${chartPosition.ticker} - Position Analysis`}
-                    ticker={chartPosition.ticker}
-                    companyName={chartPosition.company_name || chartPosition.ticker}
-                    currentPrice={currentPrice}
-                    dailyChange={dailyChange}
-                    dailyChangePercent={dailyChangePercent}
-                    onCursorMove={setHoverData}
-                  />
-                )
-              })()}
+              <TradingChart
+                timeframe="1Y"
+                ticker={chartPosition.ticker}
+                visibleWindow="1Y"
+                onCursorMove={setHoverData}
+              />
             </div>
           </div>
         </div>
