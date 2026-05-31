@@ -27,7 +27,6 @@ interface TradingChartProps {
 
 export default function TradingChart({ timeframe, title = 'Price Chart', ticker, companyName, entryDate, exitDate, positions, selectedIndicators = new Set(), chartData: externalChartData, visibleWindow = '1Y', onCursorMove, currentPrice, dailyChange, dailyChangePercent }: TradingChartProps) {
   const [isLoading, setIsLoading] = useState(false)
-  const [companyName, setCompanyName] = useState<string>('')
   const [chartData, setChartData] = useState<any[]>([])
   const [shaCandles, setShaCandles] = useState<any[]>([])
   const [showSHA10, setShowSHA10] = useState(true)
@@ -145,26 +144,6 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
     const volume = generateVolumeData(candles)
     return { candles, volume }
   }
-
-  // Fetch fundamental data (company name) when ticker changes
-  useEffect(() => {
-    if (!ticker) {
-      setCompanyName('')
-      return
-    }
-
-    const fetchFundamental = async () => {
-      try {
-        const data = await api.getFundamental(ticker)
-        setCompanyName(data.data?.company?.name || '')
-      } catch (err) {
-        console.error('Failed to fetch fundamental data:', err)
-        setCompanyName('')
-      }
-    }
-
-    fetchFundamental()
-  }, [ticker])
 
   useEffect(() => {
     if (!containerRef.current) return
