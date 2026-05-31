@@ -9,6 +9,7 @@ interface Message {
 
 interface GlobalConversationPanelProps {
   onClose?: () => void
+  onAlertClick?: (ticker: string) => void
 }
 
 const SOURCE_COLORS = {
@@ -25,7 +26,7 @@ const SOURCE_ICONS = {
   notification: '🔔',
 }
 
-export default function GlobalConversationPanel({ onClose }: GlobalConversationPanelProps) {
+export default function GlobalConversationPanel({ onClose, onAlertClick }: GlobalConversationPanelProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -111,6 +112,21 @@ export default function GlobalConversationPanel({ onClose }: GlobalConversationP
     }
   }
 
+  const extractTickerFromAlert = (content: string): string | null => {
+    // Extract ticker from format: "🚨 ALERT: {ticker} {stock_name} matches..."
+    const match = content.match(/ALERT:\s*(\w+[\w.-]*)\s+/)
+    return match ? match[1] : null
+  }
+
+  const handleAlertClick = (msg: Message) => {
+    if (msg.source === 'alert' && onAlertClick) {
+      const ticker = extractTickerFromAlert(msg.content)
+      if (ticker) {
+        onAlertClick(ticker)
+      }
+    }
+  }
+
   return (
     <div className="flex h-full bg-slate-900 rounded-lg border border-slate-800">
       {/* Left side - Conversation */}
@@ -166,7 +182,10 @@ export default function GlobalConversationPanel({ onClose }: GlobalConversationP
             messages.map((msg, idx) => (
               <div
                 key={idx}
-                className="rounded-lg p-3 bg-slate-800/50 border border-slate-700/50 space-y-1 transition-all"
+                onClick={() => handleAlertClick(msg)}
+                className={`rounded-lg p-3 bg-slate-800/50 border border-slate-700/50 space-y-1 transition-all ${
+                  msg.source === 'alert' ? 'cursor-pointer hover:bg-slate-800/80 hover:border-red-700/50' : ''
+                }`}
               >
                 <div className="flex items-center justify-between">
                   <span
