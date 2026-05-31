@@ -36,6 +36,7 @@ export default function ChartPage() {
   const [visibleWindow, setVisibleWindow] = useState<'1M' | '3M' | '6M' | 'YTD' | '1Y' | '2Y'>('1Y')
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [tickerSearch, setTickerSearch] = useState('')
+  const [hoverData, setHoverData] = useState<any>(null)
 
   // Handle column sort
   const handleSort = (column: 'ticker' | 'price' | 'score' | 'entry') => {
@@ -477,11 +478,38 @@ export default function ChartPage() {
 
         {/* Center - Chart */}
         <div className="flex-1 h-full bg-slate-950 overflow-hidden">
-          <TradingChart timeframe={timeframe} title={selectedTicker} ticker={selectedTicker} selectedIndicators={selectedIndicators} visibleWindow={visibleWindow} />
+          <TradingChart timeframe={timeframe} title={selectedTicker} ticker={selectedTicker} selectedIndicators={selectedIndicators} visibleWindow={visibleWindow} onCursorMove={setHoverData} />
         </div>
 
         {/* Right sidebar - Controls */}
         <div className="w-48 bg-slate-900 border-l border-slate-800 p-4 overflow-y-auto space-y-4">
+          {/* OHLCV Display */}
+          {hoverData && (
+            <div className="bg-slate-800 rounded border border-slate-700 p-3 space-y-1">
+              <div className="text-xs font-bold text-slate-400 uppercase mb-2">Price Data</div>
+              <div className="text-xs text-slate-400 font-mono">
+                <span className="text-slate-400">O </span>
+                <span className="text-white">{hoverData.open?.toFixed(3) || '—'}</span>
+              </div>
+              <div className="text-xs text-slate-400 font-mono">
+                <span className="text-slate-400">H </span>
+                <span className="text-white">{hoverData.high?.toFixed(3) || '—'}</span>
+              </div>
+              <div className="text-xs text-slate-400 font-mono">
+                <span className="text-slate-400">L </span>
+                <span className="text-white">{hoverData.low?.toFixed(3) || '—'}</span>
+              </div>
+              <div className="text-xs text-slate-400 font-mono">
+                <span className="text-slate-400">C </span>
+                <span className="text-white">{hoverData.close?.toFixed(3) || '—'}</span>
+              </div>
+              <div className="text-xs text-slate-400 font-mono">
+                <span className="text-slate-400">V </span>
+                <span className="text-white">{(hoverData.volume / 1000)?.toFixed(1) || '—'}K</span>
+              </div>
+            </div>
+          )}
+
           {/* Timeframe selector */}
           <div>
             <div className="text-xs font-bold text-slate-400 uppercase mb-2">Timeframe</div>
