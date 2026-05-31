@@ -488,11 +488,59 @@ class ScreenerCommand:
 			if result.get("status") == "success":
 				matches = result.get("matches", [])
 				if matches:
-					# Build title based on what was specified
-					if portfolio:
-						title = f"Screener Results: Portfolio {portfolio}"
+					# Track alerts to add
+					alerts_to_add = {}  # portfolio -> list of alert messages
+
+					# If screening all portfolios, group matches by portfolio
+					if portfolio and portfolio.lower() == "all":
+						# Group matches by portfolio and display separately
+						matches_by_portfolio = {}
+						for row in matches[:100]:
+							portfolio_list = ticker_portfolio_map.get(row.get("ticker", ""), [])
+							for pf_name in portfolio_list:
+								if pf_name not in matches_by_portfolio:
+									matches_by_portfolio[pf_name] = []
+								matches_by_portfolio[pf_name].append(row)
+
+						# Display table for each portfolio
+						for pf_name in sorted(matches_by_portfolio.keys()):
+							pf_matches = matches_by_portfolio[pf_name]
+							title = f"Screener Results: Portfolio {pf_name}"
+							table = Table(title=title)
+							table.add_column("Date", style="cyan")
+							table.add_column("Ticker", style="blue", no_wrap=True)
+							table.add_column("Name", style="green")
+							table.add_column("Close", justify="right", style="yellow")
+							table.add_column("Volume", justify="right", style="magenta")
+
+							for row in pf_matches:
+								close = row.get("close")
+								volume = row.get("volume")
+								ticker = row.get("ticker", "-")
+								name = row.get("name", "-") or "-"
+								table.add_row(
+									row.get("date", "-"),
+									ticker,
+									name[:35],
+									f"{float(close):.2f}" if close else "-",
+									f"{int(float(volume)):,}" if volume else "-",
+								)
+
+								# Prepare alerts if --alert flag is set
+								if alert:
+									alert_msg = f"🚨 ALERT: {ticker} {name} matches screener formula: {formula}"
+									if pf_name not in alerts_to_add:
+										alerts_to_add[pf_name] = []
+									alerts_to_add[pf_name].append(alert_msg)
+
+							console.print(table)
+						console.print(f"[dim]Found {result.get('match_count', 0)} match(es) total[/dim]")
 					else:
-						title = f"Screener Results: {universe_or_tickers}"
+						# Build title based on what was specified
+						if portfolio:
+							title = f"Screener Results: Portfolio {portfolio}"
+						else:
+							title = f"Screener Results: {universe_or_tickers}"
 
 					table = Table(title=title)
 					table.add_column("Date", style="cyan")
@@ -504,9 +552,6 @@ class ScreenerCommand:
 					# Add Portfolio column if portfolio filtering was used
 					if portfolio:
 						table.add_column("Portfolio", style="magenta")
-
-					# Track alerts to add
-					alerts_to_add = {}  # portfolio -> list of alert messages
 
 					for row in matches[:100]:
 						close = row.get("close")
