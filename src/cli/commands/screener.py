@@ -379,12 +379,12 @@ class ScreenerCommand:
 		except Exception as e:
 			console.print(f"[red]✗ Error exporting: {e}[/red]")
 
-	def screen(self, formula: str, universe_or_tickers: str, portfolio: Optional[str] = None):
+	def screen(self, formula: str, universe_or_tickers: Optional[str] = None, portfolio: Optional[str] = None):
 		"""Run adhoc screener with formula and universe/tickers.
 
 		Args:
 			formula: DSL formula string
-			universe_or_tickers: Universe name or comma-separated tickers
+			universe_or_tickers: Universe name or comma-separated tickers (optional if portfolio specified)
 			portfolio: Optional portfolio name to filter tickers from open positions, or "all"
 		"""
 		try:
@@ -485,9 +485,11 @@ class ScreenerCommand:
 			if result.get("status") == "success":
 				matches = result.get("matches", [])
 				if matches:
-					title = f"Screener Results: {universe_or_tickers}"
+					# Build title based on what was specified
 					if portfolio:
-						title += f" (Portfolio: {portfolio})"
+						title = f"Screener Results: Portfolio {portfolio}"
+					else:
+						title = f"Screener Results: {universe_or_tickers}"
 
 					table = Table(title=title)
 					table.add_column("Date", style="cyan")
