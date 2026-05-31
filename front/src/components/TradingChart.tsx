@@ -31,6 +31,7 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
   const [shaCandles, setShaCandles] = useState<any[]>([])
   const [showSHA10, setShowSHA10] = useState(true)
   const [tickerData, setTickerData] = useState<any>(null)
+  const [hoverData, setHoverData] = useState<any>(null)
   const [companyName, setCompanyName] = useState<string>('')
   const [currentPrice, setCurrentPrice] = useState<number | undefined>(undefined)
   const [dailyChange, setDailyChange] = useState<number | undefined>(undefined)
@@ -484,6 +485,7 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
               indicatorChartsRef.current.macd.clearCrosshairPosition()
             }
             // Reset to last values when cursor leaves
+            setHoverData(null)
             if (onCursorMove) {
               onCursorMove(null)
             }
@@ -491,17 +493,21 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
           }
 
           // Emit OHLCV data at cursor position using seriesData
-          if (onCursorMove && param.seriesData) {
+          if (param.seriesData) {
             const candleData = param.seriesData.get(candlestickSeries) as any
             const volumeData = param.seriesData.get(volumeSeries) as any
             if (candleData && 'close' in candleData) {
-              onCursorMove({
+              const ohlcvData = {
                 open: candleData.open,
                 high: candleData.high,
                 low: candleData.low,
                 close: candleData.close,
                 volume: volumeData?.value || null
-              })
+              }
+              setHoverData(ohlcvData)
+              if (onCursorMove) {
+                onCursorMove(ohlcvData)
+              }
             }
           }
 
@@ -678,13 +684,13 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
               </div>
             </div>
           </div>
-          {/* OHLCV Data Line */}
+          {/* OHLCV Data Line - Shows hover data if cursor is over chart, otherwise daily data */}
           <div className="text-xs text-slate-400 font-mono flex items-center gap-3">
-            <span>O <span className="text-white">{tickerData.open?.toFixed(3) || '—'}</span></span>
-            <span>H <span className="text-white">{tickerData.high?.toFixed(3) || '—'}</span></span>
-            <span>L <span className="text-white">{tickerData.low?.toFixed(3) || '—'}</span></span>
-            <span>C <span className="text-white">{tickerData.close?.toFixed(3) || '—'}</span></span>
-            <span>Vol <span className="text-white">{(tickerData.volume / 1000)?.toFixed(1) || '—'}K</span></span>
+            <span>O <span className="text-white">{(hoverData?.open || tickerData?.open)?.toFixed(3) || '—'}</span></span>
+            <span>H <span className="text-white">{(hoverData?.high || tickerData?.high)?.toFixed(3) || '—'}</span></span>
+            <span>L <span className="text-white">{(hoverData?.low || tickerData?.low)?.toFixed(3) || '—'}</span></span>
+            <span>C <span className="text-white">{(hoverData?.close || tickerData?.close)?.toFixed(3) || '—'}</span></span>
+            <span>Vol <span className="text-white">{((hoverData?.volume || tickerData?.volume) / 1000)?.toFixed(1) || '—'}K</span></span>
             {dailyChangePercent !== undefined && (
               <span className={`ml-auto ${dailyChangePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                 {dailyChangePercent >= 0 ? '+' : ''}{dailyChangePercent.toFixed(3)}%
