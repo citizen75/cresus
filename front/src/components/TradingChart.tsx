@@ -419,17 +419,17 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
             return
           }
 
-          // Emit OHLCV data at cursor position
-          if (onCursorMove && param.time && chartData.length > 0) {
-            // Find the data point at the cursor time
-            const dataPoint = chartData.find(d => d.time === param.time)
-            if (dataPoint) {
+          // Emit OHLCV data at cursor position using seriesData
+          if (onCursorMove && param.seriesData) {
+            const candleData = param.seriesData.get(candlestickSeries) as any
+            const volumeData = param.seriesData.get(volumeSeries) as any
+            if (candleData && 'close' in candleData) {
               onCursorMove({
-                open: dataPoint.open,
-                high: dataPoint.high,
-                low: dataPoint.low,
-                close: dataPoint.close,
-                volume: dataPoint.volume || null
+                open: candleData.open,
+                high: candleData.high,
+                low: candleData.low,
+                close: candleData.close,
+                volume: volumeData?.value || null
               })
             }
           }
