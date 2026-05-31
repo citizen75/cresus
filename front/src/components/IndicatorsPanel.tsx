@@ -263,13 +263,13 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
       {selectedIndicators.has('RSI 14') && (
         <div className="border-b border-slate-800">
           <div className="px-4 py-2 bg-slate-900 text-xs font-bold text-slate-400">RSI 14</div>
-          <div ref={rsiContainerRef} />
+          <div ref={rsiContainerRef} style={{ height: '120px', width: '100%' }} />
         </div>
       )}
       {selectedIndicators.has('MACD') && (
         <div>
           <div className="px-4 py-2 bg-slate-900 text-xs font-bold text-slate-400">MACD</div>
-          <div ref={macdContainerRef} />
+          <div ref={macdContainerRef} style={{ height: '120px', width: '100%' }} />
         </div>
       )}
     </div>
