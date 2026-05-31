@@ -421,8 +421,9 @@ class ScreenerCommand:
 
 				portfolio_tickers = []
 				if portfolio.lower() == "all":
-					# Get tickers from all portfolios
-					portfolios = pm.list_portfolios()
+					# Get tickers from all real portfolios (exclude special ones starting with underscore)
+					all_portfolios = pm.list_portfolios()
+					portfolios = [pf for pf in all_portfolios if not pf.get("name", "").startswith("_")]
 					console.print(f"[cyan]Screening across {len(portfolios)} portfolios...[/cyan]")
 					for pf_info in portfolios:
 						pf_name = pf_info.get("name")
