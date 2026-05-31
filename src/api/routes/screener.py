@@ -444,14 +444,14 @@ async def clear_screener_results(name: str):
 
 
 @router.post("/screener/builder")
-async def screener_builder(request: ScreenerRequest):
+async def screener_builder(http_request: Request):
 	"""Screener builder - evaluate a formula against a universe and return live preview results.
 
-	Args:
-		request.formula: DSL formula string (e.g., "sha_10_green[0] && rsi_14 > 50")
-		request.source: Universe source (e.g., "nasdaq_100", "cac40")
-		request.tickers: Optional array of specific tickers to screen
-		request.limit: Max tickers to process for preview (default 50 for speed)
+	Accepts either JSON body or query parameters:
+		formula: DSL formula string (e.g., "sha_10_green[0] && rsi_14 > 50")
+		source: Universe source (e.g., "nasdaq_100", "cac40")
+		tickers: Optional array of specific tickers to screen
+		limit: Max tickers to process for preview (default 50 for speed)
 
 	Returns:
 		Dict with:
@@ -462,14 +462,43 @@ async def screener_builder(request: ScreenerRequest):
 			message: Status message
 	"""
 	try:
-		if not request.formula or not request.formula.strip():
+		# Try to parse JSON body first
+		request_data = None
+		try:
+			if http_request.headers.get("content-type", "").startswith("application/json"):
+				body = await http_request.json()
+				request_data = ScreenerRequest(**body)
+		except:
+			pass
+
+		# Fall back to query parameters
+		if request_data:
+			formula = request_data.formula
+			source = request_data.source
+			tickers = request_data.tickers
+			limit = request_data.limit
+		else:
+			query_params = http_request.query_params
+			formula = query_params.get("formula")
+			source = query_params.get("source")
+			tickers = query_params.get("tickers")
+			limit = int(query_params.get("limit", 0))
+
+			# Parse tickers if provided
+			if tickers and isinstance(tickers, str):
+				try:
+					tickers = json.loads(tickers) if tickers.startswith('[') else tickers.split(',')
+				except:
+					tickers = tickers.split(',')
+
+		if not formula or not formula.strip():
 			raise HTTPException(status_code=400, detail="Formula is required")
 
 		# Extract indicators from formula
-		indicators = extract_indicators_from_formula(request.formula)
+		indicators = extract_indicators_from_formula(formula)
 
 		# Validate source or tickers
-		if not request.source and not request.tickers:
+		if not source and not tickers:
 			raise HTTPException(status_code=400, detail="Either source or tickers is required")
 
 		# Import screening dependencies
@@ -478,10 +507,10 @@ async def screener_builder(request: ScreenerRequest):
 		# Create screener config
 		screener_config = ScreenerConfig(
 			name="_api_preview",
-			source=request.source,
-			tickers=request.tickers,
+			source=source,
+			tickers=tickers,
 			indicators=indicators,
-			formula=request.formula,
+			formula=formula,
 			description="API preview screener"
 		)
 
@@ -494,7 +523,7 @@ async def screener_builder(request: ScreenerRequest):
 		result = agent.process({
 			"screener_config": screener_config,
 			"use_cached_data": False,
-			"max_tickers": request.limit,
+			"max_tickers": limit,
 		})
 
 		if result.get("status") != "success":
