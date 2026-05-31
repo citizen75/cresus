@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { getApiBaseUrl } from '@/services/api'
-import TradingChart from '@/components/TradingChart'
 
 interface Message {
   source: 'user' | 'chatbot' | 'alert' | 'notification'
@@ -32,7 +31,6 @@ export default function GlobalConversationPanel({ onClose }: GlobalConversationP
   const [error, setError] = useState<string | null>(null)
   const [newMessage, setNewMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [selectedTicker, setSelectedTicker] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchMessages = async () => {
@@ -113,21 +111,6 @@ export default function GlobalConversationPanel({ onClose }: GlobalConversationP
     }
   }
 
-  const extractTickerFromAlert = (content: string): string | null => {
-    // Extract ticker from format: "🚨 ALERT: {ticker} {stock_name} matches..."
-    const match = content.match(/ALERT:\s*(\w+[\w.-]*)\s+/)
-    return match ? match[1] : null
-  }
-
-  const handleAlertClick = (msg: Message) => {
-    if (msg.source === 'alert') {
-      const ticker = extractTickerFromAlert(msg.content)
-      if (ticker) {
-        setSelectedTicker(ticker)
-      }
-    }
-  }
-
   return (
     <div className="flex h-full bg-slate-900 rounded-lg border border-slate-800">
       {/* Left side - Conversation */}
@@ -183,10 +166,7 @@ export default function GlobalConversationPanel({ onClose }: GlobalConversationP
             messages.map((msg, idx) => (
               <div
                 key={idx}
-                onClick={() => handleAlertClick(msg)}
-                className={`rounded-lg p-3 bg-slate-800/50 border border-slate-700/50 space-y-1 transition-all ${
-                  msg.source === 'alert' ? 'cursor-pointer hover:bg-slate-800/80 hover:border-red-700/50' : ''
-                }`}
+                className="rounded-lg p-3 bg-slate-800/50 border border-slate-700/50 space-y-1 transition-all"
               >
                 <div className="flex items-center justify-between">
                   <span
@@ -231,28 +211,7 @@ export default function GlobalConversationPanel({ onClose }: GlobalConversationP
         </form>
       </div>
 
-      {/* Right side - Chart */}
-      {selectedTicker && (
-        <div className="flex-1 min-w-0 flex flex-col bg-slate-900 border-l border-slate-800">
-          {/* Chart Header */}
-          <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-white">
-              📈 {selectedTicker}
-            </h3>
-            <button
-              onClick={() => setSelectedTicker(null)}
-              className="text-slate-500 hover:text-slate-400"
-            >
-              ✕
-            </button>
-          </div>
-
-          {/* Chart Container */}
-          <div className="flex-1 overflow-hidden p-4">
-            <TradingChart ticker={selectedTicker} />
-          </div>
-        </div>
-      )}
+      {/* Right side - Reserved for future features */}
     </div>
   )
 }
