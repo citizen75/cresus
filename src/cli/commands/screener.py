@@ -557,9 +557,11 @@ class ScreenerCommand:
 						# Add to global conversation
 						try:
 							global_conv_mgr = ConversationManager("_global")
-							for msgs in alerts_to_add.values():
+							for pf_name, msgs in alerts_to_add.items():
 								for msg in msgs:
-									global_conv_mgr.add_alert(msg)
+									# Include portfolio name in global conversation alerts
+									global_msg = f"[{pf_name}] {msg}"
+									global_conv_mgr.add_alert(global_msg)
 						except Exception as e:
 							console.print(f"[yellow]⚠️  Could not add alert to global conversation: {e}[/yellow]")
 
