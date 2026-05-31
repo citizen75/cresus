@@ -258,25 +258,41 @@ export default function ChartPage() {
                       })
 
                       const matched = uniqueTickers.filter(t => t.ticker && t.ticker.includes(tickerSearch))
+                      const results = matched.slice(0, 15)
 
-                      if (matched.length === 0) {
-                        return <div className="px-3 py-2 text-xs text-slate-400">No tickers found</div>
-                      }
+                      return (
+                        <>
+                          {results.map(t => (
+                            <button
+                              key={t.ticker}
+                              onClick={() => {
+                                setSelectedTicker(t.ticker)
+                                setTickerSearch('')
+                                navigate(`/chart/${t.ticker}`)
+                              }}
+                              className="w-full text-left px-3 py-2 hover:bg-slate-700 transition text-sm text-white border-b border-slate-700 flex justify-between items-center"
+                            >
+                              <span className="font-medium">{t.ticker}</span>
+                              <span className="text-xs text-slate-400">${t.price ? parseFloat(String(t.price)).toFixed(2) : 'N/A'}</span>
+                            </button>
+                          ))}
 
-                      return matched.slice(0, 15).map(t => (
-                        <button
-                          key={t.ticker}
-                          onClick={() => {
-                            setSelectedTicker(t.ticker)
-                            setTickerSearch('')
-                            navigate(`/chart/${t.ticker}`)
-                          }}
-                          className="w-full text-left px-3 py-2 hover:bg-slate-700 transition text-sm text-white border-b border-slate-700 last:border-b-0 flex justify-between items-center"
-                        >
-                          <span className="font-medium">{t.ticker}</span>
-                          <span className="text-xs text-slate-400">${t.price ? parseFloat(String(t.price)).toFixed(2) : 'N/A'}</span>
-                        </button>
-                      ))
+                          {/* Option to view custom ticker if search doesn't match existing ones */}
+                          {tickerSearch.length > 0 && !results.some(t => t.ticker === tickerSearch) && (
+                            <button
+                              onClick={() => {
+                                setSelectedTicker(tickerSearch)
+                                setTickerSearch('')
+                                navigate(`/chart/${tickerSearch}`)
+                              }}
+                              className="w-full text-left px-3 py-2 hover:bg-slate-700 transition text-sm text-purple-400 border-t border-slate-700 flex items-center gap-2 font-medium"
+                            >
+                              <span>→</span>
+                              <span>View {tickerSearch}</span>
+                            </button>
+                          )}
+                        </>
+                      )
                     })()}
                   </div>
                 )}
