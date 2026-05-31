@@ -75,15 +75,8 @@ class ScreenerConfig:
 		if not self.name:
 			return False, "Screener name is required"
 
-		if not self.source and not self.tickers:
-			return False, "Either source or tickers must be specified"
-
-		if not self.indicators:
-			return False, "At least one indicator is required"
-
-		if not self.formula:
-			return False, "Formula is required"
-
+		# Allow creating screener with minimal config (can be edited later)
+		# Only require name for initial creation
 		return True, ""
 
 
