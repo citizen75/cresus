@@ -655,37 +655,47 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
 
   return (
     <div className="flex flex-col h-full">
-      {/* OHLCV Header */}
+      {/* OHLCV Header with Compact Data */}
       {ticker && tickerData && (
-        <div className="bg-slate-900 border-b border-slate-800 px-4 py-2 flex-shrink-0">
-          <div className="flex items-center justify-between">
+        <div className="bg-slate-900 border-b border-slate-800 px-4 py-3">
+          <div className="flex justify-between items-start mb-2">
             <div>
-              <span className="text-white font-semibold">{companyName}</span>
-              <span className="text-slate-400 ml-2">{ticker}</span>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-bold text-white">
+                  {companyName}
+                </h2>
+                <span className="text-sm text-slate-400">{ticker}</span>
+              </div>
+              <div className="text-xs text-slate-400 mt-1">Live Position Analysis</div>
             </div>
-            <div className="text-sm text-slate-400 font-mono">
-              <span className="text-slate-400">O </span>
-              <span className="text-white">{tickerData.open?.toFixed(3) || '—'}</span>
-              <span className="text-slate-400 ml-3">H </span>
-              <span className="text-white">{tickerData.high?.toFixed(3) || '—'}</span>
-              <span className="text-slate-400 ml-3">L </span>
-              <span className="text-white">{tickerData.low?.toFixed(3) || '—'}</span>
-              <span className="text-slate-400 ml-3">C </span>
-              <span className="text-white">{tickerData.close?.toFixed(3) || '—'}</span>
-              <span className="text-slate-400 ml-3">Vol </span>
-              <span className="text-white">{(tickerData.volume / 1000)?.toFixed(1) || '—'}K</span>
-              {dailyChangePercent !== undefined && (
-                <span className={`ml-3 ${dailyChangePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {dailyChangePercent >= 0 ? '+' : ''}{dailyChangePercent.toFixed(3)}%
-                </span>
-              )}
+            <div className="text-right">
+              <div className="text-sm text-white">
+                {currentPrice ? `${currentPrice.toFixed(3)}` : 'N/A'}
+              </div>
+              <div className={`text-sm ${dailyChangePercent !== undefined && dailyChangePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {dailyChange !== undefined ? `${dailyChange >= 0 ? '+' : ''}${dailyChange.toFixed(3)}` : 'N/A'}
+                {dailyChangePercent !== undefined ? ` ${dailyChangePercent >= 0 ? '+' : ''}${dailyChangePercent.toFixed(2)}%` : ''}
+              </div>
             </div>
+          </div>
+          {/* OHLCV Data Line */}
+          <div className="text-xs text-slate-400 font-mono flex items-center gap-3">
+            <span>O <span className="text-white">{tickerData.open?.toFixed(3) || '—'}</span></span>
+            <span>H <span className="text-white">{tickerData.high?.toFixed(3) || '—'}</span></span>
+            <span>L <span className="text-white">{tickerData.low?.toFixed(3) || '—'}</span></span>
+            <span>C <span className="text-white">{tickerData.close?.toFixed(3) || '—'}</span></span>
+            <span>Vol <span className="text-white">{(tickerData.volume / 1000)?.toFixed(1) || '—'}K</span></span>
+            {dailyChangePercent !== undefined && (
+              <span className={`ml-auto ${dailyChangePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {dailyChangePercent >= 0 ? '+' : ''}{dailyChangePercent.toFixed(3)}%
+              </span>
+            )}
           </div>
         </div>
       )}
 
-      {/* Header with Position Analysis */}
-      {ticker && (
+      {/* Fallback header if no tickerData */}
+      {ticker && !tickerData && (
         <div className="bg-slate-900 border-b border-slate-800 px-4 py-3">
           <div className="flex justify-between items-start">
             <div>
