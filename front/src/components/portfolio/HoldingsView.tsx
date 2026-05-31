@@ -545,7 +545,10 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
                     return (
                       <tr
                         key={pos.ticker}
-                        onClick={() => setSelectedPosition(pos.ticker)}
+                        onClick={() => {
+                          setSelectedPosition(pos.ticker)
+                          setChartPosition(pos)
+                        }}
                         className={`border-t border-slate-800 hover:bg-slate-800/30 transition cursor-pointer ${
                           selectedPosition === pos.ticker ? 'bg-slate-800/50' : ''
                         }`}
@@ -785,12 +788,27 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
 
             {/* Chart Container */}
             <div className="flex-1 overflow-hidden">
-              <TradingChart
-                timeframe="1Y"
-                title={`${chartPosition.ticker} - Position Analysis`}
-                ticker={chartPosition.ticker}
-                onCursorMove={setHoverData}
-              />
+              {(() => {
+                // Get latest price data from historical data
+                const latestData = historicalData[chartPosition.ticker]?.[historicalData[chartPosition.ticker].length - 1]
+                const prevData = historicalData[chartPosition.ticker]?.[historicalData[chartPosition.ticker].length - 2]
+                const currentPrice = latestData?.close || chartPosition.current_price
+                const dailyChange = latestData && prevData ? latestData.close - prevData.close : 0
+                const dailyChangePercent = latestData && prevData ? ((latestData.close - prevData.close) / prevData.close) * 100 : 0
+
+                return (
+                  <TradingChart
+                    timeframe="1Y"
+                    title={`${chartPosition.ticker} - Position Analysis`}
+                    ticker={chartPosition.ticker}
+                    companyName={chartPosition.company_name || chartPosition.ticker}
+                    currentPrice={currentPrice}
+                    dailyChange={dailyChange}
+                    dailyChangePercent={dailyChangePercent}
+                    onCursorMove={setHoverData}
+                  />
+                )
+              })()}
             </div>
           </div>
         </div>

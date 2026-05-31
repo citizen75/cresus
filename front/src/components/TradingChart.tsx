@@ -6,6 +6,7 @@ interface TradingChartProps {
   timeframe: string
   title?: string
   ticker?: string
+  companyName?: string
   entryDate?: string
   exitDate?: string
   positions?: Array<{
@@ -19,9 +20,12 @@ interface TradingChartProps {
   chartData?: any[]
   visibleWindow?: '1M' | '3M' | '6M' | 'YTD' | '1Y' | '2Y'
   onCursorMove?: (data: any) => void
+  currentPrice?: number
+  dailyChange?: number
+  dailyChangePercent?: number
 }
 
-export default function TradingChart({ timeframe, title = 'Price Chart', ticker, entryDate, exitDate, positions, selectedIndicators = new Set(), chartData: externalChartData, visibleWindow = '1Y', onCursorMove }: TradingChartProps) {
+export default function TradingChart({ timeframe, title = 'Price Chart', ticker, companyName, entryDate, exitDate, positions, selectedIndicators = new Set(), chartData: externalChartData, visibleWindow = '1Y', onCursorMove, currentPrice, dailyChange, dailyChangePercent }: TradingChartProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [companyName, setCompanyName] = useState<string>('')
   const [chartData, setChartData] = useState<any[]>([])
@@ -601,6 +605,32 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
 
   return (
     <div className="flex flex-col h-full">
+      {/* Header with Position Analysis */}
+      {ticker && (
+        <div className="bg-slate-900 border-b border-slate-800 px-4 py-3">
+          <div className="flex justify-between items-start">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-bold text-white">
+                  {companyName || ticker}
+                </h2>
+                <span className="text-sm text-slate-400">{ticker}</span>
+              </div>
+              <div className="text-xs text-slate-400 mt-1">Live Position Analysis</div>
+            </div>
+            <div className="text-right">
+              <div className="text-sm text-white">
+                {currentPrice ? `${currentPrice.toFixed(3)}` : 'N/A'}
+              </div>
+              <div className={`text-sm ${dailyChangePercent !== undefined && dailyChangePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {dailyChange !== undefined ? `${dailyChange >= 0 ? '+' : ''}${dailyChange.toFixed(3)}` : 'N/A'}
+                {dailyChangePercent !== undefined ? ` ${dailyChangePercent >= 0 ? '+' : ''}${dailyChangePercent.toFixed(2)}%` : ''}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 flex flex-col min-h-0 relative">
         <div className="flex-grow" ref={containerRef} />
         {/* Legend Overlay */}
