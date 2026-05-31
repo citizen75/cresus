@@ -723,6 +723,10 @@ class CresusCLI(cmd2.Cmd):
 		"""Manage orders: list <strategy>"""
 		self.portfolio_commands.handle_orders(args)
 
+	def do_portfolio(self, args):
+		"""Manage portfolios: list [real|paper|all]"""
+		self.portfolio_commands.handle(args)
+
 	def do_universe(self, args):
 		"""Manage universes: list|info <name>"""
 		from tools.universe.universe import Universe

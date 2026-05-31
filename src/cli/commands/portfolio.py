@@ -12,6 +12,93 @@ console = Console()
 class PortfolioCommands:
 	"""Portfolio management command handlers."""
 
+	def handle(self, args: str):
+		"""Handle portfolio commands."""
+		args_str = str(args).strip() if args else ""
+
+		if not args_str:
+			self._show_help()
+			return
+
+		parts = args_str.split()
+		cmd = parts[0] if parts else None
+
+		if cmd == "list":
+			portfolio_type = parts[1] if len(parts) > 1 else "all"
+			self._list_portfolios(portfolio_type)
+		elif cmd == "orders":
+			self.handle_orders(args_str[len(cmd):].strip())
+		elif cmd == "watchlist":
+			self.handle_watchlist(args_str[len(cmd):].strip())
+		else:
+			console.print(f"[red]✗[/red] Unknown command: {cmd}")
+			self._show_help()
+
+	def _show_help(self):
+		"""Show help for portfolio commands."""
+		table = Table(title="Portfolio Commands", box=box.ROUNDED)
+		table.add_column("Command", style="cyan")
+		table.add_column("Description")
+		table.add_row("portfolio list [real|paper|all]", "List portfolios (default: all)")
+		table.add_row("orders list <strategy>", "List orders for a strategy")
+		table.add_row("watchlist show <strategy>", "Show watchlist")
+		table.add_row("watchlist extended <strategy>", "Show watchlist with indicators")
+		table.add_row("watchlist train <strategy>", "Train ranking model")
+		table.add_row("watchlist rank <strategy>", "Rank tickers using model")
+		console.print(table)
+
+	def _list_portfolios(self, portfolio_type: str = "all"):
+		"""List portfolios filtered by type."""
+		try:
+			from tools.portfolio.manager import PortfolioManager
+
+			pm = PortfolioManager()
+			all_portfolios = pm.list_portfolios()
+
+			# Filter by type
+			if portfolio_type.lower() == "real":
+				portfolios = [pf for pf in all_portfolios if pf.get("type") == "real"]
+				title = "Real Portfolios"
+			elif portfolio_type.lower() == "paper":
+				portfolios = [pf for pf in all_portfolios if pf.get("type") == "paper"]
+				title = "Paper Portfolios"
+			else:  # all
+				portfolios = all_portfolios
+				title = "All Portfolios"
+
+			if not portfolios:
+				console.print(f"[yellow]⚠[/yellow] No {portfolio_type} portfolios found")
+				return
+
+			# Create table
+			table = Table(title=title, box=box.ROUNDED)
+			table.add_column("Name", style="cyan")
+			table.add_column("Type", style="magenta")
+			table.add_column("Currency", style="yellow")
+			table.add_column("Initial Capital", justify="right", style="green")
+			table.add_column("Description")
+
+			for pf in portfolios:
+				name = pf.get("name", "-")
+				pf_type = pf.get("type", "paper")
+				currency = pf.get("currency", "EUR")
+				initial_capital = pf.get("initial_capital", 0)
+				description = pf.get("description", "")
+
+				table.add_row(
+					name,
+					pf_type,
+					currency,
+					f"${initial_capital:,.0f}" if initial_capital else "-",
+					description[:40] if description else "-"
+				)
+
+			console.print(table)
+			console.print(f"\n[dim]Total: {len(portfolios)} portfolio(ies)[/dim]")
+
+		except Exception as e:
+			console.print(f"[red]✗[/red] Error listing portfolios: {e}")
+
 	def handle_orders(self, args: str):
 		"""Handle orders commands."""
 		args_str = str(args).strip() if args else ""
