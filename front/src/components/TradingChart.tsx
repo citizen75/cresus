@@ -150,22 +150,14 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
     return { candles, volume }
   }
 
-  // Fetch ticker data if not provided via props
+  // Fetch ticker data and price info
   useEffect(() => {
     if (!ticker) {
       setCompanyName('')
       setCurrentPrice(undefined)
       setDailyChange(undefined)
       setDailyChangePercent(undefined)
-      return
-    }
-
-    // Use props if provided, otherwise fetch
-    if (propsCompanyName || propsCurrentPrice !== undefined) {
-      setCompanyName(propsCompanyName || ticker)
-      setCurrentPrice(propsCurrentPrice)
-      setDailyChange(propsDailyChange)
-      setDailyChangePercent(propsDailyChangePercent)
+      setTickerData(null)
       return
     }
 
@@ -175,20 +167,36 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
         if (result && result.data) {
           const data = result.data
           setTickerData(data)
-          setCompanyName(data.company?.name || ticker)
-          setCurrentPrice(data.close)
 
-          if (data.history && data.history.length >= 2) {
-            const latest = data.history[data.history.length - 1]
-            const previous = data.history[data.history.length - 2]
-            const change = latest.close - previous.close
-            const changePercent = (change / previous.close) * 100
-            setDailyChange(change)
-            setDailyChangePercent(changePercent)
+          // Use props if provided, otherwise use fetched data
+          if (propsCompanyName || propsCurrentPrice !== undefined) {
+            setCompanyName(propsCompanyName || ticker)
+            setCurrentPrice(propsCurrentPrice)
+            setDailyChange(propsDailyChange)
+            setDailyChangePercent(propsDailyChangePercent)
+          } else {
+            setCompanyName(data.company?.name || ticker)
+            setCurrentPrice(data.close)
+
+            if (data.history && data.history.length >= 2) {
+              const latest = data.history[data.history.length - 1]
+              const previous = data.history[data.history.length - 2]
+              const change = latest.close - previous.close
+              const changePercent = (change / previous.close) * 100
+              setDailyChange(change)
+              setDailyChangePercent(changePercent)
+            }
           }
         }
       } catch (err) {
         console.error('Failed to fetch ticker data:', err)
+        setTickerData(null)
+        if (!propsCurrentPrice) {
+          setCompanyName('')
+          setCurrentPrice(undefined)
+          setDailyChange(undefined)
+          setDailyChangePercent(undefined)
+        }
       }
     }
 
