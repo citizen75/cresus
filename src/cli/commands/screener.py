@@ -539,10 +539,12 @@ class ScreenerCommand:
 					console.print(table)
 					console.print(f"[dim]Found {result.get('match_count', 0)} match(es)[/dim]")
 
-					# Add alerts to portfolio conversations
+					# Add alerts to portfolio conversations and global conversation
 					if alert and alerts_to_add:
 						from tools.conversation import ConversationManager
 						alert_count = 0
+
+						# Add to portfolio conversations
 						for pf_name, msgs in alerts_to_add.items():
 							try:
 								conv_mgr = ConversationManager(pf_name)
@@ -551,7 +553,17 @@ class ScreenerCommand:
 									alert_count += 1
 							except Exception as e:
 								console.print(f"[yellow]⚠️  Could not add alert to portfolio {pf_name}: {e}[/yellow]")
-						console.print(f"[cyan]✓ Added {alert_count} alert(s) to portfolio conversations[/cyan]")
+
+						# Add to global conversation
+						try:
+							global_conv_mgr = ConversationManager("_global")
+							for msgs in alerts_to_add.values():
+								for msg in msgs:
+									global_conv_mgr.add_alert(msg)
+						except Exception as e:
+							console.print(f"[yellow]⚠️  Could not add alert to global conversation: {e}[/yellow]")
+
+						console.print(f"[cyan]✓ Added {alert_count} alert(s) to portfolio conversations and global conversation[/cyan]")
 				else:
 					console.print("[yellow]No matches found[/yellow]")
 			else:
