@@ -127,6 +127,28 @@ export default function GlobalConversationPanel({ onClose, onAlertClick }: Globa
     }
   }
 
+  const handleDeleteMessage = async (msg: Message) => {
+    try {
+      const baseUrl = getApiBaseUrl()
+      const url = `${baseUrl}/api/v1/conversations/_global/message?timestamp=${encodeURIComponent(msg.datetime)}`
+
+      const response = await fetch(url, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete message`)
+      }
+
+      const data = await response.json()
+      setMessages(data.history || [])
+      setError(null)
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Error deleting message'
+      setError(errorMsg)
+    }
+  }
+
   return (
     <div className="flex h-full bg-slate-900 rounded-lg border border-slate-800">
       {/* Left side - Conversation */}
@@ -195,9 +217,18 @@ export default function GlobalConversationPanel({ onClose, onAlertClick }: Globa
                   >
                     {SOURCE_ICONS[msg.source]} {msg.source}
                   </span>
-                  <span className="text-xs text-slate-500">
-                    {formatTime(msg.datetime)}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500">
+                      {formatTime(msg.datetime)}
+                    </span>
+                    <button
+                      onClick={() => handleDeleteMessage(msg)}
+                      className="text-slate-500 hover:text-red-400 text-xs"
+                      title="Delete message"
+                    >
+                      ✕
+                    </button>
+                  </div>
                 </div>
                 <p className="text-xs text-slate-300 break-words line-clamp-3">
                   {msg.content}

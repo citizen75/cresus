@@ -402,6 +402,50 @@ async def search_messages(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# Delete specific message by timestamp
+@router.delete("/{portfolio_name}/message")
+async def delete_message(
+    portfolio_name: str,
+    timestamp: str = Query(..., description="Message timestamp to delete"),
+):
+    """Delete a specific message by timestamp."""
+    try:
+        from datetime import datetime
+        manager = ConversationManager(portfolio_name)
+        all_messages = manager.get_history()
+
+        # Find and remove the message with matching timestamp
+        target_time = datetime.fromisoformat(timestamp)
+        remaining = [
+            msg for msg in all_messages
+            if msg.timestamp != target_time
+        ]
+
+        if len(remaining) == len(all_messages):
+            raise HTTPException(status_code=404, detail="Message not found")
+
+        # Clear and re-add remaining messages
+        manager.clear_history()
+        for msg in remaining:
+            manager.add_message(
+                source=msg.source,
+                content=msg.content,
+                timestamp=msg.timestamp,
+            )
+
+        # Return updated history
+        history = manager.get_history_dicts()
+        return ConversationHistoryResponse(
+            portfolio_name=portfolio_name,
+            history=history,
+            count=len(history),
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Export conversation
 @router.get("/{portfolio_name}/export")
 async def export_conversation(
