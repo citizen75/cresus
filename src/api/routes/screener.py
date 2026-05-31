@@ -1,6 +1,6 @@
 """Screener management API routes."""
 
-from fastapi import APIRouter, HTTPException, Body
+from fastapi import APIRouter, HTTPException, Request, Body
 from pydantic import BaseModel
 from typing import Optional, List
 import json
@@ -118,46 +118,54 @@ async def get_screener(name: str):
 
 
 @router.post("/screener/screeners")
-async def create_screener(
-	request: Optional[CreateScreenerRequest] = Body(None),
-	name: Optional[str] = None,
-	source: Optional[str] = None,
-	tickers: Optional[str] = None,
-	indicators: Optional[str] = None,
-	formula: Optional[str] = None,
-	description: str = "",
-):
+async def create_screener(http_request: Request):
 	"""Create a new screener.
 
 	Accepts either JSON body or query parameters for flexibility.
 	"""
 	try:
-		# If request body provided, use it; otherwise use query parameters
-		if request:
-			screener_name = request.name
-			screener_source = request.source
-			screener_tickers = request.tickers
-			screener_indicators = request.indicators
-			screener_formula = request.formula
-			screener_description = request.description
+		# Try to parse JSON body first
+		request_data = None
+		try:
+			if http_request.headers.get("content-type", "").startswith("application/json"):
+				body = await http_request.json()
+				request_data = CreateScreenerRequest(**body)
+		except:
+			pass
+
+		# Fall back to query parameters
+		if request_data:
+			screener_name = request_data.name
+			screener_source = request_data.source
+			screener_tickers = request_data.tickers
+			screener_indicators = request_data.indicators
+			screener_formula = request_data.formula
+			screener_description = request_data.description
 		else:
-			# Parse from query/form parameters
-			screener_name = name
-			screener_source = source
+			# Parse from query parameters
+			query_params = http_request.query_params
+			screener_name = query_params.get("name")
+			screener_source = query_params.get("source")
+			screener_formula = query_params.get("formula")
+			screener_description = query_params.get("description", "")
+
+			# Parse tickers (can be JSON array or comma-separated)
 			screener_tickers = None
+			tickers_param = query_params.get("tickers")
+			if tickers_param:
+				try:
+					screener_tickers = json.loads(tickers_param) if tickers_param.startswith('[') else tickers_param.split(',')
+				except:
+					screener_tickers = tickers_param.split(',')
+
+			# Parse indicators (can be JSON array or comma-separated)
 			screener_indicators = None
-			if tickers:
+			indicators_param = query_params.get("indicators")
+			if indicators_param:
 				try:
-					screener_tickers = json.loads(tickers) if tickers.startswith('[') else tickers.split(',')
+					screener_indicators = json.loads(indicators_param) if indicators_param.startswith('[') else indicators_param.split(',')
 				except:
-					screener_tickers = tickers.split(',')
-			if indicators:
-				try:
-					screener_indicators = json.loads(indicators) if indicators.startswith('[') else indicators.split(',')
-				except:
-					screener_indicators = indicators.split(',')
-			screener_formula = formula
-			screener_description = description
+					screener_indicators = indicators_param.split(',')
 
 		if not screener_name:
 			raise HTTPException(status_code=400, detail="Name is required")
@@ -196,15 +204,7 @@ async def create_screener(
 
 
 @router.put("/screener/screeners/{name}")
-async def update_screener(
-	name: str,
-	request: Optional[UpdateScreenerRequest] = Body(None),
-	source: Optional[str] = None,
-	tickers: Optional[str] = None,
-	indicators: Optional[str] = None,
-	formula: Optional[str] = None,
-	description: Optional[str] = None,
-):
+async def update_screener(name: str, http_request: Request):
 	"""Update a screener.
 
 	Accepts either JSON body or query parameters for flexibility.
@@ -216,29 +216,46 @@ async def update_screener(
 		if not existing:
 			raise HTTPException(status_code=404, detail=f"Screener '{name}' not found")
 
-		# Use request body if provided, otherwise use query parameters
-		if request:
-			update_source = request.source
-			update_tickers = request.tickers
-			update_indicators = request.indicators
-			update_formula = request.formula
-			update_description = request.description
+		# Try to parse JSON body first
+		request_data = None
+		try:
+			if http_request.headers.get("content-type", "").startswith("application/json"):
+				body = await http_request.json()
+				request_data = UpdateScreenerRequest(**body)
+		except:
+			pass
+
+		# Fall back to query parameters
+		if request_data:
+			update_source = request_data.source
+			update_tickers = request_data.tickers
+			update_indicators = request_data.indicators
+			update_formula = request_data.formula
+			update_description = request_data.description
 		else:
-			update_source = source
+			# Parse from query parameters
+			query_params = http_request.query_params
+			update_source = query_params.get("source")
+			update_formula = query_params.get("formula")
+			update_description = query_params.get("description")
+
+			# Parse tickers (can be JSON array or comma-separated)
 			update_tickers = None
+			tickers_param = query_params.get("tickers")
+			if tickers_param:
+				try:
+					update_tickers = json.loads(tickers_param) if tickers_param.startswith('[') else tickers_param.split(',')
+				except:
+					update_tickers = tickers_param.split(',')
+
+			# Parse indicators (can be JSON array or comma-separated)
 			update_indicators = None
-			if tickers:
+			indicators_param = query_params.get("indicators")
+			if indicators_param:
 				try:
-					update_tickers = json.loads(tickers) if tickers.startswith('[') else tickers.split(',')
+					update_indicators = json.loads(indicators_param) if indicators_param.startswith('[') else indicators_param.split(',')
 				except:
-					update_tickers = tickers.split(',')
-			if indicators:
-				try:
-					update_indicators = json.loads(indicators) if indicators.startswith('[') else indicators.split(',')
-				except:
-					update_indicators = indicators.split(',')
-			update_formula = formula
-			update_description = description
+					update_indicators = indicators_param.split(',')
 
 		# Use provided values or keep existing ones
 		tickers_list = update_tickers if update_tickers is not None else existing.tickers
