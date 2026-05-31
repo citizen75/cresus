@@ -1,6 +1,7 @@
 """Screener management API routes."""
 
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 from typing import Optional, List
 import json
 import re
@@ -362,20 +363,22 @@ async def clear_screener_results(name: str):
 		raise HTTPException(status_code=500, detail=str(e))
 
 
+class ScreenerRequest(BaseModel):
+	formula: str
+	source: Optional[str] = None
+	tickers: Optional[List[str]] = None
+	limit: int = 0
+
+
 @router.post("/screener/builder")
-async def screener_builder(
-	formula: str,
-	source: Optional[str] = None,
-	tickers: Optional[str] = None,
-	limit: int = 0,
-):
+async def screener_builder(request: ScreenerRequest):
 	"""Screener builder - evaluate a formula against a universe and return live preview results.
 
 	Args:
-		formula: DSL formula string (e.g., "sha_10_green[0] && rsi_14 > 50")
-		source: Universe source (e.g., "nasdaq_100", "cac40")
-		tickers: Optional JSON array of specific tickers to screen
-		limit: Max tickers to process for preview (default 50 for speed)
+		request.formula: DSL formula string (e.g., "sha_10_green[0] && rsi_14 > 50")
+		request.source: Universe source (e.g., "nasdaq_100", "cac40")
+		request.tickers: Optional array of specific tickers to screen
+		request.limit: Max tickers to process for preview (default 50 for speed)
 
 	Returns:
 		Dict with:
@@ -386,22 +389,14 @@ async def screener_builder(
 			message: Status message
 	"""
 	try:
-		if not formula or not formula.strip():
+		if not request.formula or not request.formula.strip():
 			raise HTTPException(status_code=400, detail="Formula is required")
 
 		# Extract indicators from formula
-		indicators = extract_indicators_from_formula(formula)
-
-		# Parse tickers if provided
-		tickers_list = []
-		if tickers:
-			try:
-				tickers_list = json.loads(tickers)
-			except json.JSONDecodeError:
-				raise HTTPException(status_code=400, detail="Invalid JSON in tickers")
+		indicators = extract_indicators_from_formula(request.formula)
 
 		# Validate source or tickers
-		if not source and not tickers_list:
+		if not request.source and not request.tickers:
 			raise HTTPException(status_code=400, detail="Either source or tickers is required")
 
 		# Import screening dependencies
@@ -410,10 +405,10 @@ async def screener_builder(
 		# Create screener config
 		screener_config = ScreenerConfig(
 			name="_api_preview",
-			source=source,
-			tickers=tickers_list if tickers_list else None,
+			source=request.source,
+			tickers=request.tickers,
 			indicators=indicators,
-			formula=formula,
+			formula=request.formula,
 			description="API preview screener"
 		)
 
@@ -426,7 +421,7 @@ async def screener_builder(
 		result = agent.process({
 			"screener_config": screener_config,
 			"use_cached_data": False,
-			"max_tickers": limit,
+			"max_tickers": request.limit,
 		})
 
 		if result.get("status") != "success":
