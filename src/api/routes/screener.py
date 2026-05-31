@@ -49,6 +49,31 @@ def extract_indicators_from_formula(formula: str) -> List[str]:
 	return sorted(list(indicators))
 
 
+# Pydantic models for request bodies
+class ScreenerRequest(BaseModel):
+	formula: str
+	source: Optional[str] = None
+	tickers: Optional[List[str]] = None
+	limit: int = 0
+
+
+class CreateScreenerRequest(BaseModel):
+	name: str
+	source: Optional[str] = None
+	tickers: Optional[List[str]] = None
+	indicators: Optional[List[str]] = None
+	formula: Optional[str] = None
+	description: str = ""
+
+
+class UpdateScreenerRequest(BaseModel):
+	source: Optional[str] = None
+	tickers: Optional[List[str]] = None
+	indicators: Optional[List[str]] = None
+	formula: Optional[str] = None
+	description: Optional[str] = None
+
+
 @router.get("/screener/screeners")
 async def list_screeners():
 	"""List all screeners."""
@@ -326,30 +351,6 @@ async def clear_screener_results(name: str):
 		raise
 	except Exception as e:
 		raise HTTPException(status_code=500, detail=str(e))
-
-
-class ScreenerRequest(BaseModel):
-	formula: str
-	source: Optional[str] = None
-	tickers: Optional[List[str]] = None
-	limit: int = 0
-
-
-class CreateScreenerRequest(BaseModel):
-	name: str
-	source: Optional[str] = None
-	tickers: Optional[List[str]] = None
-	indicators: Optional[List[str]] = None
-	formula: Optional[str] = None
-	description: str = ""
-
-
-class UpdateScreenerRequest(BaseModel):
-	source: Optional[str] = None
-	tickers: Optional[List[str]] = None
-	indicators: Optional[List[str]] = None
-	formula: Optional[str] = None
-	description: Optional[str] = None
 
 
 @router.post("/screener/builder")
