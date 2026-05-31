@@ -37,6 +37,10 @@ export default function ChartPage() {
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [tickerSearch, setTickerSearch] = useState('')
   const [hoverData, setHoverData] = useState<any>(null)
+  const [tickerData, setTickerData] = useState<any>(null)
+  const [currentPrice, setCurrentPrice] = useState<number | undefined>(undefined)
+  const [dailyChange, setDailyChange] = useState<number | undefined>(undefined)
+  const [dailyChangePercent, setDailyChangePercent] = useState<number | undefined>(undefined)
 
   // Handle column sort
   const handleSort = (column: 'ticker' | 'price' | 'score' | 'entry') => {
@@ -192,6 +196,38 @@ export default function ChartPage() {
     loadWatchlist()
   }, [activeTab, selectedPortfolio])
 
+  // Fetch ticker data for price display
+  useEffect(() => {
+    if (!selectedTicker) return
+
+    const fetchTickerData = async () => {
+      try {
+        const result = await api.getTicker(selectedTicker)
+        if (result && result.data) {
+          const data = result.data
+          setTickerData(data)
+          setCurrentPrice(data.close)
+
+          if (data.history && data.history.length >= 2) {
+            const latest = data.history[data.history.length - 1]
+            const previous = data.history[data.history.length - 2]
+            const change = latest.close - previous.close
+            const changePercent = (change / previous.close) * 100
+            setDailyChange(change)
+            setDailyChangePercent(changePercent)
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch ticker data:', err)
+        setTickerData(null)
+        setCurrentPrice(undefined)
+        setDailyChange(undefined)
+        setDailyChangePercent(undefined)
+      }
+    }
+
+    fetchTickerData()
+  }, [selectedTicker])
 
   return (
     <div className="flex flex-col h-screen bg-slate-950">
@@ -478,7 +514,18 @@ export default function ChartPage() {
 
         {/* Center - Chart */}
         <div className="flex-1 h-full bg-slate-950 overflow-hidden">
-          <TradingChart timeframe={timeframe} title={selectedTicker} ticker={selectedTicker} selectedIndicators={selectedIndicators} visibleWindow={visibleWindow} onCursorMove={setHoverData} />
+          <TradingChart
+            timeframe={timeframe}
+            title={`${selectedTicker} - Price Analysis`}
+            ticker={selectedTicker}
+            companyName={tickerData?.company?.name || selectedTicker}
+            currentPrice={currentPrice}
+            dailyChange={dailyChange}
+            dailyChangePercent={dailyChangePercent}
+            selectedIndicators={selectedIndicators}
+            visibleWindow={visibleWindow}
+            onCursorMove={setHoverData}
+          />
         </div>
 
         {/* Right sidebar - Controls */}
