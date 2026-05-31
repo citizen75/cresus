@@ -35,6 +35,7 @@ export default function ChartPage() {
   const [selectedIndicators, setSelectedIndicators] = useState<Set<string>>(new Set(['RSI 14', 'MACD']))
   const [visibleWindow, setVisibleWindow] = useState<'1M' | '3M' | '6M' | 'YTD' | '1Y' | '2Y'>('1Y')
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const [tickerSearch, setTickerSearch] = useState('')
 
   // Handle column sort
   const handleSort = (column: 'ticker' | 'price' | 'score' | 'entry') => {
@@ -217,6 +218,54 @@ export default function ChartPage() {
                 ))}
               </select>
             )}
+
+            {/* Ticker selector */}
+            <div className="space-y-2">
+              <div className="text-xs font-bold text-slate-400 uppercase">Go to Ticker</div>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search ticker..."
+                  value={tickerSearch}
+                  onChange={(e) => setTickerSearch(e.target.value.toUpperCase())}
+                  className="w-full bg-slate-800 border border-slate-700 text-white rounded px-3 py-2 text-sm placeholder:text-slate-500 focus:border-purple-500 focus:outline-none"
+                />
+
+                {/* Dropdown list of matching tickers */}
+                {tickerSearch && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded shadow-lg z-50 max-h-48 overflow-y-auto">
+                    {(() => {
+                      const allTickers = [
+                        ...holdings.map(h => ({ ticker: h.ticker, type: 'holdings', price: h.current_price })),
+                        ...sortedWatchlist.map(w => ({ ticker: w.ticker || w.symbol, type: 'watchlist', price: w.close }))
+                      ]
+                      // Remove duplicates
+                      const uniqueTickers = Array.from(new Map(allTickers.map(t => [t.ticker, t])).values())
+                      const matched = uniqueTickers.filter(t => t.ticker.includes(tickerSearch))
+
+                      return matched.length === 0 ? (
+                        <div className="px-3 py-2 text-xs text-slate-400">No tickers found</div>
+                      ) : (
+                        matched.map(t => (
+                          <button
+                            key={t.ticker}
+                            onClick={() => {
+                              setSelectedTicker(t.ticker)
+                              setTickerSearch('')
+                              navigate(`/chart/${t.ticker}`)
+                            }}
+                            className="w-full text-left px-3 py-2 hover:bg-slate-700 transition text-sm text-white border-b border-slate-700 last:border-b-0 flex justify-between items-center"
+                          >
+                            <span>{t.ticker}</span>
+                            <span className="text-xs text-slate-400">${parseFloat(t.price).toFixed(2)}</span>
+                          </button>
+                        ))
+                      )
+                    })()}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Tabs */}
