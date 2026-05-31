@@ -23,9 +23,10 @@ interface TradingChartProps {
   currentPrice?: number
   dailyChange?: number
   dailyChangePercent?: number
+  hideHeader?: boolean
 }
 
-export default function TradingChart({ timeframe, title = 'Price Chart', ticker, companyName: propsCompanyName, entryDate, exitDate, positions, selectedIndicators = new Set(), chartData: externalChartData, visibleWindow = '1Y', onCursorMove, currentPrice: propsCurrentPrice, dailyChange: propsDailyChange, dailyChangePercent: propsDailyChangePercent }: TradingChartProps) {
+export default function TradingChart({ timeframe, title = 'Price Chart', ticker, companyName: propsCompanyName, entryDate, exitDate, positions, selectedIndicators = new Set(), chartData: externalChartData, visibleWindow = '1Y', onCursorMove, currentPrice: propsCurrentPrice, dailyChange: propsDailyChange, dailyChangePercent: propsDailyChangePercent, hideHeader = false }: TradingChartProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [chartData, setChartData] = useState<any[]>([])
   const [shaCandles, setShaCandles] = useState<any[]>([])
@@ -662,7 +663,7 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
   return (
     <div className="flex flex-col h-full">
       {/* OHLCV Header with Compact Data */}
-      {ticker && tickerData && (
+      {ticker && tickerData && !hideHeader && (
         <div className="bg-slate-900 border-b border-slate-800 px-4 py-3">
           <div className="flex justify-between items-center mb-2">
             <div className="flex items-center gap-2">
@@ -714,7 +715,7 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
       )}
 
       {/* Fallback header if no tickerData */}
-      {ticker && !tickerData && (
+      {ticker && !tickerData && !hideHeader && (
         <div className="bg-slate-900 border-b border-slate-800 px-4 py-3">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
