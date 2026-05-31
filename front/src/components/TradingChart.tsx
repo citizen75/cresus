@@ -18,9 +18,10 @@ interface TradingChartProps {
   selectedIndicators?: Set<string>
   chartData?: any[]
   visibleWindow?: '1M' | '3M' | '6M' | 'YTD' | '1Y' | '2Y'
+  onCursorMove?: (data: any) => void
 }
 
-export default function TradingChart({ timeframe, title = 'Price Chart', ticker, entryDate, exitDate, positions, selectedIndicators = new Set(), chartData: externalChartData, visibleWindow = '1Y' }: TradingChartProps) {
+export default function TradingChart({ timeframe, title = 'Price Chart', ticker, entryDate, exitDate, positions, selectedIndicators = new Set(), chartData: externalChartData, visibleWindow = '1Y', onCursorMove }: TradingChartProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [companyName, setCompanyName] = useState<string>('')
   const [chartData, setChartData] = useState<any[]>([])
@@ -428,7 +429,26 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
             if (indicatorChartsRef.current.macd) {
               indicatorChartsRef.current.macd.clearCrosshairPosition()
             }
+            // Reset to last values when cursor leaves
+            if (onCursorMove) {
+              onCursorMove(null)
+            }
             return
+          }
+
+          // Emit OHLCV data at cursor position
+          if (onCursorMove && param.time && chartData.length > 0) {
+            // Find the data point at the cursor time
+            const dataPoint = chartData.find(d => d.time === param.time)
+            if (dataPoint) {
+              onCursorMove({
+                open: dataPoint.open,
+                high: dataPoint.high,
+                low: dataPoint.low,
+                close: dataPoint.close,
+                volume: dataPoint.volume || null
+              })
+            }
           }
 
           // Sync to RSI chart - just sync the time position

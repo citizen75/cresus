@@ -40,7 +40,7 @@ export default function GlobalConversationPanel({ onClose }: GlobalConversationP
         setLoading(true)
         const baseUrl = getApiBaseUrl()
         const response = await fetch(
-          `${baseUrl}/api/v1/conversations/global`
+          `${baseUrl}/api/v1/conversations/_global`
         )
         if (!response.ok) {
           throw new Error('Failed to load conversations')
@@ -67,7 +67,7 @@ export default function GlobalConversationPanel({ onClose }: GlobalConversationP
       setError(null)
 
       const baseUrl = getApiBaseUrl()
-      const url = `${baseUrl}/api/v1/conversations/global/message`
+      const url = `${baseUrl}/api/v1/conversations/_global/message`
 
       const response = await fetch(url, {
         method: 'POST',

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '@/services/api'
 import TradingChart from '@/components/TradingChart'
+import CardChart from '@/components/CardChart'
 
 interface ScreenerConfig {
   name: string
@@ -19,7 +20,7 @@ interface ScreenerResult {
 }
 
 export default function ScreenerDetail() {
-  const { name: paramName } = useParams<{ name?: string }>()
+  const { name: paramName, view: viewParam } = useParams<{ name?: string; view?: string }>()
   const navigate = useNavigate()
   const [screener, setScreener] = useState<ScreenerConfig | null>(null)
   const [results, setResults] = useState<ScreenerResult[]>([])
@@ -27,12 +28,26 @@ export default function ScreenerDetail() {
   const [selectedResult, setSelectedResult] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState(false)
+  const [loadingResults, setLoadingResults] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [editMode, setEditMode] = useState(false)
   const [formData, setFormData] = useState<Partial<ScreenerConfig>>({})
   const [selectedRow, setSelectedRow] = useState<any | null>(null)
-  const [chartData, setChartData] = useState<any[]>([])
-  const [chartLoading, setChartLoading] = useState(false)
+  const [hoverData, setHoverData] = useState<any | null>(null)
+  const [searchQuery, setSearchQuery] = useState<string>('')
+  const [sortColumn, setSortColumn] = useState<string | null>(null)
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [formulaError, setFormulaError] = useState<string | null>(null)
+  const [previewResults, setPreviewResults] = useState<any[]>([])
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewMatchCount, setPreviewMatchCount] = useState(0)
+  const [previewSearchQuery, setPreviewSearchQuery] = useState<string>('')
+  const [previewSortColumn, setPreviewSortColumn] = useState<string | null>(null)
+  const [previewSortDirection, setPreviewSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [resultViewMode, setResultViewMode] = useState<'table' | 'charts'>(viewParam === 'charts' ? 'charts' : 'table')
+  const [historicalData, setHistoricalData] = useState<{ [ticker: string]: any[] }>({})
+  const [loadingCharts, setLoadingCharts] = useState(false)
+  const [chartTimeframe, setChartTimeframe] = useState<'1W' | '1M' | '3M' | 'YTD' | 'ALL'>('1M')
 
   const [universes] = useState([
     'cac40',
@@ -45,6 +60,86 @@ export default function ScreenerDetail() {
     'etf_pea',
     'etf_fr',
   ])
+
+  // Filter and sort results
+  const filteredAndSortedResults = (() => {
+    let filtered = selectedResult.filter((row) => {
+      if (!searchQuery.trim()) return true
+      const query = searchQuery.toLowerCase()
+      return Object.values(row).some((val) =>
+        String(val).toLowerCase().includes(query)
+      )
+    })
+
+    if (sortColumn) {
+      filtered.sort((a, b) => {
+        const aVal = a[sortColumn]
+        const bVal = b[sortColumn]
+        const isNumeric = typeof aVal === 'number' && typeof bVal === 'number'
+
+        if (isNumeric) {
+          return sortDirection === 'asc' ? aVal - bVal : bVal - aVal
+        } else {
+          const aStr = String(aVal || '').toLowerCase()
+          const bStr = String(bVal || '').toLowerCase()
+          return sortDirection === 'asc'
+            ? aStr.localeCompare(bStr)
+            : bStr.localeCompare(aStr)
+        }
+      })
+    }
+
+    return filtered
+  })()
+
+  // Filter and sort preview results
+  const filteredAndSortedPreviewResults = (() => {
+    let filtered = previewResults.filter((row) => {
+      if (!previewSearchQuery.trim()) return true
+      const query = previewSearchQuery.toLowerCase()
+      return Object.values(row).some((val) =>
+        String(val).toLowerCase().includes(query)
+      )
+    })
+
+    if (previewSortColumn) {
+      filtered.sort((a, b) => {
+        const aVal = a[previewSortColumn]
+        const bVal = b[previewSortColumn]
+        const isNumeric = typeof aVal === 'number' && typeof bVal === 'number'
+
+        if (isNumeric) {
+          return previewSortDirection === 'asc' ? aVal - bVal : bVal - aVal
+        } else {
+          const aStr = String(aVal || '').toLowerCase()
+          const bStr = String(bVal || '').toLowerCase()
+          return previewSortDirection === 'asc'
+            ? aStr.localeCompare(bStr)
+            : bStr.localeCompare(aStr)
+        }
+      })
+    }
+
+    return filtered
+  })()
+
+  const handleColumnSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortColumn(column)
+      setSortDirection('asc')
+    }
+  }
+
+  const handlePreviewColumnSort = (column: string) => {
+    if (previewSortColumn === column) {
+      setPreviewSortDirection(previewSortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setPreviewSortColumn(column)
+      setPreviewSortDirection('asc')
+    }
+  }
 
   useEffect(() => {
     if (paramName) {
@@ -69,6 +164,70 @@ export default function ScreenerDetail() {
     }
   }, [selectedRow])
 
+  // Load chart data when switching to charts view
+  useEffect(() => {
+    if (resultViewMode === 'charts' && selectedResult.length > 0 && Object.keys(historicalData).length === 0) {
+      loadHistoricalDataForCharts()
+    }
+  }, [resultViewMode, selectedResult])
+
+  // Formula validation
+  useEffect(() => {
+    if (!editMode || !formData.formula) {
+      setFormulaError(null)
+      return
+    }
+
+    // Basic syntax validation only
+    const validateFormula = () => {
+      const formula = (formData.formula || '').trim()
+
+      // Check for common issues
+      if (formula.includes('[[') || formula.includes(']]')) {
+        return 'Invalid syntax: double brackets not allowed'
+      }
+
+      if ((formula.match(/\(/g) || []).length !== (formula.match(/\)/g) || []).length) {
+        return 'Invalid syntax: mismatched parentheses'
+      }
+
+      return null
+    }
+
+    const error = validateFormula()
+    setFormulaError(error)
+  }, [formData.formula, editMode])
+
+  // Test formula handler
+  const handleTestFormula = async () => {
+    if (!formData.formula || !formData.source) {
+      setFormulaError('Formula and source required')
+      return
+    }
+
+    try {
+      setPreviewLoading(true)
+      const response = await api.screenerBuilder(formData.formula, formData.source)
+
+      if (response && response.status === 'success') {
+        setPreviewResults(response.matches || [])
+        setPreviewMatchCount(response.match_count || 0)
+        setFormulaError(null)
+      } else {
+        setFormulaError(response?.message || 'Screening failed')
+        setPreviewResults([])
+        setPreviewMatchCount(0)
+      }
+    } catch (err) {
+      console.error('Failed to test formula:', err)
+      setFormulaError(err instanceof Error ? err.message : 'Test failed - check console')
+      setPreviewResults([])
+      setPreviewMatchCount(0)
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
   const loadScreener = async () => {
     if (!paramName) return
     try {
@@ -87,10 +246,14 @@ export default function ScreenerDetail() {
   const loadResults = async () => {
     if (!paramName) return
     try {
+      setLoadingResults(true)
       const response = await api.listScreenerResults(paramName)
       setResults(response.results || [])
     } catch (err) {
-      console.error(err)
+      console.error('Failed to load results:', err)
+      setError('Failed to load results')
+    } finally {
+      setLoadingResults(false)
     }
   }
 
@@ -99,10 +262,20 @@ export default function ScreenerDetail() {
     try {
       setRunning(true)
       setError(null)
-      const response = await api.runScreener(paramName)
+      await api.runScreener(paramName)
 
-      // Reload results list
-      await loadResults()
+      // Reload results list and auto-select the latest
+      const resultsResponse = await api.listScreenerResults(paramName)
+      const resultsList = resultsResponse.results || []
+      setResults(resultsList)
+
+      // Auto-load the latest result
+      if (resultsList.length > 0) {
+        const latestResult = resultsList[0]
+        setSelectedResultId(latestResult.result_id)
+        const resultData = await api.getScreenerResult(paramName, latestResult.result_id)
+        setSelectedResult(resultData.data || [])
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to run screener')
       console.error(err)
@@ -181,22 +354,99 @@ export default function ScreenerDetail() {
   }
 
   const loadChartData = async (ticker: string) => {
+    // Chart data is loaded directly by TradingChart component
+    // This function is kept for compatibility with useEffect
+    void ticker  // Suppress unused parameter warning
+  }
+
+  const handleViewModeChange = (mode: 'table' | 'charts') => {
+    setResultViewMode(mode)
+    if (paramName) {
+      navigate(`/screener/${paramName}${mode === 'charts' ? '/charts' : ''}`)
+    }
+    if (mode === 'charts' && selectedResult.length > 0) {
+      loadHistoricalDataForCharts()
+    }
+  }
+
+  const getDaysForTimeframe = (tf: string) => {
+    switch (tf) {
+      case '1W': return 7
+      case '1M': return 30
+      case '3M': return 90
+      case 'YTD': return 365
+      case 'ALL': return 1825 // ~5 years
+      default: return 30
+    }
+  }
+
+  const filterDataByTimeframe = (data: any[], tf: string) => {
+    if (!data || data.length === 0) return data
+
+    let cutoffDate = new Date()
+
+    if (tf === 'YTD') {
+      cutoffDate = new Date(cutoffDate.getFullYear(), 0, 1)
+    } else if (tf !== 'ALL') {
+      const days = getDaysForTimeframe(tf)
+      cutoffDate.setDate(cutoffDate.getDate() - days)
+    }
+
+    // Filter and sort by date (oldest to newest)
+    return data
+      .filter((item: any) => {
+        const itemDate = new Date(item.date || item.timestamp)
+        return tf === 'ALL' || itemDate >= cutoffDate
+      })
+      .sort((a: any, b: any) => {
+        const dateA = new Date(a.date || a.timestamp)
+        const dateB = new Date(b.date || b.timestamp)
+        return dateA.getTime() - dateB.getTime()
+      })
+  }
+
+  const loadHistoricalDataForCharts = async () => {
+    if (selectedResult.length === 0) return
+
     try {
-      setChartLoading(true)
-      const response = await api.getHistoricalData(ticker, 90)
-      if (response && response.data) {
-        const chartDataPoints = response.data.map((item: any) => ({
-          date: item.Date || item.timestamp,
-          close: parseFloat(item.Close || item.close || 0),
-          volume: parseFloat(item.Volume || item.volume || 0),
-        }))
-        setChartData(chartDataPoints.reverse())
+      setLoadingCharts(true)
+      const data: { [ticker: string]: any[] } = {}
+
+      // Load full historical data for each ticker (5 years for timeframe filtering)
+      for (const row of selectedResult) {
+        const ticker = row.ticker
+        if (!data[ticker]) {
+          try {
+            const response = await api.getHistoricalData(ticker, 1825) // ~5 years
+            if (response.data) {
+              // Map and sort by date (oldest to newest)
+              data[ticker] = response.data
+                .map((item: any) => ({
+                  date: item.date || item.timestamp,
+                  close: parseFloat(item.close),
+                  open: parseFloat(item.open),
+                  high: parseFloat(item.high),
+                  low: parseFloat(item.low),
+                  volume: parseFloat(item.volume),
+                }))
+                .sort((a: any, b: any) => {
+                  const dateA = new Date(a.date)
+                  const dateB = new Date(b.date)
+                  return dateA.getTime() - dateB.getTime()
+                })
+            } else {
+              data[ticker] = []
+            }
+          } catch (err) {
+            console.error(`Failed to load history for ${ticker}:`, err)
+            data[ticker] = []
+          }
+        }
       }
-    } catch (err) {
-      console.error('Failed to load chart data:', err)
-      setChartData([])
+
+      setHistoricalData(data)
     } finally {
-      setChartLoading(false)
+      setLoadingCharts(false)
     }
   }
 
@@ -295,21 +545,22 @@ export default function ScreenerDetail() {
         </div>
       )}
 
-      {/* Edit Form */}
-      {editMode && (
-        <div className="bg-slate-900 border border-slate-800 rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Edit Screener</h2>
+
+      {/* Configuration and Results Side by Side */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Configuration (Left - 3 columns / 75%) */}
+        <div className="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-lg p-6">
+          <h2 className="text-lg font-semibold text-white mb-4">Configuration</h2>
 
           <form onSubmit={handleSave} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Source */}
-              <div>
-                <label className="block text-sm text-slate-300 mb-2">Source (Universe)</label>
+            <div>
+              <div className="text-slate-500 text-sm">Source</div>
+              {editMode ? (
                 <select
                   name="source"
                   value={formData.source || screener?.source || ''}
                   onChange={handleFormChange}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
+                  className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
                 >
                   <option value="">Select universe...</option>
                   {universes.map((u) => (
@@ -318,72 +569,48 @@ export default function ScreenerDetail() {
                     </option>
                   ))}
                 </select>
-              </div>
-            </div>
-
-            {/* Formula */}
-            <div>
-              <label className="block text-sm text-slate-300 mb-2">Formula</label>
-              <textarea
-                name="formula"
-                value={formData.formula || screener?.formula || ''}
-                onChange={handleFormChange}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500 font-mono"
-                placeholder="e.g., rsi_14[0] > 70 and close[0] > ema_20[0]"
-                rows={3}
-              />
-            </div>
-
-            {/* Description */}
-            <div>
-              <label className="block text-sm text-slate-300 mb-2">Description</label>
-              <input
-                type="text"
-                name="description"
-                value={formData.description || screener?.description || ''}
-                onChange={handleFormChange}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
-                placeholder="Optional description"
-              />
-            </div>
-
-            {/* Buttons */}
-            <div className="flex gap-3 pt-4">
-              <button
-                type="submit"
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-medium transition"
-              >
-                Save
-              </button>
-              <button
-                type="button"
-                onClick={() => setEditMode(false)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-medium transition"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* Configuration and Results Side by Side */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Configuration (Left - 3 columns / 75%) */}
-        <div className="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Configuration</h2>
-
-          <div className="space-y-4">
-            <div>
-              <div className="text-slate-500 text-sm">Source</div>
-              <div className="text-white font-medium mt-1">{screener.source || '—'}</div>
+              ) : (
+                <div className="text-white font-medium mt-1">{screener.source || '—'}</div>
+              )}
             </div>
 
             <div>
               <div className="text-slate-500 text-sm">Formula</div>
-              <div className="text-white font-mono text-xs mt-1 break-words">
-                {screener.formula || '—'}
-              </div>
+              {editMode ? (
+                <>
+                  <textarea
+                    name="formula"
+                    value={formData.formula || screener?.formula || ''}
+                    onChange={handleFormChange}
+                    className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500 font-mono"
+                    placeholder="e.g., sha_10_up[0] == 1 && rsi_14 > 50"
+                    rows={3}
+                  />
+
+                  {/* Formula Validation */}
+                  {formData.formula && (
+                    <div className="mt-4 p-3 rounded border">
+                      {formulaError ? (
+                        <div className="bg-red-900/20 border border-red-700 text-red-400 text-sm">
+                          <div className="font-medium">Formula Error</div>
+                          <div className="text-xs mt-1">{formulaError}</div>
+                        </div>
+                      ) : (
+                        <div className="bg-green-900/20 border border-green-700 text-green-400 text-sm">
+                          <div className="font-medium">✓ Formula syntax is valid</div>
+                          <div className="text-xs mt-1">
+                            {previewLoading ? 'Loading preview...' : `${previewMatchCount} matches found`}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-white font-mono text-xs mt-1 break-words">
+                  {screener.formula || '—'}
+                </div>
+              )}
             </div>
 
             {screener.indicators && screener.indicators.length > 0 && (
@@ -394,7 +621,20 @@ export default function ScreenerDetail() {
                 </div>
               </div>
             )}
-          </div>
+
+            {editMode && (
+              <div className="flex gap-3 pt-4 border-t border-slate-700">
+                <button
+                  type="button"
+                  onClick={handleTestFormula}
+                  disabled={previewLoading || !formData.formula || !formData.source}
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded font-medium transition"
+                >
+                  {previewLoading ? 'Testing...' : '🧪 Test Formula'}
+                </button>
+              </div>
+            )}
+          </form>
         </div>
 
         {/* Recent Results (Right - 1 column / 25%) */}
@@ -451,37 +691,322 @@ export default function ScreenerDetail() {
         </div>
       </div>
 
+      {/* Results Loading State */}
+      {loadingResults && (
+        <div className="bg-slate-900 border border-slate-800 rounded-lg p-12 text-center">
+          <div className="text-slate-400">Loading results...</div>
+        </div>
+      )}
+
+      {/* No Results Message */}
+      {!loadingResults && results.length === 0 && (
+        <div className="bg-slate-900 border border-slate-800 rounded-lg p-12 text-center">
+          <div className="text-slate-400">No results available. Click "▶ Run" to execute the screener.</div>
+        </div>
+      )}
+
       {/* Results Table */}
-      {selectedResult && selectedResult.length > 0 && (
+      {!loadingResults && results.length > 0 && selectedResult !== null && (
         <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-800">
-            <h2 className="text-lg font-semibold text-white">Results ({selectedResult.length} matches)</h2>
+            <div className="flex items-center justify-between gap-4">
+              {/* Results Title */}
+              <h2 className="text-lg font-semibold text-white whitespace-nowrap">Results ({filteredAndSortedResults.length} of {selectedResult.length} matches)</h2>
+
+              {/* Search Input */}
+              <input
+                type="text"
+                placeholder="Search results..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="flex-1 px-4 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-slate-600"
+              />
+
+              {/* Timeframe Selector - shown only in charts view */}
+              {resultViewMode === 'charts' && (
+                <select
+                  value={chartTimeframe}
+                  onChange={(e) => setChartTimeframe(e.target.value as '1W' | '1M' | '3M' | 'YTD' | 'ALL')}
+                  className="px-4 py-1.5 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:border-slate-600 transition font-medium text-sm"
+                >
+                  <option value="1W">1W</option>
+                  <option value="1M">1M</option>
+                  <option value="3M">3M</option>
+                  <option value="YTD">YTD</option>
+                  <option value="ALL">ALL</option>
+                </select>
+              )}
+
+              {/* Table/Charts Toggle */}
+              <div className="flex gap-2 bg-slate-800 border border-slate-700 rounded-lg p-1">
+                <button
+                  onClick={() => handleViewModeChange('table')}
+                  className={`px-4 py-1.5 rounded transition font-medium text-sm whitespace-nowrap ${
+                    resultViewMode === 'table'
+                      ? 'bg-purple-600 text-white'
+                      : 'text-slate-400 hover:text-slate-300'
+                  }`}
+                >
+                  📊 Table
+                </button>
+                <button
+                  onClick={() => handleViewModeChange('charts')}
+                  className={`px-4 py-1.5 rounded transition font-medium text-sm whitespace-nowrap ${
+                    resultViewMode === 'charts'
+                      ? 'bg-purple-600 text-white'
+                      : 'text-slate-400 hover:text-slate-300'
+                  }`}
+                >
+                  📈 Charts
+                </button>
+              </div>
+            </div>
           </div>
 
+          {/* Table View */}
+          {resultViewMode === 'table' && (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-slate-800/50 border-b border-slate-800">
                 <tr>
                   {selectedResult.length > 0 &&
                     Object.keys(selectedResult[0]).map((key) => (
-                      <th key={key} className="px-6 py-3 text-left text-slate-300 font-medium">
-                        {key}
+                      <th
+                        key={key}
+                        onClick={() => handleColumnSort(key)}
+                        className="px-6 py-3 text-left text-slate-300 font-medium cursor-pointer hover:bg-slate-700/50 transition"
+                      >
+                        <div className="flex items-center gap-2">
+                          {key}
+                          {sortColumn === key && (
+                            <span className="text-xs text-slate-400">
+                              {sortDirection === 'asc' ? '↑' : '↓'}
+                            </span>
+                          )}
+                        </div>
                       </th>
                     ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
-                {selectedResult.map((row, idx) => (
+                {filteredAndSortedResults.map((row, idx) => (
                   <tr
                     key={idx}
                     className="hover:bg-slate-800/50 cursor-pointer transition"
-                    onClick={() => setSelectedRow(row)}
+                    onClick={() => {
+                      console.log('Row clicked:', row)
+                      setSelectedRow(row)
+                    }}
                   >
-                    {Object.values(row).map((value, colIdx) => (
-                      <td key={colIdx} className="px-6 py-3 text-slate-300">
-                        {typeof value === 'number' ? value.toFixed(2) : String(value)}
-                      </td>
+                    {Object.entries(row).map(([key, value], colIdx) => {
+                      let displayValue = String(value || '')
+                      const numValue = typeof value === 'number' ? value : parseFloat(String(value || 0))
+
+                      if (!isNaN(numValue)) {
+                        // Format volume with 0 decimal places
+                        if (key.toLowerCase().includes('volume') || key.toLowerCase().includes('vol')) {
+                          displayValue = numValue.toFixed(0)
+                        } else {
+                          // Format other numbers (prices) with 3 decimal places
+                          displayValue = numValue.toFixed(3)
+                        }
+                      }
+                      return (
+                        <td key={colIdx} className="px-6 py-3 text-slate-300">
+                          {displayValue}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          )}
+
+          {/* Charts View */}
+          {resultViewMode === 'charts' && (
+            <div className="p-6">
+            {selectedResult.length === 0 ? (
+              <div className="text-center py-12 text-slate-400">
+                No matches in this result
+              </div>
+            ) : loadingCharts ? (
+              <div className="text-center py-12 text-slate-400">
+                Loading price history for {selectedResult.length} tickers...
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredAndSortedResults.map((row) => {
+                  const tickerHistory = historicalData[row.ticker] || []
+                  const filteredHistory = tickerHistory.length > 0 ? filterDataByTimeframe(tickerHistory, chartTimeframe) : []
+                  const chartData = filteredHistory.length > 0 ? filteredHistory : [
+                    {
+                      date: row.date,
+                      close: parseFloat(row.close),
+                      open: parseFloat(row.open),
+                      high: parseFloat(row.high),
+                      low: parseFloat(row.low),
+                      volume: parseFloat(row.volume),
+                    },
+                  ]
+
+                  // Calculate price change for timeframe
+                  let priceChange = 0
+                  if (filteredHistory.length > 1) {
+                    const firstPrice = filteredHistory[0]?.close || 0
+                    const lastPrice = filteredHistory[filteredHistory.length - 1]?.close || 0
+                    priceChange = firstPrice ? ((lastPrice - firstPrice) / firstPrice) * 100 : 0
+                  }
+
+                  return (
+                    <div key={row.ticker} className="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden hover:border-purple-600/50 transition">
+                      {/* Card Header */}
+                      <div className="bg-slate-800/50 border-b border-slate-800 p-4">
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <p className="text-white font-bold text-lg">{row.name || row.ticker}</p>
+                            <p className="text-slate-400 text-xs">{row.ticker}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className={`text-2xl font-bold ${priceChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(1)}%
+                            </p>
+                            <p className="text-slate-400 text-xs">{chartTimeframe} Change</p>
+                          </div>
+                        </div>
+                        <div className="text-slate-400 text-xs">
+                          {row.name ? `${row.ticker} • ${row.name}` : row.ticker}
+                        </div>
+                      </div>
+
+                      {/* Chart */}
+                      {historicalData[row.ticker] && historicalData[row.ticker].length > 0 ? (
+                        <CardChart
+                          data={chartData}
+                          ticker={row.ticker}
+                          showVariation={false}
+                        />
+                      ) : (
+                        <div className="p-4 h-48 bg-slate-800/20 flex flex-col items-center justify-center gap-2">
+                          <p className="text-slate-500 text-sm">No historical data</p>
+                        </div>
+                      )}
+
+                      {/* Price Range Row */}
+                      {filteredHistory.length > 0 && (() => {
+                        const lowPrice = Math.min(...filteredHistory.map((d: any) => d.low || d.close))
+                        const highPrice = Math.max(...filteredHistory.map((d: any) => d.high || d.close))
+                        const currentPrice = parseFloat(row.close)
+                        return (
+                          <div className="border-t border-slate-800 px-4 py-3 bg-slate-800/30">
+                            <div className="flex justify-between items-center text-xs">
+                              <div className="flex flex-col items-center flex-1">
+                                <p className="text-slate-500 text-xs mb-1">{chartTimeframe} Low</p>
+                                <p className="text-white font-medium">{lowPrice.toFixed(2)}</p>
+                              </div>
+                              <div className="flex flex-col items-center flex-1">
+                                <p className="text-slate-500 text-xs mb-1">Current</p>
+                                <p className="text-white font-medium">{currentPrice.toFixed(2)}</p>
+                              </div>
+                              <div className="flex flex-col items-center flex-1">
+                                <p className="text-slate-500 text-xs mb-1">{chartTimeframe} High</p>
+                                <p className="text-white font-medium">{highPrice.toFixed(2)}</p>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })()}
+
+                      {/* Card Footer */}
+                      <div className="border-t border-slate-800 p-4 space-y-2">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-slate-400">Volume</span>
+                          <span className="text-white font-medium">{(parseFloat(row.volume) / 1000000).toFixed(2)}M</span>
+                        </div>
+                        <button
+                          onClick={() => setSelectedRow(row)}
+                          className="w-full mt-3 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-medium transition"
+                        >
+                          View Full Chart
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Preview Results Section (shown when editing and test was run) */}
+      {editMode && previewResults.length > 0 && (
+        <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-800">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-white">Test Results ({filteredAndSortedPreviewResults.length} of {previewMatchCount})</h2>
+            </div>
+            <input
+              type="text"
+              placeholder="Search results..."
+              value={previewSearchQuery}
+              onChange={(e) => setPreviewSearchQuery(e.target.value)}
+              className="w-full px-4 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-slate-600"
+            />
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-800/50 border-b border-slate-800">
+                <tr>
+                  {previewResults.length > 0 &&
+                    Object.keys(previewResults[0]).map((key) => (
+                      <th
+                        key={key}
+                        onClick={() => handlePreviewColumnSort(key)}
+                        className="px-6 py-3 text-left text-slate-300 font-medium cursor-pointer hover:bg-slate-700/50 transition"
+                      >
+                        <div className="flex items-center gap-2">
+                          {key}
+                          {previewSortColumn === key && (
+                            <span className="text-xs text-slate-400">
+                              {previewSortDirection === 'asc' ? '↑' : '↓'}
+                            </span>
+                          )}
+                        </div>
+                      </th>
                     ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {filteredAndSortedPreviewResults.map((row, idx) => (
+                  <tr
+                    key={idx}
+                    className="hover:bg-slate-800/50 cursor-pointer transition"
+                    onClick={() => {
+                      console.log('Preview row clicked:', row)
+                      setSelectedRow(row)
+                    }}
+                  >
+                    {Object.entries(row).map(([key, value], colIdx) => {
+                      let displayValue = String(value || '')
+                      const numValue = typeof value === 'number' ? value : parseFloat(String(value || 0))
+
+                      if (!isNaN(numValue)) {
+                        if (key.toLowerCase().includes('volume') || key.toLowerCase().includes('vol')) {
+                          displayValue = numValue.toFixed(0)
+                        } else {
+                          displayValue = numValue.toFixed(3)
+                        }
+                      }
+                      return (
+                        <td key={colIdx} className="px-6 py-3 text-slate-300">
+                          {displayValue}
+                        </td>
+                      )
+                    })}
                   </tr>
                 ))}
               </tbody>
@@ -491,18 +1016,66 @@ export default function ScreenerDetail() {
       )}
 
       {/* Row Details Modal */}
-      {selectedRow && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+      {selectedRow && (() => {
+        console.log('Modal rendering with selectedRow:', selectedRow)
+        return (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-slate-900 rounded-lg border border-slate-800 w-full max-w-6xl h-screen max-h-[90vh] flex flex-col">
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
               <div>
-                <h2 className="text-2xl font-bold text-white">
-                  {selectedRow.ticker || selectedRow.symbol}
-                  <span className="text-lg text-slate-400 ml-2">
-                    - Current Price: €{parseFloat(selectedRow.close)?.toFixed(2) || '—'} | Close: €{parseFloat(selectedRow.close)?.toFixed(2) || '—'}
-                  </span>
-                </h2>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-white">
+                    {(selectedRow.company_name || selectedRow.company || selectedRow.name) && (
+                      <span className="text-slate-400 font-normal">{selectedRow.company_name || selectedRow.company || selectedRow.name} </span>
+                    )}
+                    {selectedRow.ticker || selectedRow.symbol}
+                  </h2>
+                  <div className="text-sm text-slate-400 font-mono">
+                    {(hoverData?.open || selectedRow.open) && (
+                      <>
+                        <span className="text-slate-400">O </span>
+                        <span className="text-white">{parseFloat(hoverData?.open || selectedRow.open)?.toFixed(3) || '—'}</span>
+                      </>
+                    )}
+                    {(hoverData?.high || selectedRow.high) && (
+                      <>
+                        <span className="text-slate-400 ml-3">H </span>
+                        <span className="text-white">{parseFloat(hoverData?.high || selectedRow.high)?.toFixed(3) || '—'}</span>
+                      </>
+                    )}
+                    {(hoverData?.low || selectedRow.low) && (
+                      <>
+                        <span className="text-slate-400 ml-3">L </span>
+                        <span className="text-white">{parseFloat(hoverData?.low || selectedRow.low)?.toFixed(3) || '—'}</span>
+                      </>
+                    )}
+                    {(hoverData?.close || selectedRow.close) && (
+                      <>
+                        <span className="text-slate-400 ml-3">C </span>
+                        <span className="text-white">{parseFloat(hoverData?.close || selectedRow.close)?.toFixed(3) || '—'}</span>
+                      </>
+                    )}
+                    {(hoverData?.volume || selectedRow.volume) && (
+                      <>
+                        <span className="text-slate-400 ml-3">Vol </span>
+                        <span className="text-white">{(parseFloat(hoverData?.volume || selectedRow.volume) / 1000)?.toFixed(1)}K</span>
+                      </>
+                    )}
+                    {(() => {
+                      const dataToUse = hoverData || selectedRow
+                      let variationPct = parseFloat(dataToUse.daily_change_pct || dataToUse.variation_pct || dataToUse.pct_change || 0)
+                      if (!variationPct && dataToUse.open && dataToUse.close) {
+                        variationPct = ((parseFloat(dataToUse.close) - parseFloat(dataToUse.open)) / parseFloat(dataToUse.open)) * 100
+                      }
+                      return variationPct ? (
+                        <span className={`ml-3 ${variationPct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          {variationPct >= 0 ? '+' : ''}{variationPct?.toFixed(2)}%
+                        </span>
+                      ) : null
+                    })()}
+                  </div>
+                </div>
                 <p className="text-slate-400 text-sm mt-1">Live Position Analysis</p>
               </div>
               <button
@@ -519,26 +1092,13 @@ export default function ScreenerDetail() {
                 timeframe="1Y"
                 title={`${selectedRow.ticker || selectedRow.symbol || 'N/A'} - Position Analysis`}
                 ticker={selectedRow.ticker || selectedRow.symbol}
+                onCursorMove={setHoverData}
               />
-            </div>
-
-            {/* Details Grid Footer */}
-            <div className="border-t border-slate-800 bg-slate-800/30 p-4 max-h-32 overflow-y-auto">
-              <h3 className="text-sm font-medium text-slate-300 mb-3">Screener Match Details</h3>
-              <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                {Object.entries(selectedRow).map(([key, value]) => (
-                  <div key={key}>
-                    <div className="text-slate-500 text-xs font-medium mb-1">{key}</div>
-                    <div className="text-white font-mono text-xs">
-                      {typeof value === 'number' ? value.toFixed(4) : String(value)}
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
         </div>
-      )}
+        )
+      })()}
     </div>
   )
 }

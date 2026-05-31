@@ -56,7 +56,7 @@ export default function App() {
           <Route path="/insights" element={<Layout><Insights /></Layout>} />
           <Route path="/scheduler" element={<Layout><Scheduler /></Layout>} />
           <Route path="/screener" element={<Layout><Screener /></Layout>} />
-          <Route path="/screener/:name" element={<Layout><ScreenerDetail /></Layout>} />
+          <Route path="/screener/:name/:view?" element={<Layout><ScreenerDetail /></Layout>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

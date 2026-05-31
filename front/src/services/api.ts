@@ -9,6 +9,7 @@ export function getApiBaseUrl(): string {
 
 class CresusAPI {
   private client: AxiosInstance
+  private longTimeoutClient: AxiosInstance
 
   constructor() {
     // Use default initially, will be updated after config is fetched
@@ -17,12 +18,20 @@ class CresusAPI {
       baseURL: `${baseURL}/api/v1`,
       timeout: 30000,
     })
+    this.longTimeoutClient = axios.create({
+      baseURL: `${baseURL}/api/v1`,
+      timeout: 120000, // 2 minutes for long-running operations
+    })
   }
 
   updateBaseURL(baseURL: string) {
     this.client = axios.create({
       baseURL: `${baseURL}/api/v1`,
       timeout: 30000,
+    })
+    this.longTimeoutClient = axios.create({
+      baseURL: `${baseURL}/api/v1`,
+      timeout: 120000,
     })
   }
 
@@ -332,7 +341,7 @@ class CresusAPI {
   }
 
   async runScreener(name: string) {
-    return (await this.client.post(`/screener/screeners/${name}/run`)).data
+    return (await this.longTimeoutClient.post(`/screener/screeners/${name}/run`)).data
   }
 
   async listScreenerResults(name: string) {
@@ -349,6 +358,13 @@ class CresusAPI {
 
   async clearScreenerResults(name: string) {
     return (await this.client.post(`/screener/screeners/${name}/results/clear`)).data
+  }
+
+  async screenerBuilder(formula: string, source?: string, tickers?: string[]) {
+    const params: any = { formula }
+    if (source) params.source = source
+    if (tickers) params.tickers = JSON.stringify(tickers)
+    return (await this.longTimeoutClient.post('/screener/builder', null, { params })).data
   }
 }
 

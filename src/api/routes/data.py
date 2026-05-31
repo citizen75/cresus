@@ -123,14 +123,14 @@ async def get_ticker_history(
 				# Sort in ascending order (oldest first) for indicator calculation
 				df_for_calc = df.sort_values('timestamp', ascending=True).reset_index(drop=True)
 
-				# Normalize column names to lowercase for indicator calculation
+				# Keep only essential OHLCV columns for indicator calculation
+				# (Exclude Dividends, Stock Splits which can interfere)
+				keep_cols = [col for col in df_for_calc.columns if col.lower() in ['timestamp', 'open', 'high', 'low', 'close', 'volume', 'ticker']]
+				df_for_calc = df_for_calc[keep_cols]
+
+				# Normalize all column names to lowercase for indicator calculation
 				df_normalized = df_for_calc.copy()
-				column_mapping = {}
-				for col in df_normalized.columns:
-					col_lower = col.lower()
-					if col_lower in ['open', 'high', 'low', 'close', 'volume']:
-						column_mapping[col] = col_lower
-				df_normalized = df_normalized.rename(columns=column_mapping)
+				df_normalized.columns = [col.lower() for col in df_normalized.columns]
 
 				indicator_lower = indicator.lower()
 
@@ -138,14 +138,10 @@ async def get_ticker_history(
 				# to include all components needed for candlestick or other visualizations
 				indicators_to_calculate = [indicator_lower]
 
-				# For candlestick indicators, include OHLC components
+				# For SHA, request just the base indicator
+				# The heikin_ashi.calculate_smooth() function returns OHLC values with wicks removed based on signals
 				if indicator_lower.startswith('sha'):
-					indicators_to_calculate = [
-						f"{indicator_lower}_open",
-						f"{indicator_lower}_high",
-						f"{indicator_lower}_low",
-						f"{indicator_lower}_close",
-					]
+					pass  # Use indicator_lower as-is
 				elif indicator_lower.startswith('bb'):  # Bollinger Bands
 					indicators_to_calculate = [
 						f"{indicator_lower}_upper",

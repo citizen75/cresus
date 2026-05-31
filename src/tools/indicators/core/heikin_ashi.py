@@ -202,8 +202,8 @@ def calculate_smooth(
             - 'sha_down': 1 if bearish AND sha_high <= sha_open (no top wick)
             - 'sha': Smooth HA Close (default)
     """
-    # Use post_smooth_length if provided, else fall back to period
-    post_length = post_smooth_length if post_smooth_length != 14 else period
+    # Prefer period parameter (from DSL), fall back to post_smooth_length if period is default
+    post_length = period if period != 14 else post_smooth_length
 
     # Normalize column names
     df = data.copy()
@@ -267,6 +267,14 @@ def calculate_smooth(
 
     sha_up = ((sha_close_series > sha_open_series) & ((sha_open_series - sha_low_series) < epsilon)).astype(int)
     sha_down = ((sha_close_series < sha_open_series) & ((sha_high_series - sha_open_series) < epsilon)).astype(int)
+
+    # Apply wick removal for candlesticks with no bottom/top wick
+    # sha_up: set low = open (no bottom wick)
+    # sha_down: set high = open (no top wick)
+    sha_low_series = sha_low_series.copy()
+    sha_high_series = sha_high_series.copy()
+    sha_low_series[sha_up == 1] = sha_open_series[sha_up == 1]
+    sha_high_series[sha_down == 1] = sha_open_series[sha_down == 1]
 
     # Include period in key names for proper formula reference
     period_suffix = f"_{post_length}" if post_length else ""

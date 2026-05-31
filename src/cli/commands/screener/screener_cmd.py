@@ -16,6 +16,8 @@ class ScreenerCommand(BaseCommand):
 		create <name> <formula> <indicators> [options]
 		delete <name>
 		run <name>
+		screen <formula> <universe_or_tickers>
+		                            Run adhoc screener with formula
 		results <name>
 		result-show <name> <result_id>
 		result-delete <name> <result_id>
@@ -43,6 +45,7 @@ class ScreenerCommand(BaseCommand):
 				"create": self._cmd_create,
 				"delete": self._cmd_delete,
 				"run": self._cmd_run,
+				"screen": self._cmd_screen,
 				"results": self._cmd_results,
 				"result-show": self._cmd_result_show,
 				"result-delete": self._cmd_result_delete,
@@ -200,6 +203,192 @@ class ScreenerCommand(BaseCommand):
 
 		message = f"Screener '{name}' execution delegated to BacktestAgent\nSource: {config.source or 'Custom'}\nFormula: {config.formula}"
 		return self._success(message)
+
+	def _cmd_screen(self, args: str) -> CommandResult:
+		"""Run adhoc screener with formula and universe/tickers.
+
+		Usage: screener screen <formula> <universe_or_tickers>
+		Examples:
+			screener screen "sha_10_up[0]==1" enx_large
+			screener screen "close > 100" AAPL,MSFT,GOOGL
+		"""
+		try:
+			parsed = ArgParser.parse_positional(args, ["formula", "universe_or_tickers"])
+			formula = parsed["formula"]
+			universe_or_tickers = parsed["universe_or_tickers"]
+		except ValidationError as e:
+			return self._error(
+				f"Usage: screener screen <formula> <universe_or_tickers>\n{str(e)}",
+				error_type="usage"
+			)
+
+		try:
+			import json
+			import pandas as pd
+			from src.tools.universe.universe import Universe
+			from src.tools.data.core import DataHistory, Fundamental
+			from src.tools.indicators import calculate
+			from src.tools.formula.dsl_parser import evaluate_dsl_vectorized
+			from contextlib import redirect_stderr
+			from io import StringIO
+
+			# Extract indicators from formula
+			import re
+			indicators = set()
+			pattern1 = r'(\w+)\[(-?\d+)\]'
+			for match in re.finditer(pattern1, formula):
+				indicators.add(match.group(1))
+			formula_copy = re.sub(pattern1, '', formula)
+			pattern2 = r'\b([a-z_][a-z0-9_]*)\b'
+			for match in re.finditer(pattern2, formula_copy):
+				name = match.group(1)
+				skip_words = {'and', 'or', 'not', 'true', 'false', 'if', 'else'}
+				skip_columns = {'open', 'high', 'low', 'close', 'volume', 'date', 'timestamp', 'ticker', 'symbol'}
+				if name not in skip_words and name not in skip_columns:
+					indicators.add(name)
+			indicators = sorted(list(indicators))
+
+			# Determine tickers
+			tickers = []
+			if ',' in universe_or_tickers:
+				# Explicit ticker list
+				tickers = [t.strip() for t in universe_or_tickers.split(',')]
+			else:
+				# Universe name
+				universe = Universe(universe_or_tickers.lower())
+				if universe.exists():
+					tickers = universe.get_tickers()
+				else:
+					return self._error(
+						f"Universe '{universe_or_tickers}' not found",
+						error_type="validation"
+					)
+
+			if not tickers:
+				return self._error("No tickers found", error_type="validation")
+
+			# Determine most recent date
+			most_recent_date = None
+			for ticker in tickers[:10]:
+				try:
+					dh = DataHistory(ticker)
+					history_df = dh.get_all()
+					if history_df is not None and not history_df.empty:
+						date_col = 'timestamp' if 'timestamp' in history_df.columns else 'date'
+						ticker_max_date = history_df[date_col].max()
+						if most_recent_date is None or ticker_max_date > most_recent_date:
+							most_recent_date = ticker_max_date
+				except Exception:
+					pass
+
+			if most_recent_date is None:
+				return self._error(
+					"Could not determine screening date from historical data",
+					error_type="error"
+				)
+
+			# Screen tickers
+			all_results = []
+			ticker_count = 0
+			skip_count = 0
+
+			for ticker in tickers:
+				try:
+					dh = DataHistory(ticker)
+					history_df = dh.get_all()
+
+					if history_df is None or history_df.empty:
+						skip_count += 1
+						continue
+
+					date_col = 'timestamp' if 'timestamp' in history_df.columns else 'date'
+					history_df = history_df.sort_values(date_col).reset_index(drop=True)
+
+					# Calculate indicators
+					try:
+						indicator_results = calculate(indicators, history_df)
+						for indicator_name, indicator_series in indicator_results.items():
+							history_df[indicator_name.lower()] = indicator_series
+					except Exception:
+						skip_count += 1
+						continue
+
+					# Filter to screening date
+					screening_df = history_df[history_df[date_col] == most_recent_date]
+					if screening_df.empty:
+						skip_count += 1
+						continue
+
+					# Evaluate formula
+					try:
+						matches = evaluate_dsl_vectorized(formula, screening_df)
+					except Exception:
+						skip_count += 1
+						continue
+
+					# Get company name
+					company_name = ticker
+					try:
+						with redirect_stderr(StringIO()):
+							fundamental = Fundamental(ticker)
+							company_info = fundamental.get_company_info()
+							company_name = company_info.get('company_name', ticker)
+					except Exception:
+						pass
+
+					# Collect matches
+					for idx, (is_match, row) in enumerate(zip(matches, screening_df.itertuples(index=False))):
+						if is_match:
+							row_dict = row._asdict() if hasattr(row, '_asdict') else dict(row)
+							result_row = {
+								'Date': str(row_dict.get('timestamp', row_dict.get('date', ''))),
+								'Ticker': ticker,
+								'Name': company_name,
+								'Close': float(row_dict.get('close', 0)) if pd.notna(row_dict.get('close')) else None,
+								'Volume': float(row_dict.get('volume', 0)) if pd.notna(row_dict.get('volume')) else None,
+							}
+							all_results.append(result_row)
+
+					if len(all_results) > 0 and ticker_count == 0:
+						ticker_count = 1
+					elif len(all_results) > 0:
+						ticker_count += 1
+
+				except Exception:
+					skip_count += 1
+					continue
+
+			# Display results
+			if all_results:
+				# Format for display
+				display_data = []
+				for row in all_results[:100]:
+					display_data.append({
+						'Date': row['Date'],
+						'Ticker': row['Ticker'],
+						'Name': row['Name'][:35] if row['Name'] else '-',
+						'Close': f"{row['Close']:.2f}" if row['Close'] else '-',
+						'Volume': f"{int(row['Volume']):,}" if row['Volume'] else '-',
+					})
+
+				table = Formatter.table(
+					display_data,
+					title=f"Screener Results: {universe_or_tickers}",
+					columns={
+						'Date': 'Date',
+						'Ticker': 'Ticker',
+						'Name': 'Name',
+						'Close': 'Close',
+						'Volume': 'Volume'
+					}
+				)
+				self.console.print(table)
+				return self._success(f"Found {len(all_results)} match(es) in {len(tickers)} ticker(s)")
+			else:
+				return self._success(f"No matches found in {len(tickers)} ticker(s)")
+
+		except Exception as e:
+			return self._error(f"Screener execution failed: {str(e)}", error_type="error")
 
 	def _cmd_results(self, args: str) -> CommandResult:
 		"""List screener results."""

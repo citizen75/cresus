@@ -31,6 +31,7 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
   const [sectorFilter, setSectorFilter] = useState<string>('All sectors')
   const [chartPosition, setChartPosition] = useState<any>(null)
   const [fundamentalData, setFundamentalData] = useState<Record<string, any>>({})
+  const [hoverData, setHoverData] = useState<any>(null)
 
   const positions = priceData?.positions || []
   const totalValue = priceData?.total_value || 0
@@ -600,6 +601,7 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
                                 e.stopPropagation()
                                 setChartPosition({
                                   ticker: pos.ticker,
+                                  company_name: pos.company_name,
                                   current_price: pos.current_price,
                                   quantity: pos.quantity
                                 })
@@ -683,7 +685,7 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
                       <div className="flex justify-between items-center text-xs">
                         <div className="flex flex-col items-center flex-1">
                           <p className="text-slate-500 text-xs mb-1">90D Low</p>
-                          <p className="text-white font-medium">€{firstPrice?.toFixed(2)}</p>
+                          <p className="text-white font-medium">€{firstPrice?.toFixed(3)}</p>
                         </div>
                         <div className="flex flex-col items-center flex-1">
                           <p className="text-slate-500 text-xs mb-1">Current</p>
@@ -693,7 +695,7 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
                         </div>
                         <div className="flex flex-col items-center flex-1">
                           <p className="text-slate-500 text-xs mb-1">90D High</p>
-                          <p className="text-white font-medium">€{lastPrice?.toFixed(2)}</p>
+                          <p className="text-white font-medium">€{lastPrice?.toFixed(3)}</p>
                         </div>
                       </div>
                     </div>
@@ -737,12 +739,40 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
               <div>
-                <h2 className="text-2xl font-bold text-white">
-                  {chartPosition.ticker}
-                  <span className="text-lg text-slate-400 ml-2">
-                    - Current Price: €{chartPosition.current_price?.toFixed(2)} | Qty: {chartPosition.quantity}
-                  </span>
-                </h2>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-white">
+                    {chartPosition.company_name && (
+                      <span className="text-slate-400 font-normal">{chartPosition.company_name} </span>
+                    )}
+                    {chartPosition.ticker}
+                  </h2>
+                  {(hoverData || fundamentalData[chartPosition.ticker]) && (
+                    <div className="text-sm text-slate-400 font-mono">
+                      <span className="text-slate-400">O </span>
+                      <span className="text-white">{(hoverData?.open || fundamentalData[chartPosition.ticker]?.open)?.toFixed(3) || '—'}</span>
+                      <span className="text-slate-400 ml-3">H </span>
+                      <span className="text-white">{(hoverData?.high || fundamentalData[chartPosition.ticker]?.high)?.toFixed(3) || '—'}</span>
+                      <span className="text-slate-400 ml-3">L </span>
+                      <span className="text-white">{(hoverData?.low || fundamentalData[chartPosition.ticker]?.low)?.toFixed(3) || '—'}</span>
+                      <span className="text-slate-400 ml-3">C </span>
+                      <span className="text-white">{(hoverData?.close || chartPosition.current_price)?.toFixed(3) || '—'}</span>
+                      <span className="text-slate-400 ml-3">Vol </span>
+                      <span className="text-white">{((hoverData?.volume || fundamentalData[chartPosition.ticker]?.volume) / 1000)?.toFixed(1)}K</span>
+                      {(() => {
+                        const dataToUse = hoverData || fundamentalData[chartPosition.ticker]
+                        let variationPct = dataToUse?.daily_change_pct || 0
+                        if (!variationPct && dataToUse?.open && dataToUse?.close) {
+                          variationPct = ((parseFloat(dataToUse.close) - parseFloat(dataToUse.open)) / parseFloat(dataToUse.open)) * 100
+                        }
+                        return variationPct ? (
+                          <span className={`ml-3 ${variationPct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {variationPct >= 0 ? '+' : ''}{variationPct?.toFixed(3)}%
+                          </span>
+                        ) : null
+                      })()}
+                    </div>
+                  )}
+                </div>
                 <p className="text-slate-400 text-sm mt-1">Live Position Analysis</p>
               </div>
               <button
@@ -759,6 +789,7 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
                 timeframe="1Y"
                 title={`${chartPosition.ticker} - Position Analysis`}
                 ticker={chartPosition.ticker}
+                onCursorMove={setHoverData}
               />
             </div>
           </div>

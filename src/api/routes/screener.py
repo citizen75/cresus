@@ -3,11 +3,49 @@
 from fastapi import APIRouter, HTTPException
 from typing import Optional, List
 import json
+import re
+import pandas as pd
 
 from tools.screener import ScreenerManager, ScreenerConfig
 from agents.screener.agent import ScreenerAgent
 
 router = APIRouter(tags=["screener"])
+
+
+def extract_indicators_from_formula(formula: str) -> List[str]:
+	"""Extract indicator names from a DSL formula.
+
+	Args:
+		formula: DSL formula string (e.g., "sha_10_green[0] && rsi_14 > 50")
+
+	Returns:
+		List of unique indicator names found in the formula
+	"""
+	indicators = set()
+
+	# Pattern 1: indicator[shift] notation
+	# Matches: sha_10_green[0], ema_20[-1], rsi_14[2]
+	pattern1 = r'(\w+)\[(-?\d+)\]'
+	for match in re.finditer(pattern1, formula):
+		indicators.add(match.group(1))
+
+	# Pattern 2: bare indicator names (without shift notation)
+	# Remove already captured indicators from formula to avoid double-matching
+	formula_copy = re.sub(pattern1, '', formula)
+
+	# Look for indicator-like names (lowercase with underscores, typically with numbers)
+	# Examples: sha_10_green, ema_20, rsi_14, adx_14
+	pattern2 = r'\b([a-z_][a-z0-9_]*)\b'
+	for match in re.finditer(pattern2, formula_copy):
+		name = match.group(1)
+		# Skip logical operators, comparison operators as words, and common keywords
+		skip_words = {'and', 'or', 'not', 'true', 'false', 'if', 'else'}
+		# Skip OHLCV column names (these are data columns, not indicators)
+		skip_columns = {'open', 'high', 'low', 'close', 'volume', 'date', 'timestamp', 'ticker', 'symbol'}
+		if name not in skip_words and name not in skip_columns:
+			indicators.add(name)
+
+	return sorted(list(indicators))
 
 
 @router.get("/screener/screeners")
@@ -79,9 +117,12 @@ async def create_screener(
 			except json.JSONDecodeError:
 				raise HTTPException(status_code=400, detail="Invalid JSON in indicators")
 
-		# Set default indicators if not provided
+		# Auto-extract indicators from formula if provided, otherwise use defaults
 		if not indicators_list:
-			indicators_list = ["rsi_14", "ema_20", "close"]
+			if formula:
+				indicators_list = extract_indicators_from_formula(formula)
+			else:
+				indicators_list = ["rsi_14", "ema_20", "close"]
 
 		config = ScreenerConfig(
 			name=name,
@@ -133,19 +174,26 @@ async def update_screener(
 			except json.JSONDecodeError:
 				raise HTTPException(status_code=400, detail="Invalid JSON in tickers")
 
-		indicators_list = existing.indicators
-		if indicators:
-			try:
-				indicators_list = json.loads(indicators)
-			except json.JSONDecodeError:
-				raise HTTPException(status_code=400, detail="Invalid JSON in indicators")
+		# Auto-extract indicators from formula if formula is being updated
+		final_formula = formula or existing.formula
+		if formula:
+			# Formula is being updated, auto-extract indicators
+			indicators_list = extract_indicators_from_formula(formula)
+		else:
+			# Formula not being updated, use existing indicators or parse provided ones
+			indicators_list = existing.indicators
+			if indicators:
+				try:
+					indicators_list = json.loads(indicators)
+				except json.JSONDecodeError:
+					raise HTTPException(status_code=400, detail="Invalid JSON in indicators")
 
 		config = ScreenerConfig(
 			name=name,
 			source=source or existing.source,
 			tickers=tickers_list,
 			indicators=indicators_list,
-			formula=formula or existing.formula,
+			formula=final_formula,
 			description=description if description is not None else existing.description,
 		)
 
@@ -308,6 +356,93 @@ async def clear_screener_results(name: str):
 			"status": "success",
 			"message": message,
 		}
+	except HTTPException:
+		raise
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/screener/builder")
+async def screener_builder(
+	formula: str,
+	source: Optional[str] = None,
+	tickers: Optional[str] = None,
+	limit: int = 0,
+):
+	"""Screener builder - evaluate a formula against a universe and return live preview results.
+
+	Args:
+		formula: DSL formula string (e.g., "sha_10_green[0] && rsi_14 > 50")
+		source: Universe source (e.g., "nasdaq_100", "cac40")
+		tickers: Optional JSON array of specific tickers to screen
+		limit: Max tickers to process for preview (default 50 for speed)
+
+	Returns:
+		Dict with:
+			status: "success" or "error"
+			indicators: List of indicators extracted from formula
+			matches: List of matching rows (up to 100)
+			match_count: Total number of matches
+			message: Status message
+	"""
+	try:
+		if not formula or not formula.strip():
+			raise HTTPException(status_code=400, detail="Formula is required")
+
+		# Extract indicators from formula
+		indicators = extract_indicators_from_formula(formula)
+
+		# Parse tickers if provided
+		tickers_list = []
+		if tickers:
+			try:
+				tickers_list = json.loads(tickers)
+			except json.JSONDecodeError:
+				raise HTTPException(status_code=400, detail="Invalid JSON in tickers")
+
+		# Validate source or tickers
+		if not source and not tickers_list:
+			raise HTTPException(status_code=400, detail="Either source or tickers is required")
+
+		# Import screening dependencies
+		from core.context import AgentContext
+
+		# Create screener config
+		screener_config = ScreenerConfig(
+			name="_api_preview",
+			source=source,
+			tickers=tickers_list if tickers_list else None,
+			indicators=indicators,
+			formula=formula,
+			description="API preview screener"
+		)
+
+		# Create context and run ScreenerAgent
+		context = AgentContext()
+		agent = ScreenerAgent("ScreenerAgent", context)
+
+		# Pass use_cached_data=False for API to load fresh data (bypasses context cache)
+		# Use limit parameter for faster preview results
+		result = agent.process({
+			"screener_config": screener_config,
+			"use_cached_data": False,
+			"max_tickers": limit,
+		})
+
+		if result.get("status") != "success":
+			raise HTTPException(status_code=400, detail=result.get("message", "Screening failed"))
+
+		return {
+			"status": "success",
+			"indicators": indicators,
+			"matches": result.get("matches", [])[:100],  # Return first 100 matches
+			"match_count": result.get("match_count", 0),
+			"tickers_processed": result.get("tickers_processed", 0),
+			"tickers_skipped": result.get("tickers_skipped", 0),
+			"screening_date": result.get("screening_date", ""),
+			"message": result.get("message", "Screening complete"),
+		}
+
 	except HTTPException:
 		raise
 	except Exception as e:
