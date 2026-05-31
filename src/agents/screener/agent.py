@@ -125,17 +125,19 @@ class ScreenerAgent(Agent):
 			# Determine most recent date if not specified
 			most_recent_date = target_date
 			if not most_recent_date:
-				most_recent_date = None
+				# When screening multiple tickers (portfolios), find the minimum of max dates
+				# so all tickers have data for the screening date
+				max_dates = []
 
 				# Get date from cached data if available
 				if data_history:
-					# Find most recent date from cached data_history
+					# Find most recent date for each ticker
 					for ticker_df in data_history.values():
 						if ticker_df is not None and not ticker_df.empty:
 							date_col = 'timestamp' if 'timestamp' in ticker_df.columns else 'date'
 							ticker_max_date = ticker_df[date_col].max()
-							if most_recent_date is None or ticker_max_date > most_recent_date:
-								most_recent_date = ticker_max_date
+							if ticker_max_date is not None:
+								max_dates.append(ticker_max_date)
 				else:
 					# Load date from individual tickers if no cache
 					for ticker in tickers:
@@ -145,12 +147,15 @@ class ScreenerAgent(Agent):
 							if history_df is not None and not history_df.empty:
 								date_col = 'timestamp' if 'timestamp' in history_df.columns else 'date'
 								ticker_max_date = history_df[date_col].max()
-								if most_recent_date is None or ticker_max_date > most_recent_date:
-									most_recent_date = ticker_max_date
+								if ticker_max_date is not None:
+									max_dates.append(ticker_max_date)
 						except Exception:
 							pass
 
-				if most_recent_date is None:
+				if max_dates:
+					# Use the minimum of the max dates (common date for all tickers)
+					most_recent_date = min(max_dates)
+				else:
 					return {
 						"status": "error",
 						"message": "Could not determine screening date from historical data",
