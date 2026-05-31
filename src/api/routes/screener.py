@@ -28,7 +28,11 @@ def extract_indicators_from_formula(formula: str) -> List[str]:
 	# Matches: sha_10_green[0], ema_20[-1], rsi_14[2]
 	pattern1 = r'(\w+)\[(-?\d+)\]'
 	for match in re.finditer(pattern1, formula):
-		indicators.add(match.group(1))
+		name = match.group(1)
+		# Handle SHA indicators without period (e.g., sha_up -> sha_14_up)
+		if name in ['sha_up', 'sha_down', 'sha_green', 'sha_red']:
+			name = f"sha_14_{name.split('_')[1]}"  # Add default period 14
+		indicators.add(name)
 
 	# Pattern 2: bare indicator names (without shift notation)
 	# Remove already captured indicators from formula to avoid double-matching
@@ -44,6 +48,9 @@ def extract_indicators_from_formula(formula: str) -> List[str]:
 		# Skip OHLCV column names (these are data columns, not indicators)
 		skip_columns = {'open', 'high', 'low', 'close', 'volume', 'date', 'timestamp', 'ticker', 'symbol'}
 		if name not in skip_words and name not in skip_columns:
+			# Handle SHA indicators without period (e.g., sha_up -> sha_14_up)
+			if name in ['sha_up', 'sha_down', 'sha_green', 'sha_red']:
+				name = f"sha_14_{name.split('_')[1]}"
 			indicators.add(name)
 
 	return sorted(list(indicators))
@@ -542,5 +549,21 @@ async def screener_builder(http_request: Request):
 
 	except HTTPException:
 		raise
+	except ValueError as e:
+		# DSL parsing or evaluation errors
+		error_msg = str(e)
+		if "Vectorized evaluation failed" in error_msg or "DSL" in error_msg:
+			raise HTTPException(
+				status_code=400,
+				detail=f"Formula error: {error_msg}"
+			)
+		raise HTTPException(status_code=400, detail=error_msg)
 	except Exception as e:
-		raise HTTPException(status_code=500, detail=str(e))
+		# Check if it's a DSL-related error
+		error_msg = str(e)
+		if "Vectorized" in error_msg or "formula" in error_msg.lower() or "indicator" in error_msg.lower():
+			raise HTTPException(
+				status_code=400,
+				detail=f"Formula evaluation error: {error_msg}"
+			)
+		raise HTTPException(status_code=500, detail=f"Server error: {error_msg}")

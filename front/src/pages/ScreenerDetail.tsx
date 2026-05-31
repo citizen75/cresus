@@ -218,9 +218,16 @@ export default function ScreenerDetail() {
         setPreviewResults([])
         setPreviewMatchCount(0)
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to test formula:', err)
-      setFormulaError(err instanceof Error ? err.message : 'Test failed - check console')
+      // Extract error detail from API response
+      let errorMessage = 'Formula test failed'
+      if (err.response?.data?.detail) {
+        errorMessage = err.response.data.detail
+      } else if (err.message) {
+        errorMessage = err.message
+      }
+      setFormulaError(errorMessage)
       setPreviewResults([])
       setPreviewMatchCount(0)
     } finally {
