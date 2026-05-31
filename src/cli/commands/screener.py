@@ -379,6 +379,158 @@ class ScreenerCommand:
 		except Exception as e:
 			console.print(f"[red]✗ Error exporting: {e}[/red]")
 
+	def screen(self, formula: str, universe_or_tickers: str, portfolio: Optional[str] = None):
+		"""Run adhoc screener with formula and universe/tickers.
+
+		Args:
+			formula: DSL formula string
+			universe_or_tickers: Universe name or comma-separated tickers
+			portfolio: Optional portfolio name to filter tickers from open positions, or "all"
+		"""
+		try:
+			import re
+			from tools.screener import ScreenerConfig
+			from agents.screener.agent import ScreenerAgent
+			from core.context import AgentContext
+
+			# Extract indicators from formula
+			indicators = set()
+			pattern1 = r'(\w+)\[(-?\d+)\]'
+			for match in re.finditer(pattern1, formula):
+				indicators.add(match.group(1))
+			formula_copy = re.sub(pattern1, '', formula)
+			pattern2 = r'\b([a-z_][a-z0-9_]*)\b'
+			for match in re.finditer(pattern2, formula_copy):
+				name = match.group(1)
+				skip_words = {'and', 'or', 'not', 'true', 'false', 'if', 'else'}
+				skip_columns = {'open', 'high', 'low', 'close', 'volume', 'date', 'timestamp', 'ticker', 'symbol'}
+				if name not in skip_words and name not in skip_columns:
+					indicators.add(name)
+			indicators = sorted(list(indicators))
+
+			# Parse universe or tickers
+			source = None
+			tickers = None
+			ticker_portfolio_map = {}  # Track which portfolio(s) each ticker belongs to
+
+			# If portfolio is specified, extract tickers from portfolio positions
+			if portfolio:
+				from tools.portfolio.manager import PortfolioManager
+				pm = PortfolioManager()
+
+				portfolio_tickers = []
+				if portfolio.lower() == "all":
+					# Get tickers from all portfolios
+					portfolios = pm.list_portfolios()
+					console.print(f"[cyan]Screening across {len(portfolios)} portfolios...[/cyan]")
+					for pf_info in portfolios:
+						pf_name = pf_info.get("name")
+						positions = pm.get_portfolio_positions(pf_name)
+						if positions:
+							for pos in positions.get("positions", []):
+								ticker = pos.get("ticker")
+								if ticker:
+									if ticker not in portfolio_tickers:
+										portfolio_tickers.append(ticker)
+										ticker_portfolio_map[ticker] = [pf_name]
+									else:
+										# Ticker in multiple portfolios
+										if ticker not in ticker_portfolio_map:
+											ticker_portfolio_map[ticker] = []
+										if pf_name not in ticker_portfolio_map[ticker]:
+											ticker_portfolio_map[ticker].append(pf_name)
+				else:
+					# Get tickers from specific portfolio
+					positions = pm.get_portfolio_positions(portfolio)
+					if positions:
+						for pos in positions.get("positions", []):
+							ticker = pos.get("ticker")
+							if ticker:
+								portfolio_tickers.append(ticker)
+								ticker_portfolio_map[ticker] = [portfolio]
+					else:
+						console.print(f"[yellow]Portfolio '{portfolio}' not found or has no open positions[/yellow]")
+						return
+
+				if portfolio_tickers:
+					tickers = portfolio_tickers
+					console.print(f"[cyan]Found {len(tickers)} tickers with open positions[/cyan]")
+				else:
+					console.print(f"[yellow]No open positions found in portfolio(s)[/yellow]")
+					return
+			elif ',' in universe_or_tickers:
+				tickers = [t.strip() for t in universe_or_tickers.split(',')]
+			else:
+				source = universe_or_tickers.lower()
+
+			# Create screener config
+			screener_config = ScreenerConfig(
+				name="_cli_screener",
+				source=source,
+				tickers=tickers,
+				indicators=indicators,
+				formula=formula,
+				description="CLI adhoc screener"
+			)
+
+			# Run using ScreenerAgent
+			context = AgentContext()
+			agent = ScreenerAgent("ScreenerAgent", context)
+			result = agent.process({
+				"screener_config": screener_config,
+				"use_cached_data": False,
+			})
+
+			# Display results
+			if result.get("status") == "success":
+				matches = result.get("matches", [])
+				if matches:
+					title = f"Screener Results: {universe_or_tickers}"
+					if portfolio:
+						title += f" (Portfolio: {portfolio})"
+
+					table = Table(title=title)
+					table.add_column("Date", style="cyan")
+					table.add_column("Ticker", style="blue", no_wrap=True)
+					table.add_column("Name", style="green")
+					table.add_column("Close", justify="right", style="yellow")
+					table.add_column("Volume", justify="right", style="magenta")
+
+					# Add Portfolio column if portfolio filtering was used
+					if portfolio:
+						table.add_column("Portfolio", style="magenta")
+
+					for row in matches[:100]:
+						close = row.get("close")
+						volume = row.get("volume")
+						ticker = row.get("ticker", "-")
+
+						row_data = [
+							row.get("date", "-"),
+							ticker,
+							(row.get("name", "-") or "-")[:35],
+							f"{float(close):.2f}" if close else "-",
+							f"{int(float(volume)):,}" if volume else "-",
+						]
+
+						# Add portfolio info if filtering was used
+						if portfolio:
+							portfolio_list = ticker_portfolio_map.get(ticker, [])
+							portfolio_str = ", ".join(portfolio_list) if portfolio_list else "-"
+							row_data.append(portfolio_str)
+
+						table.add_row(*row_data)
+
+					console.print(table)
+					console.print(f"[dim]Found {result.get('match_count', 0)} match(es)[/dim]")
+				else:
+					console.print("[yellow]No matches found[/yellow]")
+			else:
+				console.print(f"[red]✗ Error: {result.get('message', 'Unknown error')}[/red]")
+
+		except Exception as e:
+			console.print(f"[red]✗ Error: {str(e)}[/red]")
+
 
 def get_screener_command() -> ScreenerCommand:
 	"""Get screener command instance."""

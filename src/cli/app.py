@@ -1444,16 +1444,17 @@ class CresusCLI(cmd2.Cmd):
 		"""Manage and run screeners.
 
 		Usage:
-		  screener list                                    List all screeners
-		  screener info <name>                             Show screener configuration
-		  screener create <name> <formula> <indicators>    Create new screener
-		  screener delete <name>                           Delete a screener
-		  screener run <name>                              Run a screener
-		  screener results <name> [--limit N]              List screener results
-		  screener result-show <name> <result_id>          Show specific result
-		  screener result-delete <name> <result_id>        Delete a result
-		  screener clear-results <name>                    Clear all results
-		  screener export <name> <result_id> <path>        Export result to file
+		  screener list                                                  List all screeners
+		  screener info <name>                                           Show screener configuration
+		  screener create <name> <formula> <indicators>                  Create new screener
+		  screener delete <name>                                         Delete a screener
+		  screener run <name>                                            Run a screener
+		  screener screen <formula> <universe_or_tickers> [--portfolio]  Run adhoc screener
+		  screener results <name> [--limit N]                            List screener results
+		  screener result-show <name> <result_id>                        Show specific result
+		  screener result-delete <name> <result_id>                      Delete a result
+		  screener clear-results <name>                                  Clear all results
+		  screener export <name> <result_id> <path>                      Export result to file
 
 		Examples:
 		  screener list
@@ -1461,15 +1462,26 @@ class CresusCLI(cmd2.Cmd):
 		  screener create momentum "rsi_14 > 70" "rsi_14,macd"
 		  screener run momentum
 		  screener results momentum --limit 10
+		  screener screen "sha_10_up[0]==1" enx_large
+		  screener screen "close > 100" AAPL,MSFT,GOOGL
+		  screener screen "sha_10_up[0]==1" enx_large --portfolio PEA
+		  screener screen "sha_10_up[0]==1" enx_large --portfolio all
 		"""
 		from .commands.screener import ScreenerCommand
+		import shlex
 
 		if not args:
 			cmd = ScreenerCommand()
 			cmd.list()
 			return
 
-		parts = args.split()
+		# Use shlex for proper quote handling
+		try:
+			parts = shlex.split(args)
+		except ValueError:
+			# Fall back to simple split if shlex fails
+			parts = args.split()
+
 		command = parts[0] if parts else None
 
 		try:
@@ -1527,6 +1539,24 @@ class CresusCLI(cmd2.Cmd):
 					console.print("[red]✗ screener_name required[/red]")
 					return
 				cmd.run(parts[1])
+
+			elif command == "screen":
+				if len(parts) < 3:
+					console.print("[red]✗ Usage: screener screen <formula> <universe_or_tickers> [--portfolio <name>|all][/red]")
+					return
+
+				# Parse portfolio option if present
+				portfolio = None
+				if "--portfolio" in parts:
+					idx = parts.index("--portfolio")
+					if idx + 1 < len(parts):
+						portfolio = parts[idx + 1]
+						parts = parts[:idx] + parts[idx+2:]  # Remove --portfolio and its value
+
+				# Last part is universe_or_tickers, everything else is formula
+				universe_or_tickers = parts[-1]
+				formula = " ".join(parts[1:-1])
+				cmd.screen(formula, universe_or_tickers, portfolio=portfolio)
 
 			elif command == "results":
 				if len(parts) < 2:
