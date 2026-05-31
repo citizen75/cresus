@@ -118,24 +118,65 @@ async def get_screener(name: str):
 
 
 @router.post("/screener/screeners")
-async def create_screener(request: CreateScreenerRequest):
-	"""Create a new screener."""
+async def create_screener(
+	request: Optional[CreateScreenerRequest] = None,
+	name: Optional[str] = None,
+	source: Optional[str] = None,
+	tickers: Optional[str] = None,
+	indicators: Optional[str] = None,
+	formula: Optional[str] = None,
+	description: str = "",
+):
+	"""Create a new screener.
+
+	Accepts either JSON body or query parameters for flexibility.
+	"""
 	try:
+		# If request body provided, use it; otherwise use query parameters
+		if request:
+			screener_name = request.name
+			screener_source = request.source
+			screener_tickers = request.tickers
+			screener_indicators = request.indicators
+			screener_formula = request.formula
+			screener_description = request.description
+		else:
+			# Parse from query/form parameters
+			screener_name = name
+			screener_source = source
+			screener_tickers = None
+			screener_indicators = None
+			if tickers:
+				try:
+					screener_tickers = json.loads(tickers) if tickers.startswith('[') else tickers.split(',')
+				except:
+					screener_tickers = tickers.split(',')
+			if indicators:
+				try:
+					screener_indicators = json.loads(indicators) if indicators.startswith('[') else indicators.split(',')
+				except:
+					screener_indicators = indicators.split(',')
+			screener_formula = formula
+			screener_description = description
+
+		if not screener_name:
+			raise HTTPException(status_code=400, detail="Name is required")
+
 		# Auto-extract indicators from formula if provided, otherwise use defaults
-		indicators_list = request.indicators if request.indicators else []
+		indicators_list = screener_indicators if screener_indicators else []
 		if not indicators_list:
-			if request.formula:
-				indicators_list = extract_indicators_from_formula(request.formula)
+			if screener_formula:
+				indicators_list = extract_indicators_from_formula(screener_formula)
 			else:
 				indicators_list = ["rsi_14", "ema_20", "close"]
 
 		config = ScreenerConfig(
-			name=request.name,
-			source=request.source,
-			tickers=request.tickers,
+			name=screener_name,
+			source=screener_source,
+			tickers=screener_tickers,
 			indicators=indicators_list,
-			formula=request.formula,
-			description=request.description,
+			formula=screener_formula,
+			description=screener_description,
 		)
 
 		manager = ScreenerManager()
