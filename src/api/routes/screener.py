@@ -93,45 +93,24 @@ async def get_screener(name: str):
 
 
 @router.post("/screener/screeners")
-async def create_screener(
-	name: str,
-	source: Optional[str] = None,
-	tickers: Optional[str] = None,
-	indicators: Optional[str] = None,
-	formula: Optional[str] = None,
-	description: str = "",
-):
+async def create_screener(request: CreateScreenerRequest):
 	"""Create a new screener."""
 	try:
-		# Parse JSON arrays if provided
-		tickers_list = []
-		if tickers:
-			try:
-				tickers_list = json.loads(tickers)
-			except json.JSONDecodeError:
-				raise HTTPException(status_code=400, detail="Invalid JSON in tickers")
-
-		indicators_list = []
-		if indicators:
-			try:
-				indicators_list = json.loads(indicators)
-			except json.JSONDecodeError:
-				raise HTTPException(status_code=400, detail="Invalid JSON in indicators")
-
 		# Auto-extract indicators from formula if provided, otherwise use defaults
+		indicators_list = request.indicators if request.indicators else []
 		if not indicators_list:
-			if formula:
-				indicators_list = extract_indicators_from_formula(formula)
+			if request.formula:
+				indicators_list = extract_indicators_from_formula(request.formula)
 			else:
 				indicators_list = ["rsi_14", "ema_20", "close"]
 
 		config = ScreenerConfig(
-			name=name,
-			source=source,
-			tickers=tickers_list,
+			name=request.name,
+			source=request.source,
+			tickers=request.tickers,
 			indicators=indicators_list,
-			formula=formula,
-			description=description,
+			formula=request.formula,
+			description=request.description,
 		)
 
 		manager = ScreenerManager()
@@ -153,11 +132,7 @@ async def create_screener(
 @router.put("/screener/screeners/{name}")
 async def update_screener(
 	name: str,
-	source: Optional[str] = None,
-	tickers: Optional[str] = None,
-	indicators: Optional[str] = None,
-	formula: Optional[str] = None,
-	description: Optional[str] = None,
+	request: UpdateScreenerRequest,
 ):
 	"""Update a screener."""
 	try:
@@ -167,35 +142,25 @@ async def update_screener(
 		if not existing:
 			raise HTTPException(status_code=404, detail=f"Screener '{name}' not found")
 
-		# Parse JSON arrays if provided
-		tickers_list = existing.tickers
-		if tickers:
-			try:
-				tickers_list = json.loads(tickers)
-			except json.JSONDecodeError:
-				raise HTTPException(status_code=400, detail="Invalid JSON in tickers")
+		# Use provided values or keep existing ones
+		tickers_list = request.tickers if request.tickers is not None else existing.tickers
 
 		# Auto-extract indicators from formula if formula is being updated
-		final_formula = formula or existing.formula
-		if formula:
+		final_formula = request.formula or existing.formula
+		if request.formula:
 			# Formula is being updated, auto-extract indicators
-			indicators_list = extract_indicators_from_formula(formula)
+			indicators_list = extract_indicators_from_formula(request.formula)
 		else:
-			# Formula not being updated, use existing indicators or parse provided ones
-			indicators_list = existing.indicators
-			if indicators:
-				try:
-					indicators_list = json.loads(indicators)
-				except json.JSONDecodeError:
-					raise HTTPException(status_code=400, detail="Invalid JSON in indicators")
+			# Formula not being updated, use provided indicators or existing ones
+			indicators_list = request.indicators if request.indicators else existing.indicators
 
 		config = ScreenerConfig(
 			name=name,
-			source=source or existing.source,
+			source=request.source or existing.source,
 			tickers=tickers_list,
 			indicators=indicators_list,
 			formula=final_formula,
-			description=description if description is not None else existing.description,
+			description=request.description if request.description is not None else existing.description,
 		)
 
 		success, message = manager.update_screener(config)
@@ -368,6 +333,23 @@ class ScreenerRequest(BaseModel):
 	source: Optional[str] = None
 	tickers: Optional[List[str]] = None
 	limit: int = 0
+
+
+class CreateScreenerRequest(BaseModel):
+	name: str
+	source: Optional[str] = None
+	tickers: Optional[List[str]] = None
+	indicators: Optional[List[str]] = None
+	formula: Optional[str] = None
+	description: str = ""
+
+
+class UpdateScreenerRequest(BaseModel):
+	source: Optional[str] = None
+	tickers: Optional[List[str]] = None
+	indicators: Optional[List[str]] = None
+	formula: Optional[str] = None
+	description: Optional[str] = None
 
 
 @router.post("/screener/builder")
