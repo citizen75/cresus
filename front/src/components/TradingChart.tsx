@@ -696,11 +696,22 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
             <span className="text-white">{(hoverData?.close || tickerData?.close)?.toFixed(3) || '—'}</span>
             <span className="ml-3">Vol </span>
             <span className="text-white">{((hoverData?.volume || tickerData?.volume) / 1000)?.toFixed(1) || '—'}K</span>
-            {dailyChangePercent !== undefined && (
-              <span className={`ml-3 ${dailyChangePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {dailyChangePercent >= 0 ? '+' : ''}{dailyChangePercent.toFixed(3)}%
-              </span>
-            )}
+            {(() => {
+              const dataToUse = hoverData || tickerData
+              let changePercent = 0
+              if (dataToUse?.open && dataToUse?.close) {
+                changePercent = ((dataToUse.close - dataToUse.open) / dataToUse.open) * 100
+              } else if (hoverData) {
+                changePercent = dailyChangePercent || 0
+              } else {
+                changePercent = dailyChangePercent || 0
+              }
+              return (
+                <span className={`ml-3 ${changePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {changePercent >= 0 ? '+' : ''}{changePercent.toFixed(3)}%
+                </span>
+              )
+            })()}
           </div>
         </div>
       )}
