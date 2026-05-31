@@ -60,6 +60,7 @@ class DataCommands:
 		table.add_row("data fetch fundamental <ticker>", "Fetch fundamental data")
 		table.add_row("data fetch universe <name> [start_date]", "Fetch all tickers in universe")
 		table.add_row("data fetch all <universe> [start_date]", "Fetch history + fundamental for universe")
+		table.add_row("data fetch all --portfolio <name|all> [start_date]", "Fetch history + fundamental for portfolio tickers")
 		table.add_row("data fetch ptf <portfolio_name>", "Calculate portfolio history from journal")
 		table.add_row("data fetch ptf all", "Fetch fundamental data for all portfolio tickers")
 		table.add_row("data show <ticker>", "Show ticker info (history dates, last OHLCV, fundamentals)")
@@ -73,11 +74,24 @@ class DataCommands:
 	def _handle_fetch(self, parts):
 		"""Handle data fetch command."""
 		if len(parts) < 3:
-			console.print("[red]✗[/red] Usage: data fetch <history|fundamental|universe|all|ptf> <ticker|name|universe|portfolio> [start_date]")
+			console.print("[red]✗[/red] Usage: data fetch <history|fundamental|universe|all|ptf> <ticker|name|universe|portfolio> [--portfolio <name|all>] [start_date]")
 			return
 		data_type = parts[1]
 		target = parts[2]
-		start_date = parts[3] if len(parts) > 3 else None
+
+		# Parse --portfolio flag if present
+		portfolio = None
+		start_date = None
+		remaining_parts = parts[3:]
+
+		if "--portfolio" in remaining_parts:
+			idx = remaining_parts.index("--portfolio")
+			if idx + 1 < len(remaining_parts):
+				portfolio = remaining_parts[idx + 1]
+				remaining_parts = remaining_parts[:idx] + remaining_parts[idx+2:]
+
+		if remaining_parts:
+			start_date = remaining_parts[0]
 
 		if data_type == "history":
 			result = self.data_manager.fetch_history(target, start_date)
@@ -89,12 +103,112 @@ class DataCommands:
 			result = self.data_manager.fetch_universe(target, start_date)
 			self._print_universe_result(result)
 		elif data_type == "all":
-			result = self.data_manager.fetch_all(target, start_date)
-			self._print_universe_result(result)
+			if portfolio:
+				self._handle_fetch_portfolio_data(portfolio, start_date)
+			else:
+				result = self.data_manager.fetch_all(target, start_date)
+				self._print_universe_result(result)
 		elif data_type == "ptf":
 			self._handle_fetch_portfolio(target)
 		else:
 			console.print(f"[red]✗[/red] Unknown data type: {data_type}")
+
+	def _handle_fetch_portfolio_data(self, portfolio_name: str, start_date: str = None):
+		"""Fetch history and fundamental data for portfolio tickers."""
+		from tools.portfolio.manager import PortfolioManager
+		from loguru import logger
+
+		try:
+			pm = PortfolioManager()
+
+			# Get list of portfolios to process
+			portfolios_to_process = []
+			if portfolio_name.lower() == "all":
+				portfolios_info = pm.list_portfolios()
+				portfolios_to_process = [pf_info.get("name") for pf_info in portfolios_info]
+			else:
+				portfolios_to_process = [portfolio_name]
+
+			if not portfolios_to_process:
+				console.print("[yellow]⚠[/yellow] No portfolios found")
+				return
+
+			console.print(f"[cyan]Fetching data for {len(portfolios_to_process)} portfolio(s)...[/cyan]")
+
+			total_tickers = set()
+			portfolio_tickers = {}
+
+			# Collect tickers from all portfolios
+			for pf_name in portfolios_to_process:
+				try:
+					positions = pm.get_portfolio_positions(pf_name)
+					tickers = [pos.get("ticker") for pos in positions.get("positions", [])]
+					portfolio_tickers[pf_name] = tickers
+					total_tickers.update(tickers)
+				except Exception as e:
+					console.print(f"[yellow]⚠[/yellow] Could not get positions for {pf_name}: {e}")
+
+			if not total_tickers:
+				console.print("[yellow]⚠[/yellow] No open positions found in any portfolio")
+				return
+
+			console.print(f"[cyan]Found {len(total_tickers)} unique ticker(s) across {len(portfolios_to_process)} portfolio(s)[/cyan]\n")
+
+			# Fetch data for each ticker
+			success_count = 0
+			failed_tickers = []
+
+			# Create progress table
+			table = Table(title=f"Fetching Data for Portfolio Ticker(s)", box=box.ROUNDED)
+			table.add_column("Ticker", style="cyan")
+			table.add_column("Portfolios", style="yellow")
+			table.add_column("History", style="green")
+			table.add_column("Fundamental", style="green")
+
+			for ticker in sorted(total_tickers):
+				# Get which portfolios have this ticker
+				portfolios_with_ticker = [pf for pf, tickers in portfolio_tickers.items() if ticker in tickers]
+				portfolio_str = ", ".join(portfolios_with_ticker)
+
+				try:
+					# Fetch history
+					history_result = self.data_manager.fetch_history(ticker, start_date)
+					history_status = "✓" if history_result.get("status") == "success" else "✗"
+
+					# Fetch fundamental
+					fundamental_result = self.data_manager.fetch_fundamental(ticker)
+					fundamental_status = "✓" if fundamental_result.get("status") == "success" else "✗"
+
+					if history_result.get("status") == "success" and fundamental_result.get("status") == "success":
+						success_count += 1
+						history_colored = "[green]✓[/green]"
+						fundamental_colored = "[green]✓[/green]"
+					else:
+						failed_tickers.append(ticker)
+						history_colored = "[red]✗[/red]" if history_result.get("status") != "success" else "[green]✓[/green]"
+						fundamental_colored = "[red]✗[/red]" if fundamental_result.get("status") != "success" else "[green]✓[/green]"
+
+					table.add_row(ticker, portfolio_str, history_colored, fundamental_colored)
+
+				except Exception as e:
+					console.print(f"[yellow]⚠[/yellow] Error fetching data for {ticker}: {e}")
+					failed_tickers.append(ticker)
+					table.add_row(ticker, portfolio_str, "[red]✗[/red]", "[red]✗[/red]")
+
+			console.print(table)
+
+			# Summary
+			console.print(f"\n[green]✓[/green] Successfully fetched {success_count}/{len(total_tickers)} ticker(s)")
+			if failed_tickers:
+				console.print(f"[yellow]⚠[/yellow] Failed: {', '.join(failed_tickers)}")
+			else:
+				console.print("[green]✓ All data fetched successfully![/green]")
+
+			console.print(f"[dim]Portfolio data is now cached and available in the API[/dim]")
+
+		except Exception as e:
+			console.print(f"[red]✗[/red] Error fetching portfolio data: {e}")
+			logger.error(f"Portfolio data fetch error: {e}")
 
 	def _handle_fetch_portfolio(self, portfolio_name):
 		"""Handle portfolio history fetch or all portfolio tickers data fetch."""
