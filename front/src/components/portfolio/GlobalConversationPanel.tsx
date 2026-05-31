@@ -212,6 +212,14 @@ export default function GlobalConversationPanel({ onClose }: GlobalConversationP
       </div>
 
       {/* Right side - Reserved for future features */}
+      <div className="flex-1 min-w-0 flex flex-col bg-slate-900 border-l border-slate-800">
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center text-slate-500 space-y-2">
+            <div className="text-4xl">🔮</div>
+            <div className="text-sm font-medium">Reserved for future features</div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
