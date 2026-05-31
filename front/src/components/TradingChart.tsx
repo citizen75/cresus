@@ -664,15 +664,12 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
       {/* OHLCV Header with Compact Data */}
       {ticker && tickerData && (
         <div className="bg-slate-900 border-b border-slate-800 px-4 py-3">
-          <div className="flex justify-between items-start mb-2">
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-white">
-                  {companyName}
-                </h2>
-                <span className="text-sm text-slate-400">{ticker}</span>
-              </div>
-              <div className="text-xs text-slate-400 mt-1">Live Position Analysis</div>
+          <div className="flex justify-between items-center mb-2">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-bold text-white">
+                {companyName}
+              </h2>
+              <span className="text-sm text-slate-400">{ticker}</span>
             </div>
             <div className="text-right">
               <div className="text-sm text-white">
@@ -719,15 +716,12 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
       {/* Fallback header if no tickerData */}
       {ticker && !tickerData && (
         <div className="bg-slate-900 border-b border-slate-800 px-4 py-3">
-          <div className="flex justify-between items-start">
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-white">
-                  {companyName || ticker}
-                </h2>
-                <span className="text-sm text-slate-400">{ticker}</span>
-              </div>
-              <div className="text-xs text-slate-400 mt-1">Live Position Analysis</div>
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-bold text-white">
+                {companyName || ticker}
+              </h2>
+              <span className="text-sm text-slate-400">{ticker}</span>
             </div>
             <div className="text-right">
               <div className="text-sm text-white">
