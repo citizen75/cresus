@@ -73,25 +73,26 @@ class DataCommands:
 
 	def _handle_fetch(self, parts):
 		"""Handle data fetch command."""
-		if len(parts) < 3:
-			console.print("[red]✗[/red] Usage: data fetch <history|fundamental|universe|all|ptf> <ticker|name|universe|portfolio> [--portfolio <name|all>] [start_date]")
+		if len(parts) < 2:
+			console.print("[red]✗[/red] Usage: data fetch <history|fundamental|universe|all|ptf> [args...]")
 			return
+
 		data_type = parts[1]
+
+		# Check if this is a portfolio fetch (all with --portfolio flag)
+		if data_type == "all" and len(parts) >= 4 and parts[2] == "--portfolio":
+			portfolio_name = parts[3]
+			start_date = parts[4] if len(parts) > 4 else None
+			self._handle_fetch_portfolio_data(portfolio_name, start_date)
+			return
+
+		# Original behavior for other commands
+		if len(parts) < 3:
+			console.print("[red]✗[/red] Usage: data fetch <history|fundamental|universe|all|ptf> <ticker|name|universe|portfolio> [start_date]")
+			return
+
 		target = parts[2]
-
-		# Parse --portfolio flag if present
-		portfolio = None
-		start_date = None
-		remaining_parts = parts[3:]
-
-		if "--portfolio" in remaining_parts:
-			idx = remaining_parts.index("--portfolio")
-			if idx + 1 < len(remaining_parts):
-				portfolio = remaining_parts[idx + 1]
-				remaining_parts = remaining_parts[:idx] + remaining_parts[idx+2:]
-
-		if remaining_parts:
-			start_date = remaining_parts[0]
+		start_date = parts[3] if len(parts) > 3 else None
 
 		if data_type == "history":
 			result = self.data_manager.fetch_history(target, start_date)
@@ -103,11 +104,8 @@ class DataCommands:
 			result = self.data_manager.fetch_universe(target, start_date)
 			self._print_universe_result(result)
 		elif data_type == "all":
-			if portfolio:
-				self._handle_fetch_portfolio_data(portfolio, start_date)
-			else:
-				result = self.data_manager.fetch_all(target, start_date)
-				self._print_universe_result(result)
+			result = self.data_manager.fetch_all(target, start_date)
+			self._print_universe_result(result)
 		elif data_type == "ptf":
 			self._handle_fetch_portfolio(target)
 		else:
