@@ -776,7 +776,6 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
                     </div>
                   )}
                 </div>
-                <p className="text-slate-400 text-sm mt-1">Live Position Analysis</p>
               </div>
               <button
                 onClick={() => setChartPosition(null)}
