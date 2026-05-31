@@ -123,14 +123,11 @@ class DataCommands:
 			portfolios_to_process = []
 			if portfolio_name.lower() == "all":
 				portfolios_info = pm.list_portfolios()
-				# Only include portfolios with open positions (exclude special ones starting with underscore)
-				for pf_info in portfolios_info:
-					pf_name = pf_info.get("name")
-					if pf_name.startswith("_"):
-						continue
-					positions = pm.get_portfolio_positions(pf_name)
-					if positions and positions.get("positions"):
-						portfolios_to_process.append(pf_name)
+				# Only include real portfolios (type="real")
+				portfolios_to_process = [
+					pf_info.get("name") for pf_info in portfolios_info
+					if pf_info.get("type") == "real"
+				]
 			else:
 				portfolios_to_process = [portfolio_name]
 

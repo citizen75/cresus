@@ -421,20 +421,12 @@ class ScreenerCommand:
 
 				portfolio_tickers = []
 				if portfolio.lower() == "all":
-					# Get tickers from real portfolios with open positions
+					# Get tickers from real portfolios (type="real")
 					all_portfolios = pm.list_portfolios()
-					portfolios_with_positions = []
-					for pf_info in all_portfolios:
-						pf_name = pf_info.get("name")
-						# Skip special portfolios (starting with underscore)
-						if pf_name.startswith("_"):
-							continue
-						positions = pm.get_portfolio_positions(pf_name)
-						if positions and positions.get("positions"):
-							portfolios_with_positions.append(pf_info)
+					real_portfolios = [pf for pf in all_portfolios if pf.get("type") == "real"]
 
-					console.print(f"[cyan]Screening across {len(portfolios_with_positions)} portfolio(ies) with open positions...[/cyan]")
-					for pf_info in portfolios_with_positions:
+					console.print(f"[cyan]Screening across {len(real_portfolios)} real portfolio(ies)...[/cyan]")
+					for pf_info in real_portfolios:
 						pf_name = pf_info.get("name")
 						positions = pm.get_portfolio_positions(pf_name)
 						if positions:
