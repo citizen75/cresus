@@ -1,6 +1,6 @@
 """Screener management API routes."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Body
 from pydantic import BaseModel
 from typing import Optional, List
 import json
@@ -119,7 +119,7 @@ async def get_screener(name: str):
 
 @router.post("/screener/screeners")
 async def create_screener(
-	request: Optional[CreateScreenerRequest] = None,
+	request: Optional[CreateScreenerRequest] = Body(None),
 	name: Optional[str] = None,
 	source: Optional[str] = None,
 	tickers: Optional[str] = None,
@@ -198,9 +198,17 @@ async def create_screener(
 @router.put("/screener/screeners/{name}")
 async def update_screener(
 	name: str,
-	request: UpdateScreenerRequest,
+	request: Optional[UpdateScreenerRequest] = Body(None),
+	source: Optional[str] = None,
+	tickers: Optional[str] = None,
+	indicators: Optional[str] = None,
+	formula: Optional[str] = None,
+	description: Optional[str] = None,
 ):
-	"""Update a screener."""
+	"""Update a screener.
+
+	Accepts either JSON body or query parameters for flexibility.
+	"""
 	try:
 		manager = ScreenerManager()
 		existing = manager.get_screener(name)
@@ -208,25 +216,49 @@ async def update_screener(
 		if not existing:
 			raise HTTPException(status_code=404, detail=f"Screener '{name}' not found")
 
+		# Use request body if provided, otherwise use query parameters
+		if request:
+			update_source = request.source
+			update_tickers = request.tickers
+			update_indicators = request.indicators
+			update_formula = request.formula
+			update_description = request.description
+		else:
+			update_source = source
+			update_tickers = None
+			update_indicators = None
+			if tickers:
+				try:
+					update_tickers = json.loads(tickers) if tickers.startswith('[') else tickers.split(',')
+				except:
+					update_tickers = tickers.split(',')
+			if indicators:
+				try:
+					update_indicators = json.loads(indicators) if indicators.startswith('[') else indicators.split(',')
+				except:
+					update_indicators = indicators.split(',')
+			update_formula = formula
+			update_description = description
+
 		# Use provided values or keep existing ones
-		tickers_list = request.tickers if request.tickers is not None else existing.tickers
+		tickers_list = update_tickers if update_tickers is not None else existing.tickers
 
 		# Auto-extract indicators from formula if formula is being updated
-		final_formula = request.formula or existing.formula
-		if request.formula:
+		final_formula = update_formula or existing.formula
+		if update_formula:
 			# Formula is being updated, auto-extract indicators
-			indicators_list = extract_indicators_from_formula(request.formula)
+			indicators_list = extract_indicators_from_formula(update_formula)
 		else:
 			# Formula not being updated, use provided indicators or existing ones
-			indicators_list = request.indicators if request.indicators else existing.indicators
+			indicators_list = update_indicators if update_indicators else existing.indicators
 
 		config = ScreenerConfig(
 			name=name,
-			source=request.source or existing.source,
+			source=update_source or existing.source,
 			tickers=tickers_list,
 			indicators=indicators_list,
 			formula=final_formula,
-			description=request.description if request.description is not None else existing.description,
+			description=update_description if update_description is not None else existing.description,
 		)
 
 		success, message = manager.update_screener(config)
