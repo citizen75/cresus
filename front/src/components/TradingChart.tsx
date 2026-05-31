@@ -685,14 +685,19 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
             </div>
           </div>
           {/* OHLCV Data Line - Shows hover data if cursor is over chart, otherwise daily data */}
-          <div className="text-xs text-slate-400 font-mono flex items-center gap-3">
-            <span>O <span className="text-white">{(hoverData?.open || tickerData?.open)?.toFixed(3) || '—'}</span></span>
-            <span>H <span className="text-white">{(hoverData?.high || tickerData?.high)?.toFixed(3) || '—'}</span></span>
-            <span>L <span className="text-white">{(hoverData?.low || tickerData?.low)?.toFixed(3) || '—'}</span></span>
-            <span>C <span className="text-white">{(hoverData?.close || tickerData?.close)?.toFixed(3) || '—'}</span></span>
-            <span>Vol <span className="text-white">{((hoverData?.volume || tickerData?.volume) / 1000)?.toFixed(1) || '—'}K</span></span>
+          <div className="text-xs text-slate-400 font-mono">
+            <span>O </span>
+            <span className="text-white">{(hoverData?.open || tickerData?.open)?.toFixed(3) || '—'}</span>
+            <span className="ml-3">H </span>
+            <span className="text-white">{(hoverData?.high || tickerData?.high)?.toFixed(3) || '—'}</span>
+            <span className="ml-3">L </span>
+            <span className="text-white">{(hoverData?.low || tickerData?.low)?.toFixed(3) || '—'}</span>
+            <span className="ml-3">C </span>
+            <span className="text-white">{(hoverData?.close || tickerData?.close)?.toFixed(3) || '—'}</span>
+            <span className="ml-3">Vol </span>
+            <span className="text-white">{((hoverData?.volume || tickerData?.volume) / 1000)?.toFixed(1) || '—'}K</span>
             {dailyChangePercent !== undefined && (
-              <span className={`ml-auto ${dailyChangePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              <span className={`ml-3 ${dailyChangePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                 {dailyChangePercent >= 0 ? '+' : ''}{dailyChangePercent.toFixed(3)}%
               </span>
             )}
