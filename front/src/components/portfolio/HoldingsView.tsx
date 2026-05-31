@@ -805,7 +805,6 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
                     dailyChange={dailyChange}
                     dailyChangePercent={dailyChangePercent}
                     onCursorMove={setHoverData}
-                    hideHeader={true}
                   />
                 )
               })()}
