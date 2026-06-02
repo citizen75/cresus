@@ -1,5 +1,5 @@
-# Hermes Agent Configuration
-# This file configures Hermes to use Cresus MCP Server
+# Hermes Configuration
+# Main configuration file for Hermes Agent
 
 name: "Cresus Portfolio Agent"
 description: "Autonomous agent for portfolio management using Cresus MCP"
@@ -14,11 +14,11 @@ personality:
 
 # Memory configuration
 memory:
-  type: "short-term"  # Options: short-term, long-term, hybrid
+  type: "short-term"
   max_messages: 100
   retention_days: 7
 
-# MCP Server Configuration
+# MCP Server Configuration - ADD THIS TO YOUR EXISTING config.yaml
 mcp_servers:
   cresus:
     name: "Cresus Portfolio API"
@@ -31,12 +31,11 @@ mcp_servers:
     enabled: true
     auto_start: true
 
-# Skills configuration
+# Skills configuration - ADD THIS TO YOUR EXISTING config.yaml
 skills:
   enabled:
     - "portfolio_manager"
     - "screener_analyzer"
-    - "strategy_executor"
     - "performance_analyzer"
   disabled: []
 
@@ -58,7 +57,7 @@ constraints:
   min_position_size: 100
   max_daily_trades: 20
   require_confirmation_for:
-    - "large_trades"  # > 10000 EUR
+    - "large_trades"
     - "new_portfolios"
     - "strategy_changes"
 
@@ -72,5 +71,3 @@ api:
 # Prompts and templates
 prompts:
   system: "config/system_prompt.md"
-  portfolio_analysis: "config/prompts/portfolio_analysis.md"
-  screener_setup: "config/prompts/screener_setup.md"

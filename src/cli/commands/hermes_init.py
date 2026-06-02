@@ -90,6 +90,7 @@ class HermesInitializer:
         copied = []
         skipped = []
 
+        # Copy individual config files
         for config_file in config_src.glob("*"):
             if config_file.is_file():
                 dst_file = config_dst / config_file.name
@@ -105,6 +106,23 @@ class HermesInitializer:
                 else:
                     # File already exists - don't overwrite
                     skipped.append(config_file.name)
+
+        # Copy config.yaml to root
+        config_yaml_src = self.init_template / "config.yaml"
+        config_yaml_dst = self.hermes_home / "config.yaml"
+
+        if config_yaml_src.exists():
+            if not config_yaml_dst.exists():
+                try:
+                    with open(config_yaml_src, "r") as f:
+                        content = f.read()
+                    with open(config_yaml_dst, "w") as f:
+                        f.write(content)
+                    copied.append("config.yaml")
+                except Exception as e:
+                    console.print(f"[red]✗ Error copying config.yaml: {e}[/red]")
+            else:
+                skipped.append("config.yaml")
 
         if copied:
             console.print(f"[green]✓ Copied {len(copied)} config file(s)[/green]")
@@ -124,26 +142,26 @@ class HermesInitializer:
         copied = []
         skipped = []
 
-        for skill_file in skills_src.glob("*.yml"):
-            dst_file = skills_dst / skill_file.name
-            if not dst_file.exists():
-                try:
-                    with open(skill_file, "r") as f:
-                        content = f.read()
-                    with open(dst_file, "w") as f:
-                        f.write(content)
-                    copied.append(skill_file.name)
-                except Exception as e:
-                    console.print(f"[red]✗ Error copying {skill_file.name}: {e}[/red]")
-            else:
-                # Skill already exists - don't overwrite
-                skipped.append(skill_file.name)
+        # Copy skill directories (each skill is a folder)
+        for skill_dir in skills_src.iterdir():
+            if skill_dir.is_dir():
+                dst_dir = skills_dst / skill_dir.name
+                if not dst_dir.exists():
+                    try:
+                        import shutil
+                        shutil.copytree(skill_dir, dst_dir)
+                        copied.append(skill_dir.name)
+                    except Exception as e:
+                        console.print(f"[red]✗ Error copying {skill_dir.name}: {e}[/red]")
+                else:
+                    # Skill directory already exists - don't overwrite
+                    skipped.append(skill_dir.name)
 
         if copied:
-            console.print(f"[green]✓ Copied {len(copied)} skill(s): {', '.join([f.replace('.yml', '') for f in copied])}[/green]")
+            console.print(f"[green]✓ Copied {len(copied)} skill(s): {', '.join(copied)}[/green]")
 
         if skipped:
-            console.print(f"[dim]⊘ Preserved {len(skipped)} existing skill(s): {', '.join([f.replace('.yml', '') for f in skipped])}[/dim]")
+            console.print(f"[dim]⊘ Preserved {len(skipped)} existing skill(s): {', '.join(skipped)}[/dim]")
 
     def _copy_agents(self):
         """Copy agent definitions from template (skip if they exist)."""

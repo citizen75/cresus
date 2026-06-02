@@ -4,52 +4,65 @@ Hermes is an autonomous agent framework for AI-driven portfolio management. This
 
 ## Quick Start
 
-### 1. Initialize Hermes Configuration
+### For Existing Hermes Installation (Manual Setup)
+
+**Edit `~/.hermes/config.yaml`** and add this section:
+
+```yaml
+mcp_servers:
+  cresus:
+    name: "Cresus Portfolio API"
+    type: "stdio"
+    command: "python"
+    args: ["-m", "src.mcp.main"]
+    env:
+      CRESUS_API_URL: "http://localhost:8000/api/v1"
+      CRESUS_LOG_LEVEL: "INFO"
+    enabled: true
+    auto_start: true
+
+skills:
+  enabled:
+    - "portfolio_manager"
+    - "screener_analyzer"
+    - "performance_analyzer"
+    # ... your existing skills
+```
+
+Then copy the skill folders:
+```bash
+cp -r init/hermes/skills/portfolio_manager ~/.hermes/skills/
+cp -r init/hermes/skills/screener_analyzer ~/.hermes/skills/
+cp -r init/hermes/skills/performance_analyzer ~/.hermes/skills/
+```
+
+### Or Use Automated Setup (Fresh Install)
 
 ```bash
 cresus init --hermes
 ```
 
 This will:
-- Create `~/.hermes/` directory structure
+- Create `~/.hermes/` directory structure  
 - Copy all Hermes configuration files
 - Setup Hermes skills for portfolio management
 - Configure the Cresus MCP server
 
-### 2. Configure API Connection
-
-Edit `~/.hermes/config/hermes.yml`:
-
-```yaml
-mcp_servers:
-  cresus:
-    env:
-      CRESUS_API_URL: "http://localhost:8000/api/v1"
-      CRESUS_API_KEY: ""  # Add API key if needed
-```
-
-### 3. Start the Services
+### Start the Services
 
 ```bash
 # Start Cresus API
 cresus service start api
 
-# Start MCP server (auto-started by Hermes)
-# or manually:
-python -m src.mcp.main
-```
-
-### 4. Launch Hermes Agent
-
-```bash
-hermes run --config ~/.hermes/config/hermes.yml
+# Launch Hermes Agent
+hermes run
 ```
 
 ## Configuration
 
-### Main Configuration: `~/.hermes/config/hermes.yml`
+### Main Configuration File: `~/.hermes/config.yaml`
 
-Controls:
+This is the main Hermes configuration file. The Cresus integration adds:
 - Agent personality and role
 - MCP server configuration
 - Available skills
