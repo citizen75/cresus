@@ -1,0 +1,123 @@
+# Cresus Agent Definition for Hermes
+# Defines the autonomous agent that manages portfolios
+
+name: "cresus_portfolio_agent"
+description: "Autonomous agent for portfolio management and analysis"
+version: "1.0.0"
+
+# Agent configuration
+agent:
+  type: "autonomous"
+  model: "gpt-4"  # Can be changed to other models
+  temperature: 0.7
+  max_tokens: 2000
+
+# Skills the agent has access to
+skills:
+  - "portfolio_manager"
+  - "screener_analyzer"
+  - "strategy_executor"
+  - "performance_analyzer"
+
+# MCP integration
+mcp:
+  servers:
+    - "cresus"  # Cresus MCP Server
+  features:
+    - "portfolio_analysis"
+    - "screener_creation"
+    - "strategy_backtesting"
+    - "performance_tracking"
+
+# Agent behavior
+behavior:
+  # Proactive actions
+  proactive:
+    enabled: true
+    actions:
+      - "daily_performance_summary"
+      - "risk_alerts"
+      - "rebalancing_suggestions"
+
+  # Decision making
+  decision_making:
+    confidence_threshold: 0.8
+    require_user_confirmation:
+      - "large_trades"
+      - "new_strategies"
+      - "major_rebalances"
+
+  # Learning and improvement
+  learning:
+    enabled: true
+    track_performance: true
+    update_models: true
+
+# Communication
+communication:
+  style: "professional"
+  language: "English"
+  explain_reasoning: true
+  show_data_sources: true
+
+# Safety constraints
+safety:
+  max_portfolio_size: 50
+  daily_loss_limit: -0.05  # -5%
+  require_stops_losses: true
+  diversification_requirement: true
+  min_positions: 5
+  max_positions: 50
+
+# Integration with Cresus
+integration:
+  api:
+    base_url: "http://localhost:8000/api/v1"
+    timeout: 30
+    retry_count: 3
+
+  mcp_features:
+    portfolio_operations: true
+    screener_execution: true
+    backtest_analysis: true
+    strategy_management: true
+
+# Logging and monitoring
+logging:
+  level: "INFO"
+  file: "~/.hermes/logs/cresus_agent.log"
+  include_api_calls: true
+  include_decisions: true
+
+# Capabilities
+capabilities:
+  portfolio_management:
+    - "create_portfolio"
+    - "analyze_portfolio"
+    - "optimize_portfolio"
+    - "rebalance_portfolio"
+    - "compare_portfolios"
+
+  analysis:
+    - "performance_analysis"
+    - "risk_analysis"
+    - "correlation_analysis"
+    - "scenario_analysis"
+
+  strategy:
+    - "screen_stocks"
+    - "backtest_strategy"
+    - "validate_strategy"
+    - "execute_strategy"
+
+  reporting:
+    - "performance_reports"
+    - "risk_reports"
+    - "trade_reports"
+    - "recommendations"
+
+# Knowledge base
+knowledge_base:
+  indicators: "config/indicators.md"
+  strategies: "config/strategies.md"
+  best_practices: "config/best_practices.md"

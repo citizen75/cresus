@@ -1,0 +1,113 @@
+# Portfolio Manager Skill for Hermes Agent
+# Handles portfolio-related operations using Cresus MCP
+
+skill_name: "portfolio_manager"
+description: "Manage investment portfolios - create, analyze, and optimize"
+version: "1.0.0"
+
+triggers:
+  - "create.*portfolio"
+  - "analyze.*portfolio"
+  - "get.*portfolio.*metrics"
+  - "compare.*portfolios"
+  - "rebalance.*portfolio"
+  - "portfolio.*performance"
+  - "view.*positions"
+
+actions:
+  - name: "list_portfolios"
+    description: "List all available portfolios"
+    mcp_tool: "list_portfolios"
+    parameters: {}
+
+  - name: "create_portfolio"
+    description: "Create a new portfolio"
+    mcp_tool: "create_portfolio"
+    parameters:
+      - name: "name"
+        type: "string"
+        required: true
+        description: "Portfolio name (e.g., 'Main', 'Aggressive', 'Conservative')"
+      - name: "initial_capital"
+        type: "number"
+        required: false
+        default: 100000
+        description: "Initial capital in EUR"
+      - name: "portfolio_type"
+        type: "string"
+        required: false
+        default: "paper"
+        enum: ["paper", "live"]
+        description: "Paper for simulation, live for real trading"
+      - name: "description"
+        type: "string"
+        required: false
+        description: "Portfolio description"
+
+  - name: "analyze_portfolio"
+    description: "Get comprehensive portfolio analysis"
+    mcp_tool: "get_portfolio_metrics"
+    parameters:
+      - name: "portfolio_name"
+        type: "string"
+        required: true
+        description: "Name of the portfolio to analyze"
+
+  - name: "get_positions"
+    description: "View current portfolio positions"
+    mcp_tool: "get_portfolio_positions"
+    parameters:
+      - name: "portfolio_name"
+        type: "string"
+        required: true
+        description: "Portfolio name"
+      - name: "limit"
+        type: "integer"
+        required: false
+        default: 100
+        description: "Maximum positions to return"
+
+  - name: "compare_portfolios"
+    description: "Compare performance across multiple portfolios"
+    mcp_tool: "compare_portfolios"
+    parameters:
+      - name: "portfolio_names"
+        type: "array"
+        required: true
+        description: "List of portfolio names to compare"
+
+  - name: "rebalance_portfolio"
+    description: "Rebalance portfolio to target allocation"
+    mcp_tool: "rebalance_portfolio"
+    parameters:
+      - name: "portfolio_name"
+        type: "string"
+        required: true
+        description: "Portfolio to rebalance"
+      - name: "target_allocation"
+        type: "object"
+        required: true
+        description: "Target allocation {ticker: percentage}"
+
+# Response templates
+responses:
+  portfolio_created: "Created portfolio '{{name}}' with {{initial_capital}}€ initial capital"
+  analysis_ready: "Portfolio '{{name}}' analysis complete. Sharpe ratio: {{sharpe}}, Max drawdown: {{drawdown}}%"
+  positions_summary: "Portfolio has {{count}} positions worth {{total_value}}€"
+
+# Validation rules
+validation:
+  portfolio_name:
+    min_length: 1
+    max_length: 50
+    pattern: "^[a-zA-Z0-9_-]+$"
+
+  initial_capital:
+    min: 100
+    max: 100000000
+
+# Error handling
+error_handlers:
+  portfolio_not_found: "Portfolio '{{name}}' not found. Would you like to create it?"
+  invalid_allocation: "Total allocation must equal 100%. Current: {{total}}%"
+  insufficient_capital: "Operation requires {{required}}€ but portfolio has {{available}}€"

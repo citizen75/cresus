@@ -129,9 +129,19 @@ class CresusCLI(cmd2.Cmd):
 				console.print(f"[yellow]Warning:[/yellow] Could not load history: {e}")
 
 	# ==================== Init Command ====================
-	def do_init(self, _):
-		"""Initialize ~/.cresus directory structure with config files."""
-		self._init_cresus_directory()
+	def do_init(self, args):
+		"""Initialize ~/.cresus directory structure with config files.
+
+		Usage:
+			init                    # Initialize Cresus only
+			init --hermes          # Initialize Cresus + Hermes agent
+		"""
+		args_str = str(args).strip() if args else ""
+
+		if "--hermes" in args_str:
+			self._init_with_hermes()
+		else:
+			self._init_cresus_directory()
 
 	def _init_cresus_directory(self):
 		"""Create ~/.cresus directory structure and copy config files from init/ template."""
@@ -261,6 +271,21 @@ class CresusCLI(cmd2.Cmd):
 		console.print(f"\n[bold green]✓ Cresus initialized successfully![/bold green]")
 		console.print(f"[dim]Configuration location: {cresus_home}[/dim]")
 		console.print(f"[dim]Edit {cresus_home / '.env'} to customize settings[/dim]")
+
+	def _init_with_hermes(self):
+		"""Initialize Cresus + Hermes agent."""
+		# First initialize Cresus
+		self._init_cresus_directory()
+
+		# Then initialize Hermes
+		try:
+			from cli.commands.hermes_init import HermesInitializer
+			hermes_init = HermesInitializer(self.project_root)
+			hermes_init.initialize()
+		except ImportError:
+			console.print("[red]✗ Hermes initialization module not found[/red]")
+		except Exception as e:
+			console.print(f"[red]✗ Error initializing Hermes: {e}[/red]")
 
 	# ==================== Service Commands ====================
 	def do_service(self, args):

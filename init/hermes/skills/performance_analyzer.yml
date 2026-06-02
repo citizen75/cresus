@@ -1,0 +1,133 @@
+# Performance Analyzer Skill for Hermes Agent
+# Handles portfolio and backtest analysis
+
+skill_name: "performance_analyzer"
+description: "Analyze portfolio and strategy performance with advanced metrics"
+version: "1.0.0"
+
+triggers:
+  - "performance"
+  - "metrics"
+  - "drawdown"
+  - "sharpe"
+  - "analyze.*performance"
+  - "backtest.*results"
+  - "compare.*strategies"
+
+actions:
+  - name: "get_metrics"
+    description: "Get portfolio performance metrics"
+    mcp_tool: "get_portfolio_metrics"
+    parameters:
+      - name: "portfolio_name"
+        type: "string"
+        required: true
+
+  - name: "get_performance"
+    description: "Get portfolio performance data"
+    mcp_tool: "get_portfolio_performance"
+    parameters:
+      - name: "portfolio_name"
+        type: "string"
+        required: true
+
+  - name: "get_transactions"
+    description: "Get portfolio transaction history"
+    mcp_tool: "get_portfolio_transactions"
+    parameters:
+      - name: "portfolio_name"
+        type: "string"
+        required: true
+      - name: "limit"
+        type: "integer"
+        required: false
+        default: 50
+
+# Metrics reference
+metrics:
+  risk_metrics:
+    sharpe_ratio:
+      description: "Risk-adjusted returns (higher = better)"
+      benchmark: 1.0
+    sortino_ratio:
+      description: "Downside-risk-adjusted returns"
+      benchmark: 1.5
+    max_drawdown:
+      description: "Largest peak-to-trough decline"
+      benchmark: -0.20
+    volatility:
+      description: "Portfolio return volatility"
+      benchmark: 0.15
+
+  return_metrics:
+    total_return:
+      description: "Cumulative return %"
+    annual_return:
+      description: "Annualized return %"
+    monthly_return:
+      description: "Average monthly return %"
+
+  trade_metrics:
+    win_rate:
+      description: "Percentage of winning trades"
+      benchmark: 0.50
+    profit_factor:
+      description: "Gross profit / Gross loss"
+      benchmark: 1.5
+    total_trades:
+      description: "Number of trades executed"
+
+# Analysis templates
+analysis_templates:
+  quick_summary: |
+    **Portfolio Performance Summary**
+    - Total Return: {{total_return}}%
+    - Sharpe Ratio: {{sharpe_ratio}}
+    - Max Drawdown: {{max_drawdown}}%
+    - Win Rate: {{win_rate}}%
+
+  detailed_analysis: |
+    **Comprehensive Portfolio Analysis**
+
+    **Risk Metrics:**
+    - Sharpe Ratio: {{sharpe}} (benchmark: 1.0)
+    - Sortino Ratio: {{sortino}} (benchmark: 1.5)
+    - Max Drawdown: {{max_drawdown}}% (target: > -20%)
+    - Volatility: {{volatility}}% (benchmark: 15%)
+
+    **Return Metrics:**
+    - Total Return: {{total_return}}%
+    - Annual Return: {{annual_return}}%
+    - Win Rate: {{win_rate}}%
+
+    **Recommendations:**
+    {{recommendations}}
+
+# Performance thresholds
+thresholds:
+  excellent:
+    sharpe: 2.0
+    drawdown: -0.10
+    win_rate: 0.65
+
+  good:
+    sharpe: 1.5
+    drawdown: -0.15
+    win_rate: 0.55
+
+  acceptable:
+    sharpe: 1.0
+    drawdown: -0.20
+    win_rate: 0.50
+
+  poor:
+    sharpe: 0.5
+    drawdown: -0.30
+    win_rate: 0.40
+
+# Alerts
+alerts:
+  high_drawdown: "Portfolio drawdown {{drawdown}}% exceeds threshold"
+  low_sharpe: "Sharpe ratio {{sharpe}} below target of 1.0"
+  low_win_rate: "Win rate {{win_rate}}% is below 50%"
+  volatility_spike: "Volatility increased to {{volatility}}%"

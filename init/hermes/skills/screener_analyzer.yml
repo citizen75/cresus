@@ -1,0 +1,124 @@
+# Screener Analyzer Skill for Hermes Agent
+# Handles screener operations using Cresus MCP
+
+skill_name: "screener_analyzer"
+description: "Create, test, and analyze stock screeners using DSL formulas"
+version: "1.0.0"
+
+triggers:
+  - "create.*screener"
+  - "test.*screener"
+  - "analyze.*screener"
+  - "run.*screener"
+  - "validate.*formula"
+  - "screener.*results"
+
+actions:
+  - name: "list_screeners"
+    description: "List all available screeners"
+    mcp_tool: "list_screeners"
+    parameters: {}
+
+  - name: "create_screener"
+    description: "Create a new screener"
+    mcp_tool: "create_screener"
+    parameters:
+      - name: "name"
+        type: "string"
+        required: true
+        description: "Screener name (e.g., 'momentum_cac')"
+      - name: "formula"
+        type: "string"
+        required: true
+        description: "DSL formula (e.g., 'sha_14_green and rsi_14 > 50')"
+      - name: "source"
+        type: "string"
+        required: false
+        description: "Data source (cac40, nasdaq_100, etc.)"
+      - name: "indicators"
+        type: "array"
+        required: false
+        description: "Technical indicators to compute"
+      - name: "description"
+        type: "string"
+        required: false
+        description: "Screener description"
+
+  - name: "validate_formula"
+    description: "Validate a screener formula before running"
+    mcp_tool: "validate_formula"
+    parameters:
+      - name: "formula"
+        type: "string"
+        required: true
+        description: "DSL formula to validate"
+      - name: "source"
+        type: "string"
+        required: false
+        description: "Data source for testing"
+
+  - name: "run_screener"
+    description: "Execute a screener and get matching tickers"
+    mcp_tool: "run_screener"
+    parameters:
+      - name: "name"
+        type: "string"
+        required: true
+        description: "Name of the screener to run"
+      - name: "limit"
+        type: "integer"
+        required: false
+        default: 0
+        description: "Max results (0 = unlimited)"
+
+  - name: "get_results"
+    description: "Get screener results"
+    mcp_tool: "get_screener_results"
+    parameters:
+      - name: "name"
+        type: "string"
+        required: true
+        description: "Screener name"
+
+# Available indicators (DSL reference)
+indicators:
+  technical:
+    - "sha_14_green"     # Super Trend - green
+    - "sha_14_red"       # Super Trend - red
+    - "rsi_14"           # RSI above 50
+    - "ema_20"           # Exponential Moving Average 20
+    - "ema_50"           # Exponential Moving Average 50
+    - "sma_200"          # Simple Moving Average 200
+    - "adx_14"           # ADX trend strength
+
+  conditions:
+    - "price > sma_200"  # Price above 200-day MA
+    - "volume > avg_volume"  # Volume spike
+    - "rsi_14 > 70"      # Overbought
+    - "rsi_14 < 30"      # Oversold
+
+# Example formulas
+examples:
+  momentum: "sha_14_green and rsi_14 > 50"
+  mean_reversion: "rsi_14 < 30 and price > sma_200"
+  trend_following: "ema_20 > ema_50 and adx_14 > 25"
+
+# Response templates
+responses:
+  screener_created: "Created screener '{{name}}' with formula: {{formula}}"
+  formula_valid: "✓ Formula is valid. Found {{count}} indicators to compute"
+  formula_invalid: "✗ Formula error: {{error}}"
+  results_ready: "Screener found {{count}} matching tickers"
+
+# Validation rules
+validation:
+  formula:
+    min_length: 5
+    max_length: 1000
+    allowed_operators: ["and", "or", "not", "(", ")", ">", "<", "==", "!="]
+
+# Error handling
+error_handlers:
+  formula_syntax_error: "Syntax error in formula: {{error}}. Please check the expression."
+  indicator_not_found: "Indicator '{{indicator}}' not recognized. Use: {{available}}"
+  no_results: "No tickers matched the screener criteria"

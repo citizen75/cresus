@@ -1,0 +1,76 @@
+# Hermes Agent Configuration
+# This file configures Hermes to use Cresus MCP Server
+
+name: "Cresus Portfolio Agent"
+description: "Autonomous agent for portfolio management using Cresus MCP"
+version: "1.0.0"
+
+# Agent personality and role
+personality:
+  role: "Portfolio Management Expert"
+  personality_type: "analytical"
+  tone: "professional"
+  background: "Expert in algorithmic trading, portfolio analysis, and risk management"
+
+# Memory configuration
+memory:
+  type: "short-term"  # Options: short-term, long-term, hybrid
+  max_messages: 100
+  retention_days: 7
+
+# MCP Server Configuration
+mcp_servers:
+  cresus:
+    name: "Cresus Portfolio API"
+    type: "stdio"
+    command: "python"
+    args: ["-m", "src.mcp.main"]
+    env:
+      CRESUS_API_URL: "http://localhost:8000/api/v1"
+      CRESUS_LOG_LEVEL: "INFO"
+    enabled: true
+    auto_start: true
+
+# Skills configuration
+skills:
+  enabled:
+    - "portfolio_manager"
+    - "screener_analyzer"
+    - "strategy_executor"
+    - "performance_analyzer"
+  disabled: []
+
+# Tool configuration
+tools:
+  timeout: 30
+  max_retries: 3
+  retry_delay: 1
+
+# Logging
+logging:
+  level: "INFO"
+  format: "json"
+  file: "~/.hermes/logs/cresus_agent.log"
+
+# Safety and constraints
+constraints:
+  max_portfolio_size: 50
+  min_position_size: 100
+  max_daily_trades: 20
+  require_confirmation_for:
+    - "large_trades"  # > 10000 EUR
+    - "new_portfolios"
+    - "strategy_changes"
+
+# API Configuration
+api:
+  base_url: "http://localhost:8000/api/v1"
+  timeout: 30
+  retry_count: 3
+  ssl_verify: true
+
+# Prompts and templates
+prompts:
+  system: "config/system_prompt.md"
+  portfolio_analysis: "config/prompts/portfolio_analysis.md"
+  screener_setup: "config/prompts/screener_setup.md"
