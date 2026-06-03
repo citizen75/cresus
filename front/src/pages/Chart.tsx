@@ -591,6 +591,31 @@ export default function ChartPage() {
               ))}
             </div>
           </div>
+
+          {/* All Indicators Cached */}
+          <div>
+            <div className="text-xs font-bold text-slate-400 uppercase mb-2">All Indicators</div>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {[
+                'RSI 7', 'RSI 14', 'RSI 21',
+                'MACD', 'BB 20', 'ATR 14',
+                'MA 5', 'MA 10', 'MA 20', 'MA 50', 'MA 100', 'MA 200',
+                'EMA 12', 'EMA 26', 'EMA 50',
+                'ADX 14', 'Stochastic', 'Williams %R',
+                'CCI 20', 'ROC 12', 'Momentum'
+              ].map((indicator) => (
+                <label key={indicator} className="flex items-center gap-2 cursor-pointer text-xs">
+                  <input
+                    type="checkbox"
+                    className="rounded border-slate-600"
+                    checked={selectedIndicators.has(indicator)}
+                    onChange={() => toggleIndicator(indicator)}
+                  />
+                  <span className="text-slate-300">{indicator}</span>
+                </label>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>
