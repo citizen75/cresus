@@ -299,6 +299,31 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
             setShaCandles(shaData)
             rawDataRef.current = data
             indicatorColumnsRef.current = indicators
+
+            // Set initial hover data to most recent data point
+            if (data.length > 0) {
+              const lastData = data[data.length - 1]
+              const initialHoverData: any = {
+                open: parseFloat(lastData.open),
+                high: parseFloat(lastData.high),
+                low: parseFloat(lastData.low),
+                close: parseFloat(lastData.close),
+                volume: parseInt(lastData.volume)
+              }
+              indicators.forEach(col => {
+                const value = lastData[col]
+                if (value !== undefined && value !== null && value !== '') {
+                  const numValue = typeof value === 'string' ? parseFloat(value) : value
+                  if (!isNaN(numValue)) {
+                    initialHoverData[col] = numValue
+                  }
+                }
+              })
+              setHoverData(initialHoverData)
+              if (onCursorMove) {
+                onCursorMove(initialHoverData)
+              }
+            }
           } catch (err) {
             console.error('Failed to fetch historical data:', err)
             const { candles: genCandles, volume: genVolume } = generateDatasets(timeframe)
@@ -492,10 +517,29 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
             if (indicatorChartsRef.current.macd) {
               indicatorChartsRef.current.macd.clearCrosshairPosition()
             }
-            // Reset to last values when cursor leaves
-            setHoverData(null)
-            if (onCursorMove) {
-              onCursorMove(null)
+            // Show most recent values when cursor leaves
+            if (rawDataRef.current.length > 0) {
+              const lastData = rawDataRef.current[rawDataRef.current.length - 1]
+              const recentHoverData: any = {
+                open: parseFloat(lastData.open),
+                high: parseFloat(lastData.high),
+                low: parseFloat(lastData.low),
+                close: parseFloat(lastData.close),
+                volume: parseInt(lastData.volume)
+              }
+              indicatorColumnsRef.current.forEach(col => {
+                const value = lastData[col]
+                if (value !== undefined && value !== null && value !== '') {
+                  const numValue = typeof value === 'string' ? parseFloat(value) : value
+                  if (!isNaN(numValue)) {
+                    recentHoverData[col] = numValue
+                  }
+                }
+              })
+              setHoverData(recentHoverData)
+              if (onCursorMove) {
+                onCursorMove(recentHoverData)
+              }
             }
             return
           }

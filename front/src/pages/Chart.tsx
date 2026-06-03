@@ -613,7 +613,7 @@ export default function ChartPage() {
                 })}
               {(!hoverData || Object.keys(hoverData).filter(key => !['open', 'high', 'low', 'close', 'volume'].includes(key.toLowerCase())).length === 0) && (
                 <div className="text-xs text-slate-500 px-2 py-4 text-center">
-                  Move cursor over chart to see indicators
+                  No indicators available
                 </div>
               )}
             </div>
