@@ -2,12 +2,49 @@
 
 import os
 import json
+import yaml
 from pathlib import Path
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 
 console = Console()
+
+
+def deep_merge_dicts(base: dict, updates: dict) -> dict:
+    """Deep merge updates into base dict.
+
+    Arrays are merged and deduplicated.
+    Nested dicts are recursively merged.
+    Scalar values are overwritten.
+    Existing keys in base are preserved if they're dicts or lists.
+
+    Args:
+        base: The base/existing config
+        updates: The new config to merge in
+
+    Returns:
+        Merged config dict
+    """
+    result = base.copy()
+
+    for key, value in updates.items():
+        if key not in result:
+            # New key - add it
+            result[key] = value
+        elif isinstance(value, dict) and isinstance(result[key], dict):
+            # Both are dicts - recursively merge
+            result[key] = deep_merge_dicts(result[key], value)
+        elif isinstance(value, list) and isinstance(result[key], list):
+            # Both are lists - merge and deduplicate
+            merged_list = result[key].copy()
+            for item in value:
+                if item not in merged_list:
+                    merged_list.append(item)
+            result[key] = merged_list
+        # else: keep existing value (don't overwrite scalars or mismatched types)
+
+    return result
 
 
 class HermesInitializer:
@@ -378,7 +415,7 @@ class HermesInitializer:
             return False
 
     def _setup_config_yaml(self):
-        """Setup config.yaml with versioned backups."""
+        """Setup config.yaml with intelligent merging and versioned backups."""
         config_yaml_src = self.init_template / "config.yaml"
         config_yaml_dst = self.hermes_home / "config.yaml"
 
@@ -387,18 +424,33 @@ class HermesInitializer:
             return
 
         try:
-            # Backup existing config.yaml if it exists
+            # Load template config
+            with open(config_yaml_src, "r") as f:
+                template_config = yaml.safe_load(f) or {}
+
             if config_yaml_dst.exists():
+                # Load existing config
+                with open(config_yaml_dst, "r") as f:
+                    existing_config = yaml.safe_load(f) or {}
+
+                # Backup existing config
                 if not self._backup_with_versioning(config_yaml_dst):
                     return
 
-            # Copy new config.yaml
-            with open(config_yaml_src, "r") as f:
-                content = f.read()
-            with open(config_yaml_dst, "w") as f:
-                f.write(content)
+                # Merge: template updates into existing
+                merged_config = deep_merge_dicts(existing_config, template_config)
 
-            console.print("[green]✓ Created config.yaml[/green]")
+                # Write merged config
+                with open(config_yaml_dst, "w") as f:
+                    yaml.dump(merged_config, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+
+                console.print("[green]✓ Merged config.yaml (preserved existing values)[/green]")
+            else:
+                # New file - just copy
+                with open(config_yaml_dst, "w") as f:
+                    yaml.dump(template_config, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+
+                console.print("[green]✓ Created config.yaml[/green]")
 
         except Exception as e:
             console.print(f"[red]✗ Error setting up config.yaml: {e}[/red]")
