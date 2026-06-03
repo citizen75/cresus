@@ -488,33 +488,6 @@ export default function ChartPage() {
 
         {/* Right sidebar - Controls */}
         <div className="w-48 bg-slate-900 border-l border-slate-800 p-4 overflow-y-auto space-y-4">
-          {/* OHLCV Display */}
-          {hoverData && (
-            <div className="bg-slate-800 rounded border border-slate-700 p-3 space-y-1">
-              <div className="text-xs font-bold text-slate-400 uppercase mb-2">Price Data</div>
-              <div className="text-xs text-slate-400 font-mono">
-                <span className="text-slate-400">O </span>
-                <span className="text-white">{hoverData.open?.toFixed(3) || '—'}</span>
-              </div>
-              <div className="text-xs text-slate-400 font-mono">
-                <span className="text-slate-400">H </span>
-                <span className="text-white">{hoverData.high?.toFixed(3) || '—'}</span>
-              </div>
-              <div className="text-xs text-slate-400 font-mono">
-                <span className="text-slate-400">L </span>
-                <span className="text-white">{hoverData.low?.toFixed(3) || '—'}</span>
-              </div>
-              <div className="text-xs text-slate-400 font-mono">
-                <span className="text-slate-400">C </span>
-                <span className="text-white">{hoverData.close?.toFixed(3) || '—'}</span>
-              </div>
-              <div className="text-xs text-slate-400 font-mono">
-                <span className="text-slate-400">V </span>
-                <span className="text-white">{(hoverData.volume / 1000)?.toFixed(1) || '—'}K</span>
-              </div>
-            </div>
-          )}
-
           {/* Timeframe selector */}
           <div>
             <div className="text-xs font-bold text-slate-400 uppercase mb-2">Timeframe</div>
