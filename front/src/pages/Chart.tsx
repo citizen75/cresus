@@ -596,34 +596,26 @@ export default function ChartPage() {
           <div>
             <div className="text-xs font-bold text-slate-400 uppercase mb-2">All Indicators</div>
             <div className="space-y-1 max-h-80 overflow-y-auto text-xs">
-              {[
-                { name: 'RSI 7', value: '—' },
-                { name: 'RSI 14', value: '—' },
-                { name: 'RSI 21', value: '—' },
-                { name: 'MACD', value: '—' },
-                { name: 'BB 20', value: '—' },
-                { name: 'ATR 14', value: '—' },
-                { name: 'MA 5', value: '—' },
-                { name: 'MA 10', value: '—' },
-                { name: 'MA 20', value: '—' },
-                { name: 'MA 50', value: '—' },
-                { name: 'MA 100', value: '—' },
-                { name: 'MA 200', value: '—' },
-                { name: 'EMA 12', value: '—' },
-                { name: 'EMA 26', value: '—' },
-                { name: 'EMA 50', value: '—' },
-                { name: 'ADX 14', value: '—' },
-                { name: 'Stochastic', value: '—' },
-                { name: 'Williams %R', value: '—' },
-                { name: 'CCI 20', value: '—' },
-                { name: 'ROC 12', value: '—' },
-                { name: 'Momentum', value: '—' }
-              ].map((indicator) => (
-                <div key={indicator.name} className="flex justify-between items-center px-2 py-1 rounded bg-slate-800/50 hover:bg-slate-800 transition">
-                  <span className="text-slate-300">{indicator.name}</span>
-                  <span className="text-slate-400 font-mono">{indicator.value}</span>
+              {hoverData && Object.keys(hoverData)
+                .filter(key => !['open', 'high', 'low', 'close', 'volume'].includes(key.toLowerCase()))
+                .sort()
+                .map((key) => {
+                  const value = hoverData[key]
+                  const displayValue = value !== undefined && value !== null
+                    ? (typeof value === 'number' ? value.toFixed(3) : value)
+                    : '—'
+                  return (
+                    <div key={key} className="flex justify-between items-center px-2 py-1 rounded bg-slate-800/50 hover:bg-slate-800 transition">
+                      <span className="text-slate-300">{key}</span>
+                      <span className="text-slate-400 font-mono">{displayValue}</span>
+                    </div>
+                  )
+                })}
+              {(!hoverData || Object.keys(hoverData).filter(key => !['open', 'high', 'low', 'close', 'volume'].includes(key.toLowerCase())).length === 0) && (
+                <div className="text-xs text-slate-500 px-2 py-4 text-center">
+                  Move cursor over chart to see indicators
                 </div>
-              ))}
+              )}
             </div>
           </div>
         </div>

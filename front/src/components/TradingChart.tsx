@@ -28,6 +28,8 @@ interface TradingChartProps {
 export default function TradingChart({ timeframe, title = 'Price Chart', ticker, companyName: propsCompanyName, entryDate, exitDate, positions, selectedIndicators = new Set(), chartData: externalChartData, visibleWindow = '1Y', onCursorMove, currentPrice: propsCurrentPrice, dailyChange: propsDailyChange, dailyChangePercent: propsDailyChangePercent }: TradingChartProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [chartData, setChartData] = useState<any[]>([])
+  const [rawData, setRawData] = useState<any[]>([])
+  const [indicatorColumns, setIndicatorColumns] = useState<string[]>([])
   const [shaCandles, setShaCandles] = useState<any[]>([])
   const [showSHA10, setShowSHA10] = useState(true)
   const [tickerData, setTickerData] = useState<any>(null)
@@ -288,9 +290,15 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
               }
             })
 
-            console.log(`Loaded ${candles.length} candles for ${ticker} (SHA_10: ${shaData.length})`)
+            // Extract indicator columns from data
+            const excludeColumns = new Set(['timestamp', 'ticker', 'open', 'high', 'low', 'close', 'volume', 'date', 'Date', 'Open', 'High', 'Low', 'Close', 'Volume'])
+            const indicators = Object.keys(data[0] || {}).filter(col => !excludeColumns.has(col))
+
+            console.log(`Loaded ${candles.length} candles for ${ticker} (SHA_10: ${shaData.length}, Indicators: ${indicators.join(', ')})`)
             setChartData(candles)
             setShaCandles(shaData)
+            setRawData(data)
+            setIndicatorColumns(indicators)
           } catch (err) {
             console.error('Failed to fetch historical data:', err)
             const { candles: genCandles, volume: genVolume } = generateDatasets(timeframe)
@@ -492,18 +500,33 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
             return
           }
 
-          // Emit OHLCV data at cursor position using seriesData
+          // Emit OHLCV and indicator data at cursor position using seriesData
           if (param.seriesData) {
             const candleData = param.seriesData.get(candlestickSeries) as any
             const volumeData = param.seriesData.get(volumeSeries) as any
             if (candleData && 'close' in candleData) {
-              const ohlcvData = {
+              const ohlcvData: any = {
                 open: candleData.open,
                 high: candleData.high,
                 low: candleData.low,
                 close: candleData.close,
                 volume: volumeData?.value || null
               }
+
+              // Add indicator values by looking up the time in rawData
+              if (param.time && rawData.length > 0) {
+                const timeStr = String(param.time)
+                const dataPoint = rawData.find(d => d.timestamp && d.timestamp.substring(0, 10) === timeStr)
+                if (dataPoint) {
+                  indicatorColumns.forEach(col => {
+                    const value = dataPoint[col]
+                    if (value !== undefined && value !== null) {
+                      ohlcvData[col] = parseFloat(value)
+                    }
+                  })
+                }
+              }
+
               setHoverData(ohlcvData)
               if (onCursorMove) {
                 onCursorMove(ohlcvData)
