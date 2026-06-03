@@ -172,13 +172,13 @@ class GatewayServer:
 		try:
 			logger.info("Starting MCP server")
 
-			from mcp.server import CresusMCPServer
+			from src.mcp.server import CresusMCPServer
 
 			mcp_server = CresusMCPServer()
 			mcp_server.run()
 
-		except ImportError:
-			logger.warning("MCP module not found, skipping MCP server")
+		except ImportError as e:
+			logger.warning(f"MCP module not found: {e}, skipping MCP server")
 		except Exception as e:
 			logger.error(f"MCP server failed: {e}", exc_info=True)
 
