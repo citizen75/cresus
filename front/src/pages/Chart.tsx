@@ -595,24 +595,34 @@ export default function ChartPage() {
           {/* All Indicators Cached */}
           <div>
             <div className="text-xs font-bold text-slate-400 uppercase mb-2">All Indicators</div>
-            <div className="space-y-2 max-h-64 overflow-y-auto">
+            <div className="space-y-1 max-h-80 overflow-y-auto text-xs">
               {[
-                'RSI 7', 'RSI 14', 'RSI 21',
-                'MACD', 'BB 20', 'ATR 14',
-                'MA 5', 'MA 10', 'MA 20', 'MA 50', 'MA 100', 'MA 200',
-                'EMA 12', 'EMA 26', 'EMA 50',
-                'ADX 14', 'Stochastic', 'Williams %R',
-                'CCI 20', 'ROC 12', 'Momentum'
+                { name: 'RSI 7', value: '—' },
+                { name: 'RSI 14', value: '—' },
+                { name: 'RSI 21', value: '—' },
+                { name: 'MACD', value: '—' },
+                { name: 'BB 20', value: '—' },
+                { name: 'ATR 14', value: '—' },
+                { name: 'MA 5', value: '—' },
+                { name: 'MA 10', value: '—' },
+                { name: 'MA 20', value: '—' },
+                { name: 'MA 50', value: '—' },
+                { name: 'MA 100', value: '—' },
+                { name: 'MA 200', value: '—' },
+                { name: 'EMA 12', value: '—' },
+                { name: 'EMA 26', value: '—' },
+                { name: 'EMA 50', value: '—' },
+                { name: 'ADX 14', value: '—' },
+                { name: 'Stochastic', value: '—' },
+                { name: 'Williams %R', value: '—' },
+                { name: 'CCI 20', value: '—' },
+                { name: 'ROC 12', value: '—' },
+                { name: 'Momentum', value: '—' }
               ].map((indicator) => (
-                <label key={indicator} className="flex items-center gap-2 cursor-pointer text-xs">
-                  <input
-                    type="checkbox"
-                    className="rounded border-slate-600"
-                    checked={selectedIndicators.has(indicator)}
-                    onChange={() => toggleIndicator(indicator)}
-                  />
-                  <span className="text-slate-300">{indicator}</span>
-                </label>
+                <div key={indicator.name} className="flex justify-between items-center px-2 py-1 rounded bg-slate-800/50 hover:bg-slate-800 transition">
+                  <span className="text-slate-300">{indicator.name}</span>
+                  <span className="text-slate-400 font-mono">{indicator.value}</span>
+                </div>
               ))}
             </div>
           </div>
