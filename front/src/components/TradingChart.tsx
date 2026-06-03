@@ -28,8 +28,6 @@ interface TradingChartProps {
 export default function TradingChart({ timeframe, title = 'Price Chart', ticker, companyName: propsCompanyName, entryDate, exitDate, positions, selectedIndicators = new Set(), chartData: externalChartData, visibleWindow = '1Y', onCursorMove, currentPrice: propsCurrentPrice, dailyChange: propsDailyChange, dailyChangePercent: propsDailyChangePercent }: TradingChartProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [chartData, setChartData] = useState<any[]>([])
-  const [rawData, setRawData] = useState<any[]>([])
-  const [indicatorColumns, setIndicatorColumns] = useState<string[]>([])
   const [shaCandles, setShaCandles] = useState<any[]>([])
   const [showSHA10, setShowSHA10] = useState(true)
   const [tickerData, setTickerData] = useState<any>(null)
@@ -43,6 +41,8 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
   const shaSeriesRef = useRef<any>(null)
   const indicatorChartsRef = useRef<{ rsi?: any; macd?: any; mainChart?: any }>({})
   const lastCursorPosRef = useRef<any>(null)
+  const rawDataRef = useRef<any[]>([])
+  const indicatorColumnsRef = useRef<string[]>([])
 
   const randomNumber = (min: number, max: number) => Math.random() * (max - min) + min
 
@@ -297,8 +297,8 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
             console.log(`Loaded ${candles.length} candles for ${ticker} (SHA_10: ${shaData.length}, Indicators: ${indicators.join(', ')})`)
             setChartData(candles)
             setShaCandles(shaData)
-            setRawData(data)
-            setIndicatorColumns(indicators)
+            rawDataRef.current = data
+            indicatorColumnsRef.current = indicators
           } catch (err) {
             console.error('Failed to fetch historical data:', err)
             const { candles: genCandles, volume: genVolume } = generateDatasets(timeframe)
@@ -514,14 +514,21 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
               }
 
               // Add indicator values by looking up the time in rawData
-              if (param.time && rawData.length > 0) {
+              if (param.time && rawDataRef.current.length > 0 && indicatorColumnsRef.current.length > 0) {
                 const timeStr = String(param.time)
-                const dataPoint = rawData.find(d => d.timestamp && d.timestamp.substring(0, 10) === timeStr)
+                const dataPoint = rawDataRef.current.find(d => {
+                  if (!d.timestamp) return false
+                  const dTime = String(d.timestamp).substring(0, 10)
+                  return dTime === timeStr
+                })
                 if (dataPoint) {
-                  indicatorColumns.forEach(col => {
+                  indicatorColumnsRef.current.forEach(col => {
                     const value = dataPoint[col]
-                    if (value !== undefined && value !== null) {
-                      ohlcvData[col] = parseFloat(value)
+                    if (value !== undefined && value !== null && value !== '') {
+                      const numValue = typeof value === 'string' ? parseFloat(value) : value
+                      if (!isNaN(numValue)) {
+                        ohlcvData[col] = numValue
+                      }
                     }
                   })
                 }
