@@ -48,7 +48,8 @@ class ServiceManager:
     def start(self, service: str, daemon: bool = False) -> Dict[str, Any]:
         """Start a service."""
         if service not in self.SERVICES:
-            return {"error": f"Unknown service: {service}"}
+            available = ", ".join(self.SERVICES.keys())
+            return {"error": f"Unknown service: {service}", "message": f"Available services: {available}"}
 
         pid = self._load_pid(service)
         if pid:
@@ -92,7 +93,8 @@ class ServiceManager:
     def stop(self, service: str) -> Dict[str, Any]:
         """Stop a service."""
         if service not in self.SERVICES:
-            return {"error": f"Unknown service: {service}"}
+            available = ", ".join(self.SERVICES.keys())
+            return {"error": f"Unknown service: {service}", "message": f"Available services: {available}"}
 
         pid = self._load_pid(service)
         if not pid:
@@ -111,7 +113,8 @@ class ServiceManager:
     def restart(self, service: str, daemon: bool = True) -> Dict[str, Any]:
         """Restart a service (stop and start in daemon mode)."""
         if service not in self.SERVICES:
-            return {"error": f"Unknown service: {service}"}
+            available = ", ".join(self.SERVICES.keys())
+            return {"error": f"Unknown service: {service}", "message": f"Available services: {available}"}
 
         # Stop the service
         stop_result = self.stop(service)
@@ -200,6 +203,9 @@ class ServiceManager:
                 console.print(f"[green]✓[/green] Started {service} (PID: {result['pid']})")
             elif result.get("status") == "already_running":
                 console.print(f"[yellow]⚠[/yellow] {service} already running (PID: {result['pid']})")
+            elif result.get("error"):
+                msg = result.get("message", result.get("error", "Unknown error"))
+                console.print(f"[red]✗[/red] {msg}")
             else:
                 console.print(f"[red]✗[/red] Failed to start {service}: {result.get('message', 'Unknown error')}")
 
@@ -220,6 +226,9 @@ class ServiceManager:
                 console.print(f"[green]✓[/green] Stopped {service}")
             elif result.get("status") == "not_running":
                 console.print(f"[yellow]⚠[/yellow] {service} not running")
+            elif result.get("error"):
+                msg = result.get("message", result.get("error", "Unknown error"))
+                console.print(f"[red]✗[/red] {msg}")
             else:
                 console.print(f"[red]✗[/red] Failed to stop {service}: {result.get('message', 'Unknown error')}")
 
@@ -238,6 +247,9 @@ class ServiceManager:
             result = self.restart(service, daemon=True)
             if result.get("status") == "started":
                 console.print(f"[green]✓[/green] Restarted {service} (PID: {result['pid']})")
+            elif result.get("error"):
+                msg = result.get("message", result.get("error", "Unknown error"))
+                console.print(f"[red]✗[/red] {msg}")
             else:
                 console.print(f"[red]✗[/red] Failed to restart {service}: {result.get('message', 'Unknown error')}")
 
