@@ -168,19 +168,17 @@ class GatewayServer:
 			logger.error(f"Cron scheduler failed: {e}", exc_info=True)
 
 	def _start_mcp(self) -> None:
-		"""Start the MCP server in a separate thread."""
-		try:
-			logger.info("Starting MCP server")
+		"""Skip MCP server (runs separately as subprocess via Hermes).
 
-			from src.mcp.server import CresusMCPServer
+		The MCP server uses stdio and must run as a separate process,
+		not in-thread. Hermes manages the MCP server startup via config.yaml:
 
-			mcp_server = CresusMCPServer()
-			mcp_server.run()
-
-		except ImportError as e:
-			logger.warning(f"MCP module not found: {e}, skipping MCP server")
-		except Exception as e:
-			logger.error(f"MCP server failed: {e}", exc_info=True)
+		mcp_servers:
+		  cresus:
+		    type: stdio
+		    command: python -m src.mcp.main
+		"""
+		logger.info("MCP server managed by Hermes (runs as subprocess, not in-gateway)")
 
 	def _warm_caches(self) -> None:
 		"""Pre-warm critical caches before API starts."""
