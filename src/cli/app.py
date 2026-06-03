@@ -133,8 +133,10 @@ class CresusCLI(cmd2.Cmd):
 		"""Initialize ~/.cresus directory structure with config files.
 
 		Usage:
-			init                    # Initialize Cresus only
-			init --hermes          # Initialize Cresus + Hermes agent
+			init                         # Initialize Cresus only
+			init --hermes                # Initialize Cresus + Hermes agent (full init)
+			init --hermes --report       # Show merge report (what would be added/preserved)
+			init --hermes --merge        # Merge Cresus agents/skills with existing Hermes (skip config)
 		"""
 		args_str = str(args).strip() if args else ""
 
@@ -274,14 +276,28 @@ class CresusCLI(cmd2.Cmd):
 
 	def _init_with_hermes(self):
 		"""Initialize Cresus + Hermes agent."""
-		# First initialize Cresus
-		self._init_cresus_directory()
+		import sys
+
+		# Check for flags
+		args_str = ' '.join(sys.argv)
+		report_only = "--report" in args_str
+		merge_only = "--merge" in args_str
+
+		# First initialize Cresus (unless we're only doing merge/report)
+		if not merge_only and not report_only:
+			self._init_cresus_directory()
 
 		# Then initialize Hermes
 		try:
 			from cli.commands.hermes_init import HermesInitializer
 			hermes_init = HermesInitializer(self.project_root)
-			hermes_init.initialize()
+
+			if report_only:
+				# Generate merge report without making changes
+				hermes_init.generate_merge_report()
+			else:
+				# Initialize or merge Hermes
+				hermes_init.initialize(merge_only=merge_only)
 		except ImportError:
 			console.print("[red]✗ Hermes initialization module not found[/red]")
 		except Exception as e:

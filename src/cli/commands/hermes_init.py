@@ -17,10 +17,167 @@ class HermesInitializer:
         self.project_root = project_root
         self.hermes_home = Path.home() / ".hermes"
         self.init_template = project_root / "init" / "hermes"
+        self.merge_report = {
+            "new_files": [],
+            "preserved_files": [],
+            "agents_to_add": [],
+            "agents_preserved": [],
+            "skills_to_add": [],
+            "skills_preserved": [],
+            "config_files_to_add": [],
+            "config_files_preserved": [],
+        }
 
-    def initialize(self):
-        """Initialize Hermes with Cresus configuration."""
-        console.print("[bold cyan]Initializing Hermes Agent for Cresus[/bold cyan]")
+    def generate_merge_report(self):
+        """Generate a detailed report of what would be merged without making changes."""
+        console.print("[bold cyan]Hermes Merge Report (Dry Run)[/bold cyan]\n")
+        console.print(f"[dim]Cresus template: {self.init_template}[/dim]")
+        console.print(f"[dim]Hermes home: {self.hermes_home}\n[/dim]")
+
+        if not self.init_template.exists():
+            console.print(f"[red]✗ Hermes template not found: {self.init_template}[/red]")
+            return False
+
+        try:
+            # Analyze config files
+            self._analyze_config_files()
+
+            # Analyze skills
+            self._analyze_skills()
+
+            # Analyze agents
+            self._analyze_agents()
+
+            # Print report
+            self._print_merge_report()
+
+            return True
+        except Exception as e:
+            console.print(f"[red]✗ Error generating merge report: {e}[/red]")
+            return False
+
+    def _analyze_config_files(self):
+        """Analyze which config files would be added vs preserved."""
+        config_src = self.init_template / "config"
+        config_dst = self.hermes_home / "config"
+
+        if not config_src.exists():
+            return
+
+        for config_file in config_src.glob("*"):
+            if config_file.is_file():
+                dst_file = config_dst / config_file.name
+                if dst_file.exists():
+                    self.merge_report["config_files_preserved"].append(config_file.name)
+                else:
+                    self.merge_report["config_files_to_add"].append(config_file.name)
+
+        # Check config.yaml at root
+        config_yaml_src = self.init_template / "config.yaml"
+        config_yaml_dst = self.hermes_home / "config.yaml"
+
+        if config_yaml_src.exists():
+            if config_yaml_dst.exists():
+                self.merge_report["config_files_preserved"].append("config.yaml")
+            else:
+                self.merge_report["config_files_to_add"].append("config.yaml")
+
+    def _analyze_skills(self):
+        """Analyze which skills would be added vs preserved."""
+        skills_src = self.init_template / "skills"
+        skills_dst = self.hermes_home / "skills"
+
+        if not skills_src.exists():
+            return
+
+        for skill_dir in skills_src.iterdir():
+            if skill_dir.is_dir():
+                dst_dir = skills_dst / skill_dir.name
+                if dst_dir.exists():
+                    self.merge_report["skills_preserved"].append(skill_dir.name)
+                else:
+                    self.merge_report["skills_to_add"].append(skill_dir.name)
+
+    def _analyze_agents(self):
+        """Analyze which agents would be added vs preserved."""
+        agents_src = self.init_template / "agents"
+        agents_dst = self.hermes_home / "agents"
+
+        if not agents_src.exists():
+            return
+
+        for agent_file in agents_src.glob("*.yml"):
+            dst_file = agents_dst / agent_file.name
+            if dst_file.exists():
+                self.merge_report["agents_preserved"].append(agent_file.name)
+            else:
+                self.merge_report["agents_to_add"].append(agent_file.name)
+
+    def _print_merge_report(self):
+        """Print the merge report in a formatted way."""
+        console.print("[bold yellow]Configuration Files[/bold yellow]")
+        if self.merge_report["config_files_to_add"]:
+            console.print(f"  [green]✓ Would add ({len(self.merge_report['config_files_to_add'])}):[/green]")
+            for f in self.merge_report["config_files_to_add"]:
+                console.print(f"    - {f}")
+        if self.merge_report["config_files_preserved"]:
+            console.print(f"  [cyan]⊘ Would preserve ({len(self.merge_report['config_files_preserved'])}): [/cyan]")
+            for f in self.merge_report["config_files_preserved"]:
+                console.print(f"    - {f}")
+        if not self.merge_report["config_files_to_add"] and not self.merge_report["config_files_preserved"]:
+            console.print("  [dim]No config files to analyze[/dim]")
+        console.print()
+
+        console.print("[bold yellow]Cresus Agents[/bold yellow]")
+        if self.merge_report["agents_to_add"]:
+            console.print(f"  [green]✓ Would add ({len(self.merge_report['agents_to_add'])}): [/green]")
+            for a in self.merge_report["agents_to_add"]:
+                console.print(f"    - {a}")
+        if self.merge_report["agents_preserved"]:
+            console.print(f"  [cyan]⊘ Would preserve ({len(self.merge_report['agents_preserved'])}): [/cyan]")
+            for a in self.merge_report["agents_preserved"]:
+                console.print(f"    - {a}")
+        if not self.merge_report["agents_to_add"] and not self.merge_report["agents_preserved"]:
+            console.print("  [dim]No agents to analyze[/dim]")
+        console.print()
+
+        console.print("[bold yellow]Cresus Skills[/bold yellow]")
+        if self.merge_report["skills_to_add"]:
+            console.print(f"  [green]✓ Would add ({len(self.merge_report['skills_to_add'])}): [/green]")
+            for s in self.merge_report["skills_to_add"]:
+                console.print(f"    - {s}")
+        if self.merge_report["skills_preserved"]:
+            console.print(f"  [cyan]⊘ Would preserve ({len(self.merge_report['skills_preserved'])}): [/cyan]")
+            for s in self.merge_report["skills_preserved"]:
+                console.print(f"    - {s}")
+        if not self.merge_report["skills_to_add"] and not self.merge_report["skills_preserved"]:
+            console.print("  [dim]No skills to analyze[/dim]")
+        console.print()
+
+        # Summary
+        total_new = len(self.merge_report["config_files_to_add"]) + len(self.merge_report["agents_to_add"]) + len(self.merge_report["skills_to_add"])
+        total_preserved = len(self.merge_report["config_files_preserved"]) + len(self.merge_report["agents_preserved"]) + len(self.merge_report["skills_preserved"])
+
+        console.print("[bold cyan]Summary[/bold cyan]")
+        console.print(f"  [green]New items to add: {total_new}[/green]")
+        console.print(f"  [cyan]Existing items to preserve: {total_preserved}[/cyan]")
+        console.print()
+
+        if total_new == 0:
+            console.print("[dim]Your Hermes setup is already up-to-date with Cresus templates![/dim]")
+        else:
+            console.print("[dim]To apply these changes, run: cresus init --hermes --merge[/dim]")
+
+    def initialize(self, merge_only=False):
+        """Initialize Hermes with Cresus configuration.
+
+        Args:
+            merge_only: If True, only copy agents and skills (not config). If False, do full init.
+        """
+        if merge_only:
+            console.print("[bold cyan]Merging Cresus with existing Hermes setup[/bold cyan]")
+        else:
+            console.print("[bold cyan]Initializing Hermes Agent for Cresus[/bold cyan]")
         console.print(f"Location: {self.hermes_home}\n")
 
         if not self.init_template.exists():
@@ -31,8 +188,9 @@ class HermesInitializer:
             # Create directory structure
             self._create_directories()
 
-            # Copy configuration files
-            self._copy_config_files()
+            # Copy configuration files (skip if merge_only)
+            if not merge_only:
+                self._copy_config_files()
 
             # Copy skills
             self._copy_skills()
@@ -40,21 +198,24 @@ class HermesInitializer:
             # Copy agents
             self._copy_agents()
 
-            # Setup environment
-            self._setup_environment()
+            # Setup environment (skip if merge_only)
+            if not merge_only:
+                self._setup_environment()
 
-            console.print(f"\n[bold green]✓ Hermes initialized successfully![/bold green]")
-            console.print(f"[dim]Configuration location: {self.hermes_home}[/dim]")
-            console.print(f"[dim]Edit {self.hermes_home / 'config' / 'hermes.yml'} to customize settings[/dim]")
-            console.print(f"\n[bold cyan]Next steps:[/bold cyan]")
-            console.print("[dim]1. Edit ~/.hermes/config/hermes.yml to set API URL and other settings[/dim]")
-            console.print("[dim]2. Start the Cresus API: cresus service start api[/dim]")
-            console.print("[dim]3. Launch Hermes with: hermes run[/dim]")
+            console.print(f"\n[bold green]✓ Hermes {'merged' if merge_only else 'initialized'} successfully![/bold green]")
+            console.print(f"[dim]Location: {self.hermes_home}[/dim]")
+
+            if not merge_only:
+                console.print(f"[dim]Edit {self.hermes_home / 'config' / 'hermes.yml'} to customize settings[/dim]")
+                console.print(f"\n[bold cyan]Next steps:[/bold cyan]")
+                console.print("[dim]1. Edit ~/.hermes/config/hermes.yml to set API URL and other settings[/dim]")
+                console.print("[dim]2. Start the Cresus API: cresus service start api[/dim]")
+                console.print("[dim]3. Launch Hermes with: hermes run[/dim]")
 
             return True
 
         except Exception as e:
-            console.print(f"[red]✗ Error initializing Hermes: {e}[/red]")
+            console.print(f"[red]✗ Error {'merging' if merge_only else 'initializing'} Hermes: {e}[/red]")
             return False
 
     def _create_directories(self):
