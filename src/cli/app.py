@@ -134,9 +134,9 @@ class CresusCLI(cmd2.Cmd):
 
 		Usage:
 			init                         # Initialize Cresus only
-			init --hermes                # Initialize Cresus + Hermes agent (full init)
+			init --hermes                # Initialize Cresus + Hermes (merge with existing, default)
 			init --hermes --report       # Show merge report (what would be added/preserved)
-			init --hermes --merge        # Merge Cresus agents/skills with existing Hermes (skip config)
+			init --hermes --full         # Full init (overwrites everything, creates fresh .env)
 		"""
 		args_str = str(args).strip() if args else ""
 
@@ -281,7 +281,8 @@ class CresusCLI(cmd2.Cmd):
 		# Check for flags
 		args_str = ' '.join(sys.argv)
 		report_only = "--report" in args_str
-		merge_only = "--merge" in args_str
+		full_init = "--full" in args_str
+		merge_only = not full_init  # Default to merge (merge_only=True)
 
 		# First initialize Cresus (unless we're only doing merge/report)
 		if not merge_only and not report_only:
@@ -296,7 +297,7 @@ class CresusCLI(cmd2.Cmd):
 				# Generate merge report without making changes
 				hermes_init.generate_merge_report()
 			else:
-				# Initialize or merge Hermes
+				# Merge (default) or full init
 				hermes_init.initialize(merge_only=merge_only)
 		except ImportError:
 			console.print("[red]✗ Hermes initialization module not found[/red]")
