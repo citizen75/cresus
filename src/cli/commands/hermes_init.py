@@ -72,15 +72,15 @@ class HermesInitializer:
                 else:
                     self.merge_report["config_files_to_add"].append(config_file.name)
 
-        # Check config.yaml at root
+        # Check config.yaml at root - will always be updated/backed up
         config_yaml_src = self.init_template / "config.yaml"
         config_yaml_dst = self.hermes_home / "config.yaml"
 
         if config_yaml_src.exists():
             if config_yaml_dst.exists():
-                self.merge_report["config_files_preserved"].append("config.yaml")
+                self.merge_report["config_files_to_add"].append("config.yaml (will backup existing to .vN)")
             else:
-                self.merge_report["config_files_to_add"].append("config.yaml")
+                self.merge_report["config_files_to_add"].append("config.yaml (new)")
 
     def _analyze_skills(self):
         """Analyze which skills would be added vs preserved."""
@@ -192,6 +192,9 @@ class HermesInitializer:
             if not merge_only:
                 self._copy_config_files()
 
+            # Setup config.yaml with versioned backups (not skipped in merge_only)
+            self._setup_config_yaml()
+
             # Copy skills
             self._copy_skills()
 
@@ -268,23 +271,6 @@ class HermesInitializer:
                     # File already exists - don't overwrite
                     skipped.append(config_file.name)
 
-        # Copy config.yaml to root
-        config_yaml_src = self.init_template / "config.yaml"
-        config_yaml_dst = self.hermes_home / "config.yaml"
-
-        if config_yaml_src.exists():
-            if not config_yaml_dst.exists():
-                try:
-                    with open(config_yaml_src, "r") as f:
-                        content = f.read()
-                    with open(config_yaml_dst, "w") as f:
-                        f.write(content)
-                    copied.append("config.yaml")
-                except Exception as e:
-                    console.print(f"[red]✗ Error copying config.yaml: {e}[/red]")
-            else:
-                skipped.append("config.yaml")
-
         if copied:
             console.print(f"[green]✓ Copied {len(copied)} config file(s)[/green]")
 
@@ -356,6 +342,66 @@ class HermesInitializer:
 
         if skipped:
             console.print(f"[dim]⊘ Preserved {len(skipped)} existing agent(s): {', '.join(skipped)}[/dim]")
+
+    def _backup_with_versioning(self, file_path: Path) -> bool:
+        """Backup existing file with version numbering.
+
+        Args:
+            file_path: Path to the file to backup
+
+        Returns:
+            True if backup was created or file doesn't exist, False on error
+        """
+        if not file_path.exists():
+            return True
+
+        try:
+            # Find the next available version number
+            version = 1
+            while True:
+                backup_path = file_path.parent / f"{file_path.name}.v{version}"
+                if not backup_path.exists():
+                    break
+                version += 1
+
+            # Create backup
+            with open(file_path, "r") as f:
+                content = f.read()
+            with open(backup_path, "w") as f:
+                f.write(content)
+
+            console.print(f"[cyan]✓ Backed up existing {file_path.name} → {file_path.name}.v{version}[/cyan]")
+            return True
+
+        except Exception as e:
+            console.print(f"[red]✗ Error backing up {file_path.name}: {e}[/red]")
+            return False
+
+    def _setup_config_yaml(self):
+        """Setup config.yaml with versioned backups."""
+        config_yaml_src = self.init_template / "config.yaml"
+        config_yaml_dst = self.hermes_home / "config.yaml"
+
+        if not config_yaml_src.exists():
+            console.print("[yellow]⚠ config.yaml template not found[/yellow]")
+            return
+
+        try:
+            # Backup existing config.yaml if it exists
+            if config_yaml_dst.exists():
+                if not self._backup_with_versioning(config_yaml_dst):
+                    return
+
+            # Copy new config.yaml
+            with open(config_yaml_src, "r") as f:
+                content = f.read()
+            with open(config_yaml_dst, "w") as f:
+                f.write(content)
+
+            console.print("[green]✓ Created config.yaml[/green]")
+
+        except Exception as e:
+            console.print(f"[red]✗ Error setting up config.yaml: {e}[/red]")
 
     def _setup_environment(self):
         """Setup Hermes environment configuration (skip if it exists)."""
