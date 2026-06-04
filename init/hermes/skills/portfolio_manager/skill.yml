@@ -1,113 +1,109 @@
-# Portfolio Manager Skill for Hermes Agent
-# Handles portfolio-related operations using Cresus MCP
+# Cresus Portfolio Manager Skill for Hermes Agent
+# Invocable actions for portfolio management via cresus-mcp CLI
 
 skill_name: "portfolio_manager"
-description: "Manage investment portfolios - create, analyze, and optimize"
-version: "1.0.0"
+description: "Query Cresus portfolio data - positions, metrics, performance, allocation, value"
+version: "4.0.0"
+category: "finance"
 
 triggers:
-  - "create.*portfolio"
-  - "analyze.*portfolio"
-  - "get.*portfolio.*metrics"
-  - "compare.*portfolios"
-  - "rebalance.*portfolio"
-  - "portfolio.*performance"
-  - "view.*positions"
+  - "portfolio"
+  - "positions"
+  - "metrics"
+  - "performance"
+  - "allocation"
+  - "holdings"
+  - "PEA"
+  - "BNP"
+  - "cresus"
+  - "show.*position"
+  - "get.*position"
 
+# Executable actions via terminal
 actions:
+
   - name: "list_portfolios"
-    description: "List all available portfolios"
-    mcp_tool: "list_portfolios"
-    parameters: {}
+    description: "List all available portfolios in Cresus"
+    command: "cresus-mcp portfolio list"
+    output_format: "json"
+    parameters: []
 
-  - name: "create_portfolio"
-    description: "Create a new portfolio"
-    mcp_tool: "create_portfolio"
+  - name: "get_portfolio_positions"
+    description: "Get all positions in a specific portfolio"
+    command: "cresus-mcp portfolio positions {{portfolio}}"
+    output_format: "json"
     parameters:
-      - name: "name"
+      - name: "portfolio"
         type: "string"
+        description: "Portfolio name (PEA, BNP, test, _global, etf_pea_trend, cac_trend, nasdaq_100_trend)"
         required: true
-        description: "Portfolio name (e.g., 'Main', 'Aggressive', 'Conservative')"
-      - name: "initial_capital"
-        type: "number"
-        required: false
-        default: 100000
-        description: "Initial capital in EUR"
-      - name: "portfolio_type"
-        type: "string"
-        required: false
-        default: "paper"
-        enum: ["paper", "live"]
-        description: "Paper for simulation, live for real trading"
-      - name: "description"
-        type: "string"
-        required: false
-        description: "Portfolio description"
 
-  - name: "analyze_portfolio"
-    description: "Get comprehensive portfolio analysis"
-    mcp_tool: "get_portfolio_metrics"
+  - name: "get_portfolio_metrics"
+    description: "Get performance metrics for a portfolio"
+    command: "cresus-mcp portfolio metrics {{portfolio}}"
+    output_format: "json"
     parameters:
-      - name: "portfolio_name"
+      - name: "portfolio"
         type: "string"
-        required: true
-        description: "Name of the portfolio to analyze"
-
-  - name: "get_positions"
-    description: "View current portfolio positions"
-    mcp_tool: "get_portfolio_positions"
-    parameters:
-      - name: "portfolio_name"
-        type: "string"
-        required: true
         description: "Portfolio name"
-      - name: "limit"
-        type: "integer"
-        required: false
-        default: 100
-        description: "Maximum positions to return"
-
-  - name: "compare_portfolios"
-    description: "Compare performance across multiple portfolios"
-    mcp_tool: "compare_portfolios"
-    parameters:
-      - name: "portfolio_names"
-        type: "array"
         required: true
-        description: "List of portfolio names to compare"
 
-  - name: "rebalance_portfolio"
-    description: "Rebalance portfolio to target allocation"
-    mcp_tool: "rebalance_portfolio"
+  - name: "get_portfolio_performance"
+    description: "Get historical performance data for a portfolio"
+    command: "cresus-mcp portfolio performance {{portfolio}}"
+    output_format: "json"
     parameters:
-      - name: "portfolio_name"
+      - name: "portfolio"
         type: "string"
+        description: "Portfolio name"
         required: true
-        description: "Portfolio to rebalance"
-      - name: "target_allocation"
-        type: "object"
+
+  - name: "get_portfolio_allocation"
+    description: "Get portfolio asset allocation breakdown"
+    command: "cresus-mcp portfolio allocation {{portfolio}}"
+    output_format: "json"
+    parameters:
+      - name: "portfolio"
+        type: "string"
+        description: "Portfolio name"
         required: true
-        description: "Target allocation {ticker: percentage}"
 
-# Response templates
-responses:
-  portfolio_created: "Created portfolio '{{name}}' with {{initial_capital}}€ initial capital"
-  analysis_ready: "Portfolio '{{name}}' analysis complete. Sharpe ratio: {{sharpe}}, Max drawdown: {{drawdown}}%"
-  positions_summary: "Portfolio has {{count}} positions worth {{total_value}}€"
+  - name: "get_portfolio_value"
+    description: "Get total portfolio value and cash position"
+    command: "cresus-mcp portfolio value {{portfolio}}"
+    output_format: "json"
+    parameters:
+      - name: "portfolio"
+        type: "string"
+        description: "Portfolio name"
+        required: true
 
-# Validation rules
-validation:
-  portfolio_name:
-    min_length: 1
-    max_length: 50
-    pattern: "^[a-zA-Z0-9_-]+$"
+# Available portfolios
+portfolios:
+  - PEA
+  - BNP
+  - test
+  - _global
+  - etf_pea_trend
+  - cac_trend
+  - nasdaq_100_trend
 
-  initial_capital:
-    min: 100
-    max: 100000000
+# Usage examples
+examples:
+  "list all portfolios": "Use list_portfolios action"
+  "show PEA positions": "Use get_portfolio_positions with portfolio=PEA"
+  "get BNP metrics": "Use get_portfolio_metrics with portfolio=BNP"
+  "show PEA performance": "Use get_portfolio_performance with portfolio=PEA"
+  "show PEA allocation": "Use get_portfolio_allocation with portfolio=PEA"
+  "what's the value of BNP": "Use get_portfolio_value with portfolio=BNP"
 
-# Error handling
-error_handlers:
-  portfolio_not_found: "Portfolio '{{name}}' not found. Would you like to create it?"
-  invalid_allocation: "Total allocation must equal 100%. Current: {{total}}%"
-  insufficient_capital: "Operation requires {{required}}€ but portfolio has {{available}}€"
+instructions: |
+  Query Cresus portfolios for real-time data via the cresus-mcp CLI tool.
+
+  Available actions:
+  - list_portfolios - List all portfolios
+  - get_portfolio_positions - Get positions in a portfolio
+  - get_portfolio_metrics - Get metrics
+  - get_portfolio_performance - Get performance history
+  - get_portfolio_allocation - Get allocation
+  - get_portfolio_value - Get portfolio value

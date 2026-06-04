@@ -1,24 +1,29 @@
 #!/usr/bin/env python3
-"""Entry point for Cresus MCP server."""
-import os
+"""Cresus MCP Server - Stdio subprocess mode"""
+
 import sys
+import os
+from pathlib import Path
 
-# CRITICAL: Set project root BEFORE any other code
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-os.environ.setdefault("CRESUS_PROJECT_ROOT", project_root)
-
-# Set up paths
-sys.path.insert(0, project_root)
-sys.path.insert(0, os.path.join(project_root, "src"))
+project_root = Path(__file__).parent.parent
+os.environ.setdefault("CRESUS_PROJECT_ROOT", str(project_root))
+sys.path.insert(0, str(project_root / "src"))
 os.chdir(project_root)
 
-# CRITICAL: Configure logging to stderr BEFORE importing anything else
 from loguru import logger
 logger.remove()
 logger.add(sys.stderr, level=os.environ.get("CRESUS_LOG_LEVEL", "INFO"))
 logger.add("logs/mcp.log", rotation="10 MB", retention="7 days", level="DEBUG")
 
-from src.mcp.main import main
+from cresus_mcp.server import CresusMCPServer
 
-if __name__ == "__main__":
-    main()
+api_url = os.environ.get("CRESUS_API_URL", "http://192.168.0.130:6501/api/v1")
+
+try:
+    server = CresusMCPServer(api_base_url=api_url)
+    server.run()
+except KeyboardInterrupt:
+    pass
+except Exception as e:
+    logger.error(f"Error: {e}", exc_info=True)
+    sys.exit(1)

@@ -1,0 +1,20 @@
+#!/usr/bin/env python3
+"""Standalone FastMCP HTTP/SSE server for Cresus."""
+
+import sys
+import os
+from pathlib import Path
+
+# Set project root
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root / "src"))
+sys.path.insert(0, str(project_root))
+
+os.chdir(project_root)
+
+from api.routes.mcp_fastmcp import mcp
+
+if __name__ == "__main__":
+    import asyncio
+    # Run FastMCP with HTTP/SSE transport
+    asyncio.run(mcp.run_streamable_http_async())

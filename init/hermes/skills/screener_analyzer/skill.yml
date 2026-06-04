@@ -1,9 +1,10 @@
-# Screener Analyzer Skill for Hermes Agent
-# Handles screener operations using Cresus MCP
+# Cresus Screener Analyzer Skill
+# Create, test, and analyze stock screeners using DSL formulas
 
 skill_name: "screener_analyzer"
 description: "Create, test, and analyze stock screeners using DSL formulas"
 version: "1.0.0"
+category: "finance"
 
 triggers:
   - "create.*screener"
@@ -13,7 +14,7 @@ triggers:
   - "validate.*formula"
   - "screener.*results"
 
-actions:
+tools:
   - name: "list_screeners"
     description: "List all available screeners"
     mcp_tool: "list_screeners"

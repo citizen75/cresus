@@ -16,6 +16,7 @@ from cli.commands.service import ServiceManager
 from cli.commands.flow import FlowManager
 from cli.commands.data import DataCommands
 from cli.commands.portfolio import PortfolioCommands
+from cli.commands.mcp import MCPCommands
 from cli.commands.scheduler import SchedulerCommands
 from cli.commands.info import InfoCommands
 from cli.commands.strategy import StrategyCommands
@@ -41,6 +42,7 @@ class CresusCLI(cmd2.Cmd):
 		self.data_manager = DataManager(self.project_root)
 		self.data_commands = DataCommands(self.data_manager)
 		self.portfolio_commands = PortfolioCommands()
+		self.mcp_commands = MCPCommands()
 		self.scheduler_commands = SchedulerCommands()
 		self.info_commands = InfoCommands()
 		self.strategy_commands = StrategyCommands(self.project_root)
@@ -766,8 +768,12 @@ class CresusCLI(cmd2.Cmd):
 		self.portfolio_commands.handle_orders(args)
 
 	def do_portfolio(self, args):
-		"""Manage portfolios: list [real|paper|all]"""
+		"""Manage portfolios: list [real|paper|all] | query <command> [--mcp]"""
 		self.portfolio_commands.handle(args)
+
+	def do_mcp(self, args):
+		"""Manage MCP (Model Context Protocol) server and tools"""
+		self.mcp_commands.handle(args)
 
 	def do_universe(self, args):
 		"""Manage universes: list|info <name>"""
@@ -1345,8 +1351,10 @@ class CresusCLI(cmd2.Cmd):
 				"backtest": "Manage backtests (run|purge)",
 			},
 			"📊 Portfolio": {
+				"portfolio": "Manage portfolios (list|query)",
 				"watchlist": "View strategy watchlist",
 				"orders": "View pending/executed orders",
+				"mcp": "MCP server and tools (server|tools)",
 			},
 			"💾 Data": {
 				"data": "Manage data cache",

@@ -1,10 +1,13 @@
 """Portfolio management commands (orders, watchlist)."""
 
+import json
+import os
 import pandas as pd
 import numpy as np
 from rich.console import Console
 from rich.table import Table
 from rich import box
+from cli.query import PortfolioQuery
 
 console = Console()
 
@@ -22,10 +25,29 @@ class PortfolioCommands:
 
 		parts = args_str.split()
 		cmd = parts[0] if parts else None
+		has_mcp = "--mcp" in args_str
+		has_query = "--query" in args_str
 
 		if cmd == "list":
-			portfolio_type = parts[1] if len(parts) > 1 else "all"
-			self._list_portfolios(portfolio_type)
+			portfolio_type = None
+			# Extract portfolio type if present (and it's not a flag)
+			for part in parts[1:]:
+				if not part.startswith("--"):
+					portfolio_type = part
+					break
+			portfolio_type = portfolio_type or "all"
+
+			if has_mcp or has_query:
+				# Use query layer for JSON output
+				query = PortfolioQuery()
+				result = query.list_portfolios()
+				output_mode = "json"
+				self._display_result("portfolios", result, output_mode)
+			else:
+				# Use old method for table output
+				self._list_portfolios(portfolio_type)
+		elif cmd in ["positions", "metrics", "performance", "allocation", "value"]:
+			self.handle_query(args_str)
 		elif cmd == "orders":
 			self.handle_orders(args_str[len(cmd):].strip())
 		elif cmd == "watchlist":
@@ -40,6 +62,11 @@ class PortfolioCommands:
 		table.add_column("Command", style="cyan")
 		table.add_column("Description")
 		table.add_row("portfolio list [real|paper|all]", "List portfolios (default: all)")
+		table.add_row("portfolio positions <name> [--mcp|--query]", "Show portfolio positions")
+		table.add_row("portfolio metrics <name> [--mcp|--query]", "Show portfolio metrics")
+		table.add_row("portfolio performance <name> [--mcp|--query]", "Show performance data")
+		table.add_row("portfolio allocation <name> [--mcp|--query]", "Show asset allocation")
+		table.add_row("portfolio value <name> [--mcp|--query]", "Show portfolio value")
 		table.add_row("orders list <strategy>", "List orders for a strategy")
 		table.add_row("watchlist show <strategy>", "Show watchlist")
 		table.add_row("watchlist extended <strategy>", "Show watchlist with indicators")
@@ -123,6 +150,209 @@ class PortfolioCommands:
 		else:
 			console.print(f"[red]✗[/red] Unknown command: {cmd}")
 			console.print("Try: orders list <strategy>")
+
+	def handle_query(self, args: str):
+		"""Handle portfolio data queries (positions, metrics, performance, etc)."""
+		args_str = str(args).strip() if args else ""
+
+		if not args_str:
+			console.print("[red]✗[/red] Usage: portfolio <command> <portfolio_name> [--mcp|--query]")
+			return
+
+		# Parse arguments
+		parts = args_str.split()
+		cmd = parts[0] if parts else None
+		has_mcp = "--mcp" in args_str
+		has_query = "--query" in args_str
+		output_mode = "json" if (has_mcp or has_query) else "table"
+
+		# Get portfolio name
+		portfolio_name = parts[1] if len(parts) > 1 else None
+		if not portfolio_name:
+			console.print(f"[red]✗[/red] Usage: portfolio {cmd} <portfolio_name> [--mcp|--query]")
+			return
+
+		try:
+			query = PortfolioQuery()
+
+			if cmd == "positions":
+				result = query.get_positions(portfolio_name)
+				self._display_result("positions", result, output_mode)
+			elif cmd == "metrics":
+				result = query.get_metrics(portfolio_name)
+				self._display_result("metrics", result, output_mode)
+			elif cmd == "performance":
+				result = query.get_performance(portfolio_name)
+				self._display_result("performance", result, output_mode)
+			elif cmd == "allocation":
+				result = query.get_allocation(portfolio_name)
+				self._display_result("allocation", result, output_mode)
+			elif cmd == "value":
+				result = query.get_value(portfolio_name)
+				self._display_result("value", result, output_mode)
+			else:
+				console.print(f"[red]✗[/red] Unknown command: {cmd}")
+		except Exception as e:
+			console.print(f"[red]✗[/red] Error: {str(e)}")
+
+	def _display_result(self, result_type: str, result: dict, output_mode: str):
+		"""Display result based on output mode."""
+		if result.get("status") == "error":
+			console.print(f"[red]✗[/red] {result.get('message')}")
+			return
+
+		if output_mode == "json":
+			# Output as JSON
+			console.print(json.dumps(result, indent=2))
+		else:
+			# Output as formatted table
+			if result_type == "portfolios":
+				self._display_portfolios(result)
+			elif result_type == "positions":
+				self._display_positions(result)
+			elif result_type == "metrics":
+				self._display_metrics(result)
+			elif result_type == "performance":
+				self._display_performance(result)
+			elif result_type == "allocation":
+				self._display_allocation(result)
+			elif result_type == "value":
+				self._display_value(result)
+
+	def _display_portfolios(self, result: dict):
+		"""Display portfolios as rich table."""
+		portfolios = result.get("portfolios", [])
+		if not portfolios:
+			console.print("[yellow]⚠[/yellow] No portfolios found")
+			return
+
+		table = Table(title="Portfolios", box=box.ROUNDED)
+		table.add_column("Name", style="cyan")
+		table.add_column("Type", style="magenta")
+		table.add_column("Currency", style="yellow")
+		table.add_column("Value", justify="right", style="green")
+		table.add_column("Positions", justify="right", style="blue")
+
+		for p in portfolios:
+			value_str = f"${p['value']:,.2f}" if p['value'] else "-"
+			table.add_row(p["name"], p["type"], p["currency"], value_str, str(p["positions"]))
+
+		console.print(table)
+		console.print(f"\n[dim]Total: {result['count']} portfolio(ies)[/dim]")
+
+	def _display_positions(self, result: dict):
+		"""Display positions as rich table."""
+		positions = result.get("positions", [])
+		portfolio = result.get("portfolio")
+
+		if not positions:
+			console.print(f"[yellow]⚠[/yellow] No positions in {portfolio}")
+			return
+
+		table = Table(title=f"Positions - {portfolio}", box=box.ROUNDED)
+		table.add_column("Ticker", style="cyan")
+		table.add_column("Qty", justify="right", style="blue")
+		table.add_column("Entry Price", justify="right", style="yellow")
+		table.add_column("Current Price", justify="right", style="yellow")
+		table.add_column("Position Value", justify="right", style="green")
+		table.add_column("PnL", justify="right", style="white")
+		table.add_column("PnL %", justify="right", style="white")
+
+		for p in positions:
+			entry = f"${p['entry_price']:.2f}" if p['entry_price'] else "-"
+			current = f"${p['current_price']:.2f}" if p['current_price'] else "-"
+			pos_value = f"${p['position_value']:,.2f}" if p['position_value'] else "-"
+			qty = str(int(p['quantity'])) if p['quantity'] else "-"
+
+			pnl = p.get("pnl")
+			pnl_pct = p.get("pnl_pct")
+			pnl_str = f"${pnl:,.2f}" if pnl else "-"
+			pnl_pct_str = f"{pnl_pct:+.2f}%" if pnl_pct else "-"
+
+			if pnl and pnl > 0:
+				pnl_str = f"[green]{pnl_str}[/green]"
+				pnl_pct_str = f"[green]{pnl_pct_str}[/green]"
+			elif pnl and pnl < 0:
+				pnl_str = f"[red]{pnl_str}[/red]"
+				pnl_pct_str = f"[red]{pnl_pct_str}[/red]"
+
+			table.add_row(p["ticker"], qty, entry, current, pos_value, pnl_str, pnl_pct_str)
+
+		console.print(table)
+		console.print(f"\n[dim]Total positions: {result['count']}[/dim]")
+
+	def _display_metrics(self, result: dict):
+		"""Display metrics as formatted output."""
+		metrics = result.get("metrics", {})
+		portfolio = result.get("portfolio")
+
+		console.print(f"\n[bold cyan]Portfolio Metrics - {portfolio}[/bold cyan]\n")
+
+		metric_list = [
+			("Total Return", metrics.get("total_return"), "%"),
+			("Sharpe Ratio", metrics.get("sharpe_ratio"), ""),
+			("Max Drawdown", metrics.get("max_drawdown"), "%"),
+			("Win Rate", metrics.get("win_rate"), "%"),
+			("Profit Factor", metrics.get("profit_factor"), ""),
+			("Volatility", metrics.get("volatility"), "%"),
+		]
+
+		for label, value, unit in metric_list:
+			if value is not None:
+				value_str = f"{value:.4f}" if isinstance(value, float) and abs(value) < 1 else f"{value:.2f}"
+				console.print(f"  {label:.<30} {value_str} {unit}".rstrip())
+			else:
+				console.print(f"  {label:.<30} N/A")
+
+	def _display_performance(self, result: dict):
+		"""Display performance data."""
+		data = result.get("data", {})
+		portfolio = result.get("portfolio")
+
+		console.print(f"\n[bold cyan]Portfolio Performance - {portfolio}[/bold cyan]\n")
+		console.print(json.dumps(data, indent=2))
+
+	def _display_allocation(self, result: dict):
+		"""Display asset allocation."""
+		allocation = result.get("allocation", [])
+		portfolio = result.get("portfolio")
+
+		console.print(f"\n[bold cyan]Asset Allocation - {portfolio}[/bold cyan]\n")
+
+		if allocation:
+			table = Table(box=box.ROUNDED)
+			table.add_column("Ticker", style="cyan")
+			table.add_column("Weight %", justify="right", style="yellow")
+			table.add_column("Value", justify="right", style="green")
+
+			for item in allocation:
+				table.add_row(
+					item.get("ticker", "-"),
+					f"{item.get('weight', 0):.2f}%",
+					f"${item.get('value', 0):,.2f}"
+				)
+
+			console.print(table)
+		else:
+			console.print("[yellow]⚠[/yellow] No allocation data available")
+
+	def _display_value(self, result: dict):
+		"""Display portfolio value."""
+		portfolio = result.get("portfolio")
+
+		console.print(f"\n[bold cyan]Portfolio Value - {portfolio}[/bold cyan]\n")
+
+		total_value = result.get("total_value", 0)
+		invested = result.get("invested", 0)
+		cash = result.get("cash", 0)
+
+		console.print(f"  Total Value:    ${total_value:,.2f}")
+		console.print(f"  Invested:       ${invested:,.2f}")
+		console.print(f"  Cash:           ${cash:,.2f}")
+
+		if total_value > 0:
+			allocated_pct = (invested / total_value) * 100
+			console.print(f"  Allocation:     {allocated_pct:.1f}%")
 
 	def handle_watchlist(self, args: str):
 		"""Handle watchlist commands."""

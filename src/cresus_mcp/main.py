@@ -26,7 +26,7 @@ def main():
     api_url = os.environ.get("CRESUS_API_URL", "http://localhost:8000/api/v1")
     logger.info(f"Starting Cresus MCP server (API: {api_url})")
 
-    from src.mcp.server import CresusMCPServer
+    from src.cresus_mcp.server import CresusMCPServer
 
     server = CresusMCPServer(api_base_url=api_url)
     server.run()

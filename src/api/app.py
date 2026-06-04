@@ -52,12 +52,19 @@ def setup_scheduler(app: FastAPI) -> None:
 
 def create_app() -> FastAPI:
     """Create and configure FastAPI app."""
+    # Import FastMCP instance with tools
+    from api.routes.mcp_fastmcp import mcp
+
     app = FastAPI(
         title="Cresus Portfolio API",
         version="1.0.0",
         docs_url="/docs",
         redoc_url="/redoc",
     )
+
+    # Mount FastMCP HTTP/SSE app
+    mcp_app = mcp.streamable_http_app()
+    app.mount("/mcp", mcp_app)
 
     # CORS middleware - allow all origins for development
     app.add_middleware(

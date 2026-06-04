@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+import sys
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Tool, TextContent
@@ -100,9 +101,37 @@ class CresusMCPServer:
 
     async def run_async(self):
         """Run MCP server."""
-        async with stdio_server() as (read_stream, write_stream):
-            await self.server.run(read_stream, write_stream)
+        try:
+            # Use stdio_server to get streams and run the server
+            async with stdio_server() as (read_stream, write_stream):
+                logger.info("MCP server stdio connection established")
+                logger.info(f"Running server with read_stream={read_stream}, write_stream={write_stream}")
+
+                # Run the server - this should block while handling client requests
+                await self.server.run(
+                    read_stream,
+                    write_stream,
+                    self.server.create_initialization_options(),
+                    raise_exceptions=True,
+                )
+                logger.info("MCP server stream closed normally")
+        except asyncio.CancelledError:
+            logger.info("MCP server was cancelled")
+            raise
+        except EOFError:
+            logger.info("MCP server reached end of stream")
+        except Exception as e:
+            logger.error(f"MCP server fatal error: {e}", exc_info=True)
+            raise
 
     def run(self):
         """Run MCP server (blocking)."""
-        asyncio.run(self.run_async())
+        try:
+            logger.info("Starting MCP server event loop")
+            asyncio.run(self.run_async())
+            logger.info("MCP server exited normally")
+        except KeyboardInterrupt:
+            logger.info("MCP server interrupted by user")
+        except Exception as e:
+            logger.error(f"MCP server fatal error: {e}", exc_info=True)
+            sys.exit(1)

@@ -10,11 +10,11 @@ from typing import Optional
 from loguru import logger
 import uvicorn
 
-from gateway.cron import CronScheduler
+from .cron import CronScheduler
 from utils.env import get_config_root
 
 try:
-	from gateway.watchdog import FileWatcher
+	from .watchdog import FileWatcher
 except ImportError:
 	FileWatcher = None
 

@@ -1,47 +1,61 @@
-# Performance Analyzer Skill for Hermes Agent
-# Handles portfolio and backtest analysis
+# Cresus Performance Analyzer Skill
+# Analyze and report on portfolio performance metrics
 
 skill_name: "performance_analyzer"
-description: "Analyze portfolio and strategy performance with advanced metrics"
+description: "Analyze Cresus portfolio performance with detailed metrics and comparisons"
 version: "1.0.0"
+category: "finance"
 
 triggers:
   - "performance"
-  - "metrics"
-  - "drawdown"
+  - "analysis"
+  - "returns"
   - "sharpe"
-  - "analyze.*performance"
-  - "backtest.*results"
-  - "compare.*strategies"
+  - "drawdown"
+  - "profit"
+  - "loss"
 
-actions:
-  - name: "get_metrics"
-    description: "Get portfolio performance metrics"
-    mcp_tool: "get_portfolio_metrics"
-    parameters:
-      - name: "portfolio_name"
-        type: "string"
-        required: true
+# Hermes-invocable tools
+tools:
 
-  - name: "get_performance"
-    description: "Get portfolio performance data"
-    mcp_tool: "get_portfolio_performance"
+  - name: "cresus_performance_compare"
+    description: "Compare performance metrics across multiple portfolios"
+    category: "performance_analysis"
+    command: "cresus-mcp portfolio metrics {{portfolio1}} && cresus-mcp portfolio metrics {{portfolio2}}"
+    output_format: "json"
     parameters:
-      - name: "portfolio_name"
+      - name: "portfolio1"
         type: "string"
+        description: "First portfolio name"
         required: true
+        examples: ["PEA", "BNP", "test"]
+      - name: "portfolio2"
+        type: "string"
+        description: "Second portfolio name"
+        required: true
+        examples: ["PEA", "BNP", "test"]
+    example:
+      user: "Compare PEA and BNP performance"
+      tool_call: "cresus_performance_compare"
+      params: { "portfolio1": "PEA", "portfolio2": "BNP" }
+      result: "Side-by-side comparison of metrics"
 
-  - name: "get_transactions"
-    description: "Get portfolio transaction history"
-    mcp_tool: "get_portfolio_transactions"
+  - name: "cresus_performance_summary"
+    description: "Get a comprehensive performance summary for a portfolio"
+    category: "performance_analysis"
+    command: "cresus-mcp portfolio metrics {{portfolio}}"
+    output_format: "json"
     parameters:
-      - name: "portfolio_name"
+      - name: "portfolio"
         type: "string"
+        description: "Portfolio name"
         required: true
-      - name: "limit"
-        type: "integer"
-        required: false
-        default: 50
+        examples: ["PEA", "BNP", "test"]
+    example:
+      user: "Summarize PEA performance"
+      tool_call: "cresus_performance_summary"
+      params: { "portfolio": "PEA" }
+      result: "Complete performance overview with key metrics"
 
 # Metrics reference
 metrics:

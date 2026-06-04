@@ -1,0 +1,25 @@
+#!/bin/bash
+# Cresus MCP wrapper for Hermes integration
+# Activates venv and executes cresus CLI with --mcp flag for JSON output
+
+set -e
+
+CRESUS_ROOT="/Volumes/Data/dev/cresus"
+VENV="${CRESUS_ROOT}/venv/bin/activate"
+
+# Check if venv exists
+if [ ! -f "$VENV" ]; then
+    echo "Error: Cresus venv not found at $VENV" >&2
+    exit 1
+fi
+
+# Source venv
+source "$VENV"
+
+# Execute cresus command with --mcp flag for JSON output
+# If --mcp not already in args, add it
+if [[ "$*" != *"--mcp"* ]]; then
+    exec cresus "$@" --mcp
+else
+    exec cresus "$@"
+fi

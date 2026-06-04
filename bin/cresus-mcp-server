@@ -1,0 +1,198 @@
+#!/usr/bin/env python3
+"""Standalone Cresus MCP server with service management."""
+
+import sys
+import os
+import signal
+import subprocess
+import time
+import json
+from pathlib import Path
+
+# Set project root
+project_root = Path(__file__).parent.parent
+os.chdir(project_root)
+
+CONFIG_DIR = Path.home() / ".cresus"
+CONFIG_DIR.mkdir(exist_ok=True)
+PID_FILE = CONFIG_DIR / "mcp.pid"
+STATUS_FILE = CONFIG_DIR / "mcp.status"
+
+
+def read_pid():
+    """Read PID from file."""
+    if PID_FILE.exists():
+        try:
+            return int(PID_FILE.read_text().strip())
+        except (ValueError, IOError):
+            return None
+    return None
+
+
+def write_pid(pid):
+    """Write PID to file."""
+    PID_FILE.write_text(str(pid))
+
+
+def is_running(pid):
+    """Check if process is running."""
+    if pid is None:
+        return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except (OSError, ProcessLookupError):
+        return False
+
+
+def get_status():
+    """Get current server status."""
+    pid = read_pid()
+    if pid and is_running(pid):
+        return {"status": "running", "pid": pid}
+    else:
+        if PID_FILE.exists():
+            PID_FILE.unlink()
+        return {"status": "stopped", "pid": None}
+
+
+def start_server():
+    """Start the MCP server."""
+    status = get_status()
+    if status["status"] == "running":
+        print(f"✓ MCP server already running (PID: {status['pid']})")
+        return 0
+
+    print("Starting Cresus MCP server...")
+
+    api_url = os.environ.get("CRESUS_API_URL", "http://192.168.0.130:6501/api/v1")
+    log_level = os.environ.get("CRESUS_LOG_LEVEL", "INFO")
+
+    env = os.environ.copy()
+    env["CRESUS_API_URL"] = api_url
+    env["CRESUS_LOG_LEVEL"] = log_level
+
+    try:
+        proc = subprocess.Popen(
+            [sys.executable, "-m", "cresus_mcp.main"],
+            cwd=str(project_root),
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            start_new_session=True,  # Detach from parent
+        )
+
+        write_pid(proc.pid)
+        time.sleep(1)  # Give server time to start
+
+        if is_running(proc.pid):
+            print(f"✓ MCP server started (PID: {proc.pid})")
+            print(f"  API: {api_url}")
+            print(f"  Logs: logs/mcp.log")
+            return 0
+        else:
+            print(f"✗ Failed to start MCP server")
+            return 1
+    except Exception as e:
+        print(f"✗ Error starting MCP server: {e}")
+        return 1
+
+
+def stop_server():
+    """Stop the MCP server."""
+    status = get_status()
+    if status["status"] == "stopped":
+        print("✓ MCP server is not running")
+        return 0
+
+    pid = status["pid"]
+    print(f"Stopping MCP server (PID: {pid})...")
+
+    try:
+        # Try SIGTERM first
+        os.kill(pid, signal.SIGTERM)
+        time.sleep(1)
+
+        if is_running(pid):
+            # Force SIGKILL if still running
+            os.kill(pid, signal.SIGKILL)
+            time.sleep(1)
+
+        if PID_FILE.exists():
+            PID_FILE.unlink()
+
+        print("✓ MCP server stopped")
+        return 0
+    except ProcessLookupError:
+        if PID_FILE.exists():
+            PID_FILE.unlink()
+        print("✓ MCP server was already stopped")
+        return 0
+    except Exception as e:
+        print(f"✗ Error stopping MCP server: {e}")
+        return 1
+
+
+def show_status():
+    """Show server status."""
+    status = get_status()
+    if status["status"] == "running":
+        print(f"✓ MCP server is running (PID: {status['pid']})")
+    else:
+        print("✗ MCP server is not running")
+    return 0
+
+
+def restart_server():
+    """Restart the MCP server."""
+    print("Restarting Cresus MCP server...")
+    stop_server()
+    time.sleep(1)
+    return start_server()
+
+
+def main():
+    """CLI entry point."""
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Cresus MCP Server Manager",
+        prog="cresus-mcp-server"
+    )
+    parser.add_argument(
+        "command",
+        choices=["start", "stop", "status", "restart"],
+        help="Service command"
+    )
+    parser.add_argument(
+        "--api-url",
+        default="http://192.168.0.130:6501/api/v1",
+        help="Cresus API URL"
+    )
+    parser.add_argument(
+        "--log-level",
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        help="Log level"
+    )
+
+    args = parser.parse_args()
+
+    # Set environment
+    if args.api_url:
+        os.environ["CRESUS_API_URL"] = args.api_url
+    if args.log_level:
+        os.environ["CRESUS_LOG_LEVEL"] = args.log_level
+
+    if args.command == "start":
+        return start_server()
+    elif args.command == "stop":
+        return stop_server()
+    elif args.command == "status":
+        return show_status()
+    elif args.command == "restart":
+        return restart_server()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

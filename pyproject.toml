@@ -12,6 +12,7 @@ dependencies = [
     "uvicorn[standard]>=0.23.0",
     "cmd2>=2.4.0",
     "mcp>=1.0.0",
+    "fastmcp>=0.1.0",
     "loguru>=0.7.0",
     "lightgbm>=4.0.0",
     "pyyaml>=6.0",
@@ -47,7 +48,8 @@ dev = [
 [project.scripts]
 cresus = "cli.main:main"
 cresus-api = "api.main:main"
-cresus-mcp = "mcp.main:main"
+cresus-mcp = "cresus_mcp.main:main"
+cresus-mcp-server = "cresus_mcp.service:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }

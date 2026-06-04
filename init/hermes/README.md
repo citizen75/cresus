@@ -1,61 +1,73 @@
 # Hermes Agent Integration with Cresus
 
-Hermes is an autonomous agent framework for AI-driven portfolio management. This integration allows Hermes to control and analyze Cresus portfolios using the MCP (Model Context Protocol) interface.
+Hermes is an autonomous agent framework that can query and analyze Cresus portfolios using pre-configured skills. This integration provides direct access to portfolio data through Hermes natural language interface.
+
+## Key Features
+
+✅ **Direct CLI Integration** - Uses `cresus-mcp` wrapper for reliable execution  
+✅ **Pre-configured Skills** - Three Cresus skills ready to use  
+✅ **No MCP Server Needed** - Simpler setup, better reliability  
+✅ **Large Context Window** - Supports 32K+ tokens for comprehensive analysis  
+✅ **Automatic Skill Loading** - Skills enabled by default in config  
 
 ## Quick Start
 
-### For Existing Hermes Installation (Manual Setup)
-
-**Edit `~/.hermes/config.yaml`** and add this section:
-
-```yaml
-mcp_servers:
-  cresus:
-    name: "Cresus Portfolio API"
-    type: "stdio"
-    command: "python"
-    args: ["-m", "src.mcp.main"]
-    env:
-      CRESUS_API_URL: "http://localhost:8000/api/v1"
-      CRESUS_LOG_LEVEL: "INFO"
-    enabled: true
-    auto_start: true
-
-skills:
-  enabled:
-    - "portfolio_manager"
-    - "screener_analyzer"
-    - "performance_analyzer"
-    # ... your existing skills
-```
-
-Then copy the skill folders:
-```bash
-cp -r init/hermes/skills/portfolio_manager ~/.hermes/skills/
-cp -r init/hermes/skills/screener_analyzer ~/.hermes/skills/
-cp -r init/hermes/skills/performance_analyzer ~/.hermes/skills/
-```
-
-### Or Use Automated Setup (Fresh Install)
+### Automated Setup (Recommended)
 
 ```bash
 cresus init --hermes
 ```
 
 This will:
-- Create `~/.hermes/` directory structure  
-- Copy all Hermes configuration files
-- Setup Hermes skills for portfolio management
-- Configure the Cresus MCP server
+- Create `~/.hermes/` directory structure
+- Copy all Cresus configuration files
+- Setup Cresus skills (cresus/portfolio_manager, cresus/screener_analyzer, cresus/performance_analyzer)
+- Configure Ollama context window requirements
 
-### Start the Services
+### Manual Setup
+
+1. **Copy skills to Hermes:**
+   ```bash
+   mkdir -p ~/.hermes/skills/cresus
+   cp -r init/hermes/skills/* ~/.hermes/skills/cresus/
+   ```
+
+2. **Update Hermes config:**
+   ```bash
+   # Merge config.yaml settings from init/hermes/config.yaml
+   # Critical: Ensure context_window: 32768 and context_length: 65536
+   ```
+
+3. **Update system prompt:**
+   ```bash
+   mkdir -p ~/.hermes/config
+   cp init/hermes/config/system_prompt.md ~/.hermes/config/
+   ```
+
+### Configure Ollama Context Window
+
+**Critical Step:** Hermes requires 64K context minimum.
 
 ```bash
-# Start Cresus API
-cresus service start api
+# Edit systemd service
+sudo systemctl edit ollama
 
-# Launch Hermes Agent
-hermes run
+# Add to [Service] section:
+Environment="OLLAMA_NUM_CTX=32768"
+
+# Reload and restart
+sudo systemctl daemon-reload
+sudo systemctl restart ollama
+
+# Verify
+sudo systemctl show ollama | grep OLLAMA_NUM_CTX
+```
+
+### Start Using Hermes
+
+```bash
+# No service startup needed - skills are built-in!
+hermes chat -q "list my portfolios"
 ```
 
 ## Configuration

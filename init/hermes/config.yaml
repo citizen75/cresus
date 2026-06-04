@@ -1,73 +1,61 @@
-# Hermes Configuration
-# Main configuration file for Hermes Agent
+# Hermes Configuration for Cresus Integration
+# Optimized for local Ollama with Cresus portfolio management
 
-name: "Cresus Portfolio Agent"
-description: "Autonomous agent for portfolio management using Cresus MCP"
-version: "1.0.0"
+model:
+  default: qwen3.5:9b
+  provider: custom
+  base_url: http://192.168.0.160:11434/v1
+  api_key: ollama
+  max_tokens: 16384
+  context_window: 32768
+  context_length: 65536
+  top_k: 20
+  top_p: 0.95
+  temperature: 0.2
+  api_mode: chat_completions
 
-# Agent personality and role
-personality:
-  role: "Portfolio Management Expert"
-  personality_type: "analytical"
-  tone: "professional"
-  background: "Expert in algorithmic trading, portfolio analysis, and risk management"
-
-# Memory configuration
-memory:
-  type: "short-term"
-  max_messages: 100
-  retention_days: 7
-
-# MCP Server Configuration - ADD THIS TO YOUR EXISTING config.yaml
-mcp_servers:
-  cresus:
-    name: "Cresus Portfolio API"
-    type: "stdio"
-    command: "python"
-    args: ["-m", "src.mcp.main"]
-    env:
-      CRESUS_API_URL: "http://localhost:8000/api/v1"
-      CRESUS_LOG_LEVEL: "INFO"
-    enabled: true
-    auto_start: true
-
-# Skills configuration - ADD THIS TO YOUR EXISTING config.yaml
-skills:
-  enabled:
-    - "portfolio_manager"
-    - "screener_analyzer"
-    - "performance_analyzer"
-  disabled: []
-
-# Tool configuration
-tools:
-  timeout: 30
-  max_retries: 3
-  retry_delay: 1
-
-# Logging
-logging:
-  level: "INFO"
-  format: "json"
-  file: "~/.hermes/logs/cresus_agent.log"
-
-# Safety and constraints
-constraints:
-  max_portfolio_size: 50
-  min_position_size: 100
-  max_daily_trades: 20
-  require_confirmation_for:
-    - "large_trades"
-    - "new_portfolios"
-    - "strategy_changes"
-
-# API Configuration
+# Cresus Integration
 api:
-  base_url: "http://localhost:8000/api/v1"
+  base_url: http://192.168.0.130:6501/api/v1
   timeout: 30
   retry_count: 3
   ssl_verify: true
 
-# Prompts and templates
+# Skills configuration
+skills:
+  external_dirs:
+  - ~/.hermes/skills
+  template_vars: true
+  enabled:
+  - cresus/portfolio_manager
+  - cresus/screener_analyzer
+  - cresus/performance_analyzer
+  disabled: []
+
+# Agent configuration
+agent:
+  max_turns: 60
+  tool_use_enforcement: auto
+  enable_tools: true
+  allow_mcp_tools: true
+
+# Prompts
 prompts:
-  system: "config/system_prompt.md"
+  system: /Users/gsamoun/.hermes/config/system_prompt.md
+
+# Display settings
+display:
+  compact: false
+  streaming: true
+  show_reasoning: false
+
+# Tools configuration
+tools:
+  enabled: true
+  timeout: 30
+  max_retries: 3
+
+# Logging
+logging:
+  level: INFO
+  file: ~/.hermes/logs/cresus.log
