@@ -1,97 +1,27 @@
 skill_name: "portfolio_manager"
-description: "Query Cresus portfolio data using cresus-mcp CLI"
-version: "5.0.0"
+description: "Cresus portfolio manager - get positions, metrics, and performance"
+version: "6.0.0"
 category: "finance"
 
 triggers:
   - "portfolio"
   - "positions"
-  - "metrics"
-  - "performance"
-  - "allocation"
-  - "holdings"
+  - "show.*position"
   - "PEA"
   - "BNP"
-  - "cresus"
-  - "show.*position"
-  - "get.*position"
 
 tools:
-  - name: "list_portfolios"
-    description: "List all available portfolios in Cresus"
-    category: "portfolio_query"
-    command: "{{skill_dir}}/run_tool.sh list"
+  - name: "get_pea_positions"
+    description: "Get all positions in PEA portfolio"
+    command: "cresus-mcp portfolio positions PEA"
     output_format: "json"
-    parameters: []
 
-  - name: "get_portfolio_positions"
-    description: "Get all positions in a specific portfolio"
-    category: "portfolio_query"
-    command: "{{skill_dir}}/run_tool.sh positions {{portfolio}}"
+  - name: "get_bnp_positions"
+    description: "Get all positions in BNP portfolio"
+    command: "cresus-mcp portfolio positions BNP"
     output_format: "json"
-    parameters:
-      - name: "portfolio"
-        type: "string"
-        description: "Portfolio name (PEA, BNP, test, _global, etf_pea_trend, cac_trend, nasdaq_100_trend)"
-        required: true
-        examples: ["PEA", "BNP"]
 
-  - name: "get_portfolio_metrics"
-    description: "Get performance metrics for a portfolio"
-    category: "portfolio_query"
-    command: "{{skill_dir}}/run_tool.sh metrics {{portfolio}}"
+  - name: "list_all_portfolios"
+    description: "List all available portfolios"
+    command: "cresus-mcp portfolio list"
     output_format: "json"
-    parameters:
-      - name: "portfolio"
-        type: "string"
-        description: "Portfolio name"
-        required: true
-
-  - name: "get_portfolio_performance"
-    description: "Get historical performance data for a portfolio"
-    category: "portfolio_query"
-    command: "{{skill_dir}}/run_tool.sh performance {{portfolio}}"
-    output_format: "json"
-    parameters:
-      - name: "portfolio"
-        type: "string"
-        description: "Portfolio name"
-        required: true
-
-  - name: "get_portfolio_allocation"
-    description: "Get portfolio asset allocation breakdown"
-    category: "portfolio_query"
-    command: "{{skill_dir}}/run_tool.sh allocation {{portfolio}}"
-    output_format: "json"
-    parameters:
-      - name: "portfolio"
-        type: "string"
-        description: "Portfolio name"
-        required: true
-
-  - name: "get_portfolio_value"
-    description: "Get total portfolio value and cash position"
-    category: "portfolio_query"
-    command: "{{skill_dir}}/run_tool.sh value {{portfolio}}"
-    output_format: "json"
-    parameters:
-      - name: "portfolio"
-        type: "string"
-        description: "Portfolio name"
-        required: true
-
-examples:
-  "show my portfolio PEA positions": "get_portfolio_positions with portfolio=PEA"
-  "what are the PEA metrics": "get_portfolio_metrics with portfolio=PEA"
-  "show BNP performance": "get_portfolio_performance with portfolio=BNP"
-
-instructions: |
-  Use Cresus portfolio manager to query portfolio data.
-
-  Available commands:
-  - list_portfolios: List all portfolios
-  - get_portfolio_positions: Get positions in a portfolio
-  - get_portfolio_metrics: Get metrics for a portfolio
-  - get_portfolio_performance: Get performance history
-  - get_portfolio_allocation: Get allocation breakdown
-  - get_portfolio_value: Get total value
