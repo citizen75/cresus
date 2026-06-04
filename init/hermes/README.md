@@ -1,30 +1,18 @@
-# Hermes Agent Integration with Cresus
+# Hermes Integration with Cresus
 
-Hermes is an autonomous agent framework that can query and analyze Cresus portfolios using pre-configured skills. This integration provides direct access to portfolio data through Hermes natural language interface.
+Hermes is an autonomous agent framework that queries and analyzes Cresus portfolios using pre-configured CLI-based skills.
 
 ## Key Features
 
-✅ **Direct CLI Integration** - Uses `cresus-mcp` wrapper for reliable execution  
+✅ **Direct CLI Integration** - Uses `cresus-mcp` CLI wrapper for reliable execution  
 ✅ **Pre-configured Skills** - Three Cresus skills ready to use  
-✅ **No MCP Server Needed** - Simpler setup, better reliability  
+✅ **Simple Setup** - No complex MCP server configuration needed  
 ✅ **Large Context Window** - Supports 32K+ tokens for comprehensive analysis  
-✅ **Automatic Skill Loading** - Skills enabled by default in config  
+✅ **Automatic Skill Loading** - Skills enabled by default  
 
 ## Quick Start
 
-### Automated Setup (Recommended)
-
-```bash
-cresus init --hermes
-```
-
-This will:
-- Create `~/.hermes/` directory structure
-- Copy all Cresus configuration files
-- Setup Cresus skills (cresus/portfolio_manager, cresus/screener_analyzer, cresus/performance_analyzer)
-- Configure Ollama context window requirements
-
-### Manual Setup
+### Setup
 
 1. **Copy skills to Hermes:**
    ```bash
@@ -32,360 +20,231 @@ This will:
    cp -r init/hermes/skills/* ~/.hermes/skills/cresus/
    ```
 
-2. **Update Hermes config:**
+2. **Update Hermes configuration:**
    ```bash
-   # Merge config.yaml settings from init/hermes/config.yaml
-   # Critical: Ensure context_window: 32768 and context_length: 65536
-   ```
-
-3. **Update system prompt:**
-   ```bash
+   # Copy config file
+   cp init/hermes/config.yaml ~/.hermes/config.yaml
+   
+   # Update system prompt
    mkdir -p ~/.hermes/config
-   cp init/hermes/config/system_prompt.md ~/.hermes/config/
+   cp init/hermes/config/system_prompt.md ~/.hermes/config/system_prompt.md
    ```
 
-### Configure Ollama Context Window
+3. **Verify Ollama context window (Important!):**
+   ```bash
+   # Check current setting
+   sudo systemctl show ollama | grep OLLAMA_NUM_CTX
+   
+   # If not 32768+, edit systemd service:
+   sudo systemctl edit ollama
+   
+   # Add to [Service] section:
+   Environment="OLLAMA_NUM_CTX=32768"
+   
+   # Reload and restart
+   sudo systemctl daemon-reload
+   sudo systemctl restart ollama
+   ```
 
-**Critical Step:** Hermes requires 64K context minimum.
-
-```bash
-# Edit systemd service
-sudo systemctl edit ollama
-
-# Add to [Service] section:
-Environment="OLLAMA_NUM_CTX=32768"
-
-# Reload and restart
-sudo systemctl daemon-reload
-sudo systemctl restart ollama
-
-# Verify
-sudo systemctl show ollama | grep OLLAMA_NUM_CTX
-```
-
-### Start Using Hermes
+### Start Using
 
 ```bash
-# No service startup needed - skills are built-in!
-hermes chat -q "list my portfolios"
+# List portfolios
+hermes -q "list my portfolios"
+
+# Show positions
+hermes -q "show positions in PEA"
+
+# Get metrics
+hermes -q "what are PEA metrics?"
 ```
 
-## Configuration
+## Available Skills
 
-### Main Configuration File: `~/.hermes/config.yaml`
+### 1. Portfolio Manager (`cresus/portfolio_manager`)
 
-This is the main Hermes configuration file. The Cresus integration adds:
-- Agent personality and role
-- MCP server configuration
-- Available skills
-- Safety constraints
-- Logging settings
+Query and analyze Cresus portfolios via `cresus-mcp` CLI.
 
-### Skills
-
-Three main skills are included:
-
-#### 1. **portfolio_manager** (`skills/portfolio_manager.yml`)
-- Create and manage portfolios
-- Analyze portfolio performance
-- View positions and allocation
-- Compare multiple portfolios
-- Rebalance portfolios
-
-**Example interactions:**
-```
-"Create a portfolio called 'Growth' with 50000€"
-"Analyze my Main portfolio"
-"Compare Main and Secondary portfolios"
-"Rebalance portfolio to 60% stocks, 40% bonds"
+**Available Commands:**
+```bash
+cresus-mcp portfolio list                    # List all portfolios
+cresus-mcp portfolio positions <name>        # Get positions
+cresus-mcp portfolio metrics <name>          # Get metrics
+cresus-mcp portfolio performance <name>      # Get performance
+cresus-mcp portfolio allocation <name>       # Get allocation
+cresus-mcp portfolio value <name>            # Get value
 ```
 
-#### 2. **screener_analyzer** (`skills/screener_analyzer.yml`)
-- Create stock screeners
-- Test screener formulas
-- Run screeners to find matching stocks
-- Validate DSL formulas
+**Portfolios:**
+- PEA (French tax-advantaged account, real)
+- BNP (BNP Paribas, real)
+- test (Test portfolio)
+- _global (Global paper portfolio)
+- etf_pea_trend, cac_trend, nasdaq_100_trend (Strategy portfolios)
 
-**Example interactions:**
-```
-"Create a screener for momentum stocks with SHA and RSI"
-"Test the formula: sha_14_green and rsi_14 > 50"
-"Run the momentum screener"
-"Show results from the CAC40 momentum screener"
-```
+### 2. Screener Analyzer (`cresus/screener_analyzer`)
 
-#### 3. **performance_analyzer** (`skills/performance_analyzer.yml`)
-- Analyze portfolio metrics
-- Track performance history
-- Compare strategies
-- Generate performance reports
+Create and test stock screeners using DSL formulas.
 
-**Example interactions:**
-```
-"What's my Main portfolio's Sharpe ratio?"
-"Show me the transaction history for Secondary"
-"Analyze performance of the last 3 months"
-"Compare performance across all my portfolios"
-```
+**Available Actions:**
+- `list_screeners` - List all screeners
+- `create_screener` - Create new screener with formula
+- `validate_formula` - Test formula syntax
+- `run_screener` - Execute screener
+- `get_results` - Get screener results
 
-## Architecture
+### 3. Performance Analyzer (`cresus/performance_analyzer`)
 
-### Data Flow
+Analyze and compare portfolio performance.
+
+**Available Tools:**
+- `cresus_performance_summary` - Get portfolio metrics
+- `cresus_performance_compare` - Compare two portfolios
+
+## Configuration Files
+
+### `config.yaml`
+
+Main Hermes configuration with:
+- Model settings (Ollama at 192.168.0.160:11434)
+- Context window configuration (32768 minimum)
+- Skill definitions
+- Agent settings
+
+### `config/system_prompt.md`
+
+Instructions for the Hermes agent:
+- Focus on using `cresus-mcp` CLI commands
+- Return API data as-is without enrichment
+- Portfolio data includes company names (from API)
+
+### `skills/portfolio_manager/skill.yml`
+
+Portfolio manager skill definition with actions mapping to `cresus-mcp` commands.
+
+### `skills/screener_analyzer/skill.yml`
+
+Screener analyzer skill for DSL-based stock screening.
+
+### `skills/performance_analyzer/skill.yml`
+
+Performance analysis tools using run_tool.sh wrapper.
+
+## Data Flow
 
 ```
 User Input
     ↓
-Hermes Agent (understanding & planning)
+Hermes Agent (natural language understanding)
     ↓
-Skills (route to appropriate tool)
+Skill System (route to appropriate action)
     ↓
-MCP Client (format request)
+cresus-mcp CLI (execute command)
     ↓
-Cresus MCP Server (stdio)
+REST API (http://192.168.0.130:6501/api/v1)
     ↓
-API Calls (http://localhost:8000/api/v1)
-    ↓
-Cresus Backend (business logic)
-    ↓
-Response → Agent → User
+Response → Hermes → User
 ```
 
-### Skills Hierarchy
+## API Features
 
-```
-Hermes Agent
-├── portfolio_manager (16 operations)
-├── screener_analyzer (9 operations)
-├── performance_analyzer (6 operations)
-└── strategy_executor (8 operations)
-```
+Portfolio responses include:
+- **Company Names** - Now included in position data (enriched at source)
+- **Structured Data** - JSON responses for reliable parsing
+- **Real-time Prices** - Current market prices via Fundamental data
+- **Performance Metrics** - Sharpe ratio, max drawdown, win rate, etc.
 
-## Available Tools
-
-### Portfolio Operations (16)
-- `list_portfolios` - List all portfolios
-- `create_portfolio` - Create new portfolio
-- `get_portfolio` - Get portfolio details
-- `update_portfolio` - Update configuration
-- `delete_portfolio` - Delete portfolio
-- `get_portfolio_positions` - View current positions
-- `get_portfolio_metrics` - Get performance metrics
-- `get_portfolio_performance` - Get performance data
-- `get_portfolio_transactions` - View transaction history
-- `get_portfolio_value` - Get current value
-- `get_portfolio_allocation` - Get asset allocation
-- `get_portfolio_risk` - Get risk metrics
-- `add_position` - Add manual position
-- `close_position` - Close position
-- `compare_portfolios` - Compare multiple portfolios
-- `rebalance_portfolio` - Rebalance to target allocation
-
-### Screener Operations (9)
-- `list_screeners` - List screeners
-- `get_screener` - Get screener details
-- `create_screener` - Create new screener
-- `update_screener` - Update screener
-- `delete_screener` - Delete screener
-- `run_screener` - Execute screener
-- `validate_formula` - Test formula
-- `get_results` - Get screener results
-
-### Performance Analysis (6)
-- `get_metrics` - Portfolio metrics
-- `get_performance` - Performance history
-- `get_transactions` - Transaction log
-- Plus analytics capabilities
-
-## Safety Features
-
-Hermes includes built-in safety constraints:
-
-```yaml
-constraints:
-  max_portfolio_size: 50          # Max number of positions
-  min_position_size: 100€         # Minimum position size
-  max_daily_trades: 20            # Max trades per day
-  require_confirmation_for:
-    - "large_trades"              # > 10000€
-    - "new_portfolios"
-    - "strategy_changes"
-```
-
-**Confirmation Required For:**
-- Large trades (> 10,000€)
-- Creating new portfolios
-- Changing strategies
-- Major rebalancing
-
-## Environment Variables
-
-Located in `~/.hermes/.env`:
+## Usage Examples
 
 ```bash
-# API Configuration
-CRESUS_API_URL=http://localhost:8000/api/v1
-CRESUS_API_KEY=
+# List portfolios
+hermes -q "list my portfolios"
 
-# Agent Configuration
-HERMES_MODEL=gpt-4
-HERMES_TEMPERATURE=0.7
-HERMES_MAX_TOKENS=2000
+# Portfolio positions with company names
+hermes -q "show PEA positions"
+# Returns: [{"ticker": "MC.PA", "company_name": "LVMH...", "quantity": 2, ...}]
 
-# Safety
-HERMES_REQUIRE_CONFIRMATION=true
-HERMES_DAILY_LOSS_LIMIT=-0.05
+# Performance comparison
+hermes -q "compare PEA and BNP performance"
+
+# Screener operations
+hermes -q "create momentum screener with sha_14_green and rsi_14 > 50"
+
+# Validation
+hermes -q "validate formula: ema_20 > ema_50 and adx_14 > 25"
+```
+
+## Environment Setup
+
+Key environment variables in `~/.hermes/.env`:
+
+```bash
+# Model
+OLLAMA_BASE_URL=http://192.168.0.160:11434/v1
+OLLAMA_NUM_CTX=32768
+
+# API
+CRESUS_API_URL=http://192.168.0.130:6501/api/v1
+
+# Settings
+HERMES_MAX_TOKENS=16384
+HERMES_TEMPERATURE=0.2
 ```
 
 ## Troubleshooting
 
-### "MCP Server not responding"
-```bash
-# Check if API is running
-curl http://localhost:8000/api/v1/health
+### "No tool calls executed"
+- Verify Ollama is running: `curl http://192.168.0.160:11434/api/tags`
+- Check context window: `sudo systemctl show ollama | grep OLLAMA_NUM_CTX`
+- Should be 32768 or higher
 
-# Start API
-cresus service start api
-
-# Test MCP
-python -m src.mcp.main
-```
+### "Command not found: cresus-mcp"
+- Ensure cresus is installed: `pip install -e .`
+- Verify bin/cresus-mcp exists and is executable
+- Check PATH: `which cresus-mcp`
 
 ### "Portfolio not found"
-```bash
-# List available portfolios
-hermes "list my portfolios"
+- List available: `cresus-mcp portfolio list`
+- Ensure portfolio exists in ~/.cresus/db/portfolios/
 
-# Create missing portfolio
-hermes "create a portfolio called 'Main' with 100000€"
-```
-
-### "Formula validation error"
-```bash
-# Check available indicators
-hermes "what indicators are available?"
-
-# Validate formula step by step
-hermes "test formula: sha_14_green and rsi_14"
-```
-
-### Logs
-
-Check logs at:
-```
-~/.hermes/logs/hermes.log
-~/.hermes/logs/cresus_agent.log
-```
-
-## Examples
-
-### Portfolio Analysis Workflow
-
-```
-User: "Analyze my performance"
-
-Hermes:
-1. Lists all portfolios
-2. Gets metrics for each
-3. Generates comprehensive report
-4. Alerts on risk issues
-5. Suggests optimizations
-```
-
-### Screener Workflow
-
-```
-User: "Find momentum stocks in CAC40"
-
-Hermes:
-1. Creates screener with momentum formula
-2. Validates formula on sample data
-3. Runs screener on CAC40
-4. Shows results with top matches
-5. Suggests adding to watchlist
-```
-
-### Optimization Workflow
-
-```
-User: "Optimize my Main portfolio"
-
-Hermes:
-1. Analyzes current allocation
-2. Identifies concentration risks
-3. Suggests diversification
-4. Proposes rebalancing
-5. Executes rebalancing with confirmation
-```
-
-## Integration with Cresus APIs
-
-The MCP integration provides access to:
-
-### REST APIs (via MCP)
-- `/portfolios` - Portfolio management
-- `/screener` - Screener operations
-- `/strategies` - Strategy management
-- `/backtests` - Backtest analysis
-- `/watchlist` - Watchlist management
-- `/data` - Market data
-
-### Real-time Data
-- Portfolio positions and values
-- Transaction history
-- Performance metrics
-- Market indicators
-- Strategy signals
-
-## Advanced Configuration
-
-### Custom Prompts
-
-Edit `~/.hermes/config/system_prompt.md` to customize agent behavior
-
-### Custom Skills
-
-Add new skills in `~/.hermes/skills/`:
-
-```yaml
-skill_name: "my_skill"
-description: "What this skill does"
-triggers: ["trigger_words"]
-actions:
-  - name: "action_name"
-    mcp_tool: "cresus_mcp_tool"
-    parameters: [...]
-```
-
-### Extended Capabilities
-
-Extend agent with additional MCP servers:
-
-```yaml
-mcp_servers:
-  cresus:
-    # ... existing config
-  other_service:
-    command: "python -m other_service.mcp"
-```
+### "API connection failed"
+- Check API is running: `curl http://192.168.0.130:6501/api/v1/health`
+- Verify IP and port in config.yaml
+- Check network connectivity: `ping 192.168.0.130`
 
 ## Performance Tips
 
-1. **Cache Results**: Hermes caches API responses automatically
-2. **Batch Operations**: Combine multiple requests when possible
-3. **Limit Data**: Use `limit` parameters for large result sets
-4. **Monitor Resources**: Check `~/.hermes/logs/` for performance issues
+1. **Context Window** - Larger context (32K+) allows more comprehensive analysis
+2. **Skill Caching** - Skills cache results automatically
+3. **Batch Queries** - Combine multiple requests when possible
+4. **Temperature** - Keep at 0.2 for accurate data retrieval
+
+## Advanced Configuration
+
+### Custom System Prompt
+
+Edit `~/.hermes/config/system_prompt.md` to customize agent behavior and instructions.
+
+### Modify Skill Triggers
+
+Update trigger patterns in skill YAML files:
+```yaml
+triggers:
+  - "portfolio"
+  - "positions"
+  - ".*portfolio.*"  # Regex patterns supported
+```
+
+## Logs
+
+- Hermes logs: `~/.hermes/logs/`
+- Cresus logs: `~/.cresus/logs/`
+- Check for errors: `tail -f ~/.hermes/logs/*.log`
 
 ## Support
 
-For issues or questions:
-1. Check logs in `~/.hermes/logs/`
-2. Verify Cresus API is running
-3. Test MCP server directly: `python -m src.mcp.main`
-4. Review configuration in `~/.hermes/config/`
-
-## Further Reading
-
-- [MCP Protocol](https://modelcontextprotocol.io/)
-- [Cresus MCP Implementation](/src/mcp/README.md)
-- [Portfolio Management Guide](/docs/portfolio.md)
-- [Screener DSL Guide](/docs/screener.md)
+For issues:
+1. Check logs in `~/.hermes/logs/` and `~/.cresus/logs/`
+2. Test CLI directly: `cresus portfolio list`
+3. Verify API: `curl http://192.168.0.130:6501/api/v1/health`
+4. Review skill configs in `~/.hermes/skills/cresus/`
