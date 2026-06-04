@@ -207,7 +207,7 @@ class HermesInitializer:
             console.print(f"[red]✗ Deployment failed: {e}[/red]")
             return False
 
-    def clean_remote(self, remote_host: str = None) -> bool:
+    def clean_remote(self, remote_host: str = None, force: bool = False) -> bool:
         """Clean up Cresus-specific files from .hermes via SSH or local.
 
         Only removes Cresus skills and config - preserves user customizations.
@@ -215,6 +215,7 @@ class HermesInitializer:
         Args:
             remote_host: SSH remote in format user@host or host.
                         If None, cleans local .hermes directory.
+            force: If True, skip confirmation prompt.
 
         Returns:
             True if cleanup succeeded, False otherwise
@@ -263,16 +264,17 @@ class HermesInitializer:
 
             console.print(result.stdout)
 
-            # Confirm before removing
-            console.print("\n[bold yellow]This will remove (Cresus-specific only):[/bold yellow]")
-            console.print("  ~/.hermes/skills/cresus/           (Cresus skills)")
-            console.print("  ~/.hermes/config/system_prompt.md  (Cresus system prompt)")
-            console.print("\n[dim]Other .hermes config and logs will be preserved[/dim]")
+            # Confirm before removing (unless --force)
+            if not force:
+                console.print("\n[bold yellow]This will remove (Cresus-specific only):[/bold yellow]")
+                console.print("  ~/.hermes/skills/cresus/           (Cresus skills)")
+                console.print("  ~/.hermes/config/system_prompt.md  (Cresus system prompt)")
+                console.print("\n[dim]Other .hermes config and logs will be preserved[/dim]")
 
-            response = input("\n[bold]Are you sure? (yes/no): [/bold]")
-            if response.lower() != "yes":
-                console.print("[dim]Cleanup cancelled[/dim]")
-                return True
+                response = input("\n[bold]Are you sure? (yes/no): [/bold]")
+                if response.lower() != "yes":
+                    console.print("[dim]Cleanup cancelled[/dim]")
+                    return True
 
             # Remove only Cresus-specific files
             if remote_host:

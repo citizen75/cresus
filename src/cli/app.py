@@ -282,10 +282,11 @@ class CresusCLI(cmd2.Cmd):
 
 	def _clean_remote_hermes(self, args_str: str):
 		"""Clean up .hermes directory (local or remote)."""
-		# Extract remote host (optional)
+		# Extract remote host (optional) and --force flag
 		parts = args_str.split()
 		clean_idx = parts.index("--clean") if "--clean" in parts else -1
 		remote_host = None
+		force = "--force" in parts
 
 		if clean_idx >= 0 and clean_idx + 1 < len(parts):
 			# Check if next part looks like a host (contains @ or dots)
@@ -298,10 +299,10 @@ class CresusCLI(cmd2.Cmd):
 			hermes_init = HermesInitializer(self.project_root)
 
 			if remote_host:
-				hermes_init.clean_remote(remote_host)
+				hermes_init.clean_remote(remote_host, force=force)
 			else:
 				# Local cleanup
-				hermes_init.clean_remote(None)
+				hermes_init.clean_remote(None, force=force)
 		except ImportError:
 			console.print("[red]✗ Hermes initialization module not found[/red]")
 		except Exception as e:
