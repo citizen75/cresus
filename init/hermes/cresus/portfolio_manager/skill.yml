@@ -24,13 +24,13 @@ actions:
 
   - name: "list_portfolios"
     description: "List all available portfolios in Cresus"
-    command: "cresus-mcp portfolio list"
+    command: "cresus portfolio list --mcp"
     output_format: "json"
     parameters: []
 
   - name: "get_portfolio_positions"
     description: "Get all positions in a specific portfolio"
-    command: "cresus-mcp portfolio positions {{portfolio}}"
+    command: "cresus portfolio positions {{portfolio}} --mcp"
     output_format: "json"
     parameters:
       - name: "portfolio"
@@ -40,7 +40,7 @@ actions:
 
   - name: "get_portfolio_metrics"
     description: "Get performance metrics for a portfolio"
-    command: "cresus-mcp portfolio metrics {{portfolio}}"
+    command: "cresus portfolio metrics {{portfolio}} --mcp"
     output_format: "json"
     parameters:
       - name: "portfolio"
@@ -50,7 +50,7 @@ actions:
 
   - name: "get_portfolio_performance"
     description: "Get historical performance data for a portfolio"
-    command: "cresus-mcp portfolio performance {{portfolio}}"
+    command: "cresus portfolio performance {{portfolio}} --mcp"
     output_format: "json"
     parameters:
       - name: "portfolio"
@@ -60,7 +60,7 @@ actions:
 
   - name: "get_portfolio_allocation"
     description: "Get portfolio asset allocation breakdown"
-    command: "cresus-mcp portfolio allocation {{portfolio}}"
+    command: "cresus portfolio allocation {{portfolio}} --mcp"
     output_format: "json"
     parameters:
       - name: "portfolio"
@@ -70,7 +70,7 @@ actions:
 
   - name: "get_portfolio_value"
     description: "Get total portfolio value and cash position"
-    command: "cresus-mcp portfolio value {{portfolio}}"
+    command: "cresus portfolio value {{portfolio}} --mcp"
     output_format: "json"
     parameters:
       - name: "portfolio"
