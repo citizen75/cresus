@@ -47,6 +47,22 @@ class PortfolioManager:
         self.portfolios_dir.mkdir(parents=True, exist_ok=True)
         self.orders_dir.mkdir(parents=True, exist_ok=True)
         self.cache = PortfolioCache(context=self.context)
+        self.company_name_cache = {}  # Cache company names by ticker
+
+    def _get_company_name(self, ticker: str) -> str:
+        """Get company name for ticker with caching."""
+        if ticker in self.company_name_cache:
+            return self.company_name_cache[ticker]
+
+        try:
+            info = Fundamental(ticker).get_company_info()
+            name = info.get("company_name", ticker)
+            self.company_name_cache[ticker] = name
+            return name
+        except Exception as e:
+            logger.warning(f"Failed to get company name for {ticker}: {e}")
+            self.company_name_cache[ticker] = ticker
+            return ticker
 
     @staticmethod
     def _normalize_portfolio_name(name: str) -> str:
@@ -319,8 +335,10 @@ class PortfolioManager:
                 # Use cached current_price from portfolio.json instead of doing fresh lookup
                 current_price = float(row.get("current_price", avg_entry_price))
                 pos_value = quantity * current_price
+                company_name = self._get_company_name(ticker)
                 positions.append({
                     "ticker": ticker,
+                    "company_name": company_name,
                     "quantity": quantity,
                     "avg_entry_price": avg_entry_price,
                     "current_price": current_price,
@@ -345,7 +363,7 @@ class PortfolioManager:
         }
 
     def get_portfolio_positions(self, name: str) -> Optional[Dict[str, Any]]:
-        """Get open positions."""
+        """Get open positions with company names."""
         journal = Journal(name, context=self.context)
         open_pos = journal.get_open_positions()
         positions = []
@@ -354,8 +372,10 @@ class PortfolioManager:
             quantity = float(row["quantity"])
             avg_entry_price = float(row["avg_entry_price"])
             current_price = Fundamental(ticker).get_current_price() or avg_entry_price
+            company_name = self._get_company_name(ticker)
             positions.append({
                 "ticker": ticker,
+                "company_name": company_name,
                 "quantity": quantity,
                 "avg_entry_price": avg_entry_price,
                 "current_price": current_price,
@@ -688,6 +708,7 @@ class PortfolioManager:
             weight = (pos["position_value"] / total_value * 100) if total_value > 0 else 0
             positions_by_weight.append({
                 "ticker": pos["ticker"],
+                "company_name": pos.get("company_name", pos["ticker"]),
                 "weight": round(weight, 2),
                 "value": round(pos["position_value"], 2),
                 "quantity": pos["quantity"],
@@ -745,7 +766,7 @@ class PortfolioManager:
 
             top_holdings.append({
                 "ticker": ticker,
-                "name": ticker,
+                "name": pos.get("company_name", ticker),
                 "weight": round(weight, 2),
                 "value": round(pos["position_value"], 2),
                 "quantity": pos["quantity"],
