@@ -139,9 +139,9 @@ class HermesInitializer:
             # Step 5: Deploy Cresus skills to remote (with version updates)
             console.print("[dim]Deploying Cresus skills to remote...[/dim]")
             skills_cmd = (
-                "mkdir -p ~/.hermes/skills && "
-                "rm -rf ~/.hermes/skills/{portfolio_manager,screener_analyzer,performance_analyzer} 2>/dev/null; "
-                "rsync -av init/hermes/skills/ ~/.hermes/skills/ --quiet"
+                "mkdir -p ~/.hermes/skills/cresus && "
+                "rm -rf ~/.hermes/skills/cresus/* 2>/dev/null; "
+                "rsync -av init/hermes/cresus/ ~/.hermes/skills/cresus/ --quiet"
             )
             result = subprocess.run(
                 ["ssh", remote_host, f"cd ~/cresus && {skills_cmd}"],
@@ -154,7 +154,7 @@ class HermesInitializer:
                 console.print(f"[red]✗ Skill deployment failed: {result.stderr}[/red]")
                 return False
 
-            console.print("[green]✓ Skills deployed (latest versions)[/green]")
+            console.print("[green]✓ Skills deployed to ~/.hermes/skills/cresus/ (latest versions)[/green]")
 
             # Step 6: Update Hermes system prompt
             console.print("[dim]Updating Hermes system prompt...[/dim]")
@@ -291,7 +291,7 @@ class HermesInitializer:
                     text=True,
                     timeout=30
                 )
-                redeploy_cmd = f"cresus init --hermes {remote_host}"
+                redeploy_cmd = f"cresus init --hermes --deploy {remote_host}"
             else:
                 console.print("\n[dim]Removing Cresus files from local .hermes...[/dim]")
                 rm_cmd = (
@@ -598,26 +598,26 @@ class HermesInitializer:
 
     def _copy_skills(self):
         """Copy skill definitions from template, updating Cresus skills if newer version available."""
-        skills_src = self.init_template / "skills"
-        skills_dst = self.hermes_home / "skills"
+        # Cresus skills are in init/hermes/cresus/ subdirectory
+        cresus_skills_src = self.init_template / "cresus"
+        cresus_skills_dst = self.hermes_home / "skills" / "cresus"
 
-        if not skills_src.exists():
-            console.print("[yellow]⚠ Skills template not found[/yellow]")
+        if not cresus_skills_src.exists():
+            console.print("[yellow]⚠ Cresus skills template not found[/yellow]")
             return
 
         copied = []
         updated = []
         skipped = []
-        cresus_skills = {"portfolio_manager", "screener_analyzer", "performance_analyzer"}
 
-        # Copy skill directories (each skill is a folder)
-        for skill_dir in skills_src.iterdir():
+        # Copy Cresus skill directories to ~/.hermes/skills/cresus/
+        for skill_dir in cresus_skills_src.iterdir():
             if skill_dir.is_dir():
-                dst_dir = skills_dst / skill_dir.name
+                dst_dir = cresus_skills_dst / skill_dir.name
                 skill_name = skill_dir.name
 
-                # Check if this is a Cresus skill with a newer version
-                if skill_name in cresus_skills and dst_dir.exists():
+                # Check if skill with newer version exists
+                if dst_dir.exists():
                     if self._should_update_skill(skill_dir, dst_dir):
                         try:
                             import shutil
@@ -628,25 +628,22 @@ class HermesInitializer:
                             console.print(f"[red]✗ Error updating {skill_name}: {e}[/red]")
                     else:
                         skipped.append(skill_name)
-                elif not dst_dir.exists():
+                else:
                     try:
                         import shutil
                         shutil.copytree(skill_dir, dst_dir)
                         copied.append(skill_name)
                     except Exception as e:
                         console.print(f"[red]✗ Error copying {skill_name}: {e}[/red]")
-                else:
-                    # Non-Cresus skill exists - preserve it
-                    skipped.append(skill_name)
 
         if copied:
-            console.print(f"[green]✓ Copied {len(copied)} skill(s): {', '.join(copied)}[/green]")
+            console.print(f"[green]✓ Copied {len(copied)} Cresus skill(s): {', '.join(copied)}[/green]")
 
         if updated:
             console.print(f"[green]✓ Updated {len(updated)} Cresus skill(s): {', '.join(updated)}[/green]")
 
         if skipped:
-            console.print(f"[dim]⊘ Preserved {len(skipped)} existing skill(s): {', '.join(skipped)}[/dim]")
+            console.print(f"[dim]⊘ Preserved {len(skipped)} existing Cresus skill(s): {', '.join(skipped)}[/dim]")
 
     def _should_update_skill(self, src_dir: Path, dst_dir: Path) -> bool:
         """Check if skill.yml in src has a newer version than dst."""
