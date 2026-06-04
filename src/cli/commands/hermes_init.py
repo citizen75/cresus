@@ -207,39 +207,59 @@ class HermesInitializer:
             console.print(f"[red]✗ Deployment failed: {e}[/red]")
             return False
 
-    def clean_remote(self, remote_host: str) -> bool:
-        """Clean up Cresus-specific files from remote .hermes via SSH.
+    def clean_remote(self, remote_host: str = None) -> bool:
+        """Clean up Cresus-specific files from .hermes via SSH or local.
 
         Only removes Cresus skills and config - preserves user customizations.
 
         Args:
-            remote_host: SSH remote in format user@host or host
+            remote_host: SSH remote in format user@host or host.
+                        If None, cleans local .hermes directory.
 
         Returns:
             True if cleanup succeeded, False otherwise
         """
-        console.print(f"[bold yellow]Cleaning Cresus from remote .hermes on {remote_host}[/bold yellow]\n")
+        if remote_host:
+            console.print(f"[bold yellow]Cleaning Cresus from remote .hermes on {remote_host}[/bold yellow]\n")
+        else:
+            console.print(f"[bold yellow]Cleaning Cresus from local .hermes[/bold yellow]\n")
 
-        # Parse remote host
-        if "@" not in remote_host:
+        # Validate remote host if provided
+        if remote_host and "@" not in remote_host:
             console.print("[red]✗ Invalid remote format. Use: user@host[/red]")
             return False
 
         try:
             # Show what will be removed (only Cresus-specific items)
-            console.print("[dim]Checking remote Cresus files...[/dim]")
-            check_cmd = (
-                "echo '=== Cresus Skills ===' && "
-                "du -sh ~/.hermes/skills/cresus 2>/dev/null || echo 'Not found' && "
-                "echo '=== System Prompt ===' && "
-                "ls -lh ~/.hermes/config/system_prompt.md 2>/dev/null || echo 'Not found'"
-            )
-            result = subprocess.run(
-                ["ssh", remote_host, check_cmd],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
+            if remote_host:
+                console.print("[dim]Checking remote Cresus files...[/dim]")
+                check_cmd = (
+                    "echo '=== Cresus Skills ===' && "
+                    "du -sh ~/.hermes/skills/cresus 2>/dev/null || echo 'Not found' && "
+                    "echo '=== System Prompt ===' && "
+                    "ls -lh ~/.hermes/config/system_prompt.md 2>/dev/null || echo 'Not found'"
+                )
+                result = subprocess.run(
+                    ["ssh", remote_host, check_cmd],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+            else:
+                console.print("[dim]Checking local Cresus files...[/dim]")
+                check_cmd = (
+                    "echo '=== Cresus Skills ===' && "
+                    f"du -sh {self.hermes_home}/skills/cresus 2>/dev/null || echo 'Not found' && "
+                    "echo '=== System Prompt ===' && "
+                    f"ls -lh {self.hermes_home}/config/system_prompt.md 2>/dev/null || echo 'Not found'"
+                )
+                result = subprocess.run(
+                    check_cmd,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
 
             console.print(result.stdout)
 
@@ -255,26 +275,43 @@ class HermesInitializer:
                 return True
 
             # Remove only Cresus-specific files
-            console.print("\n[dim]Removing Cresus files from remote .hermes...[/dim]")
-            rm_cmd = (
-                "rm -rf ~/.hermes/skills/cresus 2>/dev/null; "
-                "rm -f ~/.hermes/config/system_prompt.md 2>/dev/null; "
-                "echo 'OK'"
-            )
-            result = subprocess.run(
-                ["ssh", remote_host, rm_cmd],
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
+            if remote_host:
+                console.print("\n[dim]Removing Cresus files from remote .hermes...[/dim]")
+                rm_cmd = (
+                    "rm -rf ~/.hermes/skills/cresus 2>/dev/null; "
+                    "rm -f ~/.hermes/config/system_prompt.md 2>/dev/null; "
+                    "echo 'OK'"
+                )
+                result = subprocess.run(
+                    ["ssh", remote_host, rm_cmd],
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+                redeploy_cmd = f"cresus init --hermes {remote_host}"
+            else:
+                console.print("\n[dim]Removing Cresus files from local .hermes...[/dim]")
+                rm_cmd = (
+                    f"rm -rf {self.hermes_home}/skills/cresus 2>/dev/null; "
+                    f"rm -f {self.hermes_home}/config/system_prompt.md 2>/dev/null; "
+                    "echo 'OK'"
+                )
+                result = subprocess.run(
+                    rm_cmd,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+                redeploy_cmd = "cresus init --hermes"
 
             if result.returncode != 0 or "OK" not in result.stdout:
                 console.print(f"[yellow]⚠ Cleanup warning: {result.stderr}[/yellow]")
                 # Don't fail - files may not exist
 
-            console.print("[green]✓ Cresus files cleaned from remote .hermes[/green]")
+            console.print("[green]✓ Cresus files cleaned[/green]")
             console.print("\n[dim]To redeploy, run:[/dim]")
-            console.print(f"[cyan]  cresus init --hermes {remote_host}[/cyan]")
+            console.print(f"[cyan]  {redeploy_cmd}[/cyan]")
 
             return True
 
