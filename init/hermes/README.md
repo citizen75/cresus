@@ -12,17 +12,29 @@ Hermes is an autonomous agent framework that queries and analyzes Cresus portfol
 
 ## Quick Start
 
-### Setup
+### Automated Setup (Recommended)
+
+```bash
+# Initialize Cresus with Hermes (includes all setup)
+cresus init --hermes
+
+# Deploy to remote server
+cresus init --hermes --deploy user@host
+```
+
+### Manual Setup
+
+If you prefer to set up manually:
 
 1. **Copy skills to Hermes:**
    ```bash
-   mkdir -p ~/.hermes/skills/cresus
-   cp -r init/hermes/skills/* ~/.hermes/skills/cresus/
+   mkdir -p ~/.hermes/skills
+   cp -r init/hermes/skills/* ~/.hermes/skills/
    ```
 
 2. **Update Hermes configuration:**
    ```bash
-   # Copy config file
+   # Copy config file (merges with existing)
    cp init/hermes/config.yaml ~/.hermes/config.yaml
    
    # Update system prompt
@@ -61,7 +73,7 @@ hermes -q "what are PEA metrics?"
 
 ## Available Skills
 
-### 1. Portfolio Manager (`cresus/portfolio_manager`)
+### 1. Portfolio Manager (`portfolio_manager`)
 
 Query and analyze Cresus portfolios via `cresus-mcp` CLI.
 
@@ -82,7 +94,7 @@ cresus-mcp portfolio value <name>            # Get value
 - _global (Global paper portfolio)
 - etf_pea_trend, cac_trend, nasdaq_100_trend (Strategy portfolios)
 
-### 2. Screener Analyzer (`cresus/screener_analyzer`)
+### 2. Screener Analyzer (`screener_analyzer`)
 
 Create and test stock screeners using DSL formulas.
 
@@ -93,7 +105,7 @@ Create and test stock screeners using DSL formulas.
 - `run_screener` - Execute screener
 - `get_results` - Get screener results
 
-### 3. Performance Analyzer (`cresus/performance_analyzer`)
+### 3. Performance Analyzer (`performance_analyzer`)
 
 Analyze and compare portfolio performance.
 
@@ -247,4 +259,4 @@ For issues:
 1. Check logs in `~/.hermes/logs/` and `~/.cresus/logs/`
 2. Test CLI directly: `cresus portfolio list`
 3. Verify API: `curl http://192.168.0.130:6501/api/v1/health`
-4. Review skill configs in `~/.hermes/skills/cresus/`
+4. Review skill configs in `~/.hermes/skills/`

@@ -1,6 +1,3 @@
-# Hermes Configuration for Cresus Integration
-# Optimized for local Ollama with Cresus portfolio management
-
 model:
   default: qwen3.5:9b
   provider: custom
@@ -13,49 +10,90 @@ model:
   top_p: 0.95
   temperature: 0.2
   api_mode: chat_completions
-
-# Cresus Integration
-api:
-  base_url: http://192.168.0.130:6501/api/v1
-  timeout: 30
-  retry_count: 3
-  ssl_verify: true
-
-# Skills configuration
-skills:
-  external_dirs:
-  - ~/.hermes/skills
-  template_vars: true
-  enabled:
-  - cresus/portfolio_manager
-  - cresus/screener_analyzer
-  - cresus/performance_analyzer
-  disabled: []
-
-# Agent configuration
+providers: {}
+fallback_providers: []
+credential_pool_strategies: {}
+toolsets:
+- hermes-cli
 agent:
   max_turns: 60
+  gateway_timeout: 1800
+  restart_drain_timeout: 180
+  api_max_retries: 3
+  service_tier: ''
   tool_use_enforcement: auto
+  task_completion_guidance: true
+  environment_probe: true
+  environment_hint: ''
+  gateway_timeout_warning: 900
+  clarify_timeout: 600
+  gateway_notify_interval: 180
+  gateway_auto_continue_freshness: 3600
+  image_input_mode: auto
+  disabled_toolsets: []
+  tool_choice: auto
   enable_tools: true
   allow_mcp_tools: true
-
-# Prompts
-prompts:
-  system: /Users/gsamoun/.hermes/config/system_prompt.md
-
-# Display settings
-display:
-  compact: false
-  streaming: true
-  show_reasoning: false
-
-# Tools configuration
-tools:
+  verbose: false
+  reasoning_effort: medium
+terminal:
+  backend: local
+  modal_mode: auto
+  cwd: .
+  timeout: 180
+  env_passthrough: []
+  shell_init_files: []
+  auto_source_bashrc: true
+  docker_image: nikolaik/python-nodejs:python3.11-nodejs20
+  docker_forward_env: []
+  docker_env: {}
+  singularity_image: docker://nikolaik/python-nodejs:python3.11-nodejs20
+  modal_image: nikolaik/python-nodejs:python3.11-nodejs20
+  daytona_image: nikolaik/python-nodejs:python3.11-nodejs20
+  container_cpu: 1
+  container_memory: 5120
+  container_disk: 51200
+  container_persistent: true
+  docker_volumes: []
+  docker_mount_cwd_to_workspace: false
+  docker_extra_args: []
+  docker_run_as_host_user: false
+  persistent_shell: true
+  lifetime_seconds: 300
+web:
+  backend: ''
+  search_backend: ''
+  extract_backend: ''
+browser:
+  inactivity_timeout: 120
+  command_timeout: 30
+  record_sessions: false
+  allow_private_urls: false
+  engine: auto
+  auto_local_for_private_urls: true
+  cdp_url: ''
+  dialog_policy: must_respond
+  dialog_timeout_s: 300
+  camofox:
+    managed_persistence: false
+    user_id: ''
+    session_key: ''
+    adopt_existing_tab: false
+    rewrite_loopback_urls: false
+    loopback_host_alias: host.docker.internal
+checkpoints:
+  enabled: false
+  max_snapshots: 20
+  max_total_size_mb: 500
+  max_file_size_mb: 10
+  auto_prune: true
+  retention_days: 7
+  delete_orphans: true
+  min_interval_hours: 24
+compression:
   enabled: true
-  timeout: 30
-  max_retries: 3
-
-# Logging
-logging:
-  level: INFO
-  file: ~/.hermes/logs/cresus.log
+  level: 5
+  blacklist_mime_types:
+  - video/mp4
+  - audio/mpeg
+  - image/jpeg
