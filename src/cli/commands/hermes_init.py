@@ -488,6 +488,9 @@ class HermesInitializer:
             if not merge_only:
                 self._copy_config_files()
 
+            # Always ensure system_prompt.md is present (Cresus-specific)
+            self._ensure_system_prompt()
+
             # Setup config.yaml with versioned backups (not skipped in merge_only)
             self._setup_config_yaml()
 
@@ -550,9 +553,9 @@ class HermesInitializer:
         copied = []
         skipped = []
 
-        # Copy individual config files
+        # Copy individual config files (skip system_prompt - handled separately)
         for config_file in config_src.glob("*"):
-            if config_file.is_file():
+            if config_file.is_file() and config_file.name != "system_prompt.md":
                 dst_file = config_dst / config_file.name
                 if not dst_file.exists():
                     try:
@@ -572,6 +575,25 @@ class HermesInitializer:
 
         if skipped:
             console.print(f"[dim]⊘ Preserved {len(skipped)} existing config file(s): {', '.join(skipped)}[/dim]")
+
+    def _ensure_system_prompt(self):
+        """Ensure system_prompt.md is present (always copy from template)."""
+        config_src = self.init_template / "config"
+        config_dst = self.hermes_home / "config"
+        prompt_src = config_src / "system_prompt.md"
+        prompt_dst = config_dst / "system_prompt.md"
+
+        if not prompt_src.exists():
+            return
+
+        try:
+            with open(prompt_src, "r") as f:
+                content = f.read()
+            with open(prompt_dst, "w") as f:
+                f.write(content)
+            console.print("[green]✓ System prompt updated[/green]")
+        except Exception as e:
+            console.print(f"[red]✗ Error copying system prompt: {e}[/red]")
 
     def _copy_skills(self):
         """Copy skill definitions from template (skip if they exist)."""
