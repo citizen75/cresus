@@ -135,15 +135,19 @@ class CresusCLI(cmd2.Cmd):
 		"""Initialize ~/.cresus directory structure with config files.
 
 		Usage:
-			init                         # Initialize Cresus only
-			init --hermes                # Initialize Cresus + Hermes (merge with existing, default)
-			init --hermes --report       # Show merge report (what would be added/preserved)
-			init --hermes --full         # Full init (overwrites everything, creates fresh .env)
+			init                              # Initialize Cresus only
+			init --hermes                     # Initialize Cresus + Hermes (merge with existing, default)
+			init --hermes --report            # Show merge report (what would be added/preserved)
+			init --hermes --full              # Full init (overwrites everything, creates fresh .env)
+			init --hermes --deploy user@host  # Deploy to remote server via SSH
+			init --hermes --clean user@host   # Clean up remote .hermes directory
 		"""
 		args_str = str(args).strip() if args else ""
 
-		if "--hermes" in args_str:
-			self._init_with_hermes()
+		if "--clean" in args_str:
+			self._clean_remote_hermes(args_str)
+		elif "--hermes" in args_str:
+			self._init_with_hermes(args_str)
 		else:
 			self._init_cresus_directory()
 
@@ -276,18 +280,56 @@ class CresusCLI(cmd2.Cmd):
 		console.print(f"[dim]Configuration location: {cresus_home}[/dim]")
 		console.print(f"[dim]Edit {cresus_home / '.env'} to customize settings[/dim]")
 
-	def _init_with_hermes(self):
-		"""Initialize Cresus + Hermes agent."""
+	def _clean_remote_hermes(self, args_str: str):
+		"""Clean up remote .hermes directory."""
+		# Extract remote host
+		parts = args_str.split()
+		clean_idx = parts.index("--clean") if "--clean" in parts else -1
+		remote_host = None
+
+		if clean_idx >= 0 and clean_idx + 1 < len(parts):
+			remote_host = parts[clean_idx + 1]
+
+		if not remote_host:
+			console.print("[red]✗ Remote host required: init --hermes --clean user@host[/red]")
+			return
+
+		try:
+			from cli.commands.hermes_init import HermesInitializer
+			hermes_init = HermesInitializer(self.project_root)
+			hermes_init.clean_remote(remote_host)
+		except ImportError:
+			console.print("[red]✗ Hermes initialization module not found[/red]")
+		except Exception as e:
+			console.print(f"[red]✗ Error: {e}[/red]")
+
+	def _init_with_hermes(self, args_str: str = ""):
+		"""Initialize Cresus + Hermes agent.
+
+		Args:
+			args_str: Command arguments string
+		"""
 		import sys
 
 		# Check for flags
-		args_str = ' '.join(sys.argv)
+		if not args_str:
+			args_str = ' '.join(sys.argv)
+
 		report_only = "--report" in args_str
 		full_init = "--full" in args_str
-		merge_only = not full_init  # Default to merge (merge_only=True)
+		deploy_mode = "--deploy" in args_str
+		merge_only = not full_init and not deploy_mode
 
-		# First initialize Cresus (unless we're only doing merge/report)
-		if not merge_only and not report_only:
+		# Extract remote host if deploying
+		remote_host = None
+		if deploy_mode:
+			parts = args_str.split()
+			deploy_idx = parts.index("--deploy") if "--deploy" in parts else -1
+			if deploy_idx >= 0 and deploy_idx + 1 < len(parts):
+				remote_host = parts[deploy_idx + 1]
+
+		# First initialize Cresus (unless we're only doing merge/report/deploy)
+		if not merge_only and not report_only and not deploy_mode:
 			self._init_cresus_directory()
 
 		# Then initialize Hermes
@@ -295,7 +337,16 @@ class CresusCLI(cmd2.Cmd):
 			from cli.commands.hermes_init import HermesInitializer
 			hermes_init = HermesInitializer(self.project_root)
 
-			if report_only:
+			if deploy_mode:
+				# Deploy to remote server
+				if not remote_host:
+					console.print("[red]✗ Remote host required: init --hermes --deploy user@host[/red]")
+					return
+				if hermes_init.deploy_to_remote(remote_host):
+					console.print(f"[green]✓ Hermes deployed to {remote_host}[/green]")
+				else:
+					console.print("[red]✗ Deployment failed[/red]")
+			elif report_only:
 				# Generate merge report without making changes
 				hermes_init.generate_merge_report()
 			else:

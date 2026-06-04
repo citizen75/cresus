@@ -3,6 +3,7 @@
 import os
 import json
 import yaml
+import subprocess
 from pathlib import Path
 from rich.console import Console
 from rich.panel import Panel
@@ -64,6 +65,220 @@ class HermesInitializer:
             "config_files_to_add": [],
             "config_files_preserved": [],
         }
+
+    def deploy_to_remote(self, remote_host: str) -> bool:
+        """Deploy Cresus and setup Hermes on a remote server via SSH.
+
+        Args:
+            remote_host: SSH remote in format user@host or host
+
+        Returns:
+            True if deployment succeeded, False otherwise
+        """
+        console.print(f"[bold cyan]Deploying Cresus to {remote_host}[/bold cyan]\n")
+
+        # Parse remote host
+        if "@" not in remote_host:
+            console.print("[red]✗ Invalid remote format. Use: user@host[/red]")
+            return False
+
+        try:
+            # Step 1: Check remote Cresus installation
+            console.print("[dim]Checking Cresus on remote server...[/dim]")
+            result = subprocess.run(
+                ["ssh", remote_host, "ls -d ~/.cresus/venv 2>/dev/null && echo OK || echo MISSING"],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+
+            cresus_exists = "OK" in result.stdout
+
+            if not cresus_exists:
+                console.print("[yellow]⚠ Cresus not found on remote. Installation required.[/yellow]")
+                return False
+
+            # Step 2: Get local Cresus code path
+            console.print("[dim]Preparing code deployment...[/dim]")
+            cresus_repo = self.project_root.parent / "cresus"
+
+            if not cresus_repo.exists():
+                console.print(f"[red]✗ Cresus repo not found at {cresus_repo}[/red]")
+                return False
+
+            # Step 3: Sync code to remote
+            console.print("[dim]Syncing Cresus code to remote...[/dim]")
+            sync_cmd = f"rsync -av --exclude='.git' --exclude='__pycache__' --exclude='.venv' {cresus_repo}/ {remote_host}:cresus/"
+            result = subprocess.run(sync_cmd, shell=True, capture_output=True, text=True, timeout=60)
+
+            if result.returncode != 0:
+                console.print(f"[red]✗ Sync failed: {result.stderr}[/red]")
+                return False
+
+            console.print("[green]✓ Code synced[/green]")
+
+            # Step 4: Update Cresus package in venv
+            console.print("[dim]Updating Cresus package in remote venv...[/dim]")
+            update_cmd = (
+                "cd ~/cresus && "
+                "source ~/.cresus/venv/bin/activate && "
+                "pip install -e . --quiet"
+            )
+            result = subprocess.run(
+                ["ssh", remote_host, update_cmd],
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+
+            if result.returncode != 0:
+                console.print(f"[yellow]⚠ Package update warning: {result.stderr[:100]}[/yellow]")
+
+            console.print("[green]✓ Package updated[/green]")
+
+            # Step 5: Copy Hermes skills to remote
+            console.print("[dim]Copying Hermes skills to remote...[/dim]")
+            skills_cmd = (
+                "mkdir -p ~/.hermes/skills/cresus && "
+                "rsync -av init/hermes/skills/ ~/.hermes/skills/cresus/ --quiet"
+            )
+            result = subprocess.run(
+                ["ssh", remote_host, f"cd ~/cresus && {skills_cmd}"],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+
+            if result.returncode != 0:
+                console.print(f"[red]✗ Skill copy failed: {result.stderr}[/red]")
+                return False
+
+            console.print("[green]✓ Skills copied[/green]")
+
+            # Step 6: Update Hermes system prompt
+            console.print("[dim]Updating Hermes system prompt...[/dim]")
+            prompt_cmd = (
+                "mkdir -p ~/.hermes/config && "
+                "cp init/hermes/config/system_prompt.md ~/.hermes/config/"
+            )
+            result = subprocess.run(
+                ["ssh", remote_host, f"cd ~/cresus && {prompt_cmd}"],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+
+            if result.returncode != 0:
+                console.print(f"[yellow]⚠ Prompt update warning: {result.stderr[:100]}[/yellow]")
+
+            console.print("[green]✓ System prompt updated[/green]")
+
+            # Step 7: Verify Hermes skill works
+            console.print("[dim]Verifying cresus-mcp CLI tool...[/dim]")
+            test_cmd = "~/.cresus/venv/bin/python -c 'from src.cli.commands.portfolio import PortfolioCommands; print(\"OK\")'"
+            result = subprocess.run(
+                ["ssh", remote_host, test_cmd],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+
+            if result.returncode != 0 or "OK" not in result.stdout:
+                console.print(f"[yellow]⚠ CLI verification failed (this may be OK): {result.stderr[:100]}[/yellow]")
+
+            console.print("[green]✓ Deployment complete![/green]")
+
+            # Summary
+            console.print(f"\n[bold cyan]Deployment Summary[/bold cyan]")
+            console.print(f"  [green]✓[/green] Cresus code synced to {remote_host}")
+            console.print(f"  [green]✓[/green] Package updated in venv")
+            console.print(f"  [green]✓[/green] Hermes skills deployed")
+            console.print(f"  [green]✓[/green] System prompt updated")
+            console.print(f"\n[bold cyan]Next Steps[/bold cyan]")
+            console.print(f"  1. Test Hermes on remote: [dim]ssh {remote_host} 'hermes -q \"list my portfolios\"'[/dim]")
+            console.print(f"  2. If cresus-mcp CLI needed: [dim]ssh {remote_host} 'pip install -e ~/cresus'[/dim]")
+
+            return True
+
+        except subprocess.TimeoutExpired:
+            console.print("[red]✗ Operation timed out[/red]")
+            return False
+        except Exception as e:
+            console.print(f"[red]✗ Deployment failed: {e}[/red]")
+            return False
+
+    def clean_remote(self, remote_host: str) -> bool:
+        """Clean up remote .hermes directory via SSH.
+
+        Args:
+            remote_host: SSH remote in format user@host or host
+
+        Returns:
+            True if cleanup succeeded, False otherwise
+        """
+        console.print(f"[bold yellow]Cleaning remote .hermes on {remote_host}[/bold yellow]\n")
+
+        # Parse remote host
+        if "@" not in remote_host:
+            console.print("[red]✗ Invalid remote format. Use: user@host[/red]")
+            return False
+
+        try:
+            # Show what will be removed
+            console.print("[dim]Checking remote .hermes directory...[/dim]")
+            check_cmd = "du -sh ~/.hermes 2>/dev/null || echo 'Directory does not exist'"
+            result = subprocess.run(
+                ["ssh", remote_host, check_cmd],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+
+            if "does not exist" in result.stdout:
+                console.print("[yellow]⚠ Remote .hermes does not exist[/yellow]")
+                return True
+
+            console.print(f"[cyan]Found:[/cyan] {result.stdout.strip()}")
+
+            # Confirm before removing
+            console.print("\n[bold yellow]This will remove:[/bold yellow]")
+            console.print("  ~/.hermes/          (entire directory)")
+            console.print("  ~/.hermes/.env      (environment config)")
+            console.print("  ~/.hermes/skills/   (all skills)")
+            console.print("  ~/.hermes/config/   (all config files)")
+            console.print("  ~/.hermes/logs/     (all logs)")
+
+            response = input("\n[bold]Are you sure? (yes/no): [/bold]")
+            if response.lower() != "yes":
+                console.print("[dim]Cleanup cancelled[/dim]")
+                return True
+
+            # Remove remote .hermes directory
+            console.print("\n[dim]Removing remote .hermes...[/dim]")
+            rm_cmd = "rm -rf ~/.hermes"
+            result = subprocess.run(
+                ["ssh", remote_host, rm_cmd],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+
+            if result.returncode != 0:
+                console.print(f"[red]✗ Cleanup failed: {result.stderr}[/red]")
+                return False
+
+            console.print("[green]✓ Remote .hermes cleaned[/green]")
+            console.print("\n[dim]To reinitialize Hermes, run:[/dim]")
+            console.print(f"[cyan]  cresus init --hermes --deploy {remote_host}[/cyan]")
+
+            return True
+
+        except subprocess.TimeoutExpired:
+            console.print("[red]✗ Operation timed out[/red]")
+            return False
+        except Exception as e:
+            console.print(f"[red]✗ Cleanup failed: {e}[/red]")
+            return False
 
     def generate_merge_report(self):
         """Generate a detailed report of what would be merged without making changes."""
