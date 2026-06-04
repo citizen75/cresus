@@ -1,35 +1,33 @@
 #!/bin/bash
-# Executable tool wrapper for Hermes portfolio_manager skill
-# Enables Hermes to invoke portfolio commands
+# Portfolio Manager Tool Runner
+# Executes cresus portfolio commands and returns JSON
 
 set -e
 
-ACTION="${1:-list}"
-PORTFOLIO="${2:-PEA}"
+action=$1
+portfolio=${2:-PEA}
 
-# Map action to cresus-mcp command
-case "$ACTION" in
+case "$action" in
   list)
-    cresus-mcp portfolio list
+    cresus portfolio list --mcp
     ;;
   positions)
-    cresus-mcp portfolio positions "$PORTFOLIO"
+    cresus portfolio positions "$portfolio" --mcp
     ;;
   metrics)
-    cresus-mcp portfolio metrics "$PORTFOLIO"
+    cresus portfolio metrics "$portfolio" --mcp
     ;;
   performance)
-    cresus-mcp portfolio performance "$PORTFOLIO"
+    cresus portfolio performance "$portfolio" --mcp
     ;;
   allocation)
-    cresus-mcp portfolio allocation "$PORTFOLIO"
+    cresus portfolio allocation "$portfolio" --mcp
     ;;
   value)
-    cresus-mcp portfolio value "$PORTFOLIO"
+    cresus portfolio value "$portfolio" --mcp
     ;;
   *)
-    echo "Unknown action: $ACTION"
-    echo "Available actions: list, positions, metrics, performance, allocation, value"
+    echo "{\"error\": \"Unknown action: $action\"}" >&2
     exit 1
     ;;
 esac

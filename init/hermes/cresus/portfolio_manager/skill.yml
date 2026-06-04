@@ -1,9 +1,6 @@
-# Cresus Portfolio Manager Skill for Hermes Agent
-# Invocable actions for portfolio management via cresus-mcp CLI
-
 skill_name: "portfolio_manager"
-description: "Query Cresus portfolio data - positions, metrics, performance, allocation, value"
-version: "4.0.0"
+description: "Query Cresus portfolio data using cresus-mcp CLI"
+version: "5.0.0"
 category: "finance"
 
 triggers:
@@ -19,28 +16,30 @@ triggers:
   - "show.*position"
   - "get.*position"
 
-# Executable actions via terminal
-actions:
-
+tools:
   - name: "list_portfolios"
     description: "List all available portfolios in Cresus"
-    command: "cresus portfolio list --mcp"
+    category: "portfolio_query"
+    command: "{{skill_dir}}/run_tool.sh list"
     output_format: "json"
     parameters: []
 
   - name: "get_portfolio_positions"
     description: "Get all positions in a specific portfolio"
-    command: "cresus portfolio positions {{portfolio}} --mcp"
+    category: "portfolio_query"
+    command: "{{skill_dir}}/run_tool.sh positions {{portfolio}}"
     output_format: "json"
     parameters:
       - name: "portfolio"
         type: "string"
         description: "Portfolio name (PEA, BNP, test, _global, etf_pea_trend, cac_trend, nasdaq_100_trend)"
         required: true
+        examples: ["PEA", "BNP"]
 
   - name: "get_portfolio_metrics"
     description: "Get performance metrics for a portfolio"
-    command: "cresus portfolio metrics {{portfolio}} --mcp"
+    category: "portfolio_query"
+    command: "{{skill_dir}}/run_tool.sh metrics {{portfolio}}"
     output_format: "json"
     parameters:
       - name: "portfolio"
@@ -50,7 +49,8 @@ actions:
 
   - name: "get_portfolio_performance"
     description: "Get historical performance data for a portfolio"
-    command: "cresus portfolio performance {{portfolio}} --mcp"
+    category: "portfolio_query"
+    command: "{{skill_dir}}/run_tool.sh performance {{portfolio}}"
     output_format: "json"
     parameters:
       - name: "portfolio"
@@ -60,7 +60,8 @@ actions:
 
   - name: "get_portfolio_allocation"
     description: "Get portfolio asset allocation breakdown"
-    command: "cresus portfolio allocation {{portfolio}} --mcp"
+    category: "portfolio_query"
+    command: "{{skill_dir}}/run_tool.sh allocation {{portfolio}}"
     output_format: "json"
     parameters:
       - name: "portfolio"
@@ -70,7 +71,8 @@ actions:
 
   - name: "get_portfolio_value"
     description: "Get total portfolio value and cash position"
-    command: "cresus portfolio value {{portfolio}} --mcp"
+    category: "portfolio_query"
+    command: "{{skill_dir}}/run_tool.sh value {{portfolio}}"
     output_format: "json"
     parameters:
       - name: "portfolio"
@@ -78,32 +80,18 @@ actions:
         description: "Portfolio name"
         required: true
 
-# Available portfolios
-portfolios:
-  - PEA
-  - BNP
-  - test
-  - _global
-  - etf_pea_trend
-  - cac_trend
-  - nasdaq_100_trend
-
-# Usage examples
 examples:
-  "list all portfolios": "Use list_portfolios action"
-  "show PEA positions": "Use get_portfolio_positions with portfolio=PEA"
-  "get BNP metrics": "Use get_portfolio_metrics with portfolio=BNP"
-  "show PEA performance": "Use get_portfolio_performance with portfolio=PEA"
-  "show PEA allocation": "Use get_portfolio_allocation with portfolio=PEA"
-  "what's the value of BNP": "Use get_portfolio_value with portfolio=BNP"
+  "show my portfolio PEA positions": "get_portfolio_positions with portfolio=PEA"
+  "what are the PEA metrics": "get_portfolio_metrics with portfolio=PEA"
+  "show BNP performance": "get_portfolio_performance with portfolio=BNP"
 
 instructions: |
-  Query Cresus portfolios for real-time data via the cresus-mcp CLI tool.
+  Use Cresus portfolio manager to query portfolio data.
 
-  Available actions:
-  - list_portfolios - List all portfolios
-  - get_portfolio_positions - Get positions in a portfolio
-  - get_portfolio_metrics - Get metrics
-  - get_portfolio_performance - Get performance history
-  - get_portfolio_allocation - Get allocation
-  - get_portfolio_value - Get portfolio value
+  Available commands:
+  - list_portfolios: List all portfolios
+  - get_portfolio_positions: Get positions in a portfolio
+  - get_portfolio_metrics: Get metrics for a portfolio
+  - get_portfolio_performance: Get performance history
+  - get_portfolio_allocation: Get allocation breakdown
+  - get_portfolio_value: Get total value
