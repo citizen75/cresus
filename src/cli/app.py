@@ -16,7 +16,6 @@ from cli.commands.service import ServiceManager
 from cli.commands.flow import FlowManager
 from cli.commands.data import DataCommands
 from cli.commands.portfolio import PortfolioCommands
-from cli.commands.mcp import MCPCommands
 from cli.commands.scheduler import SchedulerCommands
 from cli.commands.info import InfoCommands
 from cli.commands.strategy import StrategyCommands
@@ -42,7 +41,6 @@ class CresusCLI(cmd2.Cmd):
 		self.data_manager = DataManager(self.project_root)
 		self.data_commands = DataCommands(self.data_manager)
 		self.portfolio_commands = PortfolioCommands()
-		self.mcp_commands = MCPCommands()
 		self.scheduler_commands = SchedulerCommands()
 		self.info_commands = InfoCommands()
 		self.strategy_commands = StrategyCommands(self.project_root)
@@ -73,7 +71,7 @@ class CresusCLI(cmd2.Cmd):
 		info_table.add_column("Description")
 		info_table.add_row("[bold]init[/bold]", "Initialize ~/.cresus directory structure")
 		info_table.add_row("[bold]help[/bold]", "Show all available commands")
-		info_table.add_row("[bold]service[/bold]", "Manage services (api, mcp, front)")
+		info_table.add_row("[bold]service[/bold]", "Manage services (gateway, front)")
 		info_table.add_row("[bold]flow[/bold]", "Execute workflows (e.g., flow run watchlist)")
 		info_table.add_row("[bold]strategy[/bold]", "Validate strategies (e.g., strategy check single_etf --fix)")
 		info_table.add_row("[bold]data[/bold]", "Manage portfolio data and cache")
@@ -827,10 +825,6 @@ class CresusCLI(cmd2.Cmd):
 		"""Manage portfolios: list [real|paper|all] | query <command> [--mcp]"""
 		self.portfolio_commands.handle(args)
 
-	def do_mcp(self, args):
-		"""Manage MCP (Model Context Protocol) server and tools"""
-		self.mcp_commands.handle(args)
-
 	def do_universe(self, args):
 		"""Manage universes: list|info <name>"""
 		from tools.universe.universe import Universe
@@ -1410,7 +1404,6 @@ class CresusCLI(cmd2.Cmd):
 				"portfolio": "Manage portfolios (list|query)",
 				"watchlist": "View strategy watchlist",
 				"orders": "View pending/executed orders",
-				"mcp": "MCP server and tools (server|tools)",
 			},
 			"💾 Data": {
 				"data": "Manage data cache",
@@ -1422,7 +1415,7 @@ class CresusCLI(cmd2.Cmd):
 				"screener": "Manage screeners (create|list|run|results)",
 			},
 			"⚙️  System": {
-				"service": "Manage services (api|mcp|front|all)",
+				"service": "Manage services (gateway|front|all)",
 				"cron": "View scheduled jobs",
 				"update": "Update cresus",
 				"status": "Show system status",

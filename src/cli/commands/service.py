@@ -8,12 +8,11 @@ from typing import Optional, Dict, Any
 
 
 class ServiceManager:
-    """Manage API, MCP, and frontend services."""
+    """Manage gateway (API + Cron) and frontend services."""
 
     SERVICES = {
         "gateway": {"script": "bin/gateway", "port": 8000, "name": "Gateway (API + Cron)"},
         "front": {"script": "bin/front", "port": 5173, "name": "Frontend"},
-        "mcp": {"script": "bin/mcp", "port": None, "name": "MCP Server (Hermes-managed)"},
     }
 
     def __init__(self, project_root: Path):

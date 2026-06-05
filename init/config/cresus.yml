@@ -9,9 +9,6 @@ servers:
   gateway:
     cron_enabled: false              # Set to true to enable cron scheduler
     cron_config: "config/cron.yml"
-    mcp_enabled: true                # Set to false to disable MCP server
-  mcp:
-    log_file: "logs/mcp.log"
   front:
     port: "${FRONT_PORT:5173}"       # Set via FRONT_PORT env var
     api_url: "${VITE_API_URL:http://localhost:8000}"  # Set via VITE_API_URL env var
