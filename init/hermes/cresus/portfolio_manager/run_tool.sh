@@ -8,16 +8,12 @@ action=$1
 portfolio=${2:-PEA}
 
 # Find cresus command - try venv first, then PATH
-if [ -f ~/.cresus/venv/bin/cresus ]; then
-  CRESUS_CMD="~/.cresus/venv/bin/cresus"
-elif [ -f "$HOME/.cresus/venv/bin/cresus" ]; then
-  CRESUS_CMD="$HOME/.cresus/venv/bin/cresus"
+VENV_CRESUS="$HOME/.cresus/venv/bin/cresus"
+if [ -f "$VENV_CRESUS" ]; then
+  CRESUS_CMD="$VENV_CRESUS"
 else
   CRESUS_CMD="cresus"
 fi
-
-# Expand tilde in path
-CRESUS_CMD=$(eval echo "$CRESUS_CMD")
 
 case "$action" in
   list)
