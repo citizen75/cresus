@@ -233,6 +233,4 @@ export default function Screener() {
       )}
     </div>
   )
-    </div>
-  )
 }
