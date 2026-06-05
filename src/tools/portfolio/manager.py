@@ -332,8 +332,9 @@ class PortfolioManager:
                 ticker = row["ticker"]
                 avg_entry_price = float(row["avg_entry_price"])
                 quantity = float(row["quantity"])
-                # Use cached current_price from portfolio.json instead of doing fresh lookup
-                current_price = float(row.get("current_price", avg_entry_price))
+                # Use cached current_price from Fundamental data, fallback to journal data
+                from tools.data import Fundamental
+                current_price = Fundamental(ticker).get_current_price() or float(row.get("current_price", avg_entry_price))
                 pos_value = quantity * current_price
                 company_name = self._get_company_name(ticker)
                 positions.append({
