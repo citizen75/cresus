@@ -47,13 +47,18 @@ class IndicatorCache:
 
             cached_hash = cache_df["_data_hash"].iloc[0] if len(cache_df) > 0 else None
 
+            # Log data info for debugging
+            last_row = ohlcv_df.iloc[-1]
+            logger.debug(f"{self.ticker}: Cache validation - last row date={last_row.get('TIMESTAMP', '?')}, close={last_row.get('CLOSE', '?')}, volume={last_row.get('VOLUME', '?')}")
+            logger.debug(f"{self.ticker}: Data hash computed: '{data_hash}' vs cached: '{cached_hash}'")
+
             if data_hash == cached_hash:
                 # Cache is valid - return all columns except metadata
                 indicators = {col: cache_df[col] for col in cache_df.columns if col != "_data_hash"}
-                logger.debug(f"{self.ticker}: Cache hit - using {len(indicators)} cached indicators")
+                logger.info(f"{self.ticker}: Cache hit - using {len(indicators)} cached indicators")
                 return indicators
             else:
-                logger.debug(f"{self.ticker}: Cache invalidated (data hash mismatch: {data_hash} != {cached_hash})")
+                logger.debug(f"{self.ticker}: Cache invalidated (data hash mismatch)")
                 return {}
 
         except Exception as e:
@@ -78,6 +83,9 @@ class IndicatorCache:
             # Add data hash as metadata for cache validation
             data_hash = self._get_data_hash(ohlcv_df)
             df["_data_hash"] = data_hash
+
+            last_row = ohlcv_df.iloc[-1]
+            logger.debug(f"{self.ticker}: Saving cache with hash '{data_hash}' (date={last_row.get('TIMESTAMP', '?')}, close={last_row.get('CLOSE', '?')}, volume={last_row.get('VOLUME', '?')})")
 
             # Save to cache
             df.to_parquet(self.cache_filepath, index=False)
