@@ -48,23 +48,9 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-hidden p-4">
-          {selectedTicker ? (
-            <TradingChart ticker={selectedTicker} />
-          ) : (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center text-slate-500">
-                <div className="text-4xl mb-2">📌</div>
-                <div className="text-xs">Click on an alert to view chart</div>
-              </div>
-            </div>
-          )}
-        </div>
-
         {/* Chart History */}
         {chartHistory.length > 0 && (
-          <div className="border-t border-slate-800 bg-slate-950 px-4 py-3">
+          <div className="border-b border-slate-800 bg-slate-950 px-4 py-3">
             <div className="text-xs font-semibold text-slate-400 mb-2">History</div>
             <div className="flex gap-2 overflow-x-auto pb-2">
               {chartHistory.map((ticker) => (
@@ -83,6 +69,20 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+
+        {/* Content */}
+        <div className="flex-1 overflow-hidden p-4">
+          {selectedTicker ? (
+            <TradingChart ticker={selectedTicker} />
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center text-slate-500">
+                <div className="text-4xl mb-2">📌</div>
+                <div className="text-xs">Click on an alert to view chart</div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
