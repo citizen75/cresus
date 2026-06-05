@@ -21,19 +21,22 @@ def execute_cresus_command(action: str, portfolio: str = "PEA") -> dict:
         )
 
         if result.returncode == 0:
-            return json.loads(result.stdout)
+            try:
+                return json.loads(result.stdout)
+            except json.JSONDecodeError as e:
+                # If JSON parsing fails, return the raw output as error
+                return {
+                    "status": "error",
+                    "message": f"JSON parse error: {str(e)}",
+                    "raw_output": result.stdout[:500]
+                }
         else:
             return {
                 "status": "error",
-                "message": result.stderr or "Unknown error"
+                "message": result.stderr or "Command failed"
             }
     except subprocess.TimeoutExpired:
         return {"status": "error", "message": "Command timed out"}
-    except json.JSONDecodeError:
-        return {
-            "status": "error",
-            "message": f"Invalid JSON response: {result.stdout}"
-        }
     except Exception as e:
         return {"status": "error", "message": str(e)}
 

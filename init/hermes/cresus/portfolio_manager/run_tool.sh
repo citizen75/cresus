@@ -29,22 +29,22 @@ fi
 
 case "$action" in
   list)
-    "$CRESUS_CMD" portfolio list --mcp
+    "$CRESUS_CMD" portfolio list --mcp | tr -d '\n' | sed 's/[[:space:]]*//g'
     ;;
   positions)
-    "$CRESUS_CMD" portfolio positions "$portfolio" --mcp
+    "$CRESUS_CMD" portfolio positions "$portfolio" --mcp | python3 -c "import sys, json; data = json.load(sys.stdin); print(json.dumps(data))"
     ;;
   metrics)
-    "$CRESUS_CMD" portfolio metrics "$portfolio" --mcp
+    "$CRESUS_CMD" portfolio metrics "$portfolio" --mcp | python3 -c "import sys, json; data = json.load(sys.stdin); print(json.dumps(data))"
     ;;
   performance)
-    "$CRESUS_CMD" portfolio performance "$portfolio" --mcp
+    "$CRESUS_CMD" portfolio performance "$portfolio" --mcp | python3 -c "import sys, json; data = json.load(sys.stdin); print(json.dumps(data))"
     ;;
   allocation)
-    "$CRESUS_CMD" portfolio allocation "$portfolio" --mcp
+    "$CRESUS_CMD" portfolio allocation "$portfolio" --mcp | python3 -c "import sys, json; data = json.load(sys.stdin); print(json.dumps(data))"
     ;;
   value)
-    "$CRESUS_CMD" portfolio value "$portfolio" --mcp
+    "$CRESUS_CMD" portfolio value "$portfolio" --mcp | python3 -c "import sys, json; data = json.load(sys.stdin); print(json.dumps(data))"
     ;;
   *)
     echo "{\"error\": \"Unknown action: $action\"}" >&2
