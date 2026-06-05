@@ -12,10 +12,17 @@ if [ -z "$HOME" ]; then
   export HOME=$(getent passwd $(whoami) | cut -d: -f6)
 fi
 
-# Find cresus command - try venv first, then PATH
-VENV_CRESUS="$HOME/.cresus/venv/bin/cresus"
-if [ -f "$VENV_CRESUS" ]; then
-  CRESUS_CMD="$VENV_CRESUS"
+# Find cresus command - check multiple paths
+# 1. Try ~/.cresus/venv/bin (production standard)
+if [ -f "$HOME/.cresus/venv/bin/cresus" ]; then
+  CRESUS_CMD="$HOME/.cresus/venv/bin/cresus"
+# 2. Try ~/.local/bin (symlink location)
+elif [ -f "$HOME/.local/bin/cresus" ]; then
+  CRESUS_CMD="$HOME/.local/bin/cresus"
+# 3. Try /var/apps/cresus/venv/bin (alternative production location)
+elif [ -f "/var/apps/cresus/venv/bin/cresus" ]; then
+  CRESUS_CMD="/var/apps/cresus/venv/bin/cresus"
+# 4. Fall back to PATH search
 else
   CRESUS_CMD="cresus"
 fi
