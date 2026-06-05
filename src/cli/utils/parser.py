@@ -29,7 +29,7 @@ class ArgParser:
 		names: List[str],
 		optional: Optional[List[str]] = None,
 	) -> Dict[str, str]:
-		"""Parse positional arguments.
+		"""Parse positional arguments, respecting quoted strings.
 
 		Args:
 			args_str: Raw argument string
@@ -45,7 +45,9 @@ class ArgParser:
 		optional = optional or []
 		required_count = len(names) - len(optional)
 
-		parts = args_str.split()
+		# Parse respecting quoted strings (preserve spaces in quotes)
+		parts = ArgParser._split_respecting_quotes(args_str.strip())
+
 		if len(parts) < required_count:
 			missing = names[len(parts) : required_count]
 			raise ValidationError(f"Missing required arguments: {', '.join(missing)}")
@@ -55,6 +57,36 @@ class ArgParser:
 			result[name] = parts[i] if i < len(parts) else None
 
 		return result
+
+	@staticmethod
+	def _split_respecting_quotes(s: str) -> List[str]:
+		"""Split string on whitespace but preserve content in quotes.
+
+		Handles both single and double quotes.
+		"""
+		parts = []
+		current = ""
+		in_quote = False
+		quote_char = None
+
+		for char in s:
+			if char in ('"', "'") and not in_quote:
+				in_quote = True
+				quote_char = char
+			elif char == quote_char and in_quote:
+				in_quote = False
+				quote_char = None
+			elif char.isspace() and not in_quote:
+				if current:
+					parts.append(current)
+					current = ""
+			else:
+				current += char
+
+		if current:
+			parts.append(current)
+
+		return parts
 
 	@staticmethod
 	def parse_with_flags(

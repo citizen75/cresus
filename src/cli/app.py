@@ -3,6 +3,7 @@
 import os
 import json
 import cmd2
+import shlex
 from pathlib import Path
 from typing import Optional
 from rich.console import Console
@@ -1585,7 +1586,7 @@ class CresusCLI(cmd2.Cmd):
 		# Use shlex for proper quote handling
 		try:
 			parts = shlex.split(args)
-		except ValueError:
+		except (ValueError, Exception):
 			# Fall back to simple split if shlex fails
 			parts = args.split()
 
