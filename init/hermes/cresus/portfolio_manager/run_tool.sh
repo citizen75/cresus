@@ -7,6 +7,11 @@ set -e
 action=$1
 portfolio=${2:-PEA}
 
+# Ensure HOME is set (Hermes may not set it)
+if [ -z "$HOME" ]; then
+  export HOME=$(getent passwd $(whoami) | cut -d: -f6)
+fi
+
 # Find cresus command - try venv first, then PATH
 VENV_CRESUS="$HOME/.cresus/venv/bin/cresus"
 if [ -f "$VENV_CRESUS" ]; then
