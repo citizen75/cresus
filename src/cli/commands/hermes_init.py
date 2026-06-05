@@ -511,6 +511,9 @@ class HermesInitializer:
             if not merge_only:
                 self._setup_environment()
 
+            # Setup cresus symlink for Hermes to find the command
+            self._setup_cresus_symlink()
+
             console.print(f"\n[bold green]✓ Hermes {'merged' if merge_only else 'initialized'} successfully![/bold green]")
             console.print(f"[dim]Location: {self.hermes_home}[/dim]")
 
@@ -853,3 +856,24 @@ HERMES_TRACK_PERFORMANCE=true
                 console.print(f"[red]✗ Error creating .env: {e}[/red]")
         else:
             console.print("[dim]⊘ .env already exists (using existing configuration)[/dim]")
+
+    def _setup_cresus_symlink(self):
+        """Create symlink to cresus in ~/.local/bin for Hermes to find it."""
+        try:
+            local_bin = Path.home() / ".local" / "bin"
+            local_bin.mkdir(parents=True, exist_ok=True)
+
+            cresus_symlink = local_bin / "cresus"
+            cresus_venv = Path.home() / ".cresus" / "venv" / "bin" / "cresus"
+
+            if cresus_venv.exists():
+                # Remove existing symlink if it points to wrong location
+                if cresus_symlink.exists() or cresus_symlink.is_symlink():
+                    cresus_symlink.unlink()
+
+                # Create new symlink
+                cresus_symlink.symlink_to(cresus_venv)
+                console.print("[green]✓ Created cresus symlink in ~/.local/bin[/green]")
+            # If cresus venv doesn't exist yet, skip silently (it may not be installed)
+        except Exception as e:
+            console.print(f"[dim]⊘ Could not setup cresus symlink: {e}[/dim]")
