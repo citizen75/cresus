@@ -51,3 +51,13 @@ jobs:
     target: data_fetch
     params:
       universe: index
+
+  # Portfolio data fetch
+  - name: portfolio_data_fetch
+    description: "Fetch all portfolio data"
+    enabled: false  # Set to true to enable
+    schedule: "0 20 * * *"  # 8:00 PM daily
+    type: flow
+    target: shell_exec
+    params:
+      command: "cresus data fetch all --portfolio all"
