@@ -1,10 +1,20 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import GlobalConversationPanel from '@/components/portfolio/GlobalConversationPanel'
 import TradingChart from '@/components/TradingChart'
 
 export default function Dashboard() {
   const [conversationOpen, setConversationOpen] = useState(true)
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null)
+  const [chartHistory, setChartHistory] = useState<string[]>([])
+
+  const handleSelectTicker = useCallback((ticker: string) => {
+    setSelectedTicker(ticker)
+    // Add to history if not already there, keep last 10
+    setChartHistory((prev) => {
+      const filtered = prev.filter((t) => t !== ticker)
+      return [ticker, ...filtered].slice(0, 10)
+    })
+  }, [])
 
   return (
     <div className="flex gap-6 h-[calc(100vh-120px)]">
@@ -13,7 +23,7 @@ export default function Dashboard() {
         <div className="w-[500px] flex-shrink-0">
           <GlobalConversationPanel
             onClose={() => setConversationOpen(false)}
-            onAlertClick={(ticker) => setSelectedTicker(ticker)}
+            onAlertClick={handleSelectTicker}
           />
         </div>
       )}
@@ -51,6 +61,28 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+
+        {/* Chart History */}
+        {chartHistory.length > 0 && (
+          <div className="border-t border-slate-800 bg-slate-950 px-4 py-3">
+            <div className="text-xs font-semibold text-slate-400 mb-2">History</div>
+            <div className="flex gap-2 overflow-x-auto pb-2">
+              {chartHistory.map((ticker) => (
+                <button
+                  key={ticker}
+                  onClick={() => handleSelectTicker(ticker)}
+                  className={`px-3 py-1 rounded text-sm font-medium whitespace-nowrap transition-colors ${
+                    selectedTicker === ticker
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  {ticker}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
