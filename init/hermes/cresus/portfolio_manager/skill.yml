@@ -1,0 +1,37 @@
+name: cresus/portfolio_manager
+description: "View Cresus portfolio positions, metrics, and asset allocation"
+version: 1.0.0
+
+tools:
+  portfolio_positions:
+    description: "Get portfolio positions"
+    command: "bash {{skill_dir}}/run_tool.sh positions {{portfolio}}"
+    inputs:
+      portfolio:
+        type: string
+        default: "PEA"
+        description: "Portfolio name (PEA, BNP, etc)"
+    output_type: json
+
+  portfolio_list:
+    description: "List all portfolios"
+    command: "bash {{skill_dir}}/run_tool.sh list"
+    output_type: json
+
+  portfolio_metrics:
+    description: "Get portfolio metrics"
+    command: "bash {{skill_dir}}/run_tool.sh metrics {{portfolio}}"
+    inputs:
+      portfolio:
+        type: string
+        default: "PEA"
+    output_type: json
+
+  portfolio_allocation:
+    description: "Get portfolio allocation"
+    command: "bash {{skill_dir}}/run_tool.sh allocation {{portfolio}}"
+    inputs:
+      portfolio:
+        type: string
+        default: "PEA"
+    output_type: json
