@@ -1,27 +1,99 @@
+# Cresus Portfolio Manager Skill
+# View and manage portfolio positions and metrics
+
 skill_name: "portfolio_manager"
-description: "Cresus portfolio manager - get positions, metrics, and performance"
-version: "6.0.0"
+description: "Get Cresus portfolio positions and metrics via CLI"
+version: "1.0.0"
 category: "finance"
 
 triggers:
   - "portfolio"
   - "positions"
-  - "show.*position"
   - "PEA"
   - "BNP"
+  - "holdings"
 
+# Hermes-invocable tools
 tools:
-  - name: "get_pea_positions"
-    description: "Get all positions in PEA portfolio"
-    command: "cresus-mcp portfolio positions PEA"
-    output_format: "json"
 
-  - name: "get_bnp_positions"
-    description: "Get all positions in BNP portfolio"
-    command: "cresus-mcp portfolio positions BNP"
+  - name: "cresus_portfolio_positions"
+    description: "Get portfolio positions for a specific portfolio"
+    category: "portfolio_management"
+    command: "{{skill_dir}}/run_tool.sh positions {{portfolio}}"
     output_format: "json"
+    parameters:
+      - name: "portfolio"
+        type: "string"
+        description: "Portfolio name (PEA, BNP, test, etc.)"
+        required: true
+        examples: ["PEA", "BNP", "test"]
+    example:
+      user: "Show my PEA positions"
+      tool_call: "cresus_portfolio_positions"
+      params: { "portfolio": "PEA" }
+      result: "List of positions with quantities and values"
 
-  - name: "list_all_portfolios"
+  - name: "cresus_portfolio_metrics"
+    description: "Get portfolio performance metrics"
+    category: "portfolio_management"
+    command: "{{skill_dir}}/run_tool.sh metrics {{portfolio}}"
+    output_format: "json"
+    parameters:
+      - name: "portfolio"
+        type: "string"
+        description: "Portfolio name"
+        required: true
+        examples: ["PEA", "BNP", "test"]
+    example:
+      user: "Show PEA metrics"
+      tool_call: "cresus_portfolio_metrics"
+      params: { "portfolio": "PEA" }
+      result: "Performance metrics for the portfolio"
+
+  - name: "cresus_portfolio_allocation"
+    description: "Get portfolio asset allocation"
+    category: "portfolio_management"
+    command: "{{skill_dir}}/run_tool.sh allocation {{portfolio}}"
+    output_format: "json"
+    parameters:
+      - name: "portfolio"
+        type: "string"
+        description: "Portfolio name"
+        required: true
+        examples: ["PEA", "BNP", "test"]
+    example:
+      user: "Show PEA allocation"
+      tool_call: "cresus_portfolio_allocation"
+      params: { "portfolio": "PEA" }
+      result: "Asset allocation breakdown"
+
+  - name: "cresus_portfolio_list"
     description: "List all available portfolios"
-    command: "cresus-mcp portfolio list"
+    category: "portfolio_management"
+    command: "{{skill_dir}}/run_tool.sh list"
     output_format: "json"
+    example:
+      user: "What portfolios do I have?"
+      tool_call: "cresus_portfolio_list"
+      result: "List of available portfolios"
+
+examples:
+  "show my PEA positions": "Use cresus_portfolio_positions with portfolio=PEA"
+  "what are my holdings": "Use cresus_portfolio_positions with portfolio=PEA"
+  "PEA metrics": "Use cresus_portfolio_metrics with portfolio=PEA"
+
+instructions: |
+  ## Portfolio Manager Tools
+
+  View and manage your Cresus portfolio positions and metrics.
+
+  **Tools:**
+  1. **cresus_portfolio_positions** - View positions in a portfolio
+  2. **cresus_portfolio_metrics** - Get performance metrics
+  3. **cresus_portfolio_allocation** - View asset allocation
+  4. **cresus_portfolio_list** - List all portfolios
+
+  **Available Portfolios:**
+  - PEA (French tax-advantaged account)
+  - BNP (BNP Paribas real portfolio)
+  - test (Test portfolio)
