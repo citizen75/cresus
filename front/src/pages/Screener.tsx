@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '@/services/api'
+import ScreenerDetail from './ScreenerDetail'
 
 interface ScreenerItem {
   name: string
@@ -17,6 +18,7 @@ export default function Screener() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [selectedScreener, setSelectedScreener] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -165,65 +167,72 @@ export default function Screener() {
         </div>
       )}
 
-      {/* Screeners List */}
-      <div className="space-y-3">
-        {loading ? (
-          <div className="text-center py-12">
-            <div className="text-slate-500">Loading screeners...</div>
-          </div>
-        ) : screeners.length === 0 ? (
-          <div className="text-center py-12 bg-slate-900 border border-slate-800 rounded-lg">
-            <div className="text-slate-500">No screeners configured</div>
-          </div>
-        ) : (
-          screeners.map((screener, idx) => (
-            <div key={`${screener.name}-${idx}`} className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <h3 className="font-semibold text-white text-lg">{screener.name}</h3>
-                  {screener.description && (
-                    <p className="text-sm text-slate-400 mt-1">{screener.description}</p>
-                  )}
-
-                  <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    {screener.source && (
-                      <div>
-                        <div className="text-slate-500">Source</div>
-                        <div className="text-slate-300">{screener.source}</div>
-                      </div>
-                    )}
-                    {screener.tickers && screener.tickers.length > 0 && (
-                      <div>
-                        <div className="text-slate-500">Tickers</div>
-                        <div className="text-slate-300 font-mono text-xs">
-                          {screener.tickers.slice(0, 3).join(', ')}
-                          {screener.tickers.length > 3 && ` +${screener.tickers.length - 3}`}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex gap-2 ml-4">
-                  <button
-                    onClick={() => navigate(`/screener/${screener.name}`)}
-                    className="px-3 py-2 text-xs font-medium text-blue-400 hover:text-blue-300 rounded transition"
-                  >
-                    Open
-                  </button>
-                  <button
-                    onClick={() => handleDelete(screener.name)}
-                    className="px-3 py-2 text-xs font-medium text-red-400 hover:text-red-300 rounded transition"
-                  >
-                    Delete
-                  </button>
-                </div>
+      {/* If screener selected, show detail view */}
+      {selectedScreener ? (
+        <div>
+          <button
+            onClick={() => setSelectedScreener(null)}
+            className="mb-4 text-slate-400 hover:text-slate-300 text-sm flex items-center gap-2"
+          >
+            ← Back to List
+          </button>
+          <ScreenerDetail screenerName={selectedScreener} />
+        </div>
+      ) : (
+        <>
+          {/* Screeners List - Compact Table */}
+          <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
+            {loading ? (
+              <div className="text-center py-12">
+                <div className="text-slate-500">Loading screeners...</div>
               </div>
-            </div>
-          ))
-        )}
-      </div>
+            ) : screeners.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-slate-500">No screeners configured</div>
+              </div>
+            ) : (
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-800 bg-slate-950">
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-400">Name</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-400">Source</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-400">Last Run</th>
+                    <th className="px-6 py-3 text-right text-xs font-semibold text-slate-400">Items</th>
+                    <th className="px-6 py-3 text-right text-xs font-semibold text-slate-400">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {screeners.map((screener, idx) => (
+                    <tr
+                      key={`${screener.name}-${idx}`}
+                      onClick={() => setSelectedScreener(screener.name)}
+                      className="hover:bg-slate-800 cursor-pointer transition"
+                    >
+                      <td className="px-6 py-3 text-sm font-medium text-white">{screener.name}</td>
+                      <td className="px-6 py-3 text-sm text-slate-400">{screener.source || '—'}</td>
+                      <td className="px-6 py-3 text-sm text-slate-400">—</td>
+                      <td className="px-6 py-3 text-sm text-slate-400 text-right">—</td>
+                      <td className="px-6 py-3 text-right">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDelete(screener.name)
+                          }}
+                          className="text-xs font-medium text-red-400 hover:text-red-300 transition"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  )
     </div>
   )
 }
