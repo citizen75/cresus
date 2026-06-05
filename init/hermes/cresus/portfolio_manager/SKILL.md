@@ -10,6 +10,25 @@ metadata:
     category: finance
 prerequisites:
   commands: [cresus]
+tools:
+  - id: portfolio_positions
+    description: "Get portfolio positions for a specific portfolio"
+    command: "{{skill_dir}}/run_tool.sh positions {{portfolio}}"
+    input:
+      portfolio: "Portfolio name (PEA, BNP, etc)"
+  - id: portfolio_list
+    description: "List all available portfolios"
+    command: "{{skill_dir}}/run_tool.sh list"
+  - id: portfolio_metrics
+    description: "Get portfolio performance metrics"
+    command: "{{skill_dir}}/run_tool.sh metrics {{portfolio}}"
+    input:
+      portfolio: "Portfolio name"
+  - id: portfolio_allocation
+    description: "Get portfolio asset allocation"
+    command: "{{skill_dir}}/run_tool.sh allocation {{portfolio}}"
+    input:
+      portfolio: "Portfolio name"
 ---
 
 # Cresus Portfolio Manager
