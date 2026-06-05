@@ -259,13 +259,14 @@ class PortfolioCommands:
 		table.add_column("PnL %", justify="right", style="white")
 
 		for p in positions:
-			entry = f"${p['entry_price']:.2f}" if p['entry_price'] else "-"
+			entry_price = p.get('avg_entry_price') or p.get('entry_price')
+			entry = f"${entry_price:.2f}" if entry_price else "-"
 			current = f"${p['current_price']:.2f}" if p['current_price'] else "-"
 			pos_value = f"${p['position_value']:,.2f}" if p['position_value'] else "-"
 			qty = str(int(p['quantity'])) if p['quantity'] else "-"
 
-			pnl = p.get("pnl")
-			pnl_pct = p.get("pnl_pct")
+			pnl = p.get("position_gain")
+			pnl_pct = p.get("position_gain_pct")
 			pnl_str = f"${pnl:,.2f}" if pnl else "-"
 			pnl_pct_str = f"{pnl_pct:+.2f}%" if pnl_pct else "-"
 
