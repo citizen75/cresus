@@ -236,17 +236,17 @@ class ScreenerAgent(Agent):
 
 						if missing_indicators:
 							self.logger.debug(f"Calculating missing indicators for {ticker}: {missing_indicators}")
-							indicator_results = calculate(missing_indicators, history_df)
 
-							# Clear stale indicator columns (Option B: avoid mixing data ages)
-							# Get list of known indicator base names (sha_*, rsi_*, ema_*, etc)
-							base_indicators = {ind.split('_')[0] for ind in screener_config.indicators}
-							stale_columns = [col for col in history_df.columns
-											if any(col.lower().startswith(base + '_') for base in base_indicators)
-											and col.lower() not in [ind.lower() for ind in missing_indicators]]
-							if stale_columns:
-								self.logger.debug(f"Clearing stale indicator columns for {ticker}: {stale_columns}")
-								history_df = history_df.drop(columns=stale_columns)
+							# Delete any existing indicator columns to ensure data consistency
+							# (avoids mixing old and new data if cache was invalidated)
+							ohlcv_cols = {'timestamp', 'open', 'high', 'low', 'close', 'volume', 'ticker', 'date'}
+							indicator_cols = [col for col in history_df.columns if col.lower() not in ohlcv_cols]
+							if indicator_cols:
+								self.logger.debug(f"Clearing old indicator columns for {ticker}: {indicator_cols}")
+								history_df = history_df.drop(columns=indicator_cols)
+
+							# Calculate fresh indicators
+							indicator_results = calculate(missing_indicators, history_df)
 
 							# Add fresh indicators to dataframe (use lowercase column names for consistency)
 							for indicator_name, indicator_series in indicator_results.items():
