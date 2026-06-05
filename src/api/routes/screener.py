@@ -323,6 +323,8 @@ async def delete_screener(name: str):
 @router.post("/screener/screeners/{name}/run")
 async def run_screener(name: str):
 	"""Run a screener."""
+	import asyncio
+
 	try:
 		manager = ScreenerManager()
 		screener = manager.get_screener(name)
@@ -330,12 +332,16 @@ async def run_screener(name: str):
 		if not screener:
 			raise HTTPException(status_code=404, detail=f"Screener '{name}' not found")
 
-		# Use ScreenerAgent to run the screener
+		# Use ScreenerAgent to run the screener in a thread pool
+		# to avoid blocking the async event loop
 		agent = ScreenerAgent()
 
-		result = agent.process({
-			"screener_name": name,
-		})
+		def run_blocking():
+			return agent.process({
+				"screener_name": name,
+			})
+
+		result = await asyncio.to_thread(run_blocking)
 
 		# Save result if successful
 		result_id = None
@@ -521,17 +527,21 @@ async def screener_builder(http_request: Request):
 			description="API preview screener"
 		)
 
-		# Create context and run ScreenerAgent
+		# Create context and run ScreenerAgent in thread pool
+		import asyncio
 		context = AgentContext()
 		agent = ScreenerAgent("ScreenerAgent", context)
 
 		# Pass use_cached_data=False for API to load fresh data (bypasses context cache)
 		# Use limit parameter for faster preview results
-		result = agent.process({
-			"screener_config": screener_config,
-			"use_cached_data": False,
-			"max_tickers": limit,
-		})
+		def run_blocking():
+			return agent.process({
+				"screener_config": screener_config,
+				"use_cached_data": False,
+				"max_tickers": limit,
+			})
+
+		result = await asyncio.to_thread(run_blocking)
 
 		if result.get("status") != "success":
 			raise HTTPException(status_code=400, detail=result.get("message", "Screening failed"))
