@@ -254,16 +254,33 @@ class ServiceManager:
                 console.print(f"[red]✗[/red] Failed to restart {service}: {result.get('message', 'Unknown error')}")
 
     def view_logs(self, service: str, follow: bool = False, lines: Optional[int] = None) -> None:
-        """View service logs."""
+        """View service logs with optional follow mode."""
         from rich.console import Console
 
         console = Console()
+        log_file = self.project_root / "logs" / f"{service}.log"
 
-        if lines is None:
-            lines = 20 if not follow else 50
-
-        logs = self.logs(service, lines)
-        console.print(logs)
+        if not log_file.exists():
+            console.print(f"[red]✗ No logs for {service}[/red]")
+            return
 
         if follow:
-            console.print("[cyan]Tailing logs (follow mode) - not implemented yet[/cyan]")
+            # Follow mode - stream logs like tail -f
+            console.print(f"[cyan]Following {service} logs... (Ctrl+C to stop)[/cyan]\n")
+            try:
+                # Use tail -f to follow the log file
+                result = subprocess.run(
+                    ["tail", "-f", str(log_file)],
+                    text=True
+                )
+            except KeyboardInterrupt:
+                console.print("\n[dim]Stopped tailing logs[/dim]")
+            except Exception as e:
+                console.print(f"[red]✗ Error tailing logs: {e}[/red]")
+        else:
+            # Show last N lines
+            if lines is None:
+                lines = 50
+
+            logs = self.logs(service, lines)
+            console.print(logs)
