@@ -32,6 +32,8 @@ class CresusCLI(cmd2.Cmd):
 
 	def __init__(self, interactive: bool = True):
 		super().__init__()
+		# Disable output redirection to allow > and < in formulas
+		self.allow_redirection = False
 		self.interactive = interactive
 		self.project_root = self._find_project_root()
 		os.environ["CRESUS_PROJECT_ROOT"] = str(self.project_root)
@@ -1583,12 +1585,23 @@ class CresusCLI(cmd2.Cmd):
 			cmd.list()
 			return
 
+		# If args is a Statement object (from cmd2 with redirection parsing),
+		# use the raw attribute to get the unparsed command
+		raw_args = args
+		if hasattr(args, 'raw'):
+			# Extract everything after 'screener ' from the raw string
+			raw_str = args.raw
+			if raw_str.startswith('screener '):
+				raw_args = raw_str[9:]  # Skip 'screener '
+			else:
+				raw_args = args.args if hasattr(args, 'args') else str(args)
+
 		# Use shlex for proper quote handling
 		try:
-			parts = shlex.split(args)
+			parts = shlex.split(raw_args)
 		except (ValueError, Exception):
 			# Fall back to simple split if shlex fails
-			parts = args.split()
+			parts = raw_args.split()
 
 		command = parts[0] if parts else None
 
