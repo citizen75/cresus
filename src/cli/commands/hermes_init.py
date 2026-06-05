@@ -282,7 +282,10 @@ class HermesInitializer:
                 console.print("\n[dim]Removing Cresus files from remote .hermes...[/dim]")
                 rm_cmd = (
                     "rm -rf ~/.hermes/skills/cresus 2>/dev/null; "
+                    "rm -rf ~/.hermes/skills/finance/pea-portfolio-management 2>/dev/null; "
+                    "rm -f ~/.hermes/skills/*.yml 2>/dev/null; "
                     "rm -f ~/.hermes/config/system_prompt.md 2>/dev/null; "
+                    "rm -f ~/.hermes/.skills_prompt_snapshot.json 2>/dev/null; "
                     "echo 'OK'"
                 )
                 result = subprocess.run(
@@ -296,7 +299,10 @@ class HermesInitializer:
                 console.print("\n[dim]Removing Cresus files from local .hermes...[/dim]")
                 rm_cmd = (
                     f"rm -rf {self.hermes_home}/skills/cresus 2>/dev/null; "
+                    f"rm -rf {self.hermes_home}/skills/finance/pea-portfolio-management 2>/dev/null; "
+                    f"rm -f {self.hermes_home}/skills/*.yml 2>/dev/null; "
                     f"rm -f {self.hermes_home}/config/system_prompt.md 2>/dev/null; "
+                    f"rm -f {self.hermes_home}/.skills_prompt_snapshot.json 2>/dev/null; "
                     "echo 'OK'"
                 )
                 result = subprocess.run(
