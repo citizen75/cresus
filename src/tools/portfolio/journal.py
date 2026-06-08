@@ -221,8 +221,14 @@ class Journal:
                 positions[ticker]["total_cost"] += (quantity * price)
                 positions[ticker]["fees"] += fees
             elif operation == "SELL":
+                # Reduce cost basis by the average cost at time of sale, not the sale price
+                if positions[ticker]["quantity"] > 0:
+                    avg_cost_at_sale = positions[ticker]["total_cost"] / positions[ticker]["quantity"]
+                    positions[ticker]["total_cost"] -= (quantity * avg_cost_at_sale)
+                else:
+                    # If position doesn't exist (shouldn't happen), just subtract
+                    positions[ticker]["total_cost"] -= (quantity * price)
                 positions[ticker]["quantity"] -= quantity
-                positions[ticker]["total_cost"] -= (quantity * price)
                 positions[ticker]["fees"] += fees
 
             positions[ticker]["transactions"].append(row.to_dict())
@@ -232,7 +238,9 @@ class Journal:
 
         result = []
         for ticker, data in open_positions.items():
-            avg_entry_price = data["total_cost"] / data["quantity"] if data["quantity"] > 0 else 0
+            # Average cost includes fees distributed over shares
+            total_invested = data["total_cost"] + data["fees"]
+            avg_entry_price = total_invested / data["quantity"] if data["quantity"] > 0 else 0
 
             # Get stop_loss, take_profit, trailing_stop_distance, and highest_price from the most recent BUY transaction
             buy_transactions = [tx for tx in data["transactions"] if tx.get("operation") == "BUY"]
