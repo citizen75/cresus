@@ -292,10 +292,10 @@ export function ConversationWidget({
             e.stopPropagation()
             try {
               const baseUrl = getApiBaseUrl()
-              const timestamp = encodeURIComponent(msg.datetime)
-              console.log(`[Delete Message] Deleting: ${portfolioName}/${msg.datetime}`)
+              const messageId = msg.id || msg.datetime // Fallback to datetime for backward compatibility
+              console.log(`[Delete Message] Deleting: ${portfolioName}/${messageId}`)
               const response = await fetch(
-                `${baseUrl}/api/v1/conversations/${encodeURIComponent(portfolioName)}/message?timestamp=${timestamp}`,
+                `${baseUrl}/api/v1/conversations/${encodeURIComponent(portfolioName)}/message?message_id=${encodeURIComponent(messageId)}`,
                 {
                   method: 'DELETE',
                 }
@@ -303,7 +303,7 @@ export function ConversationWidget({
               if (response.ok) {
                 console.log(`[Delete Message] Success`)
                 // Remove message from state
-                setMessages((prev) => prev.filter((m) => m.datetime !== msg.datetime))
+                setMessages((prev) => prev.filter((m) => m.id ? m.id !== msg.id : m.datetime !== msg.datetime))
               } else {
                 console.error(`[Delete Message] Failed: ${response.status} ${response.statusText}`)
               }

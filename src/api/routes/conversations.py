@@ -417,23 +417,21 @@ async def search_messages(
 @router.delete("/{portfolio_name}/message")
 async def delete_message(
     portfolio_name: str,
-    timestamp: str = Query(..., description="Message timestamp to delete"),
+    message_id: str = Query(..., description="Message ID to delete"),
 ):
-    """Delete a specific message by timestamp."""
+    """Delete a specific message by ID."""
     try:
-        from datetime import datetime
         manager = ConversationManager(portfolio_name)
         all_messages = manager.get_history()
 
-        # Find and remove the message with matching timestamp
-        target_time = datetime.fromisoformat(timestamp)
+        # Find and remove the message with matching ID
         remaining = [
             msg for msg in all_messages
-            if msg.timestamp != target_time
+            if msg.id != message_id
         ]
 
         if len(remaining) == len(all_messages):
-            raise HTTPException(status_code=404, detail="Message not found")
+            raise HTTPException(status_code=404, detail=f"Message '{message_id}' not found")
 
         # Clear and re-add remaining messages
         manager.clear_history()
