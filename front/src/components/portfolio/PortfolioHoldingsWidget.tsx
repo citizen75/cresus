@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useEnrichedPositions } from '@/hooks/useEnrichedPositions'
 import { PortfolioHoldingsTable } from './PortfolioHoldingsTable'
 import CardChart from '@/components/CardChart'
 import { getApiBaseUrl } from '@/services/api'
@@ -14,108 +15,47 @@ export default function PortfolioHoldingsWidget({
   onClose,
   filterTickers,
 }: PortfolioHoldingsWidgetProps) {
-  const [positions, setPositions] = useState<any[]>([])
-  const [fundamentalData, setFundamentalData] = useState<Record<string, any>>({})
-  const [fundamentalCache, setFundamentalCache] = useState<Record<string, any>>({})
+  const [rawPositions, setRawPositions] = useState<any[]>([])
   const [historicalData, setHistoricalData] = useState<Record<string, any>>({})
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingPositions, setIsLoadingPositions] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [sectorFilter, setSectorFilter] = useState('All sectors')
   const [selectedPosition, setSelectedPosition] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'table' | 'charts'>('table')
   const [timeframe, setTimeframe] = useState<'1W' | '1M' | '3M' | 'YTD' | 'ALL'>('1M')
 
-  // Filter positions if filterTickers is provided (calculate early, before useEffects)
-  const filteredPositions = filterTickers && filterTickers.length > 0
-    ? positions.filter((pos: any) => filterTickers.includes(pos.ticker))
-    : positions
-
-  // Load positions for the portfolio
+  // Load raw positions from API
   useEffect(() => {
-    const loadPositionsAndFundamental = async () => {
+    const loadPositions = async () => {
       if (!portfolioName) return
-
-      setIsLoading(true)
+      setIsLoadingPositions(true)
       try {
         const baseUrl = getApiBaseUrl()
-
-        // Fetch positions
         const posResponse = await fetch(`${baseUrl}/api/v1/portfolios/${portfolioName}/positions`)
-        if (!posResponse.ok) {
-          console.error('Failed to fetch positions')
-          setPositions([])
-          return
-        }
-
-        let posData = await posResponse.json()
-        if (!Array.isArray(posData)) {
-          posData = posData.positions || []
-        }
-
-        let positions = posData
-        console.log(`[PortfolioHoldingsWidget] Loaded ${positions.length} positions for ${portfolioName}`)
-
-        if (positions.length > 0) {
-          // Fetch fundamental data for all tickers
-          const tickers = positions.map((p: any) => p.ticker)
-          const fundData: Record<string, any> = {}
-
-          for (const ticker of tickers) {
-            // Check cache first
-            if (fundamentalCache[ticker]) {
-              fundData[ticker] = fundamentalCache[ticker]
-            } else {
-              try {
-                const fundResponse = await fetch(`${baseUrl}/api/v1/data/fundamental/${ticker}`)
-                if (fundResponse.ok) {
-                  const fundResult = await fundResponse.json()
-                  if (fundResult?.data?.quotation) {
-                    fundData[ticker] = fundResult.data.quotation
-                    console.log(`[PortfolioHoldingsWidget] ✓ ${ticker}: current=${fundResult.data.quotation.current_price}`)
-                  }
-                }
-              } catch (err) {
-                console.error(`[PortfolioHoldingsWidget] Failed to fetch fundamental data for ${ticker}:`, err)
-              }
-            }
+        if (posResponse.ok) {
+          let posData = await posResponse.json()
+          if (!Array.isArray(posData)) {
+            posData = posData.positions || []
           }
-
-          // Update cache for future use
-          setFundamentalCache(fundData)
-
-          // Enrich positions with calculated daily changes
-          positions = positions.map((pos: any) => {
-            const fund = fundData[pos.ticker] || {}
-            const currentPrice = pos.current_price || 0
-            const previousClose = fund.previous_close || currentPrice
-
-            // Daily change per share: current - previous
-            const dailyChange = currentPrice - previousClose
-            const dailyChangePct = previousClose && previousClose !== 0 ? ((currentPrice - previousClose) / previousClose) * 100 : 0
-
-            console.log(`[PortfolioHoldingsWidget] ✓ ${pos.ticker}: current=${currentPrice}, prev=${previousClose}, daily=${dailyChange} (${dailyChangePct}%)`)
-
-            return {
-              ...pos,
-              position_gain: dailyChange,  // Daily change per share
-              position_gain_pct: dailyChangePct,
-              asset_type: fund.asset_type || 'Stock',
-              sector: fund.sector || 'Unknown',
-            }
-          })
-
-          setPositions(positions)
-          setFundamentalData(fundData)
+          setRawPositions(posData)
         }
       } catch (err) {
         console.error('Failed to load portfolio positions:', err)
       } finally {
-        setIsLoading(false)
+        setIsLoadingPositions(false)
       }
     }
-
-    loadPositionsAndFundamental()
+    loadPositions()
   }, [portfolioName])
+
+  // Use hook to enrich positions with fundamental data
+  const { enrichedPositions, fundamentalData, isLoading: isEnriching } = useEnrichedPositions(rawPositions, portfolioName)
+  const isLoading = isLoadingPositions || isEnriching
+
+  // Filter positions if filterTickers is provided (calculate early, before useEffects)
+  const filteredPositions = filterTickers && filterTickers.length > 0
+    ? enrichedPositions.filter((pos: any) => filterTickers.includes(pos.ticker))
+    : enrichedPositions
 
   // Load historical data for charts
   useEffect(() => {
