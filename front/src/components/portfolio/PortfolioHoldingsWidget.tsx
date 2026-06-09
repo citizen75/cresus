@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useEnrichedPositions } from '@/hooks/useEnrichedPositions'
 import { PortfolioHoldingsTable } from './PortfolioHoldingsTable'
 import CardChart from '@/components/CardChart'
+import { ChartModal } from '@/components/ChartModal'
 import { getApiBaseUrl } from '@/services/api'
 
 interface PortfolioHoldingsWidgetProps {
@@ -21,6 +22,7 @@ export default function PortfolioHoldingsWidget({
   const [searchQuery, setSearchQuery] = useState('')
   const [sectorFilter, setSectorFilter] = useState('All sectors')
   const [selectedPosition, setSelectedPosition] = useState<string | null>(null)
+  const [chartModalTicker, setChartModalTicker] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'table' | 'charts'>('table')
   const [timeframe, setTimeframe] = useState<'1W' | '1M' | '3M' | 'YTD' | 'ALL'>('1M')
 
@@ -250,7 +252,10 @@ export default function PortfolioHoldingsWidget({
             currency="USD"
             fundamentalData={fundamentalData}
             selectedPosition={selectedPosition}
-            onSelectPosition={(ticker) => setSelectedPosition(ticker)}
+            onSelectPosition={(ticker) => {
+              setSelectedPosition(ticker)
+              setChartModalTicker(ticker)
+            }}
             showSearch={false}
             showActions={true}
             externalSearchQuery={searchQuery}
@@ -314,6 +319,14 @@ export default function PortfolioHoldingsWidget({
           </div>
         )}
       </div>
+
+      {/* Chart Modal */}
+      {chartModalTicker && (
+        <ChartModal
+          ticker={chartModalTicker}
+          onClose={() => setChartModalTicker(null)}
+        />
+      )}
     </div>
   )
 }
