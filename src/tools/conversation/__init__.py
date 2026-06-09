@@ -3,6 +3,7 @@
 import json
 import re
 import threading
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Literal
@@ -29,7 +30,8 @@ class ConversationMessage:
 		source: ConversationSource,
 		content: str,
 		portfolio: Optional[str] = None,
-		timestamp: Optional[datetime] = None
+		timestamp: Optional[datetime] = None,
+		message_id: Optional[str] = None
 	):
 		"""Initialize a conversation message.
 
@@ -38,7 +40,9 @@ class ConversationMessage:
 			content: Message content
 			portfolio: Target portfolio (None = global)
 			timestamp: Message timestamp (defaults to now)
+			message_id: Unique message ID (defaults to UUID)
 		"""
+		self.id = message_id or str(uuid.uuid4())
 		self.source = source
 		self.content = content
 		self.portfolio = portfolio
@@ -47,6 +51,7 @@ class ConversationMessage:
 	def to_dict(self) -> Dict[str, Any]:
 		"""Convert message to dictionary."""
 		return {
+			"id": self.id,
 			"source": self.source,
 			"content": self.content,
 			"portfolio": self.portfolio,
@@ -61,7 +66,8 @@ class ConversationMessage:
 			source=data["source"],
 			content=data["content"],
 			portfolio=data.get("portfolio"),
-			timestamp=timestamp
+			timestamp=timestamp,
+			message_id=data.get("id")
 		)
 
 
