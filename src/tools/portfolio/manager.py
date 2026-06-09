@@ -374,7 +374,7 @@ class PortfolioManager:
             return []
 
     def get_portfolio_positions(self, name: str) -> Optional[Dict[str, Any]]:
-        """Get open positions with company names (uses cached prices for speed)."""
+        """Get open positions with company names (uses local cached prices)."""
         journal = Journal(name, context=self.context)
         open_pos = journal.get_open_positions()
         positions = []
@@ -382,11 +382,11 @@ class PortfolioManager:
             ticker = row["ticker"]
             quantity = float(row["quantity"])
             avg_entry_price = float(row["avg_entry_price"])
-            # Use cached Fundamental data instead of fetching fresh prices
-            # This avoids network calls and is much faster
-            fundamental = Fundamental(ticker)
-            # get_current_price() uses cached data by default
-            current_price = fundamental.get_current_price() or avg_entry_price
+            # Use DataHistory for prices (loads from local CSV cache, no network calls)
+            # Falls back to avg_entry_price if no cached data available
+            from tools.data import DataHistory
+            dh = DataHistory(ticker)
+            current_price = dh.get_current_price() or avg_entry_price
             company_name = self._get_company_name(ticker)
             positions.append({
                 "ticker": ticker,
