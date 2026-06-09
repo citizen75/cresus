@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import { AlertMessageRenderer } from './AlertMessageRenderer'
+import { getApiBaseUrl } from '@/services/api'
 
 interface MessageWidget {
   type: 'portfolio_holdings' | 'portfolio_positions' | 'market_overview' | 'trade_analysis'
@@ -146,10 +147,10 @@ export function ConversationWidget({
 
   const connectWebSocket = useCallback(() => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const host = import.meta.env.VITE_API_HOST || window.location.hostname
-    const port = import.meta.env.VITE_API_PORT || '8000'
+    const baseUrl = getApiBaseUrl().replace(/^https?:\/\//, '') // Remove http(s):// prefix
 
-    let url = `${protocol}//${host}:${port}/api/v1/ws/conversations/${encodeURIComponent(portfolioName)}`
+    let url = `${protocol}//${baseUrl}/api/v1/ws/conversations/${encodeURIComponent(portfolioName)}`
+    console.log(`[WebSocket] Connecting to: ${url}`)
     if (sourceFilter) {
       url += `?source=${encodeURIComponent(sourceFilter)}`
     }
