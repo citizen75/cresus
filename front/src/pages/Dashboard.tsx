@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import GlobalConversationPanel from '@/components/portfolio/GlobalConversationPanel'
 import TradingChart from '@/components/TradingChart'
 import CardChart from '@/components/CardChart'
+import { PortfolioHoldingsTable } from '@/components/portfolio/PortfolioHoldingsTable'
 import { api } from '@/services/api'
 
 interface AlertInfo {
@@ -234,130 +235,46 @@ export default function Dashboard() {
           {alertGridView ? (
             // Alert View - Table or Charts
             viewMode === 'table' ? (
-              // Table View - Portfolio positions or simple ticker list
-              <div className="h-full overflow-auto">
+              <div className="h-full overflow-auto p-4">
                 {alertGridView.portfolio && portfolioPositions.length > 0 ? (
-                  // Detailed Portfolio Holdings Table
-                  <table className="w-full text-xs">
-                    <thead className="sticky top-0 bg-slate-800/50 border-b border-slate-700">
-                      <tr>
-                        <th className="px-3 py-2 text-left font-semibold text-slate-300">Symbol</th>
-                        <th className="px-3 py-2 text-left font-semibold text-slate-300">Company</th>
-                        <th className="px-3 py-2 text-left font-semibold text-slate-300">Weight</th>
-                        <th className="px-3 py-2 text-right font-semibold text-slate-300">Shares</th>
-                        <th className="px-3 py-2 text-right font-semibold text-slate-300">Avg. Cost</th>
-                        <th className="px-3 py-2 text-right font-semibold text-slate-300">Price</th>
-                        <th className="px-3 py-2 text-right font-semibold text-slate-300">Daily Change</th>
-                        <th className="px-3 py-2 text-right font-semibold text-slate-300">Market Value</th>
-                        <th className="px-3 py-2 text-right font-semibold text-slate-300">P&L</th>
-                        <th className="px-3 py-2 text-right font-semibold text-slate-300">P&L %</th>
-                        <th className="px-3 py-2 text-center font-semibold text-slate-300">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-700">
-                      {portfolioPositions
-                        .filter((pos) => alertGridView.tickers.includes(pos.ticker))
-                        .map((pos) => {
-                          const pnlPercent =
-                            pos.position_value > 0
-                              ? ((pos.position_gain / pos.position_value) * 100).toFixed(2)
-                              : '0'
-
-                          return (
-                            <tr key={pos.ticker} className="hover:bg-slate-800/50">
-                              <td className="px-3 py-2 font-medium text-white">{pos.ticker}</td>
-                              <td className="px-3 py-2 text-slate-300 truncate max-w-xs">
-                                {pos.company_name || '-'}
-                              </td>
-                              <td className="px-3 py-2 text-slate-300">
-                                {((pos.position_value / (pos.position_value + 1000)) * 100).toFixed(1)}%
-                              </td>
-                              <td className="px-3 py-2 text-right text-slate-300">{pos.quantity}</td>
-                              <td className="px-3 py-2 text-right text-slate-300">
-                                €{pos.avg_entry_price?.toFixed(2)}
-                              </td>
-                              <td className="px-3 py-2 text-right text-slate-300">
-                                €{pos.current_price?.toFixed(2)}
-                              </td>
-                              <td className="px-3 py-2 text-right text-slate-300">-</td>
-                              <td className="px-3 py-2 text-right text-slate-300">
-                                €{pos.position_value?.toLocaleString('de-DE', { maximumFractionDigits: 2 })}
-                              </td>
-                              <td
-                                className={`px-3 py-2 text-right font-medium ${
-                                  pos.position_gain >= 0 ? 'text-green-400' : 'text-red-400'
-                                }`}
-                              >
-                                €{pos.position_gain?.toLocaleString('de-DE', { maximumFractionDigits: 2 })}
-                              </td>
-                              <td
-                                className={`px-3 py-2 text-right font-medium ${
-                                  parseFloat(pnlPercent) >= 0 ? 'text-green-400' : 'text-red-400'
-                                }`}
-                              >
-                                {pnlPercent}%
-                              </td>
-                              <td className="px-3 py-2 text-center">
-                                <button
-                                  onClick={() => handleSelectTicker(pos.ticker)}
-                                  className="text-slate-400 hover:text-slate-200 transition"
-                                  title="View chart"
-                                >
-                                  📊
-                                </button>
-                              </td>
-                            </tr>
-                          )
-                        })}
-                    </tbody>
-                  </table>
+                  <PortfolioHoldingsTable
+                    positions={portfolioPositions}
+                    totalValue={portfolioPositions.reduce((sum: number, p: any) => sum + (p.position_value || 0), 0)}
+                    currency="EUR"
+                    filterTickers={alertGridView.tickers}
+                    showSearch={true}
+                    showActions={true}
+                    onSelectPosition={(ticker) => handleSelectTicker(ticker)}
+                  />
                 ) : (
-                  // Simple Ticker Table
-                  <table className="w-full text-xs">
-                    <thead className="sticky top-0 bg-slate-800/50 border-b border-slate-700">
-                      <tr>
-                        <th className="px-4 py-3 text-left font-semibold text-slate-300">Ticker</th>
-                        <th className="px-4 py-3 text-right font-semibold text-slate-300">Current</th>
-                        <th className="px-4 py-3 text-right font-semibold text-slate-300">Change %</th>
-                        <th className="px-4 py-3 text-right font-semibold text-slate-300">Low</th>
-                        <th className="px-4 py-3 text-right font-semibold text-slate-300">High</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-700">
-                      {alertGridView.tickers.map((ticker) => {
-                        const tickerData = historicalData[ticker]
-                        const filteredData = filterDataByTimeframe(tickerData || [], timeframe)
-                        const firstPrice = filteredData?.[0]?.close
-                        const lastPrice = filteredData?.[filteredData.length - 1]?.close
-                        const minPrice = filteredData?.length
-                          ? Math.min(...filteredData.map((d: any) => d.close))
+                  <PortfolioHoldingsTable
+                    positions={alertGridView.tickers.map((ticker) => {
+                      const tickerData = historicalData[ticker]
+                      const filteredData = filterDataByTimeframe(tickerData || [], timeframe)
+                      const firstPrice = filteredData?.[0]?.close
+                      const lastPrice = filteredData?.[filteredData.length - 1]?.close
+                      const change =
+                        firstPrice && lastPrice
+                          ? ((lastPrice - firstPrice) / firstPrice) * 100
                           : 0
-                        const maxPrice = filteredData?.length
-                          ? Math.max(...filteredData.map((d: any) => d.close))
-                          : 0
-                        const change =
-                          firstPrice && lastPrice
-                            ? ((lastPrice - firstPrice) / firstPrice) * 100
-                            : 0
 
-                        return (
-                          <tr
-                            key={ticker}
-                            onClick={() => handleSelectTicker(ticker)}
-                            className="hover:bg-slate-800/50 cursor-pointer transition"
-                          >
-                            <td className="px-4 py-3 font-medium text-white">{ticker}</td>
-                            <td className="px-4 py-3 text-right text-slate-300">€{lastPrice?.toFixed(2)}</td>
-                            <td className={`px-4 py-3 text-right font-medium ${change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                              {change.toFixed(2)}%
-                            </td>
-                            <td className="px-4 py-3 text-right text-slate-300">€{minPrice?.toFixed(2)}</td>
-                            <td className="px-4 py-3 text-right text-slate-300">€{maxPrice?.toFixed(2)}</td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
+                      return {
+                        ticker,
+                        company_name: '',
+                        quantity: 1,
+                        avg_entry_price: firstPrice || 0,
+                        current_price: lastPrice || 0,
+                        position_value: lastPrice || 0,
+                        position_gain: (lastPrice || 0) - (firstPrice || 0),
+                        position_gain_pct: change,
+                      }
+                    })}
+                    totalValue={alertGridView.tickers.length}
+                    currency="EUR"
+                    showSearch={true}
+                    showActions={true}
+                    onSelectPosition={(ticker) => handleSelectTicker(ticker)}
+                  />
                 )}
               </div>
             ) : (
