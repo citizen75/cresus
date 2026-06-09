@@ -1,22 +1,11 @@
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import { AlertMessageRenderer } from './AlertMessageRenderer'
 import { getApiBaseUrl } from '@/services/api'
+import { useConversation, type ConversationMessage } from '@/contexts/ConversationContext'
 
 interface MessageWidget {
   type: 'portfolio_holdings' | 'portfolio_positions' | 'market_overview' | 'trade_analysis'
   data: Record<string, any>
-}
-
-interface ConversationMessage {
-  id?: string
-  type?: 'alert' | 'signal' | 'portfolio' | 'llm' | 'user'
-  source: string
-  content: string
-  datetime: string
-  portfolio?: string
-  signal?: string
-  tickers?: string[]
-  widget?: MessageWidget
 }
 
 // Parse alert content to extract portfolio, signal, and tickers
@@ -128,14 +117,18 @@ export function ConversationWidget({
   onPortfolioClick,
   onNewMessage
 }: ConversationWidgetProps) {
-  const [messages, setMessages] = useState<ConversationMessage[]>([])
-  const [loading, setLoading] = useState(true)
-  const [connected, setConnected] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { messages: allMessages, connected: allConnected, loading: allLoading, error: allError, subscribeToConversation, unsubscribeFromConversation, deleteMessage } = useConversation()
   const [inputValue, setInputValue] = useState('')
   const [sending, setSending] = useState(false)
-  const wsRef = useRef<WebSocket | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const conversationKeyRef = useRef<string>('')
+
+  // Get messages for this specific conversation
+  const key = sourceFilter ? `${portfolioName}:${sourceFilter}` : portfolioName
+  const messages = allMessages[key] || []
+  const loading = allLoading[key] || false
+  const connected = allConnected[key] || false
+  const error = allError[key] || null
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -145,64 +138,15 @@ export function ConversationWidget({
     scrollToBottom()
   }, [messages])
 
-  const connectWebSocket = useCallback(() => {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const baseUrl = getApiBaseUrl().replace(/^https?:\/\//, '') // Remove http(s):// prefix
-
-    let url = `${protocol}//${baseUrl}/api/v1/ws/conversations/${encodeURIComponent(portfolioName)}`
-    console.log(`[WebSocket] Connecting to: ${url}`)
-    if (sourceFilter) {
-      url += `?source=${encodeURIComponent(sourceFilter)}`
-    }
-
-    const ws = new WebSocket(url)
-
-    ws.onopen = () => {
-      console.log(`Connected to conversation: ${portfolioName}`)
-      setConnected(true)
-      setError(null)
-    }
-
-    ws.onmessage = (event) => {
-      const message = JSON.parse(event.data)
-
-      if (message.type === 'initial') {
-        setMessages(message.data || [])
-        setLoading(false)
-      } else if (message.type === 'message') {
-        setMessages((prev) => [...prev, message.data])
-        // Notify parent component of new message
-        if (onNewMessage) {
-          onNewMessage(message.data)
-        }
-      }
-    }
-
-    ws.onerror = (event) => {
-      console.error('WebSocket error:', event)
-      setError('Connection error')
-    }
-
-    ws.onclose = () => {
-      console.log('Disconnected from conversation')
-      setConnected(false)
-      setTimeout(() => {
-        connectWebSocket()
-      }, 3000)
-    }
-
-    wsRef.current = ws
-  }, [portfolioName, sourceFilter])
-
+  // Subscribe to conversation on mount
   useEffect(() => {
-    connectWebSocket()
+    conversationKeyRef.current = key
+    subscribeToConversation(portfolioName, sourceFilter, onNewMessage)
 
     return () => {
-      if (wsRef.current) {
-        wsRef.current.close()
-      }
+      unsubscribeFromConversation(portfolioName, sourceFilter)
     }
-  }, [connectWebSocket])
+  }, [portfolioName, sourceFilter, subscribeToConversation, unsubscribeFromConversation, onNewMessage])
 
   const formatMessageDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -291,22 +235,10 @@ export function ConversationWidget({
           const handleDeleteMessage = async (e: React.MouseEvent) => {
             e.stopPropagation()
             try {
-              const baseUrl = getApiBaseUrl()
               const messageId = msg.id || msg.datetime // Fallback to datetime for backward compatibility
               console.log(`[Delete Message] Deleting: ${portfolioName}/${messageId}`)
-              const response = await fetch(
-                `${baseUrl}/api/v1/conversations/${encodeURIComponent(portfolioName)}/message?message_id=${encodeURIComponent(messageId)}`,
-                {
-                  method: 'DELETE',
-                }
-              )
-              if (response.ok) {
-                console.log(`[Delete Message] Success`)
-                // Remove message from state
-                setMessages((prev) => prev.filter((m) => m.id ? m.id !== msg.id : m.datetime !== msg.datetime))
-              } else {
-                console.error(`[Delete Message] Failed: ${response.status} ${response.statusText}`)
-              }
+              await deleteMessage(portfolioName, messageId)
+              console.log(`[Delete Message] Success`)
             } catch (err) {
               console.error('[Delete Message] Error:', err)
             }

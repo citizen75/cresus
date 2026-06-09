@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClient } from '@/hooks/usePortfolio'
 import { getApiBaseUrl } from '@/services/api'
+import { ConversationProvider } from '@/contexts/ConversationContext'
 import Layout from '@/components/Layout'
 import Dashboard from '@/pages/Dashboard'
 import Portfolios from '@/pages/Portfolios'
@@ -30,8 +31,9 @@ export default function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Routes>
+      <ConversationProvider>
+        <BrowserRouter>
+          <Routes>
           <Route path="/" element={<Layout><Dashboard /></Layout>} />
           <Route path="/portfolios" element={<Layout><Portfolios /></Layout>} />
           <Route path="/portfolios/:name" element={<Layout><PortfolioDetail /></Layout>} />
@@ -59,7 +61,8 @@ export default function App() {
           <Route path="/screener/:name/:view?" element={<Layout><ScreenerDetail /></Layout>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </BrowserRouter>
+        </BrowserRouter>
+      </ConversationProvider>
     </QueryClientProvider>
   )
 }
