@@ -154,14 +154,14 @@ export default function Dashboard() {
     }
   }, [alertHistory])
 
-  // Load portfolio positions when alert has a portfolio
+  // Load portfolio positions and their fundamental data when alert has a portfolio
   useEffect(() => {
     if (!alertGridView?.portfolio) {
       setPortfolioPositions([])
       return
     }
 
-    const loadPositions = async () => {
+    const loadPositionsAndFundamental = async () => {
       try {
         const response = await api.listPortfolios()
         const portfolio = response.portfolios?.find(
@@ -173,7 +173,21 @@ export default function Dashboard() {
           )
           if (positionResponse.ok) {
             const data = await positionResponse.json()
-            setPortfolioPositions(data.positions || [])
+            const positions = data.positions || []
+            setPortfolioPositions(positions)
+
+            // Fetch fundamental data for portfolio positions
+            const fundData: Record<string, any> = {}
+            for (const pos of positions) {
+              try {
+                const result = await api.getFundamental(pos.ticker)
+                fundData[pos.ticker] = result?.data?.quotation || {}
+              } catch (err) {
+                console.error(`Failed to load fundamental data for ${pos.ticker}:`, err)
+                fundData[pos.ticker] = {}
+              }
+            }
+            setFundamentalData(fundData)
           }
         }
       } catch (err) {
@@ -181,7 +195,7 @@ export default function Dashboard() {
       }
     }
 
-    loadPositions()
+    loadPositionsAndFundamental()
   }, [alertGridView?.portfolio])
 
   // Load historical data, ticker info and fundamental data when grid view is activated
