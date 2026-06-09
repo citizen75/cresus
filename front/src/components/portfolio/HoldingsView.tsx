@@ -508,8 +508,10 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
                 const pos = positions.find((p: any) => p.ticker === ticker)
                 if (pos) setChartPosition(pos)
               }}
-              showSearch={true}
+              showSearch={false}
               showActions={true}
+              externalSearchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
             />
           )}
 
