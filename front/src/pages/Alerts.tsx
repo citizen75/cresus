@@ -44,9 +44,12 @@ export default function Alerts() {
       setLoading(true)
       setError(null)
       const response = await api.listAlerts()
+      console.log('Alerts response:', response)
       setAlerts(response.alerts || [])
     } catch (err) {
-      setError(`Failed to load alerts: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      const errorMsg = `Failed to load alerts: ${err instanceof Error ? err.message : 'Unknown error'}`
+      console.error(errorMsg, err)
+      setError(errorMsg)
     } finally {
       setLoading(false)
     }
@@ -181,21 +184,40 @@ export default function Alerts() {
           <h1 className="text-4xl font-bold text-white mb-2">Alerts</h1>
           <p className="text-slate-400">Create and manage screener formula alerts</p>
         </div>
-        <button
-          onClick={() => {
-            setEditingAlert(null)
-            setShowCreateModal(true)
-          }}
-          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition"
-        >
-          + Create Alert
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={fetchAlerts}
+            disabled={loading}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-medium transition disabled:opacity-50"
+            title="Refresh alerts list"
+          >
+            ⟳
+          </button>
+          <button
+            onClick={() => {
+              setEditingAlert(null)
+              setShowCreateModal(true)
+            }}
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition"
+          >
+            + Create Alert
+          </button>
+        </div>
       </div>
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-900/30 border border-red-800 rounded-lg p-4 text-red-400">
-          {error}
+        <div className="bg-red-900/50 border border-red-700 rounded-lg p-4 text-red-300 flex items-start justify-between gap-4">
+          <div>
+            <p className="font-bold mb-1">Error</p>
+            <p className="text-sm">{error}</p>
+          </div>
+          <button
+            onClick={() => setError(null)}
+            className="text-red-300 hover:text-red-100 flex-shrink-0"
+          >
+            ✕
+          </button>
         </div>
       )}
 
