@@ -473,22 +473,34 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
 
           {/* Tab Content - Table View */}
           {activeTab === 'positions' && viewMode === 'table' && (
-            <PortfolioHoldingsTable
-              positions={positions}
-              totalValue={totalValue}
-              currency={details?.currency || 'USD'}
-              fundamentalData={fundamentalData}
-              selectedPosition={selectedPosition}
-              onSelectPosition={(ticker) => {
-                setSelectedPosition(ticker)
-                const pos = positions.find((p: any) => p.ticker === ticker)
-                if (pos) setChartPosition(pos)
-              }}
-              showSearch={false}
-              showActions={true}
-              externalSearchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-            />
+            <div className="relative">
+              {isPricesLoading && (
+                <div className="absolute inset-0 bg-slate-900/50 rounded flex items-center justify-center z-10">
+                  <div className="text-center">
+                    <div className="inline-block">
+                      <div className="w-12 h-12 border-4 border-slate-700 border-t-purple-600 rounded-full animate-spin"></div>
+                    </div>
+                    <p className="text-slate-400 text-sm mt-3">Loading portfolio...</p>
+                  </div>
+                </div>
+              )}
+              <PortfolioHoldingsTable
+                positions={positions}
+                totalValue={totalValue}
+                currency={details?.currency || 'USD'}
+                fundamentalData={fundamentalData}
+                selectedPosition={selectedPosition}
+                onSelectPosition={(ticker) => {
+                  setSelectedPosition(ticker)
+                  const pos = positions.find((p: any) => p.ticker === ticker)
+                  if (pos) setChartPosition(pos)
+                }}
+                showSearch={false}
+                showActions={true}
+                externalSearchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+              />
+            </div>
           )}
 
           {/* Cards View - Position Cards */}

@@ -392,11 +392,13 @@ export default function Dashboard() {
 
         {/* Portfolio Holdings Widget */}
         <div className="flex-1 overflow-auto p-4">
-          <PortfolioHoldingsWidget
-            portfolioName="bnp"
-            onClose={() => setRightPanelOpen(false)}
-            filterTickers={alertGridView?.tickers}
-          />
+          {alertGridView?.portfolio && (
+            <PortfolioHoldingsWidget
+              portfolioName={alertGridView.portfolio}
+              onClose={() => setRightPanelOpen(false)}
+              filterTickers={alertGridView?.tickers}
+            />
+          )}
         </div>
       </div>
       )}
