@@ -37,7 +37,7 @@ class AlertNotifier:
             self._send_webhook_alert(alert, result)
 
     def _send_conversation_alert(self, alert: Alert, result: AlertResult) -> None:
-        """Send alert to conversation(s).
+        """Send alert to conversation(s), filtered by portfolio holdings.
 
         Args:
             alert: Alert configuration
@@ -50,18 +50,38 @@ class AlertNotifier:
                 self.logger.warning(f"No target portfolios for alert: {alert.name}")
                 return
 
-            # Format alert message
-            message = self._format_alert_message(alert, result)
-
-            # Send to each portfolio's conversation
+            # Send to each portfolio's conversation with filtered matches
+            pm = PortfolioManager()
             for portfolio_name in portfolios:
                 try:
-                    manager = ConversationManager(portfolio_name)
-                    manager.add_alert(message)
-                    self.logger.info(
-                        f"Sent alert '{alert.name}' to portfolio '{portfolio_name}': "
-                        f"{len(result.matches)} match(es)"
-                    )
+                    # Get portfolio holdings
+                    holdings = pm.get_portfolio_positions(portfolio_name)
+                    portfolio_tickers = set()
+                    if holdings:
+                        portfolio_tickers = {p.get('ticker') for p in holdings.get('positions', [])}
+
+                    # Filter matches to only include tickers in this portfolio
+                    filtered_matches = [
+                        m for m in result.matches
+                        if m.get('ticker') in portfolio_tickers
+                    ]
+
+                    # Only send if there are relevant matches
+                    if filtered_matches:
+                        # Format alert message with filtered matches
+                        message = self._format_alert_message(alert, result, filtered_matches)
+
+                        manager = ConversationManager(portfolio_name)
+                        manager.add_alert(message)
+                        self.logger.info(
+                            f"Sent alert '{alert.name}' to portfolio '{portfolio_name}': "
+                            f"{len(filtered_matches)} relevant match(es) out of {len(result.matches)}"
+                        )
+                    else:
+                        self.logger.info(
+                            f"Alert '{alert.name}' skipped for portfolio '{portfolio_name}': "
+                            f"no matching tickers in holdings"
+                        )
                 except Exception as e:
                     self.logger.error(
                         f"Error sending alert to portfolio '{portfolio_name}': {e}"
@@ -120,12 +140,16 @@ class AlertNotifier:
             portfolios = pm.list_portfolios()
             return [p.get('name') for p in portfolios if p.get('type') == 'real']
 
-    def _format_alert_message(self, alert: Alert, result: AlertResult) -> str:
+    def _format_alert_message(
+        self, alert: Alert, result: AlertResult,
+        filtered_matches: Optional[List[Dict[str, Any]]] = None
+    ) -> str:
         """Format alert message for conversation.
 
         Args:
             alert: Alert configuration
             result: Alert evaluation result
+            filtered_matches: Optional filtered matches for portfolio-specific alerts
 
         Returns:
             Formatted alert message
@@ -133,9 +157,14 @@ class AlertNotifier:
         timestamp = datetime.fromisoformat(result.evaluated_at) if result.evaluated_at else datetime.now()
         time_str = timestamp.strftime('%H:%M:%S')
 
+        # Use filtered matches if provided, otherwise use all matches
+        matches_to_display = filtered_matches if filtered_matches is not None else result.matches
+        total_matches = len(result.matches)
+        displayed_matches = len(matches_to_display)
+
         # Count matches by ticker
         ticker_counts: Dict[str, int] = {}
-        for match in result.matches:
+        for match in matches_to_display:
             ticker = match.get('ticker', '?')
             ticker_counts[ticker] = ticker_counts.get(ticker, 0) + 1
 
@@ -145,9 +174,15 @@ class AlertNotifier:
             f"",
             f"**Formula:** `{alert.formula}`",
             f"**Source:** {alert.source.value}",
-            f"**Matches:** {len(result.matches)} result(s)",
-            f"**Time:** {time_str}",
         ]
+
+        # Show match count with portfolio context
+        if filtered_matches is not None:
+            lines.append(f"**Matches:** {displayed_matches} in portfolio (of {total_matches} total)")
+        else:
+            lines.append(f"**Matches:** {total_matches} result(s)")
+
+        lines.append(f"**Time:** {time_str}")
 
         if alert.description:
             lines.append(f"**Note:** {alert.description}")
@@ -159,7 +194,7 @@ class AlertNotifier:
             for ticker, count in sorted(ticker_counts.items(), key=lambda x: -x[1])[:5]:
                 lines.append(f"  • {ticker}: {count} match(es)")
 
-        if len(ticker_counts) > 5:
-            lines.append(f"  ... and {len(ticker_counts) - 5} more")
+            if len(ticker_counts) > 5:
+                lines.append(f"  ... and {len(ticker_counts) - 5} more")
 
         return "\n".join(lines)
