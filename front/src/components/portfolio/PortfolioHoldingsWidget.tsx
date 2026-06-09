@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { PortfolioHoldingsTable } from './PortfolioHoldingsTable'
+import CardChart from '@/components/CardChart'
 import { getApiBaseUrl } from '@/services/api'
 
 interface PortfolioHoldingsWidgetProps {
@@ -16,11 +17,13 @@ export default function PortfolioHoldingsWidget({
   const [positions, setPositions] = useState<any[]>([])
   const [fundamentalData, setFundamentalData] = useState<Record<string, any>>({})
   const [fundamentalCache, setFundamentalCache] = useState<Record<string, any>>({})
+  const [historicalData, setHistoricalData] = useState<Record<string, any>>({})
   const [isLoading, setIsLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [sectorFilter, setSectorFilter] = useState('All sectors')
   const [selectedPosition, setSelectedPosition] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'table' | 'charts'>('table')
+  const [timeframe, setTimeframe] = useState<'1W' | '1M' | '3M' | 'YTD' | 'ALL'>('1M')
 
   // Load positions for the portfolio
   useEffect(() => {
@@ -109,10 +112,73 @@ export default function PortfolioHoldingsWidget({
     loadPositionsAndFundamental()
   }, [portfolioName])
 
+  // Load historical data for charts
+  useEffect(() => {
+    const loadHistoricalData = async () => {
+      if (!filteredPositions || filteredPositions.length === 0) return
+
+      const data: Record<string, any[]> = {}
+      for (const pos of filteredPositions) {
+        try {
+          const baseUrl = getApiBaseUrl()
+          const response = await fetch(`${baseUrl}/api/v1/data/history/${pos.ticker}?days=1825`)
+          if (response.ok) {
+            const result = await response.json()
+            let historyArray = []
+            if (Array.isArray(result)) {
+              historyArray = result
+            } else if (result && result.history && Array.isArray(result.history)) {
+              historyArray = result.history
+            } else if (result && result.data && Array.isArray(result.data)) {
+              historyArray = result.data
+            }
+
+            if (historyArray.length > 0) {
+              data[pos.ticker] = historyArray.map((item: any) => ({
+                date: item.date || item.timestamp || item.Date,
+                close: parseFloat(item.close || item.Close),
+              }))
+            }
+          }
+        } catch (error) {
+          console.error(`Failed to load historical data for ${pos.ticker}:`, error)
+        }
+      }
+      setHistoricalData(data)
+    }
+
+    if (viewMode === 'charts') {
+      loadHistoricalData()
+    }
+  }, [filteredPositions, viewMode])
+
   // Filter positions if filterTickers is provided
   const filteredPositions = filterTickers && filterTickers.length > 0
     ? positions.filter((pos: any) => filterTickers.includes(pos.ticker))
     : positions
+
+  const getDaysForTimeframe = (tf: string) => {
+    switch (tf) {
+      case '1W': return 7
+      case '1M': return 30
+      case '3M': return 90
+      case 'YTD': return 365
+      case 'ALL': return 1825
+      default: return 30
+    }
+  }
+
+  const filterDataByTimeframe = (data: any[], tf: string) => {
+    if (tf === 'ALL') return data
+    let cutoffDate = new Date()
+    if (tf === 'YTD') {
+      cutoffDate = new Date(cutoffDate.getFullYear(), 0, 1)
+    } else {
+      const days = getDaysForTimeframe(tf)
+      cutoffDate.setDate(cutoffDate.getDate() - days)
+    }
+    return data.filter((item: any) => new Date(item.date) >= cutoffDate)
+  }
 
   const totalValue = filteredPositions.reduce((sum: any, pos: any) => sum + (pos.position_value || 0), 0)
 
@@ -208,15 +274,30 @@ export default function PortfolioHoldingsWidget({
             📈 Charts
           </button>
         </div>
+
+        {/* Timeframe Selector - Only visible in charts mode */}
+        {viewMode === 'charts' && (
+          <select
+            value={timeframe}
+            onChange={(e) => setTimeframe(e.target.value as '1W' | '1M' | '3M' | 'YTD' | 'ALL')}
+            className="px-3 py-1.5 bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded hover:border-slate-600 transition font-medium flex-shrink-0"
+          >
+            <option value="1W">1W</option>
+            <option value="1M">1M</option>
+            <option value="3M">3M</option>
+            <option value="YTD">YTD</option>
+            <option value="ALL">ALL</option>
+          </select>
+        )}
       </div>
 
-      {/* Holdings Table */}
+      {/* Holdings - Table or Charts */}
       <div className="flex-1 overflow-hidden">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <p className="text-slate-400">Loading positions...</p>
           </div>
-        ) : (
+        ) : viewMode === 'table' ? (
           <PortfolioHoldingsTable
             positions={filteredPositions}
             totalValue={totalValue}
@@ -232,6 +313,59 @@ export default function PortfolioHoldingsWidget({
             onViewModeChange={setViewMode}
             showViewToggle={false}
           />
+        ) : (
+          // Charts View
+          <div className="overflow-y-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-2">
+              {filteredPositions.map((pos: any) => (
+                <div key={pos.ticker} className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden hover:border-purple-600/50 transition">
+                  {/* Card Header */}
+                  <div className="bg-slate-800/50 border-b border-slate-700 p-3">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <p className="text-white font-bold text-sm">{pos.company_name || pos.ticker}</p>
+                        <p className="text-slate-400 text-xs">{pos.ticker}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-green-400">{((pos.position_gain / pos.position_value) * 100).toFixed(1)}%</p>
+                        <p className="text-slate-400 text-xs">Return</p>
+                      </div>
+                    </div>
+                    <div className="text-xs text-slate-400">
+                      {pos.quantity} shares @ €{pos.avg_entry_price.toFixed(2)}
+                    </div>
+                  </div>
+
+                  {/* Chart */}
+                  {historicalData[pos.ticker] && historicalData[pos.ticker].length > 0 ? (
+                    <CardChart
+                      data={filterDataByTimeframe(historicalData[pos.ticker], timeframe)}
+                      ticker={pos.ticker}
+                      showVariation={false}
+                    />
+                  ) : (
+                    <div className="p-4 h-32 bg-slate-700/20 flex items-center justify-center gap-2">
+                      <p className="text-slate-500 text-xs">Loading chart...</p>
+                    </div>
+                  )}
+
+                  {/* Card Footer */}
+                  <div className="border-t border-slate-700 p-3 space-y-2 bg-slate-800/30 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Position Value</span>
+                      <span className="text-white font-medium">€{pos.position_value.toLocaleString('de-DE', { maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">P&L</span>
+                      <span className={`font-medium ${pos.position_gain >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        €{pos.position_gain.toLocaleString('de-DE', { maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </div>
