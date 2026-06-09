@@ -48,9 +48,9 @@ class ConversationWebSocketManager:
         for ws in disconnected:
             self.unregister(portfolio_name, ws)
 
-    def get_history_file(self, portfolio_name: str) -> Path:
-        """Get path to conversation history file."""
-        return self.db_path / "portfolios" / portfolio_name / "conversations" / "history.json"
+    def get_history_file(self) -> Path:
+        """Get path to unified conversation history file."""
+        return self.db_path / "conversations" / "history.json"
 
     def _get_file_hash(self, file_path: Path) -> Optional[str]:
         """Get hash of file contents to detect changes."""
@@ -64,7 +64,9 @@ class ConversationWebSocketManager:
 
     async def check_for_updates(self, portfolio_name: str, source_filter: Optional[str] = None) -> None:
         """Check if conversation file has changed and broadcast new messages."""
-        history_file = self.get_history_file(portfolio_name)
+        from tools.conversation import ConversationManager
+
+        history_file = self.get_history_file()
         current_hash = self._get_file_hash(history_file)
 
         if portfolio_name not in self.file_hashes or current_hash != self.file_hashes.get(portfolio_name):
@@ -72,17 +74,18 @@ class ConversationWebSocketManager:
 
             # File changed, read and broadcast latest message
             try:
-                with open(history_file, "r") as f:
-                    messages = json.load(f)
+                manager = ConversationManager(portfolio_name)
+                messages = manager.get_history_dicts(
+                    source_filter=source_filter,
+                    portfolio_filter=portfolio_name
+                )
 
                 if messages:
-                    # Get latest message and filter if needed
                     latest = messages[-1]
-                    if source_filter is None or latest.get("source") == source_filter:
-                        await self.broadcast(portfolio_name, {
-                            "type": "message",
-                            "data": latest
-                        })
+                    await self.broadcast(portfolio_name, {
+                        "type": "message",
+                        "data": latest
+                    })
             except Exception as e:
                 logger.error(f"Error reading conversation history: {e}")
 

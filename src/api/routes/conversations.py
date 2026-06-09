@@ -75,11 +75,11 @@ async def get_conversation_history(
     try:
         manager = ConversationManager(portfolio_name)
 
-        # Get all history
-        if source:
-            history = manager.get_history(source_filter=source)
-        else:
-            history = manager.get_history()
+        # Get history filtered by portfolio and source
+        history = manager.get_history(
+            source_filter=source,
+            portfolio_filter=portfolio_name
+        )
 
         # Apply search filter
         if search:
@@ -126,18 +126,24 @@ async def get_message_count(
         manager = ConversationManager(portfolio_name)
 
         if source:
-            count = manager.get_message_count(source_filter=source)
+            count = manager.get_message_count(
+                source_filter=source,
+                portfolio_filter=portfolio_name
+            )
             return MessageCountResponse(
                 portfolio_name=portfolio_name,
                 count=count,
             )
 
         # Get counts by source
-        all_messages = manager.get_history()
+        all_messages = manager.get_history(portfolio_filter=portfolio_name)
         total = len(all_messages)
         by_source = {}
         for src in ["user", "chatbot", "alert", "notification"]:
-            by_source[src] = manager.get_message_count(source_filter=src)
+            by_source[src] = manager.get_message_count(
+                source_filter=src,
+                portfolio_filter=portfolio_name
+            )
 
         return MessageCountResponse(
             portfolio_name=portfolio_name,
@@ -161,7 +167,7 @@ async def get_conversation_stats(portfolio_name: str):
     """
     try:
         manager = ConversationManager(portfolio_name)
-        all_messages = manager.get_history()
+        all_messages = manager.get_history(portfolio_filter=portfolio_name)
 
         if not all_messages:
             return ConversationStatsResponse(
@@ -178,7 +184,10 @@ async def get_conversation_stats(portfolio_name: str):
         # Count by source
         by_source = {}
         for src in ["user", "chatbot", "alert", "notification"]:
-            by_source[src] = manager.get_message_count(source_filter=src)
+            by_source[src] = manager.get_message_count(
+                source_filter=src,
+                portfolio_filter=portfolio_name
+            )
 
         # Get first and last
         first_msg = all_messages[0].to_dict() if all_messages else None
@@ -204,10 +213,11 @@ async def add_message(portfolio_name: str, message: ConversationMessage):
         manager.add_message(
             source=message.source,
             content=message.content,
+            portfolio=portfolio_name
         )
 
-        # Return updated history
-        history = manager.get_history_dicts()
+        # Return updated history for this portfolio
+        history = manager.get_history_dicts(portfolio_filter=portfolio_name)
         return ConversationHistoryResponse(
             portfolio_name=portfolio_name,
             history=history,

@@ -132,9 +132,12 @@ async def websocket_conversation(
 	logger.debug(f"WebSocket conversation connected: portfolio={portfolio_name}, source={source}")
 
 	try:
-		# Send initial conversation history
+		# Send initial conversation history filtered by portfolio and source
 		conv_manager = ConversationManager(portfolio_name)
-		history = conv_manager.get_history_dicts(source_filter=source)
+		history = conv_manager.get_history_dicts(
+			source_filter=source,
+			portfolio_filter=portfolio_name
+		)
 
 		await websocket.send_json({
 			"type": "initial",

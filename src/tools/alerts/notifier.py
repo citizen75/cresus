@@ -54,6 +54,8 @@ class AlertNotifier:
 
             # Send to each portfolio's conversation with filtered matches
             pm = PortfolioManager()
+            manager = ConversationManager("_temp")  # Portfolio is set per message
+
             for portfolio_name in portfolios:
                 try:
                     # Get portfolio holdings
@@ -72,9 +74,7 @@ class AlertNotifier:
                     if filtered_matches:
                         # Format alert message with filtered matches
                         message = self._format_alert_message(alert, result, filtered_matches)
-
-                        manager = ConversationManager(portfolio_name)
-                        manager.add_alert(message)
+                        manager.add_message("alert", message, portfolio=portfolio_name)
                         self.logger.info(
                             f"Sent alert '{alert.name}' to portfolio '{portfolio_name}': "
                             f"{len(filtered_matches)} relevant match(es) out of {len(result.matches)}"
@@ -93,8 +93,7 @@ class AlertNotifier:
             if alert.source == AlertSource.ALL_PORTFOLIOS:
                 try:
                     message = self._format_alert_message(alert, result, result.matches)
-                    manager = ConversationManager("_global")
-                    manager.add_alert(message)
+                    manager.add_message("alert", message, portfolio=None)  # None = global
                     self.logger.info(
                         f"Sent alert '{alert.name}' to global chat: {len(result.matches)} match(es)"
                     )
