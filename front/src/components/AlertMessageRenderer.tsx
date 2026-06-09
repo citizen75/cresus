@@ -1,153 +1,102 @@
+import React from 'react'
+
 /**
- * Simple markdown renderer for alert messages
- * Supports: bold (**text**), code (`text`), emoji, line breaks
+ * Simple markdown renderer for alert messages using regex replacement
+ * Supports: bold (**text**), code (`text`), bullet points
  */
 export function AlertMessageRenderer({ content }: { content: string }) {
-  // Split by lines
   const lines = content.split('\n')
 
   return (
-    <div className="text-slate-300 space-y-1">
+    <div className="text-slate-300 space-y-0.5">
       {lines.map((line, idx) => {
-        // Skip empty lines but preserve spacing
-        if (line.trim() === '') {
-          return <div key={idx} className="h-1" />
-        }
-
-        // Render line with markdown parsing
-        return (
-          <div key={idx} className="text-sm leading-relaxed">
-            {renderLineContent(line)}
-          </div>
-        )
+        if (!line.trim()) return <div key={idx} className="h-px" />
+        return <Line key={idx} text={line} />
       })}
     </div>
   )
 }
 
-function renderLineContent(line: string) {
-  const parts: React.ReactNode[] = []
-  let i = 0
-  let buffer = ''
-  let key = 0
+function Line({ text }: { text: string }) {
+  // Process the line with regex replacements
+  const parts: Array<{ type: 'text' | 'bold' | 'code' | 'bullet'; content: string | Array<string> }> = []
 
-  while (i < line.length) {
-    // Check for bold (**text**)
-    if (line[i] === '*' && line[i + 1] === '*') {
-      // Flush buffer
-      if (buffer) {
-        parts.push(
-          <span key={`text-${key++}`} className="text-slate-300">
-            {buffer}
-          </span>
-        )
-        buffer = ''
-      }
+  // Split by patterns: **bold**, `code`, or bullet points
+  let remaining = text
+  let index = 0
 
-      // Find closing **
-      i += 2
-      let boldText = ''
-      while (i < line.length) {
-        if (line[i] === '*' && line[i + 1] === '*') {
-          parts.push(
-            <span key={`bold-${key++}`} className="font-bold text-white">
-              {boldText}
-            </span>
-          )
-          i += 2
-          break
-        }
-        boldText += line[i]
-        i++
+  while (remaining.length > 0) {
+    // Try to match bold
+    const boldMatch = remaining.match(/^\*\*([^*]+)\*\*/)
+    if (boldMatch) {
+      if (index > 0 && parts[parts.length - 1]?.type === 'text') {
+        parts[parts.length - 1].content = (parts[parts.length - 1].content as string) + boldMatch[0].substring(0, 0)
       }
+      parts.push({ type: 'bold', content: boldMatch[1] })
+      remaining = remaining.substring(boldMatch[0].length)
+      continue
     }
-    // Check for code (`text`)
-    else if (line[i] === '`') {
-      // Flush buffer
-      if (buffer) {
-        parts.push(
-          <span key={`text-${key++}`} className="text-slate-300">
-            {buffer}
-          </span>
-        )
-        buffer = ''
-      }
 
-      // Find closing `
-      i += 1
-      let codeText = ''
-      while (i < line.length) {
-        if (line[i] === '`') {
-          parts.push(
-            <code
-              key={`code-${key++}`}
-              className="bg-black/30 px-1.5 py-0.5 rounded text-xs font-mono text-slate-200"
-            >
-              {codeText}
-            </code>
-          )
-          i += 1
-          break
-        }
-        codeText += line[i]
-        i++
-      }
+    // Try to match code
+    const codeMatch = remaining.match(/^`([^`]+)`/)
+    if (codeMatch) {
+      parts.push({ type: 'code', content: codeMatch[1] })
+      remaining = remaining.substring(codeMatch[0].length)
+      continue
     }
-    // Check for bullet point (•)
-    else if (line[i] === '•') {
-      // Flush buffer
-      if (buffer) {
-        parts.push(
-          <span key={`text-${key++}`} className="text-slate-300">
-            {buffer}
-          </span>
-        )
-        buffer = ''
-      }
 
-      // Parse bullet point
-      i += 1 // skip •
-      while (i < line.length && line[i] === ' ') i++ // skip spaces
+    // Try to match bullet
+    const bulletMatch = remaining.match(/^•\s+([^:]+):\s+(.+)$/)
+    if (bulletMatch) {
+      parts.push({ type: 'bullet', content: [bulletMatch[1].trim(), bulletMatch[2]] })
+      remaining = ''
+      continue
+    }
 
-      // Get ticker
-      let ticker = ''
-      while (i < line.length && line[i] !== ':') {
-        ticker += line[i]
-        i++
-      }
-
-      // Skip colon and space
-      if (line[i] === ':') i++
-      while (i < line.length && line[i] === ' ') i++
-
-      // Get rest of line
-      let rest = ''
-      while (i < line.length) {
-        rest += line[i]
-        i++
-      }
-
-      parts.push(
-        <span key={`bullet-${key++}`} className="inline-flex items-baseline gap-1">
-          <span className="text-yellow-400">•</span>
-          <span className="font-bold text-purple-400">{ticker.trim()}</span>
-          <span>{rest}</span>
-        </span>
-      )
+    // Regular text - consume until next markdown
+    const nextMarkdown = remaining.search(/(\*\*|`|•\s+)/)
+    if (nextMarkdown === -1) {
+      parts.push({ type: 'text', content: remaining })
+      remaining = ''
     } else {
-      buffer += line[i]
-      i++
+      parts.push({ type: 'text', content: remaining.substring(0, nextMarkdown) })
+      remaining = remaining.substring(nextMarkdown)
     }
   }
 
-  // Flush remaining buffer
-  if (buffer) {
-    parts.push(
-      <span key={`text-${key++}`} className="text-slate-300">
-        {buffer}
-      </span>
-    )
-  }
-
-  return parts.length > 0 ? parts : [<span key="empty">{line}</span>]
+  return (
+    <div className="text-sm leading-relaxed whitespace-normal">
+      {parts.map((part, idx) => {
+        switch (part.type) {
+          case 'bold':
+            return (
+              <strong key={idx} className="font-bold text-white">
+                {part.content}
+              </strong>
+            )
+          case 'code':
+            return (
+              <code key={idx} className="bg-black/30 px-1 py-0.5 rounded text-xs font-mono text-slate-200 mx-0.5">
+                {part.content}
+              </code>
+            )
+          case 'bullet':
+            const [ticker, info] = part.content as [string, string]
+            return (
+              <div key={idx} className="ml-2">
+                <span className="text-yellow-400">•</span>
+                <span className="font-bold text-purple-400 ml-1">{ticker}</span>
+                <span className="text-slate-300">: {info}</span>
+              </div>
+            )
+          default:
+            return (
+              <span key={idx} className="text-slate-300">
+                {part.content}
+              </span>
+            )
+        }
+      })}
+    </div>
+  )
 }
