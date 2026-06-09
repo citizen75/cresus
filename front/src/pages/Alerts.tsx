@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { api } from '../services/api'
 import TradingChart from '@/components/TradingChart'
 import { AlertMessageRenderer } from '@/components/AlertMessageRenderer'
+import { ConversationWidget } from '@/components/ConversationWidget'
 
 interface Alert {
   name: string
@@ -17,11 +18,6 @@ interface Alert {
   tags?: string[]
 }
 
-interface ConversationMessage {
-  source: string
-  content: string
-  datetime: string
-}
 
 export default function Alerts() {
   const [alerts, setAlerts] = useState<Alert[]>([])
@@ -33,9 +29,7 @@ export default function Alerts() {
   const [runResults, setRunResults] = useState<any>(null)
   const [showRunResults, setShowRunResults] = useState(false)
 
-  // Conversation widget state
-  const [alertMessages, setAlertMessages] = useState<ConversationMessage[]>([])
-  const [loadingConversation, setLoadingConversation] = useState(false)
+  // Portfolio selector for conversation widget
   const [selectedPortfolio, setSelectedPortfolio] = useState<string>('')
   const [portfolios, setPortfolios] = useState<string[]>([])
 
@@ -65,21 +59,11 @@ export default function Alerts() {
     return () => clearInterval(interval)
   }, [runningAlert])
 
-  // Fetch conversation when portfolio is selected (skip while alert is running)
-  useEffect(() => {
-    if (!selectedPortfolio || runningAlert) return
-    fetchAlertMessages()
-    const interval = setInterval(fetchAlertMessages, 3000) // Refresh every 3 seconds
-    return () => clearInterval(interval)
-  }, [selectedPortfolio, runningAlert])
 
-  // Refresh both panels when alert results arrive
+  // Refresh alerts list when results arrive
   useEffect(() => {
     if (runResults && !runningAlert) {
       fetchAlerts()
-      if (selectedPortfolio) {
-        fetchAlertMessages()
-      }
     }
   }, [runResults])
 
@@ -117,19 +101,6 @@ export default function Alerts() {
     }
   }
 
-  const fetchAlertMessages = async () => {
-    if (!selectedPortfolio) return
-    try {
-      setLoadingConversation(true)
-      const response = await api.getConversationHistory(selectedPortfolio, 50, 'alert')
-      const messages = response.history || []
-      setAlertMessages(messages.reverse()) // Reverse to show newest at bottom
-    } catch (err) {
-      console.error('Error fetching conversation:', err)
-    } finally {
-      setLoadingConversation(false)
-    }
-  }
 
   const handleCreateAlert = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -420,29 +391,15 @@ export default function Alerts() {
         </div>
 
         {/* Right: Conversation Alerts Widget */}
-        <div className="w-96 flex flex-col bg-slate-900/30 border border-slate-800 rounded-lg overflow-hidden">
-          {/* Header */}
-          <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-bold text-white">Alert Activity</h2>
-              <p className="text-xs text-slate-400">Latest alerts from</p>
-            </div>
-            <button
-              onClick={fetchAlertMessages}
-              disabled={loadingConversation}
-              className="px-2 py-1 text-xs bg-slate-800 hover:bg-slate-700 rounded transition disabled:opacity-50"
-            >
-              ⟳
-            </button>
-          </div>
-
+        <div className="w-96 flex flex-col gap-3">
           {/* Portfolio Selector */}
           {portfolios.length > 0 && (
-            <div className="px-4 py-2 border-b border-slate-800">
+            <div className="bg-slate-900/30 border border-slate-800 rounded-lg p-3">
+              <label className="text-xs text-slate-400 mb-2 block">Portfolio</label>
               <select
                 value={selectedPortfolio}
                 onChange={(e) => setSelectedPortfolio(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-purple-600"
+                className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-purple-600"
               >
                 {portfolios.map((p) => (
                   <option key={p} value={p}>{p}</option>
@@ -451,48 +408,16 @@ export default function Alerts() {
             </div>
           )}
 
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {loadingConversation ? (
-              <p className="text-xs text-slate-500 text-center py-4">Loading alerts...</p>
-            ) : alertMessages.length === 0 ? (
-              <p className="text-xs text-slate-500 text-center py-8">No alerts yet</p>
-            ) : (
-              alertMessages.map((msg, idx) => {
-                // Extract tickers from message
-                const tickerMatches = msg.content.match(/•\s+([A-Z0-9.]+):/g)
-                const tickers = tickerMatches ? tickerMatches.map(m => m.replace(/•\s+|:/g, '').trim()) : []
-
-                return (
-                  <div key={idx} className="bg-slate-800/50 border border-slate-700 rounded p-3 text-xs">
-                    <div className="mb-2 text-xs">
-                      <AlertMessageRenderer content={msg.content} />
-                    </div>
-
-                    {/* Clickable tickers */}
-                    {tickers.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-2 pt-2 border-t border-slate-600">
-                        {tickers.map((ticker) => (
-                          <button
-                            key={ticker}
-                            onClick={() => openChart(ticker)}
-                            className="px-2 py-1 bg-purple-900/50 hover:bg-purple-900/80 border border-purple-700 text-purple-300 hover:text-purple-200 rounded text-xs transition"
-                            title={`View ${ticker} chart`}
-                          >
-                            📊 {ticker}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-
-                    <p className="text-slate-500 text-xs mt-2">
-                      {formatMessageDate(msg.datetime)}
-                    </p>
-                  </div>
-                )
-              })
-            )}
-          </div>
+          {/* Conversation Widget */}
+          {selectedPortfolio && (
+            <ConversationWidget
+              portfolioName={selectedPortfolio}
+              sourceFilter="alert"
+              title="Alert Activity"
+              subtitle="Latest alerts"
+              maxHeight="flex-1"
+            />
+          )}
         </div>
       </div>
 

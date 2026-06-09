@@ -1,11 +1,14 @@
-"""FastAPI WebSocket routes for backtest updates."""
+"""FastAPI WebSocket routes for backtest and conversation updates."""
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 import logging
 import json
+import asyncio
 from dataclasses import asdict
 
 from .manager import get_websocket_manager
+from .conversation_manager import get_conversation_websocket_manager
+from tools.conversation import ConversationManager
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -102,3 +105,65 @@ async def get_backtest_connections(backtest_id: str):
 		"backtest_id": backtest_id,
 		"connection_count": count
 	}
+
+
+@router.websocket("/ws/conversations/{portfolio_name}")
+async def websocket_conversation(
+	websocket: WebSocket,
+	portfolio_name: str,
+	source: str = Query(default=None)
+):
+	"""WebSocket endpoint for conversation real-time updates.
+
+	Args:
+		websocket: WebSocket connection
+		portfolio_name: Portfolio name (or '_global' for global chat)
+		source: Filter by message source (alert, user, chatbot, notification)
+
+	Clients receive:
+	- initial: Full conversation history
+	- message: New messages as they arrive
+	"""
+	manager = get_conversation_websocket_manager()
+
+	await websocket.accept()
+	manager.register(portfolio_name, websocket)
+
+	logger.debug(f"WebSocket conversation connected: portfolio={portfolio_name}, source={source}")
+
+	try:
+		# Send initial conversation history
+		conv_manager = ConversationManager(portfolio_name)
+		history = conv_manager.get_history_dicts(source_filter=source)
+
+		await websocket.send_json({
+			"type": "initial",
+			"data": history,
+			"count": len(history)
+		})
+
+		# Keep connection alive and check for new messages
+		while True:
+			try:
+				# Check for file updates every 500ms
+				await manager.check_for_updates(portfolio_name, source)
+				await asyncio.sleep(0.5)
+
+				# Handle client ping/pong
+				try:
+					data = await asyncio.wait_for(websocket.receive_text(), timeout=0.1)
+					if data == "ping":
+						await websocket.send_json({"type": "pong"})
+				except asyncio.TimeoutError:
+					pass
+
+			except asyncio.CancelledError:
+				break
+
+	except WebSocketDisconnect:
+		manager.unregister(portfolio_name, websocket)
+		logger.debug(f"WebSocket conversation disconnected: portfolio={portfolio_name}")
+
+	except Exception as e:
+		manager.unregister(portfolio_name, websocket)
+		logger.error(f"WebSocket conversation error: {str(e)}")
