@@ -447,16 +447,39 @@ export default function Alerts() {
             ) : alertMessages.length === 0 ? (
               <p className="text-xs text-slate-500 text-center py-8">No alerts yet</p>
             ) : (
-              alertMessages.map((msg, idx) => (
-                <div key={idx} className="bg-slate-800/50 border border-slate-700 rounded p-3 text-xs">
-                  <div className="text-slate-300 whitespace-pre-wrap break-words line-clamp-6">
-                    {msg.content}
+              alertMessages.map((msg, idx) => {
+                // Extract tickers from message
+                const tickerMatches = msg.content.match(/•\s+([A-Z0-9.]+):/g)
+                const tickers = tickerMatches ? tickerMatches.map(m => m.replace(/•\s+|:/g, '').trim()) : []
+
+                return (
+                  <div key={idx} className="bg-slate-800/50 border border-slate-700 rounded p-3 text-xs">
+                    <div className="text-slate-300 whitespace-pre-wrap break-words line-clamp-8 mb-2">
+                      {msg.content}
+                    </div>
+
+                    {/* Clickable tickers */}
+                    {tickers.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2 pt-2 border-t border-slate-600">
+                        {tickers.map((ticker) => (
+                          <button
+                            key={ticker}
+                            onClick={() => openChart(ticker)}
+                            className="px-2 py-1 bg-purple-900/50 hover:bg-purple-900/80 border border-purple-700 text-purple-300 hover:text-purple-200 rounded text-xs transition"
+                            title={`View ${ticker} chart`}
+                          >
+                            📊 {ticker}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    <p className="text-slate-500 text-xs mt-2">
+                      {formatMessageDate(msg.datetime)}
+                    </p>
                   </div>
-                  <p className="text-slate-500 text-xs mt-2">
-                    {formatMessageDate(msg.datetime)}
-                  </p>
-                </div>
-              ))
+                )
+              })
             )}
           </div>
         </div>
