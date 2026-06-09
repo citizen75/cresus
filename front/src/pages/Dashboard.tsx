@@ -3,6 +3,7 @@ import GlobalConversationPanel from '@/components/portfolio/GlobalConversationPa
 import TradingChart from '@/components/TradingChart'
 import CardChart from '@/components/CardChart'
 import { PortfolioHoldingsTable } from '@/components/portfolio/PortfolioHoldingsTable'
+import PortfolioHoldingsWidget from '@/components/portfolio/PortfolioHoldingsWidget'
 import { ChartModal } from '@/components/ChartModal'
 import { api, getApiBaseUrl } from '@/services/api'
 
@@ -345,8 +346,15 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Right Column - Alert Grid View */}
+      {/* Right Column - Portfolio Holdings Widget */}
       {rightPanelOpen && (
+      <div className="flex-1 flex flex-col bg-slate-900 rounded-lg border border-slate-800 p-4 overflow-auto">
+        <PortfolioHoldingsWidget portfolioName="bnp" />
+      </div>
+      )}
+
+      {/* Old Alert Grid View - Hidden for now */}
+      {false && (
       <div className="flex-1 flex flex-col bg-slate-900 rounded-lg border border-slate-800">
         {/* Mixed Recent Alerts & Charts Section - Top only */}
         {alertGridView && (alertHistory.length > 0 || chartHistory.length > 0) && (
