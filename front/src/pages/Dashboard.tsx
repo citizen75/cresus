@@ -203,6 +203,7 @@ export default function Dashboard() {
     if (!alertGridView || alertGridView.tickers.length === 0) return
 
     const loadData = async () => {
+      console.log(`[Dashboard] Loading data for alert: ${alertGridView.title}, tickers:`, alertGridView.tickers)
       const data: Record<string, any[]> = {}
       const info: Record<string, any> = {}
       const fundamental: Record<string, any> = {}
@@ -259,8 +260,9 @@ export default function Dashboard() {
             previous_close: previousClose,
             sector: sector,
           }
+          console.log(`[Dashboard] ✓ ${ticker}: previous_close=${previousClose}`)
         } catch (err) {
-          console.error(`Failed to load data for ${ticker}:`, err)
+          console.error(`[Dashboard] ✗ Failed to load data for ${ticker}:`, err)
           info[ticker] = { company_name: ticker }
           fundamental[ticker] = { company_name: ticker, current_price: 0, previous_close: 0, sector: 'Unknown' }
         }
@@ -268,6 +270,7 @@ export default function Dashboard() {
       setHistoricalData(data)
       setTickerInfo(info)
       // Merge with existing fundamental data, don't overwrite portfolio data
+      console.log(`[Dashboard] Setting fundamental data:`, fundamental)
       setFundamentalData((prev) => ({ ...prev, ...fundamental }))
     }
 
