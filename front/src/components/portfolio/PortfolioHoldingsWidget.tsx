@@ -5,11 +5,13 @@ import { getApiBaseUrl } from '@/services/api'
 interface PortfolioHoldingsWidgetProps {
   portfolioName: string
   onClose?: () => void
+  filterTickers?: string[] // Only show these tickers
 }
 
 export default function PortfolioHoldingsWidget({
   portfolioName,
   onClose,
+  filterTickers,
 }: PortfolioHoldingsWidgetProps) {
   const [positions, setPositions] = useState<any[]>([])
   const [fundamentalData, setFundamentalData] = useState<Record<string, any>>({})
@@ -107,11 +109,16 @@ export default function PortfolioHoldingsWidget({
     loadPositionsAndFundamental()
   }, [portfolioName])
 
-  const totalValue = positions.reduce((sum: any, pos: any) => sum + (pos.position_value || 0), 0)
+  // Filter positions if filterTickers is provided
+  const filteredPositions = filterTickers && filterTickers.length > 0
+    ? positions.filter((pos: any) => filterTickers.includes(pos.ticker))
+    : positions
+
+  const totalValue = filteredPositions.reduce((sum: any, pos: any) => sum + (pos.position_value || 0), 0)
 
   // Calculate sector map
   const sectorMap = new Map<string, number>()
-  positions.forEach((pos: any) => {
+  filteredPositions.forEach((pos: any) => {
     const sector = pos.sector || 'Unknown'
     sectorMap.set(sector, (sectorMap.get(sector) || 0) + pos.position_value)
   })
@@ -211,7 +218,7 @@ export default function PortfolioHoldingsWidget({
           </div>
         ) : (
           <PortfolioHoldingsTable
-            positions={positions}
+            positions={filteredPositions}
             totalValue={totalValue}
             currency="USD"
             fundamentalData={fundamentalData}
