@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getApiBaseUrl } from '@/services/api'
+import { AlertMessageRenderer } from '@/components/AlertMessageRenderer'
 
 interface Message {
   source: 'user' | 'chatbot' | 'alert' | 'notification'
@@ -230,9 +231,15 @@ export default function GlobalConversationPanel({ onClose, onAlertClick }: Globa
                     </button>
                   </div>
                 </div>
-                <p className="text-xs text-slate-300 break-words line-clamp-3">
-                  {msg.content}
-                </p>
+                {msg.source === 'alert' ? (
+                  <div className="line-clamp-3 overflow-hidden">
+                    <AlertMessageRenderer content={msg.content} />
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-300 break-words line-clamp-3">
+                    {msg.content}
+                  </p>
+                )}
               </div>
             ))
           )}
