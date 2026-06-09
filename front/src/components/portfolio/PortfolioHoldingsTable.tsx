@@ -244,11 +244,11 @@ export function PortfolioHoldingsTable({
               </tr>
             ) : (
               sortedPositions.map((pos: any) => {
-                const weight = (pos.position_value / totalValue) * 100
+                const weight = totalValue > 0 ? ((pos.position_value || 0) / totalValue) * 100 : 0
                 const fundamental = fundamentalData[pos.ticker] || {}
-                const previousClose = fundamental?.previous_close || pos.current_price
-                const dailyChange = pos.current_price - previousClose
-                const dailyChangePct = previousClose > 0 ? (dailyChange / previousClose) * 100 : 0
+                const previousClose = fundamental?.previous_close || pos.current_price || 0
+                const dailyChange = (pos.current_price || 0) - (previousClose || 0)
+                const dailyChangePct = (previousClose || 0) > 0 ? (dailyChange / previousClose) * 100 : 0
 
                 return (
                   <tr
@@ -267,26 +267,26 @@ export function PortfolioHoldingsTable({
                       </div>
                     </td>
                     <td className="px-4 py-3 text-slate-300 truncate max-w-xs">{pos.company_name || '-'}</td>
-                    <td className="px-4 py-3 text-white font-medium">{weight.toFixed(1)}%</td>
+                    <td className="px-4 py-3 text-white font-medium">{isNaN(weight) ? '0.0' : weight.toFixed(1)}%</td>
                     <td className="px-4 py-3 text-right text-slate-300">{pos.quantity !== null && pos.quantity !== undefined ? pos.quantity : '-'}</td>
-                    <td className="px-4 py-3 text-right text-slate-300">{formatCurrency(pos.avg_entry_price, currency)}</td>
-                    <td className="px-4 py-3 text-right text-white font-medium">{formatCurrency(pos.current_price, currency)}</td>
+                    <td className="px-4 py-3 text-right text-slate-300">{formatCurrency(pos.avg_entry_price || 0, currency)}</td>
+                    <td className="px-4 py-3 text-right text-white font-medium">{formatCurrency(pos.current_price || 0, currency)}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex flex-col items-end">
                         <span className={`font-medium text-sm ${dailyChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                          {dailyChange >= 0 ? '+' : ''}{formatCurrency(Math.abs(dailyChange), currency)}
+                          {dailyChange >= 0 ? '+' : ''}{formatCurrency(Math.abs(dailyChange || 0), currency)}
                         </span>
-                        <span className={`text-xs ${dailyChangePct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                          {dailyChangePct >= 0 ? '+' : ''}{dailyChangePct.toFixed(2)}%
+                        <span className={`text-xs ${(dailyChangePct || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          {(dailyChangePct || 0) >= 0 ? '+' : ''}{(dailyChangePct || 0).toFixed(2)}%
                         </span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right text-white font-medium">{formatCurrency(pos.position_value, currency)}</td>
-                    <td className={`px-4 py-3 text-right font-medium ${pos.position_gain >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {pos.position_gain >= 0 ? '+' : ''}{formatCurrency(Math.abs(pos.position_gain), currency)}
+                    <td className="px-4 py-3 text-right text-white font-medium">{formatCurrency(pos.position_value || 0, currency)}</td>
+                    <td className={`px-4 py-3 text-right font-medium ${(pos.position_gain || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {(pos.position_gain || 0) >= 0 ? '+' : ''}{formatCurrency(Math.abs(pos.position_gain || 0), currency)}
                     </td>
-                    <td className={`px-4 py-3 text-right font-medium ${pos.position_gain_pct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {pos.position_gain_pct > 0 ? '+' : ''}{pos.position_gain_pct.toFixed(2)}%
+                    <td className={`px-4 py-3 text-right font-medium ${(pos.position_gain_pct || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {(pos.position_gain_pct || 0) > 0 ? '+' : ''}{(pos.position_gain_pct || 0).toFixed(2)}%
                     </td>
                     {showActions && (
                       <td className="px-4 py-3 text-center">
