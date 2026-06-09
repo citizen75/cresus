@@ -16,7 +16,7 @@ export function AlertMessageRenderer({ content }: { content: string }) {
 
         // Render line with markdown parsing
         return (
-          <div key={idx} className="flex flex-wrap gap-1 items-baseline">
+          <div key={idx} className="text-sm leading-relaxed">
             {renderLineContent(line)}
           </div>
         )
@@ -27,50 +27,126 @@ export function AlertMessageRenderer({ content }: { content: string }) {
 
 function renderLineContent(line: string) {
   const parts: React.ReactNode[] = []
-  let currentPos = 0
+  let i = 0
+  let buffer = ''
+  let key = 0
 
-  // Better regex to match: bold (**text**), code (`text`), or bullet points
-  const regex = /\*\*([^*]+)\*\*|`([^`]+)`|•\s+([^:]+):\s+(.+?)(?=•|$)|([^*`•]+)/g
-  let match
-
-  while ((match = regex.exec(line)) !== null) {
-    if (match[1]) {
-      // Bold text
-      parts.push(
-        <span key={`bold-${match.index}`} className="font-bold text-white">
-          {match[1]}
-        </span>
-      )
-    } else if (match[2]) {
-      // Code text
-      parts.push(
-        <code
-          key={`code-${match.index}`}
-          className="bg-black/30 px-1.5 py-0.5 rounded text-xs font-mono text-slate-200"
-        >
-          {match[2]}
-        </code>
-      )
-    } else if (match[3]) {
-      // Bullet point - highlight ticker
-      parts.push(
-        <span key={`bullet-${match.index}`}>
-          <span className="text-yellow-400">•</span>
-          <span className="font-bold text-purple-400 ml-1">{match[3]}</span>
-          <span>: {match[4]}</span>
-        </span>
-      )
-    } else if (match[5]) {
-      // Regular text
-      const text = match[5].trim()
-      if (text) {
+  while (i < line.length) {
+    // Check for bold (**text**)
+    if (line[i] === '*' && line[i + 1] === '*') {
+      // Flush buffer
+      if (buffer) {
         parts.push(
-          <span key={`text-${match.index}`} className="text-slate-300">
-            {text}
+          <span key={`text-${key++}`} className="text-slate-300">
+            {buffer}
           </span>
         )
+        buffer = ''
+      }
+
+      // Find closing **
+      i += 2
+      let boldText = ''
+      while (i < line.length) {
+        if (line[i] === '*' && line[i + 1] === '*') {
+          parts.push(
+            <span key={`bold-${key++}`} className="font-bold text-white">
+              {boldText}
+            </span>
+          )
+          i += 2
+          break
+        }
+        boldText += line[i]
+        i++
       }
     }
+    // Check for code (`text`)
+    else if (line[i] === '`') {
+      // Flush buffer
+      if (buffer) {
+        parts.push(
+          <span key={`text-${key++}`} className="text-slate-300">
+            {buffer}
+          </span>
+        )
+        buffer = ''
+      }
+
+      // Find closing `
+      i += 1
+      let codeText = ''
+      while (i < line.length) {
+        if (line[i] === '`') {
+          parts.push(
+            <code
+              key={`code-${key++}`}
+              className="bg-black/30 px-1.5 py-0.5 rounded text-xs font-mono text-slate-200"
+            >
+              {codeText}
+            </code>
+          )
+          i += 1
+          break
+        }
+        codeText += line[i]
+        i++
+      }
+    }
+    // Check for bullet point (•)
+    else if (line[i] === '•') {
+      // Flush buffer
+      if (buffer) {
+        parts.push(
+          <span key={`text-${key++}`} className="text-slate-300">
+            {buffer}
+          </span>
+        )
+        buffer = ''
+      }
+
+      // Parse bullet point
+      i += 1 // skip •
+      while (i < line.length && line[i] === ' ') i++ // skip spaces
+
+      // Get ticker
+      let ticker = ''
+      while (i < line.length && line[i] !== ':') {
+        ticker += line[i]
+        i++
+      }
+
+      // Skip colon and space
+      if (line[i] === ':') i++
+      while (i < line.length && line[i] === ' ') i++
+
+      // Get rest of line
+      let rest = ''
+      while (i < line.length) {
+        rest += line[i]
+        i++
+      }
+
+      parts.push(
+        <span key={`bullet-${key++}`} className="inline-flex items-baseline gap-1">
+          <span className="text-yellow-400">•</span>
+          <span className="font-bold text-purple-400">{ticker.trim()}</span>
+          <span>{rest}</span>
+        </span>
+      )
+    } else {
+      buffer += line[i]
+      i++
+    }
+  }
+
+  // Flush remaining buffer
+  if (buffer) {
+    parts.push(
+      <span key={`text-${key++}`} className="text-slate-300">
+        {buffer}
+      </span>
+    )
   }
 
   return parts.length > 0 ? parts : [<span key="empty">{line}</span>]
