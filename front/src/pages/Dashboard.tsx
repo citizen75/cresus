@@ -209,6 +209,12 @@ export default function Dashboard() {
 
       for (const ticker of alertGridView.tickers) {
         try {
+          // Initialize variables
+          let companyName = ticker
+          let sector = 'Unknown'
+          let currentPrice = 0
+          let previousClose = 0
+
           // Fetch historical data
           const result = await api.getHistoricalData(ticker, 1825) // ~5 years
           let historyArray = []
@@ -224,22 +230,15 @@ export default function Dashboard() {
               date: item.date || item.timestamp || item.Date,
               close: parseFloat(item.close || item.Close),
             }))
-            // Get previous_close from historical data if not from API
-            if (historyArray.length >= 2 && !previousClose) {
-              const lastClose = parseFloat(historyArray[historyArray.length - 1]?.close || 0)
-              previousClose = parseFloat(historyArray[historyArray.length - 2]?.close || lastClose)
-            }
+            // Get prices from historical data
+            currentPrice = parseFloat(historyArray[historyArray.length - 1]?.close || 0)
+            previousClose = historyArray.length > 1 ? parseFloat(historyArray[historyArray.length - 2]?.close || currentPrice) : currentPrice
           }
 
           // Fetch fundamental data for real company info
           const baseUrl = getApiBaseUrl()
           const fundResponse = await fetch(`${baseUrl}/api/v1/data/fundamental/${ticker}`)
           const fundData = await fundResponse.json()
-
-          let companyName = ticker
-          let sector = 'Unknown'
-          let currentPrice = historyArray.length > 0 ? parseFloat(historyArray[historyArray.length - 1]?.close || 0) : 0
-          let previousClose = historyArray.length > 1 ? parseFloat(historyArray[historyArray.length - 2]?.close || 0) : 0
 
           // Use fundamental data if available
           if (fundResponse.ok && fundData?.data?.company?.name) {
