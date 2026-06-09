@@ -366,6 +366,61 @@ class CresusAPI {
     if (tickers) params.tickers = JSON.stringify(tickers)
     return (await this.longTimeoutClient.post('/screener/builder', null, { params })).data
   }
+
+  // Alert management
+  async listAlerts() {
+    return (await this.client.get('/alerts')).data
+  }
+
+  async getAlert(name: string) {
+    return (await this.client.get(`/alerts/${name}`)).data
+  }
+
+  async createAlert(data: {
+    name: string
+    source: string
+    source_value?: string
+    formula: string
+    notify?: string
+    description?: string
+    tags?: string[]
+  }) {
+    const params = new URLSearchParams()
+    params.append('name', data.name)
+    params.append('source', data.source)
+    if (data.source_value) params.append('source_value', data.source_value)
+    params.append('formula', data.formula)
+    if (data.notify) params.append('notify', data.notify)
+    if (data.description) params.append('description', data.description)
+    if (data.tags) params.append('tags', data.tags.join(','))
+
+    return (await this.client.post('/alerts', null, { params })).data
+  }
+
+  async updateAlert(name: string, data: {
+    formula?: string
+    enabled?: boolean
+    description?: string
+    tags?: string[]
+    notify?: string
+  }) {
+    const params = new URLSearchParams()
+    if (data.formula) params.append('formula', data.formula)
+    if (data.enabled !== undefined) params.append('enabled', String(data.enabled))
+    if (data.description) params.append('description', data.description)
+    if (data.tags) params.append('tags', data.tags.join(','))
+    if (data.notify) params.append('notify', data.notify)
+
+    return (await this.client.put(`/alerts/${name}`, null, { params })).data
+  }
+
+  async deleteAlert(name: string) {
+    return (await this.client.delete(`/alerts/${name}`)).data
+  }
+
+  async runAlert(name: string) {
+    return (await this.longTimeoutClient.post(`/alerts/${name}/run`)).data
+  }
 }
 
 export const api = new CresusAPI()
