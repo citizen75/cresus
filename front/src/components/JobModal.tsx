@@ -152,7 +152,7 @@ export function JobModal({ isOpen, onClose, onSubmit, editingJob, initialData }:
             {/* Target */}
             <div>
               <label className="block text-sm text-slate-300 mb-2 font-semibold">
-                {formData.type === 'http' ? 'URL' : formData.type === 'shell_exec' ? 'Command' : 'Target'}
+                {formData.type === 'http' ? 'Webhook URL' : formData.type === 'shell_exec' ? 'Command' : 'Target'}
               </label>
               <input
                 type="text"
@@ -162,13 +162,19 @@ export function JobModal({ isOpen, onClose, onSubmit, editingJob, initialData }:
                 className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
                 placeholder={
                   formData.type === 'http'
-                    ? 'http://localhost:8000/api/...'
+                    ? 'e.g., http://localhost:8000/api/alerts/sha_red/run'
                     : formData.type === 'shell_exec'
-                      ? 'cresus data fetch all'
-                      : 'premarket or strategy'
+                      ? 'e.g., cresus data fetch all --portfolio all'
+                      : 'e.g., premarket or strategy'
                 }
                 required
               />
+              {formData.type === 'http' && (
+                <p className="text-xs text-slate-500 mt-1">Full HTTP endpoint URL (method specified in options below)</p>
+              )}
+              {formData.type === 'shell_exec' && (
+                <p className="text-xs text-slate-500 mt-1">Shell command to execute</p>
+              )}
             </div>
           </div>
 
@@ -193,8 +199,11 @@ export function JobModal({ isOpen, onClose, onSubmit, editingJob, initialData }:
 
             {formData.type === 'http' ? (
               <div className="space-y-3">
+                <p className="text-xs text-slate-400 mb-2">
+                  💡 URL is specified in the "Webhook URL" field above. These options control how the request is made.
+                </p>
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">Method</label>
+                  <label className="block text-xs text-slate-400 mb-1">HTTP Method</label>
                   <select
                     value={(() => {
                       try {
