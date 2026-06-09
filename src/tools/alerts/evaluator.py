@@ -166,23 +166,31 @@ class AlertEvaluator:
                 for indicator_name, indicator_series in indicator_results.items():
                     history_df[indicator_name.lower()] = indicator_series
 
-            # Evaluate formula
-            matches_mask = evaluate_dsl_vectorized(formula, history_df)
+            # For alerts, only evaluate the latest row (current candle [0])
+            # This prevents returning all historical matches when using [0] notation
+            if len(history_df) > 0:
+                latest_row = history_df.iloc[-1]
+                latest_dict = latest_row.to_dict()
 
-            # Filter to target date if specified
-            if target_date:
-                date_mask = history_df[date_col].dt.date == target_date if hasattr(history_df[date_col], 'dt') else history_df[date_col] == target_date
-                matches_mask = matches_mask & date_mask
+                # Evaluate formula on latest row only
+                try:
+                    from tools.formula.dsl_parser import evaluate_dsl
+                    if evaluate_dsl(formula, latest_dict):
+                        latest_dict['ticker'] = ticker
+                        return [latest_dict]
+                except Exception as e:
+                    self.logger.debug(f"Error evaluating formula with evaluate_dsl: {e}")
+                    # Fallback to vectorized evaluation
+                    matches_mask = evaluate_dsl_vectorized(formula, history_df)
+                    matching_rows = []
+                    for idx, (is_match, row) in enumerate(zip(matches_mask, history_df.itertuples(index=False))):
+                        if is_match:
+                            row_dict = row._asdict() if hasattr(row, '_asdict') else dict(row)
+                            row_dict['ticker'] = ticker
+                            matching_rows.append(row_dict)
+                    return matching_rows
 
-            # Collect matching rows
-            matching_rows = []
-            for idx, (is_match, row) in enumerate(zip(matches_mask, history_df.itertuples(index=False))):
-                if is_match:
-                    row_dict = row._asdict() if hasattr(row, '_asdict') else dict(row)
-                    row_dict['ticker'] = ticker
-                    matching_rows.append(row_dict)
-
-            return matching_rows
+            return []
 
         except Exception as e:
             self.logger.debug(f"Error evaluating {ticker}: {e}")
