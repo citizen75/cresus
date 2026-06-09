@@ -278,7 +278,7 @@ class CresusAPI {
   }
 
   async runCronJob(name: string) {
-    return (await this.client.post(`/scheduler/jobs/${name}/run`)).data
+    return (await this.longTimeoutClient.post(`/scheduler/jobs/${name}/run`)).data
   }
 
   async duplicateCronJob(name: string, newName: string) {
