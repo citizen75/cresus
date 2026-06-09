@@ -20,6 +20,7 @@ export default function Dashboard() {
   const conversationPanelRef = useRef<{ scrollToBottom: () => void } | null>(null)
   const [conversationOpen, setConversationOpen] = useState(true)
   const [rightPanelOpen, setRightPanelOpen] = useState(false)
+  const [selectedPortfolioForHoldings, setSelectedPortfolioForHoldings] = useState<string | null>(null)
   const [chartModalTicker, setChartModalTicker] = useState<string | null>(null)
   const [chartHistory, setChartHistory] = useState<string[]>([])
   const [alertHistory, setAlertHistory] = useState<{ id: string; info: AlertInfo }[]>([])
@@ -345,8 +346,8 @@ export default function Dashboard() {
             subtitle="All portfolios & alerts"
             maxHeight="h-full"
             onPortfolioClick={(portfolio) => {
-              // Navigate to portfolio holdings page
-              navigate(`/portfolios/${encodeURIComponent(portfolio)}/holdings`)
+              // Show portfolio holdings in right panel
+              setSelectedPortfolioForHoldings(portfolio)
             }}
             onSendMessage={async (message) => {
               const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -365,8 +366,31 @@ export default function Dashboard() {
       )}
 
       {/* Right Column - Portfolio Holdings Widget */}
-      {rightPanelOpen && (
+      {(rightPanelOpen || selectedPortfolioForHoldings) && (
       <div className="flex-1 flex flex-col bg-slate-900 rounded-lg border border-slate-800 overflow-auto">
+        {/* Close button for holdings panel */}
+        {selectedPortfolioForHoldings && (
+          <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between flex-shrink-0">
+            <h3 className="text-sm font-semibold text-white capitalize">{selectedPortfolioForHoldings} Holdings</h3>
+            <button
+              onClick={() => setSelectedPortfolioForHoldings(null)}
+              className="text-slate-400 hover:text-white transition"
+              title="Close"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        {/* Show holdings widget when portfolio is selected */}
+        {selectedPortfolioForHoldings && (
+          <div className="flex-1 overflow-auto p-4">
+            <PortfolioHoldingsWidget portfolioName={selectedPortfolioForHoldings} />
+          </div>
+        )}
+
+        {/* Original alert grid and holdings content */}
+        {!selectedPortfolioForHoldings && (
         {/* Recent Alerts & Charts */}
         {alertGridView && (alertHistory.length > 0 || chartHistory.length > 0) && (
           <div className="border-b border-slate-800 bg-slate-950 px-4 py-3 flex-shrink-0">
@@ -682,6 +706,7 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+        )}
       </div>
       )}
 
