@@ -105,7 +105,7 @@ export default function PortfolioHoldingsWidget({
     }
 
     loadPositionsAndFundamental()
-  }, [portfolioName, fundamentalCache])
+  }, [portfolioName])
 
   const totalValue = positions.reduce((sum: any, pos: any) => sum + (pos.position_value || 0), 0)
 
