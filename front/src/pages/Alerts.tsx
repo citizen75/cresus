@@ -53,21 +53,31 @@ export default function Alerts() {
   const [chartTicker, setChartTicker] = useState<string>('')
   const [chartTimeframe, setChartTimeframe] = useState('1D')
 
-  // Fetch alerts on mount and periodically
+  // Fetch alerts on mount and periodically (skip while alert is running)
   useEffect(() => {
     fetchAlerts()
+    if (runningAlert) return // Skip auto-refresh while running
     const interval = setInterval(fetchAlerts, 5000) // Refresh every 5 seconds
     return () => clearInterval(interval)
-  }, [])
+  }, [runningAlert])
 
-  // Fetch conversation when portfolio is selected
+  // Fetch conversation when portfolio is selected (skip while alert is running)
   useEffect(() => {
-    if (selectedPortfolio) {
-      fetchAlertMessages()
-      const interval = setInterval(fetchAlertMessages, 3000) // Refresh every 3 seconds
-      return () => clearInterval(interval)
+    if (!selectedPortfolio || runningAlert) return
+    fetchAlertMessages()
+    const interval = setInterval(fetchAlertMessages, 3000) // Refresh every 3 seconds
+    return () => clearInterval(interval)
+  }, [selectedPortfolio, runningAlert])
+
+  // Refresh both panels when alert results arrive
+  useEffect(() => {
+    if (runResults && !runningAlert) {
+      fetchAlerts()
+      if (selectedPortfolio) {
+        fetchAlertMessages()
+      }
     }
-  }, [selectedPortfolio])
+  }, [runResults])
 
   // Fetch portfolios on mount
   useEffect(() => {
