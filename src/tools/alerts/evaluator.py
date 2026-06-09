@@ -179,16 +179,9 @@ class AlertEvaluator:
                         latest_dict['ticker'] = ticker
                         return [latest_dict]
                 except Exception as e:
-                    self.logger.debug(f"Error evaluating formula with evaluate_dsl: {e}")
-                    # Fallback to vectorized evaluation
-                    matches_mask = evaluate_dsl_vectorized(formula, history_df)
-                    matching_rows = []
-                    for idx, (is_match, row) in enumerate(zip(matches_mask, history_df.itertuples(index=False))):
-                        if is_match:
-                            row_dict = row._asdict() if hasattr(row, '_asdict') else dict(row)
-                            row_dict['ticker'] = ticker
-                            matching_rows.append(row_dict)
-                    return matching_rows
+                    self.logger.warning(f"Error evaluating formula for {ticker}: {e}")
+                    # Return empty list instead of falling back to all historical matches
+                    return []
 
             return []
 
