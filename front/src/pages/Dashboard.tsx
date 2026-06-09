@@ -229,6 +229,7 @@ export default function Dashboard() {
           } else if (result && result.data && Array.isArray(result.data)) {
             historyArray = result.data
           }
+          console.log(`[Dashboard] ${ticker} history: ${historyArray.length} rows`)
           if (historyArray.length > 0) {
             data[ticker] = historyArray.map((item: any) => ({
               date: item.date || item.timestamp || item.Date,
@@ -237,12 +238,14 @@ export default function Dashboard() {
             // Get prices from historical data
             currentPrice = parseFloat(historyArray[historyArray.length - 1]?.close || 0)
             previousClose = historyArray.length > 1 ? parseFloat(historyArray[historyArray.length - 2]?.close || currentPrice) : currentPrice
+            console.log(`[Dashboard] ${ticker}: currentPrice=${currentPrice}, previousClose=${previousClose}`)
           }
 
           // Fetch fundamental data for company info and prices
           const baseUrl = getApiBaseUrl()
           const fundResponse = await fetch(`${baseUrl}/api/v1/data/fundamental/${ticker}`)
           const fundData = await fundResponse.json()
+          console.log(`[Dashboard] ${ticker} fundResponse.ok=${fundResponse.ok}, has quotation=${!!fundData?.data?.quotation}`)
 
           // Use fundamental data if available
           if (fundResponse.ok && fundData?.data?.company?.name) {
@@ -252,8 +255,11 @@ export default function Dashboard() {
 
           // Use quotation data from fundamental endpoint if available
           if (fundResponse.ok && fundData?.data?.quotation) {
-            currentPrice = fundData.data.quotation.current_price || currentPrice
-            previousClose = fundData.data.quotation.previous_close || previousClose
+            const api_current = fundData.data.quotation.current_price
+            const api_previous = fundData.data.quotation.previous_close
+            console.log(`[Dashboard] ${ticker} API: current=${api_current}, previous=${api_previous}`)
+            currentPrice = api_current || currentPrice
+            previousClose = api_previous || previousClose
           }
 
           info[ticker] = { company_name: companyName }
