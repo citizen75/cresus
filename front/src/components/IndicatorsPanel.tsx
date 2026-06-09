@@ -280,24 +280,35 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
 
         if (rangeStr && rangeStr !== lastRangeStr) {
           console.log('Range changed:', visibleRange)
+          console.log('RSI chart exists:', !!rsiChartRef.current, 'MACD chart exists:', !!macdChartRef.current)
           lastRange = { ...visibleRange }
 
           // Sync RSI
           if (rsiChartRef.current) {
             try {
-              rsiChartRef.current.timeScale().setVisibleRange(visibleRange)
+              const rsiTimeScale = rsiChartRef.current.timeScale()
+              console.log('Setting RSI range:', visibleRange)
+              rsiTimeScale.setVisibleRange(visibleRange)
+              console.log('RSI range set successfully')
             } catch (e) {
               console.warn('RSI sync error:', e)
             }
+          } else {
+            console.log('RSI chart not available')
           }
 
           // Sync MACD
           if (macdChartRef.current) {
             try {
-              macdChartRef.current.timeScale().setVisibleRange(visibleRange)
+              const macdTimeScale = macdChartRef.current.timeScale()
+              console.log('Setting MACD range:', visibleRange)
+              macdTimeScale.setVisibleRange(visibleRange)
+              console.log('MACD range set successfully')
             } catch (e) {
               console.warn('MACD sync error:', e)
             }
+          } else {
+            console.log('MACD chart not available')
           }
         }
       } catch (error) {
