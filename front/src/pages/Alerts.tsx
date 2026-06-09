@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { api } from '../services/api'
 import TradingChart from '@/components/TradingChart'
+import { AlertMessageRenderer } from '@/components/AlertMessageRenderer'
 
 interface Alert {
   name: string
@@ -454,8 +455,8 @@ export default function Alerts() {
 
                 return (
                   <div key={idx} className="bg-slate-800/50 border border-slate-700 rounded p-3 text-xs">
-                    <div className="text-slate-300 whitespace-pre-wrap break-words line-clamp-8 mb-2">
-                      {msg.content}
+                    <div className="mb-2 text-xs">
+                      <AlertMessageRenderer content={msg.content} />
                     </div>
 
                     {/* Clickable tickers */}
