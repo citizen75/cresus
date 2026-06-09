@@ -56,7 +56,7 @@ interface ConversationWidgetProps {
   onRefresh?: () => void
   maxHeight?: string
   onSendMessage?: (message: string) => Promise<void>
-  onPortfolioClick?: (portfolioName: string, tickers: string[]) => void
+  onPortfolioClick?: (portfolioName: string, tickers: string[], widget?: MessageWidget) => void
 }
 
 // Dynamic widget loader
@@ -277,7 +277,7 @@ export function ConversationWidget({
 
           const handleMessageClick = () => {
             if (portfolio && onPortfolioClick) {
-              onPortfolioClick(portfolio, tickers)
+              onPortfolioClick(portfolio, tickers, msg.widget)
             }
           }
 

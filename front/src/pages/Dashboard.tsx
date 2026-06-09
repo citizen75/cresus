@@ -342,7 +342,7 @@ export default function Dashboard() {
             title="Global Chat"
             subtitle="All portfolios & alerts"
             maxHeight="h-full"
-            onPortfolioClick={(portfolio, tickers) => {
+            onPortfolioClick={(portfolio, tickers, widget) => {
               // Create alert info object and display holdings filtered by tickers
               const alertInfo: AlertInfo = {
                 title: '',
@@ -352,6 +352,10 @@ export default function Dashboard() {
               }
               setAlertGridView(alertInfo)
               setRightPanelOpen(true)
+              // Widget data is available if message has widget field
+              if (widget) {
+                console.log('Message widget:', widget)
+              }
             }}
             onSendMessage={async (message) => {
               const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
