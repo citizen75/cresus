@@ -69,6 +69,8 @@ class SchedulerCommands:
 			self._handle_info(args_str)
 		elif args_str.startswith("edit"):
 			self._handle_edit(args_str)
+		elif args_str.startswith("reload"):
+			self._handle_reload(args_str)
 		else:
 			console.print(f"[red]✗[/red] Unknown command: {args_str}")
 			self._print_help()
@@ -81,13 +83,14 @@ class SchedulerCommands:
 		table.add_row("cron list", "List all cron jobs")
 		table.add_row("cron info <name>", "Show job details")
 		table.add_row(
-			"cron create <name> <schedule> <target> [--type flow|agent] [--desc DESC] [--params JSON] [--enable]",
+			"cron create <name> <schedule> <target> [--type http|shell_exec|flow|agent] [--desc DESC] [--params JSON] [--enable]",
 			"Create new cron job"
 		)
 		table.add_row("cron edit <name> <schedule> <target>", "Edit existing job")
 		table.add_row("cron enable <name>", "Enable a job")
 		table.add_row("cron disable <name>", "Disable a job")
 		table.add_row("cron delete <name>", "Delete a job")
+		table.add_row("cron reload", "Reload all jobs in running scheduler via API")
 		console.print(table)
 
 	def _list_jobs(self):
@@ -329,3 +332,27 @@ class SchedulerCommands:
 			console.print(f"[green]✓ {message}[/green]")
 		else:
 			console.print(f"[red]✗ {message}[/red]")
+
+	def _handle_reload(self, args: str):
+		"""Handle cron reload command - reload all jobs via API."""
+		try:
+			import requests
+			from utils.env import get_gateway_url
+
+			gateway_url = get_gateway_url() or "http://localhost:8000"
+			url = f"{gateway_url}/api/v1/scheduler/reload"
+
+			console.print(f"[cyan]Reloading all cron jobs...[/cyan]")
+			response = requests.post(url, timeout=10)
+
+			if response.status_code == 200:
+				data = response.json()
+				console.print(f"[green]✓ {data.get('message', 'Reloaded successfully')}[/green]")
+				console.print(f"[green]Jobs count: {data.get('jobs_count', 0)}[/green]")
+			else:
+				console.print(f"[red]✗ Failed to reload: {response.status_code}[/red]")
+				console.print(f"[red]{response.text}[/red]")
+
+		except Exception as e:
+			console.print(f"[red]✗ Error: {e}[/red]")
+			console.print("[yellow]Make sure the API server is running at http://localhost:8000[/yellow]")

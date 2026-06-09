@@ -265,6 +265,34 @@ async def duplicate_job(name: str, new_name: str = Query(...)):
 		raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/scheduler/reload")
+async def reload_scheduler(request: Request):
+	"""Reload all cron jobs in the running scheduler.
+
+	Useful when config file is modified externally or to sync scheduler with config.
+	"""
+	try:
+		cron_scheduler = get_cron_scheduler(request)
+		if not cron_scheduler:
+			raise HTTPException(status_code=500, detail="Cron scheduler not available")
+
+		manager = CronManager()
+
+		# Stop and restart scheduler to reload all jobs
+		cron_scheduler.stop()
+		cron_scheduler.start()
+
+		# Verify jobs loaded
+		jobs = cron_scheduler.get_jobs()
+		return {
+			"status": "success",
+			"message": f"Cron scheduler reloaded with {len(jobs)} jobs",
+			"jobs_count": len(jobs),
+		}
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.delete("/scheduler/jobs/{name}")
 async def delete_job(request: Request, name: str):
 	"""Delete a cron job."""
