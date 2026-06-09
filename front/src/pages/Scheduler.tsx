@@ -15,7 +15,7 @@ interface FormState {
   name: string
   schedule: string
   target: string
-  type: 'flow' | 'agent'
+  type: 'http' | 'shell_exec' | 'flow' | 'agent'
   description: string
   params: string
   enabled: boolean
@@ -248,27 +248,37 @@ export default function Scheduler() {
 
               {/* Target */}
               <div>
-                <label className="block text-sm text-slate-300 mb-2">Target</label>
+                <label className="block text-sm text-slate-300 mb-2">
+                  {formData.type === 'http' ? 'URL' : formData.type === 'shell_exec' ? 'Command' : 'Target'}
+                </label>
                 <input
                   type="text"
                   name="target"
                   value={formData.target}
                   onChange={handleFormChange}
                   className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
-                  placeholder="e.g., premarket"
+                  placeholder={
+                    formData.type === 'http'
+                      ? 'e.g., http://localhost:8000/api/...'
+                      : formData.type === 'shell_exec'
+                        ? 'e.g., cresus data fetch all'
+                        : 'e.g., premarket or strategy'
+                  }
                   required
                 />
               </div>
 
               {/* Type */}
               <div>
-                <label className="block text-sm text-slate-300 mb-2">Type</label>
+                <label className="block text-sm text-slate-300 mb-2">Job Type</label>
                 <select
                   name="type"
                   value={formData.type}
                   onChange={handleFormChange}
                   className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
                 >
+                  <option value="http">HTTP Request</option>
+                  <option value="shell_exec">Shell Command</option>
                   <option value="flow">Flow</option>
                   <option value="agent">Agent</option>
                 </select>
@@ -288,11 +298,13 @@ export default function Scheduler() {
               />
             </div>
 
-            {/* Parameters - Dynamic based on target */}
+            {/* Parameters - Dynamic based on type */}
             <div className="bg-slate-800/50 border border-slate-700 rounded p-4">
-              <label className="block text-sm text-slate-300 mb-3 font-semibold">Parameters</label>
+              <label className="block text-sm text-slate-300 mb-3 font-semibold">
+                {formData.type === 'http' ? 'HTTP Options' : formData.type === 'shell_exec' ? 'Shell Options' : 'Parameters'}
+              </label>
 
-              {formData.target === 'http' ? (
+              {formData.type === 'http' ? (
                 <div className="space-y-3">
                   <div>
                     <label className="block text-xs text-slate-400 mb-1">Method</label>
@@ -320,47 +332,47 @@ export default function Scheduler() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs text-slate-400 mb-1">URL</label>
+                    <label className="block text-xs text-slate-400 mb-1">Timeout (seconds)</label>
                     <input
-                      type="text"
+                      type="number"
                       value={(() => {
                         try {
                           const p = JSON.parse(formData.params)
-                          return p.url || ''
+                          return p.timeout || 30
                         } catch {
-                          return ''
+                          return 30
                         }
                       })()}
                       onChange={(e) => {
                         const p = JSON.parse(formData.params || '{}')
-                        p.url = e.target.value
+                        p.timeout = parseInt(e.target.value)
                         setFormData({ ...formData, params: JSON.stringify(p) })
                       }}
-                      placeholder="http://localhost:8000/api/..."
-                      className="w-full px-2 py-1 bg-slate-700 border border-slate-600 text-white rounded text-xs focus:outline-none focus:border-purple-500"
+                      className="w-full px-2 py-1 bg-slate-700 border border-slate-600 text-white rounded text-xs"
+                      min="1"
                     />
                   </div>
                 </div>
-              ) : formData.target === 'shell_exec' ? (
+              ) : formData.type === 'shell_exec' ? (
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">Command</label>
+                  <label className="block text-xs text-slate-400 mb-1">Timeout (seconds)</label>
                   <input
-                    type="text"
+                    type="number"
                     value={(() => {
                       try {
                         const p = JSON.parse(formData.params)
-                        return p.command || ''
+                        return p.timeout || 300
                       } catch {
-                        return ''
+                        return 300
                       }
                     })()}
                     onChange={(e) => {
                       const p = JSON.parse(formData.params || '{}')
-                      p.command = e.target.value
+                      p.timeout = parseInt(e.target.value)
                       setFormData({ ...formData, params: JSON.stringify(p) })
                     }}
-                    placeholder="cresus data fetch all --portfolio all"
-                    className="w-full px-2 py-1 bg-slate-700 border border-slate-600 text-white rounded text-xs focus:outline-none focus:border-purple-500 font-mono"
+                    className="w-full px-2 py-1 bg-slate-700 border border-slate-600 text-white rounded text-xs"
+                    min="1"
                   />
                 </div>
               ) : (

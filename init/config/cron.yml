@@ -7,8 +7,8 @@ jobs:
     description: "Run premarket analysis for momentum strategy"
     enabled: false  # Set to true to enable
     schedule: "0 8 * * 1-5"  # 8:00 AM, Monday-Friday (cron format)
-    type: flow  # 'flow' or 'agent'
-    target: premarket  # Flow or agent name
+    type: flow
+    target: "premarket"
     params:
       strategy: momentum_cac
 
@@ -18,7 +18,7 @@ jobs:
     enabled: false
     schedule: "0 * * * *"  # Every hour
     type: agent
-    target: strategy
+    target: "strategy"
     params:
       strategy: momentum_etf_fr
 
@@ -28,7 +28,7 @@ jobs:
     enabled: true
     schedule: "*/5 * * * *"  # Every 5 minutes
     type: flow
-    target: heartbeat
+    target: "heartbeat"
     params: {}
 
   # Data sync every 30 minutes during market hours
@@ -37,18 +37,17 @@ jobs:
     enabled: true
     schedule: "*/30 9-18 * * 1-5"  # Every 30 minutes, hours 9-18, Monday-Friday
     type: flow
-    target: data_fetch
+    target: "data_fetch"
     params:
       universe: cac40
 
-
-    # Data sync every 30 minutes during market hours
+  # Data sync every 30 minutes during market hours
   - name: data_sync_index
     description: "Sync index market data every 30 minutes (9:00-18:30, weekdays)"
     enabled: true
     schedule: "*/30 * * * 1-5"  # Every 30 minutes, hours 9-18, Monday-Friday
     type: flow
-    target: data_fetch
+    target: "data_fetch"
     params:
       universe: index
 
@@ -57,18 +56,17 @@ jobs:
     description: "Fetch all portfolio data"
     enabled: false  # Set to true to enable
     schedule: "0 20 * * *"  # 8:00 PM daily
-    type: flow
-    target: shell_exec
+    type: shell_exec
+    target: "cresus data fetch all --portfolio all"
     params:
-      command: "cresus data fetch all --portfolio all"
+      timeout: 300
 
   # Alert on SHA red signal
   - name: alert_sha_red
     description: "Alert when SHA turns red - every 30 minutes during market hours"
     enabled: true
     schedule: "*/30 9-18 * * 1-5"  # Every 30 minutes, 9:00-18:00, Monday-Friday
-    type: flow
-    target: http
+    type: http
+    target: "http://localhost:8000/api/alerts/sha_red/run"
     params:
       method: POST
-      url: "http://localhost:8000/api/alerts/sha_red/run"

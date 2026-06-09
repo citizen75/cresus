@@ -77,10 +77,16 @@ class CronScheduler:
 			try:
 				logger.info(f"Executing cron job '{job_config.name}' ({job_config.type}: {job_config.target})")
 
-				if job_config.type == "flow":
+				if job_config.type == "http":
+					self._call_http(job_config.target, job_config.params)
+				elif job_config.type == "shell_exec":
+					self._call_shell(job_config.target, job_config.params)
+				elif job_config.type == "flow":
 					self._call_flow(job_config.target, job_config.params)
 				elif job_config.type == "agent":
 					self._call_agent(job_config.target, job_config.params)
+				else:
+					raise ValueError(f"Unknown job type: {job_config.type}")
 
 				logger.info(f"Cron job '{job_config.name}' completed successfully")
 
@@ -159,6 +165,78 @@ class CronScheduler:
 		# Execute agent
 		result = agent.process(params)
 		logger.info(f"Agent '{agent_name}' result: {result.get('status', 'unknown')}")
+
+	def _call_http(self, url: str, params: dict) -> None:
+		"""Make an HTTP request.
+
+		Args:
+			url: Target URL
+			params: HTTP request parameters (method, headers, body, etc.)
+		"""
+		import requests
+
+		method = params.get("method", "POST").upper()
+		headers = params.get("headers", {})
+		body = params.get("body")
+		timeout = params.get("timeout", 30)
+
+		logger.info(f"Making HTTP {method} request to {url}")
+
+		try:
+			if method == "GET":
+				response = requests.get(url, headers=headers, timeout=timeout)
+			elif method == "POST":
+				response = requests.post(url, json=body, headers=headers, timeout=timeout)
+			elif method == "PUT":
+				response = requests.put(url, json=body, headers=headers, timeout=timeout)
+			elif method == "DELETE":
+				response = requests.delete(url, headers=headers, timeout=timeout)
+			elif method == "PATCH":
+				response = requests.patch(url, json=body, headers=headers, timeout=timeout)
+			else:
+				raise ValueError(f"Unsupported HTTP method: {method}")
+
+			response.raise_for_status()
+			logger.info(f"HTTP {method} request completed: {response.status_code}")
+		except Exception as e:
+			logger.error(f"HTTP request failed: {e}")
+			raise
+
+	def _call_shell(self, command: str, params: dict) -> None:
+		"""Execute a shell command.
+
+		Args:
+			command: Shell command to execute
+			params: Additional parameters (env, timeout, etc.)
+		"""
+		import subprocess
+
+		timeout = params.get("timeout", 300)
+
+		logger.info(f"Executing shell command: {command}")
+
+		try:
+			result = subprocess.run(
+				command,
+				shell=True,
+				timeout=timeout,
+				capture_output=True,
+				text=True
+			)
+
+			if result.returncode != 0:
+				logger.error(f"Shell command failed with code {result.returncode}: {result.stderr}")
+				raise RuntimeError(f"Command failed: {result.stderr}")
+
+			logger.info(f"Shell command completed successfully")
+			if result.stdout:
+				logger.info(f"Output: {result.stdout}")
+		except subprocess.TimeoutExpired:
+			logger.error(f"Shell command timed out after {timeout}s")
+			raise
+		except Exception as e:
+			logger.error(f"Shell execution failed: {e}")
+			raise
 
 	def start(self) -> None:
 		"""Start the scheduler."""
