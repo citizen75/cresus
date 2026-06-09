@@ -44,6 +44,8 @@ class AlertNotifier:
             result: Alert evaluation result
         """
         try:
+            from .models import AlertSource
+
             portfolios = self._get_target_portfolios(alert)
 
             if not portfolios:
@@ -86,6 +88,18 @@ class AlertNotifier:
                     self.logger.error(
                         f"Error sending alert to portfolio '{portfolio_name}': {e}"
                     )
+
+            # For all_portfolios alerts, also send unfiltered alert to global chat
+            if alert.source == AlertSource.ALL_PORTFOLIOS:
+                try:
+                    message = self._format_alert_message(alert, result, result.matches)
+                    manager = ConversationManager("global")
+                    manager.add_alert(message)
+                    self.logger.info(
+                        f"Sent alert '{alert.name}' to global chat: {len(result.matches)} match(es)"
+                    )
+                except Exception as e:
+                    self.logger.error(f"Error sending alert to global chat: {e}")
 
         except Exception as e:
             self.logger.error(f"Error in conversation alert notification: {e}")
