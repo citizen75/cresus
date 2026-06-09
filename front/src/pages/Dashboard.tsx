@@ -171,13 +171,14 @@ export default function Dashboard() {
           (p: any) => p.name === alertGridView.portfolio
         )
         if (portfolio) {
+          const baseUrl = getApiBaseUrl()
           const positionResponse = await fetch(
-            `/api/v1/portfolios/${encodeURIComponent(alertGridView.portfolio || '')}/positions`
+            `${baseUrl}/api/v1/portfolios/${encodeURIComponent(alertGridView.portfolio || '')}/positions`
           )
           if (positionResponse.ok) {
             const data = await positionResponse.json()
-            const positions = data.positions || []
-            setPortfolioPositions(positions)
+            let positions = data.positions || []
+            console.log(`[Dashboard] Loaded portfolio ${alertGridView.portfolio}: ${positions.length} positions`)
 
             // Fetch fundamental data for portfolio positions
             const fundData: Record<string, any> = {}
@@ -190,6 +191,29 @@ export default function Dashboard() {
                 fundData[pos.ticker] = {}
               }
             }
+
+            // Enrich positions with calculated daily changes
+            positions = positions.map((pos: any) => {
+              const fund = fundData[pos.ticker] || {}
+              const currentPrice = pos.current_price || 0
+              const previousClose = fund.previous_close || currentPrice
+
+              // Daily change per share: current - previous
+              const dailyChange = currentPrice - previousClose
+              const dailyChangePct = previousClose && previousClose !== 0 ? ((currentPrice - previousClose) / previousClose) * 100 : 0
+
+              console.log(`[Dashboard] ✓ ${pos.ticker}: current=${currentPrice}, prev=${previousClose}, daily=${dailyChange} (${dailyChangePct}%)`)
+
+              return {
+                ...pos,
+                position_gain: dailyChange,  // Daily change per share
+                position_gain_pct: dailyChangePct,
+                asset_type: fund.asset_type || 'Stock',
+                sector: fund.sector || 'Unknown',
+              }
+            })
+
+            setPortfolioPositions(positions)
             setFundamentalData(fundData)
           }
         }
