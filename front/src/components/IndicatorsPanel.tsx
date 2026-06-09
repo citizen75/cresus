@@ -256,24 +256,20 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
     }
   }, [visibleWindow, chartData])
 
-  // Sync indicator charts with main chart
+  // Sync indicator charts with main chart using subscribeCrosshairMove
   useEffect(() => {
     if (!chartsRef?.current?.mainChart) return
 
     const mainChart = chartsRef.current.mainChart
-    const subscriptions: any[] = []
+    let unsubscribe: any = null
 
-    // Subscribe to timeScale changes on main chart
     try {
-      const timeScale = mainChart.timeScale()
-
-      // Try the correct event name for this version
-      const sub = timeScale.subscribe('visibleRangeChanged', () => {
-        const visibleRange = timeScale.getVisibleRange()
+      // Use the chart's built-in method to track when the visible range changes
+      // This fires whenever the user zooms/pans the chart
+      unsubscribe = mainChart.subscribe('draw', () => {
+        const visibleRange = mainChart.timeScale().getVisibleRange()
 
         if (visibleRange?.from !== undefined && visibleRange?.to !== undefined) {
-          console.log('Main chart visible range changed:', visibleRange)
-
           if (rsiChartRef.current) {
             rsiChartRef.current.timeScale().setVisibleRange(visibleRange)
           }
@@ -282,19 +278,18 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
           }
         }
       })
-      subscriptions.push(sub)
     } catch (error) {
-      console.warn('Failed to set up timeScale sync:', error)
+      console.warn('Failed to set up chart sync:', error)
     }
 
     return () => {
-      subscriptions.forEach(sub => {
+      if (unsubscribe) {
         try {
-          sub()
+          unsubscribe()
         } catch (e) {
           // Ignore
         }
-      })
+      }
     }
   }, [chartsRef?.current?.mainChart])
 
