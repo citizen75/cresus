@@ -7,7 +7,7 @@ import AIWatchlist from '@/components/portfolio/AIWatchlist'
 import OrdersView from '@/components/portfolio/OrdersView'
 import PortfolioBacktest from '@/components/portfolio/PortfolioBacktest'
 import PortfolioSettings from '@/components/portfolio/PortfolioSettings'
-import { ConversationWidget } from '@/components/ConversationWidget'
+import ConversationPanel from '@/components/portfolio/ConversationPanel'
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
@@ -159,25 +159,8 @@ function PortfolioDetailContent() {
       </div>
 
       {/* Right Sidebar - Conversations */}
-      <div className="w-96 flex-shrink-0 flex flex-col">
-        <ConversationWidget
-          portfolioName={name}
-          title="Alerts & Chat"
-          subtitle={`${name.charAt(0).toUpperCase() + name.slice(1)} Portfolio`}
-          maxHeight="h-full"
-          onSendMessage={async (message) => {
-            const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-            const response = await fetch(`${baseUrl}/api/v1/conversations/${encodeURIComponent(name)}/message`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                source: 'user',
-                content: message,
-              }),
-            })
-            if (!response.ok) throw new Error('Failed to send message')
-          }}
-        />
+      <div className="w-80 flex-shrink-0">
+        <ConversationPanel portfolioName={name} />
       </div>
     </div>
   )

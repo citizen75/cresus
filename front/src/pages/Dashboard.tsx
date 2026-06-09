@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { ConversationWidget } from '@/components/ConversationWidget'
+import GlobalConversationPanel from '@/components/portfolio/GlobalConversationPanel'
 import TradingChart from '@/components/TradingChart'
 import CardChart from '@/components/CardChart'
 import { PortfolioHoldingsTable } from '@/components/portfolio/PortfolioHoldingsTable'
@@ -336,29 +336,13 @@ export default function Dashboard() {
     <div className="flex gap-6 h-[calc(100vh-120px)]">
       {/* Center Column - Conversations */}
       {conversationOpen && (
-        <div className="w-[500px] flex-shrink-0 flex flex-col">
-          <ConversationWidget
-            portfolioName="_global"
-            title="Global Chat"
-            subtitle="All portfolios & alerts"
-            maxHeight="h-full"
-            showRefreshButton={true}
-            onRefresh={() => {
-              // Refresh conversations
-              conversationPanelRef.current?.scrollToBottom?.()
-            }}
-            onSendMessage={async (message) => {
-              const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-              const response = await fetch(`${baseUrl}/api/v1/conversations/_global/message`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  source: 'user',
-                  content: message,
-                }),
-              })
-              if (!response.ok) throw new Error('Failed to send message')
-            }}
+        <div className="w-[500px] flex-shrink-0">
+          <GlobalConversationPanel
+            ref={conversationPanelRef}
+            onClose={() => setConversationOpen(false)}
+            onAlertClick={handleSelectTicker}
+            onAlertGridClick={handleAlertGridClick}
+            selectedAlertId={selectedAlertId}
           />
         </div>
       )}
