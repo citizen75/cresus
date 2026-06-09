@@ -179,9 +179,6 @@ export default function Alerts() {
       const response = await api.runAlert(name)
       setRunResults(response)
       setShowRunResults(true)
-      if (selectedPortfolio) {
-        await fetchAlertMessages()
-      }
     } catch (err) {
       setError(`Failed to run alert: ${err instanceof Error ? err.message : 'Unknown error'}`)
     } finally {
