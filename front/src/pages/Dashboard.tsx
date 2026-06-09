@@ -433,6 +433,9 @@ export default function Dashboard() {
                       const filteredData = filterDataByTimeframe(tickerData, timeframe)
                       const currentPrice = fund.current_price || (tickerData.length > 0 ? tickerData[tickerData.length - 1].close : 0)
                       const previousClose = fund.previous_close || (tickerData.length > 1 ? tickerData[tickerData.length - 2].close : currentPrice)
+                      const gain = (currentPrice || 0) - (previousClose || 0)
+                      const gainPct = previousClose ? (gain / previousClose) * 100 : 0
+                      console.log(`[Dashboard] Position ${ticker}: current=${currentPrice}, prev=${previousClose}, gain=${gain}`)
 
                       return {
                         ticker,
@@ -441,8 +444,8 @@ export default function Dashboard() {
                         avg_entry_price: previousClose || 0,
                         current_price: currentPrice || 0,
                         position_value: currentPrice || 0,
-                        position_gain: (currentPrice || 0) - (previousClose || 0),
-                        position_gain_pct: previousClose ? (((currentPrice || 0) - (previousClose || 0)) / previousClose) * 100 : 0,
+                        position_gain: gain,
+                        position_gain_pct: gainPct,
                       }
                     })}
                     totalValue={alertGridView.tickers.reduce((sum, ticker) => {
