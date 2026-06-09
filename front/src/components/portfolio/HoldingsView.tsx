@@ -124,15 +124,24 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
   useEffect(() => {
     const fetchFundamentals = async () => {
       const data: Record<string, any> = {}
+      console.log(`[HoldingsView] Fetching fundamental data for ${positions.length} positions`)
       for (const pos of positions) {
         try {
           const result = await api.getFundamental(pos.ticker)
-          data[pos.ticker] = result?.data?.quotation || {}
+          const quotation = result?.data?.quotation
+          if (quotation && typeof quotation.previous_close === 'number') {
+            data[pos.ticker] = quotation
+            console.log(`[HoldingsView] ✓ ${pos.ticker}: previous_close=${quotation.previous_close}`)
+          } else {
+            console.warn(`[HoldingsView] ⚠ ${pos.ticker}: no previous_close in`, result)
+            data[pos.ticker] = quotation || {}
+          }
         } catch (error) {
-          console.error(`Failed to load fundamental data for ${pos.ticker}:`, error)
+          console.error(`[HoldingsView] ✗ Failed to load ${pos.ticker}:`, error)
           data[pos.ticker] = {}
         }
       }
+      console.log('[HoldingsView] Setting fundamental data:', data)
       setFundamentalData(data)
     }
 
