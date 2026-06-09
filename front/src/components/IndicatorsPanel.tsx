@@ -131,7 +131,7 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
             time: candle.time,
             value: rsi[i],
           }))
-          // Keep all data points (including nulls) so range syncing works for all dates
+          .filter(d => d.value !== null)
 
         const chart = createChart(rsiContainerRef.current, {
           layout: { background: { color: '#0f172a' }, textColor: '#94a3b8' },
@@ -194,7 +194,7 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
             time: candle.time,
             value: macd.histogram[i],
           }))
-          // Keep all data points (including nulls) so range syncing works for all dates
+          .filter(d => d.value !== null)
 
         const chart = createChart(macdContainerRef.current, {
           layout: { background: { color: '#0f172a' }, textColor: '#94a3b8' },
@@ -283,34 +283,36 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
           console.log('RSI chart exists:', !!rsiChartRef.current, 'MACD chart exists:', !!macdChartRef.current)
           lastRange = { ...visibleRange }
 
-          // Sync RSI
+          // Sync RSI with fallback to fitContent if range is outside available data
           if (rsiChartRef.current) {
             try {
               const rsiTimeScale = rsiChartRef.current.timeScale()
-              console.log('Setting RSI range:', visibleRange)
-              rsiTimeScale.setVisibleRange(visibleRange, false)
+              try {
+                rsiTimeScale.setVisibleRange(visibleRange, false)
+              } catch (e) {
+                // If range is outside available data, fit the content
+                rsiTimeScale.fitContent()
+              }
               rsiChartRef.current.applyOptions({})
-              console.log('RSI range set successfully')
             } catch (e) {
               console.warn('RSI sync error:', e)
             }
-          } else {
-            console.log('RSI chart not available')
           }
 
-          // Sync MACD
+          // Sync MACD with fallback to fitContent if range is outside available data
           if (macdChartRef.current) {
             try {
               const macdTimeScale = macdChartRef.current.timeScale()
-              console.log('Setting MACD range:', visibleRange)
-              macdTimeScale.setVisibleRange(visibleRange, false)
+              try {
+                macdTimeScale.setVisibleRange(visibleRange, false)
+              } catch (e) {
+                // If range is outside available data, fit the content
+                macdTimeScale.fitContent()
+              }
               macdChartRef.current.applyOptions({})
-              console.log('MACD range set successfully')
             } catch (e) {
               console.warn('MACD sync error:', e)
             }
-          } else {
-            console.log('MACD chart not available')
           }
         }
       } catch (error) {
