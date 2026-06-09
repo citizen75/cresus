@@ -224,6 +224,11 @@ export default function Dashboard() {
               date: item.date || item.timestamp || item.Date,
               close: parseFloat(item.close || item.Close),
             }))
+            // Get previous_close from historical data if not from API
+            if (historyArray.length >= 2 && !previousClose) {
+              const lastClose = parseFloat(historyArray[historyArray.length - 1]?.close || 0)
+              previousClose = parseFloat(historyArray[historyArray.length - 2]?.close || lastClose)
+            }
           }
 
           // Fetch fundamental data for real company info
@@ -263,7 +268,8 @@ export default function Dashboard() {
       }
       setHistoricalData(data)
       setTickerInfo(info)
-      setFundamentalData(fundamental)
+      // Merge with existing fundamental data, don't overwrite portfolio data
+      setFundamentalData((prev) => ({ ...prev, ...fundamental }))
     }
 
     loadData()
