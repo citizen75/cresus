@@ -31,8 +31,14 @@ class TestDataAgent(unittest.TestCase):
 		"""Test that process skips loading if data_history already in context."""
 		# Pre-populate context with data_history (backtest mode)
 		existing_data = {
-			"AAPL": pd.DataFrame({"close": [100, 101, 102]}),
-			"GOOGL": pd.DataFrame({"close": [2000, 2001, 2002]}),
+			"AAPL": pd.DataFrame({
+				"timestamp": pd.date_range("2025-10-01", periods=10),
+				"close": [100, 101, 102, 103, 104, 105, 106, 107, 108, 109]
+			}),
+			"GOOGL": pd.DataFrame({
+				"timestamp": pd.date_range("2025-10-01", periods=10),
+				"close": [2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009]
+			}),
 		}
 		self.context.set("data_history", existing_data)
 
