@@ -33,7 +33,29 @@ export function JobModal({ isOpen, onClose, onSubmit, editingJob, initialData }:
 
   useEffect(() => {
     if (initialData) {
-      setFormData(initialData)
+      // Ensure params have default values based on type
+      let params = initialData.params
+      try {
+        const p = JSON.parse(params)
+        if (initialData.type === 'http' && !p.method) {
+          p.method = 'POST'
+        }
+        if (initialData.type === 'http' && !p.timeout) {
+          p.timeout = 30
+        }
+        if (initialData.type === 'shell_exec' && !p.timeout) {
+          p.timeout = 300
+        }
+        params = JSON.stringify(p)
+      } catch (e) {
+        // If params can't be parsed, initialize with defaults
+        if (initialData.type === 'http') {
+          params = JSON.stringify({ method: 'POST', timeout: 30 })
+        } else if (initialData.type === 'shell_exec') {
+          params = JSON.stringify({ timeout: 300 })
+        }
+      }
+      setFormData({ ...initialData, params })
     } else {
       setFormData({
         name: '',
