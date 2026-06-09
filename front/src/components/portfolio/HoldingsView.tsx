@@ -449,6 +449,30 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
                 ⚙️
               </button>
 
+              {/* Table/Charts Toggle */}
+              <div className="flex gap-2 bg-slate-800 border border-slate-700 rounded-lg p-1 flex-shrink-0">
+                <button
+                  onClick={() => setViewMode('table')}
+                  className={`px-4 py-1.5 rounded transition font-medium text-sm ${
+                    viewMode === 'table'
+                      ? 'bg-purple-600 text-white'
+                      : 'text-slate-400 hover:text-slate-300'
+                  }`}
+                >
+                  📊 Table
+                </button>
+                <button
+                  onClick={() => setViewMode('charts')}
+                  className={`px-4 py-1.5 rounded transition font-medium text-sm ${
+                    viewMode === 'charts'
+                      ? 'bg-purple-600 text-white'
+                      : 'text-slate-400 hover:text-slate-300'
+                  }`}
+                >
+                  📈 Charts
+                </button>
+              </div>
+
               {/* Timeframe Dropdown - Only visible in charts mode */}
               {viewMode === 'charts' && (
                 <select
@@ -483,9 +507,6 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
               showActions={true}
               externalSearchQuery={searchQuery}
               onSearchChange={setSearchQuery}
-              viewMode={viewMode}
-              onViewModeChange={setViewMode}
-              showViewToggle={true}
             />
           )}
 

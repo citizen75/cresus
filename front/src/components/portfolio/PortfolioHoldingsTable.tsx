@@ -152,57 +152,26 @@ export function PortfolioHoldingsTable({
 
   return (
     <div className="space-y-4">
-      {/* Search Bar and View Toggle */}
-      {(showSearch && !externalSearchQuery) || (showViewToggle && onViewModeChange) ? (
-        <div className="flex gap-3 items-center justify-between">
-          {/* Search Bar - Only show if enabled */}
-          {showSearch && !externalSearchQuery && (
-            <div className="flex gap-3 flex-1">
-              <input
-                type="text"
-                placeholder="Search by symbol or company..."
-                value={internalSearchQuery}
-                onChange={(e) => setInternalSearchQuery(e.target.value)}
-                className="flex-1 px-4 py-2 bg-slate-800 border border-slate-700 rounded text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-600"
-              />
-              {internalSearchQuery && (
-                <button
-                  onClick={() => setInternalSearchQuery('')}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-sm transition"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* View Toggle - Show if enabled */}
-          {showViewToggle && onViewModeChange && (
-            <div className="flex gap-2 bg-slate-800 border border-slate-700 rounded p-1 flex-shrink-0">
-              <button
-                onClick={() => onViewModeChange('table')}
-                className={`px-4 py-1.5 rounded transition font-medium text-sm ${
-                  viewMode === 'table'
-                    ? 'bg-purple-600 text-white'
-                    : 'text-slate-400 hover:text-slate-300'
-                }`}
-              >
-                📊 Table
-              </button>
-              <button
-                onClick={() => onViewModeChange('charts')}
-                className={`px-4 py-1.5 rounded transition font-medium text-sm ${
-                  viewMode === 'charts'
-                    ? 'bg-purple-600 text-white'
-                    : 'text-slate-400 hover:text-slate-300'
-                }`}
-              >
-                📈 Charts
-              </button>
-            </div>
+      {/* Search Bar - Only show if not using external search */}
+      {showSearch && !externalSearchQuery && (
+        <div className="flex gap-3">
+          <input
+            type="text"
+            placeholder="Search by symbol or company..."
+            value={internalSearchQuery}
+            onChange={(e) => setInternalSearchQuery(e.target.value)}
+            className="flex-1 px-4 py-2 bg-slate-800 border border-slate-700 rounded text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-600"
+          />
+          {internalSearchQuery && (
+            <button
+              onClick={() => setInternalSearchQuery('')}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-sm transition"
+            >
+              Clear
+            </button>
           )}
         </div>
-      ) : null}
+      )}
 
       {/* Table */}
       <div className="overflow-x-auto overflow-y-auto max-h-[600px] rounded border border-slate-800">
