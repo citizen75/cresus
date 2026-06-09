@@ -197,7 +197,7 @@ export default function Dashboard() {
               }
             }
             console.log(`[Dashboard] Setting portfolio fundamental data:`, fundData)
-            setFundamentalData(fundData)
+            setFundamentalData((prev) => ({ ...prev, ...fundData }))
           }
         }
       } catch (err) {
