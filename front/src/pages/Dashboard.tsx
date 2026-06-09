@@ -4,7 +4,7 @@ import TradingChart from '@/components/TradingChart'
 import CardChart from '@/components/CardChart'
 import { PortfolioHoldingsTable } from '@/components/portfolio/PortfolioHoldingsTable'
 import { ChartModal } from '@/components/ChartModal'
-import { api } from '@/services/api'
+import { api, getApiBaseUrl } from '@/services/api'
 
 interface AlertInfo {
   title: string
@@ -118,13 +118,26 @@ export default function Dashboard() {
             }))
           }
 
-          // Extract company info from historical data
-          let companyName = ticker
-          let previousClose = historyArray.length > 1 ? parseFloat(historyArray[historyArray.length - 2]?.close || 0) : 0
-          let currentPrice = historyArray.length > 0 ? parseFloat(historyArray[historyArray.length - 1]?.close || 0) : 0
+          // Fetch fundamental data for real company info
+          const baseUrl = getApiBaseUrl()
+          const fundResponse = await fetch(`${baseUrl}/api/v1/data/fundamental/${ticker}`)
+          const fundData = await fundResponse.json()
 
-          if (historyArray.length > 0 && historyArray[0].company_name) {
-            companyName = historyArray[0].company_name
+          let companyName = ticker
+          let sector = 'Unknown'
+          let currentPrice = historyArray.length > 0 ? parseFloat(historyArray[historyArray.length - 1]?.close || 0) : 0
+          let previousClose = historyArray.length > 1 ? parseFloat(historyArray[historyArray.length - 2]?.close || 0) : 0
+
+          // Use fundamental data if available
+          if (fundResponse.ok && fundData?.data?.company?.name) {
+            companyName = fundData.data.company.name
+            sector = fundData.data.company.sector || 'Unknown'
+          }
+
+          // Use quotation data from fundamental endpoint if available
+          if (fundResponse.ok && fundData?.data?.quotation) {
+            currentPrice = fundData.data.quotation.current_price || currentPrice
+            previousClose = fundData.data.quotation.previous_close || previousClose
           }
 
           info[ticker] = { company_name: companyName }
@@ -132,11 +145,12 @@ export default function Dashboard() {
             company_name: companyName,
             current_price: currentPrice,
             previous_close: previousClose,
+            sector: sector,
           }
         } catch (err) {
           console.error(`Failed to load data for ${ticker}:`, err)
           info[ticker] = { company_name: ticker }
-          fundamental[ticker] = { company_name: ticker, current_price: 0, previous_close: 0 }
+          fundamental[ticker] = { company_name: ticker, current_price: 0, previous_close: 0, sector: 'Unknown' }
         }
       }
       setHistoricalData(data)
