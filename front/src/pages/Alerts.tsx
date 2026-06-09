@@ -232,93 +232,72 @@ export default function Alerts() {
           </button>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-1.5">
           {alerts.map((alert) => (
             <div
               key={alert.name}
-              className="bg-slate-900/30 border border-slate-800 rounded-lg p-4 hover:border-slate-700 transition"
+              className="bg-slate-900/30 border border-slate-800 rounded p-2.5 hover:border-slate-700 hover:bg-slate-900/50 transition"
             >
-              <div className="flex items-start justify-between gap-4">
-                {/* Alert Info */}
+              <div className="flex items-center justify-between gap-3">
+                {/* Alert Info - Compact */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-bold text-white">{alert.name}</h3>
-                    <span
-                      className={`inline-flex px-2 py-1 rounded text-xs font-medium ${
-                        alert.enabled
-                          ? 'bg-green-900/30 border border-green-800 text-green-400'
-                          : 'bg-slate-800 text-slate-400'
-                      }`}
-                    >
-                      {alert.enabled ? '✓ Active' : '○ Inactive'}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm font-bold text-white">{alert.name}</h3>
+                    <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${
+                      alert.enabled
+                        ? 'bg-green-900/30 border border-green-800 text-green-400'
+                        : 'bg-slate-800 text-slate-400'
+                    }`}>
+                      {alert.enabled ? '✓' : '○'}
                     </span>
-                    <span className="inline-flex px-2 py-1 rounded text-xs font-medium bg-slate-800 text-slate-400">
+                    <span className="text-xs text-slate-500">
                       {alert.source}
                       {alert.source_value && ` (${alert.source_value})`}
                     </span>
-                  </div>
-
-                  {/* Formula */}
-                  <div className="mb-2">
-                    <p className="text-xs text-slate-400 mb-1">Formula:</p>
-                    <code className="block bg-black/30 border border-slate-800 rounded p-2 text-slate-300 text-sm overflow-x-auto">
-                      {alert.formula}
+                    <span className="text-xs text-slate-400">•</span>
+                    <code className="text-xs text-slate-400 overflow-hidden text-ellipsis max-w-xs">
+                      {alert.formula.substring(0, 50)}{alert.formula.length > 50 ? '...' : ''}
                     </code>
                   </div>
-
-                  {/* Metadata */}
-                  <div className="grid grid-cols-3 gap-4 text-sm">
-                    <div>
-                      <p className="text-slate-500 text-xs mb-1">Notify</p>
-                      <p className="text-slate-300">{alert.notify}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-500 text-xs mb-1">Created</p>
-                      <p className="text-slate-300">{formatDate(alert.created_at)}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-500 text-xs mb-1">Last Run</p>
-                      <p className="text-slate-300">{formatDate(alert.last_run)}</p>
-                    </div>
+                  <div className="text-xs text-slate-500 mt-1 flex gap-3">
+                    <span>{alert.notify}</span>
+                    <span>Last: {formatDate(alert.last_run)}</span>
+                    {alert.description && <span className="text-slate-600 italic truncate">{alert.description}</span>}
                   </div>
-
-                  {alert.description && (
-                    <p className="text-sm text-slate-400 mt-2">{alert.description}</p>
-                  )}
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center gap-1.5 flex-shrink-0">
                   <button
                     onClick={() => handleRunAlert(alert.name)}
                     disabled={runningAlert === alert.name}
-                    className="px-3 py-2 text-sm bg-blue-900/30 hover:bg-blue-900/50 border border-blue-800 text-blue-400 rounded transition disabled:opacity-50"
-                    title="Run alert evaluation"
+                    className="px-2 py-1 text-xs bg-blue-900/30 hover:bg-blue-900/50 border border-blue-800 text-blue-400 rounded transition disabled:opacity-50"
+                    title="Run alert"
                   >
                     {runningAlert === alert.name ? '⟳' : '▶'}
                   </button>
                   <button
                     onClick={() => handleToggleEnabled(alert)}
-                    className={`px-3 py-2 text-sm rounded transition border ${
+                    className={`px-2 py-1 text-xs rounded transition border ${
                       alert.enabled
                         ? 'bg-green-900/30 hover:bg-green-900/50 border-green-800 text-green-400'
                         : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-400'
                     }`}
-                    title={alert.enabled ? 'Disable alert' : 'Enable alert'}
+                    title={alert.enabled ? 'Disable' : 'Enable'}
                   >
                     {alert.enabled ? '✓' : '○'}
                   </button>
                   <button
                     onClick={() => openEditModal(alert)}
-                    className="px-3 py-2 text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition"
-                    title="Edit alert"
+                    className="px-2 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition"
+                    title="Edit"
                   >
                     ✎
                   </button>
                   <button
                     onClick={() => handleDeleteAlert(alert.name)}
-                    className="px-3 py-2 text-sm bg-slate-800 hover:bg-red-900/20 text-slate-300 hover:text-red-400 rounded transition"
-                    title="Delete alert"
+                    className="px-2 py-1 text-xs bg-slate-800 hover:bg-red-900/20 text-slate-300 hover:text-red-400 rounded transition"
+                    title="Delete"
                   >
                     ✕
                   </button>
@@ -366,12 +345,17 @@ export default function Alerts() {
                 </div>
               )}
 
-              {/* Source */}
-              {!editingAlert && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Source *
-                  </label>
+              {/* Source (read-only when editing, editable when creating) */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Source *
+                </label>
+                {editingAlert ? (
+                  <div className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2 text-slate-300 text-sm">
+                    {formData.source}
+                    {formData.source_value && ` (${formData.source_value})`}
+                  </div>
+                ) : (
                   <select
                     value={formData.source}
                     onChange={(e) => setFormData({ ...formData, source: e.target.value })}
@@ -383,8 +367,8 @@ export default function Alerts() {
                       </option>
                     ))}
                   </select>
-                </div>
-              )}
+                )}
+              </div>
 
               {/* Source Value */}
               {!editingAlert && formData.source !== 'all_portfolios' && (
