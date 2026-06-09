@@ -77,7 +77,10 @@ class TestEntryScoreAgent(unittest.TestCase):
 			"adx_20": [20, 22, 25, 28, 30],
 		})
 
-		watchlist = ["TICKER1", "TICKER2"]
+		watchlist = {
+			"TICKER1": {"price": 100},
+			"TICKER2": {"price": 101},
+		}
 		data_history = {
 			"TICKER1": df.copy(),
 			"TICKER2": df.copy(),
