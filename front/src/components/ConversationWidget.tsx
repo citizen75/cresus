@@ -281,13 +281,33 @@ export function ConversationWidget({
             }
           }
 
+          const handleDeleteMessage = async (e: React.MouseEvent) => {
+            e.stopPropagation()
+            try {
+              const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+              const timestamp = encodeURIComponent(msg.datetime)
+              const response = await fetch(
+                `${baseUrl}/api/v1/conversations/${encodeURIComponent(portfolioName)}/message?timestamp=${timestamp}`,
+                {
+                  method: 'DELETE',
+                }
+              )
+              if (response.ok) {
+                // Remove message from state
+                setMessages((prev) => prev.filter((m) => m.datetime !== msg.datetime))
+              }
+            } catch (err) {
+              console.error('Failed to delete message:', err)
+            }
+          }
+
           return (
             <div
               key={msg.id || idx}
-              className="rounded-lg p-3 bg-slate-800/50 border border-slate-700/50 space-y-2 cursor-pointer hover:bg-slate-700/50 transition"
+              className="rounded-lg p-3 bg-slate-800/50 border border-slate-700/50 space-y-2 cursor-pointer hover:bg-slate-700/50 transition group"
               onClick={handleMessageClick}
             >
-              {/* Header: Icon + Portfolio + Signal + Time */}
+              {/* Header: Icon + Portfolio + Signal + Time + Delete */}
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-slate-300">
@@ -295,7 +315,16 @@ export function ConversationWidget({
                     {signal && <span className="text-red-400 ml-1">{signal}</span>}
                   </span>
                 </div>
-                <span className="text-xs text-slate-500">{formatMessageDate(msg.datetime)}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500">{formatMessageDate(msg.datetime)}</span>
+                  <button
+                    onClick={handleDeleteMessage}
+                    className="text-slate-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition text-sm font-bold"
+                    title="Delete message"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
 
               {/* Tickers (compact inline) */}
