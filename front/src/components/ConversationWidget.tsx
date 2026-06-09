@@ -57,6 +57,7 @@ interface ConversationWidgetProps {
   maxHeight?: string
   onSendMessage?: (message: string) => Promise<void>
   onPortfolioClick?: (portfolioName: string, tickers: string[], widget?: MessageWidget) => void
+  onNewMessage?: (message: ConversationMessage) => void
 }
 
 // Dynamic widget loader
@@ -123,7 +124,8 @@ export function ConversationWidget({
   onRefresh,
   maxHeight = 'h-96',
   onSendMessage,
-  onPortfolioClick
+  onPortfolioClick,
+  onNewMessage
 }: ConversationWidgetProps) {
   const [messages, setMessages] = useState<ConversationMessage[]>([])
   const [loading, setLoading] = useState(true)
@@ -168,6 +170,10 @@ export function ConversationWidget({
         setLoading(false)
       } else if (message.type === 'message') {
         setMessages((prev) => [...prev, message.data])
+        // Notify parent component of new message
+        if (onNewMessage) {
+          onNewMessage(message.data)
+        }
       }
     }
 

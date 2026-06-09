@@ -342,6 +342,42 @@ export default function Dashboard() {
             title="Global Chat"
             subtitle="All portfolios & alerts"
             maxHeight="h-full"
+            onNewMessage={(msg) => {
+              // Update recent alerts when new message arrives
+              if (msg.source === 'alert') {
+                // Parse alert content
+                const lines = msg.content?.split('\n') || []
+                const alertInfo: AlertInfo = {
+                  title: '',
+                  portfolio: msg.portfolio,
+                  tickers: [],
+                  content: msg.content || '',
+                }
+
+                for (const line of lines) {
+                  if (line.startsWith('**Portfolio:**') && !alertInfo.portfolio) {
+                    alertInfo.portfolio = line.replace('**Portfolio:**', '').trim()
+                  }
+                  if ((line.includes('🚨') || line.includes('⚠️')) && line.includes('**')) {
+                    const match = line.match(/\*\*([^*]+)\*\*/)
+                    if (match) {
+                      alertInfo.title = match[1]
+                    }
+                  }
+                  if (line.trim().startsWith('•')) {
+                    const match = line.match(/•\s+([A-Z0-9.-]+):/)
+                    if (match) {
+                      alertInfo.tickers.push(match[1])
+                    }
+                  }
+                }
+
+                if (alertInfo.tickers.length > 0) {
+                  const alertId = `${Date.now()}-${msg.datetime}`
+                  setAlertHistory((prev) => [{ id: alertId, info: alertInfo }, ...prev].slice(0, 10))
+                }
+              }
+            }}
             onPortfolioClick={(portfolio, tickers, widget) => {
               // Create alert info object and display holdings filtered by tickers
               const alertInfo: AlertInfo = {
