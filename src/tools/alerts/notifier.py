@@ -113,8 +113,6 @@ class AlertNotifier:
                             )
                     except Exception as e:
                         self.logger.error(f"Error sending alert to global for {portfolio_name}: {e}")
-                except Exception as e:
-                    self.logger.error(f"Error sending alert to global chat: {e}")
 
         except Exception as e:
             self.logger.error(f"Error in conversation alert notification: {e}")
