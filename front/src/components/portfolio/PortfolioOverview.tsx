@@ -139,8 +139,8 @@ export default function PortfolioOverview({ name }: PortfolioOverviewProps) {
         </div>
 
         {/* Chart */}
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="h-64 w-full">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0}>
             <LineChart data={performanceData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
               <defs>
                 <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
@@ -176,9 +176,9 @@ export default function PortfolioOverview({ name }: PortfolioOverviewProps) {
         {/* Allocation */}
         <div className="bg-slate-900 rounded-lg p-6 border border-slate-800">
           <h3 className="text-white font-bold text-lg mb-6">Allocation</h3>
-          <div className="flex items-center justify-center">
-            <div className="w-48 h-48">
-              <ResponsiveContainer width="100%" height="100%">
+          <div className="flex items-center justify-center w-full">
+            <div className="w-48 h-48 flex-shrink-0">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <PieChart>
                   <Pie
                     data={allocationData}
