@@ -53,9 +53,13 @@ export default function Alerts() {
   const [chartTicker, setChartTicker] = useState<string>('')
   const [chartTimeframe, setChartTimeframe] = useState('1D')
 
-  // Fetch alerts on mount and periodically (skip while alert is running)
+  // Fetch alerts on mount
   useEffect(() => {
     fetchAlerts()
+  }, [])
+
+  // Auto-refresh alerts periodically (skip while alert is running)
+  useEffect(() => {
     if (runningAlert) return // Skip auto-refresh while running
     const interval = setInterval(fetchAlerts, 5000) // Refresh every 5 seconds
     return () => clearInterval(interval)
