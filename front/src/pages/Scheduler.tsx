@@ -146,16 +146,17 @@ export default function Scheduler() {
     try {
       setError(null)
       // Fire-and-forget: start the job and return immediately
-      api.runCronJob(name).catch((err) => {
+      api.runCronJob(name).then(() => {
+        const msg = `Job '${name}' started (running in background)`
+        alert(msg)
+      }).catch((err) => {
+        const errorMsg = err?.response?.data?.detail || err?.message || 'Unknown error'
         console.error(`Job '${name}' execution error:`, err)
-        setError(`Job '${name}' failed to start`)
+        setError(`Job '${name}' failed: ${errorMsg}`)
       })
-      // Show success message immediately (before job completes)
-      const msg = `Job '${name}' started (running in background)`
-      alert(msg)
     } catch (err) {
+      console.error('Error starting job:', err)
       setError('Failed to start job')
-      console.error(err)
     }
   }
 
