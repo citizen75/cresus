@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../services/api'
+import TradingChart from '@/components/TradingChart'
 
 interface Alert {
   name: string
@@ -45,6 +46,11 @@ export default function Alerts() {
     notify: 'conversation',
     description: '',
   })
+
+  // Chart view state
+  const [showChartModal, setShowChartModal] = useState(false)
+  const [chartTicker, setChartTicker] = useState<string>('')
+  const [chartTimeframe, setChartTimeframe] = useState('1D')
 
   // Fetch alerts on mount and periodically
   useEffect(() => {
@@ -196,6 +202,11 @@ export default function Alerts() {
     setShowCreateModal(true)
   }
 
+  const openChart = (ticker: string) => {
+    setChartTicker(ticker)
+    setShowChartModal(true)
+  }
+
   const closeModals = () => {
     setShowCreateModal(false)
     setEditingAlert(null)
@@ -311,16 +322,27 @@ export default function Alerts() {
               </div>
             ) : (
               <div className="space-y-1.5">
-                {alerts.map((alert) => (
+                {alerts.map((alert) => {
+                  const tickerFromSource = alert.source === 'ticker' ? alert.source_value : null
+
+                  return (
                   <div
                     key={alert.name}
-                    className="bg-slate-900/30 border border-slate-800 rounded p-2.5 hover:border-slate-700 hover:bg-slate-900/50 transition"
+                    className="bg-slate-900/30 border border-slate-800 rounded p-2.5 hover:border-slate-700 hover:bg-slate-900/50 transition cursor-pointer group"
+                    onClick={() => {
+                      if (tickerFromSource) {
+                        openChart(tickerFromSource)
+                      }
+                    }}
                   >
                     <div className="flex items-center justify-between gap-3">
                       {/* Alert Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="text-sm font-bold text-white">{alert.name}</h3>
+                          <h3 className={`text-sm font-bold ${tickerFromSource ? 'text-purple-400 group-hover:text-purple-300 cursor-pointer' : 'text-white'}`}>
+                            {alert.name}
+                            {tickerFromSource && <span className="text-xs text-slate-500 ml-1">(view chart)</span>}
+                          </h3>
                           <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${
                             alert.enabled
                               ? 'bg-green-900/30 border border-green-800 text-green-400'
@@ -379,7 +401,8 @@ export default function Alerts() {
                       </div>
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
@@ -673,6 +696,46 @@ export default function Alerts() {
               >
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Chart Modal */}
+      {showChartModal && chartTicker && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-lg max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="sticky top-0 bg-slate-900 border-b border-slate-800 px-6 py-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-white">{chartTicker}</h2>
+                <p className="text-sm text-slate-400">Chart View</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <select
+                  value={chartTimeframe}
+                  onChange={(e) => setChartTimeframe(e.target.value)}
+                  className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-600"
+                >
+                  <option>1M</option>
+                  <option>5M</option>
+                  <option>15M</option>
+                  <option>1H</option>
+                  <option selected>1D</option>
+                  <option>1W</option>
+                </select>
+                <button
+                  onClick={() => setShowChartModal(false)}
+                  className="text-slate-400 hover:text-white transition text-2xl"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-auto bg-slate-900/50">
+              <div className="w-full h-full">
+                <TradingChart ticker={chartTicker} interval={chartTimeframe} />
+              </div>
             </div>
           </div>
         </div>
