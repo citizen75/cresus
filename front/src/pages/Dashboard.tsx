@@ -388,8 +388,8 @@ export default function Dashboard() {
             <PortfolioHoldingsWidget portfolioName={selectedPortfolioForHoldings} />
           </div>
         ) : (
-        <div className="flex-1 flex flex-col bg-slate-900 rounded-lg border border-slate-800 overflow-auto">
-        {/* Recent Alerts & Charts */}
+          <>
+            {/* Recent Alerts & Charts */}
         {alertGridView && (alertHistory.length > 0 || chartHistory.length > 0) && (
           <div className="border-b border-slate-800 bg-slate-950 px-4 py-3 flex-shrink-0">
             <div className="text-xs font-semibold text-slate-400 mb-2">Recent</div>
@@ -703,8 +703,10 @@ export default function Dashboard() {
               </div>
             </div>
           )}
-        </div>
+          </>
         )}
+      </div>
+      )}
       </div>
       )}
 
