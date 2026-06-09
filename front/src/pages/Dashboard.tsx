@@ -698,8 +698,6 @@ export default function Dashboard() {
         )}
       </div>
       )}
-      </div>
-      )}
 
       {/* Chart Modal */}
       {chartModalTicker && (
