@@ -65,33 +65,32 @@ export default function Scheduler() {
     })
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async (submitData: FormState) => {
     try {
       // Parse params
       let params = {}
-      if (formData.params.trim()) {
-        params = JSON.parse(formData.params)
+      if (submitData.params.trim()) {
+        params = JSON.parse(submitData.params)
       }
 
       if (editingJob) {
         await api.updateCronJob(editingJob, {
-          schedule: formData.schedule,
-          target: formData.target,
-          type: formData.type,
-          description: formData.description,
+          schedule: submitData.schedule,
+          target: submitData.target,
+          job_type: submitData.type,
+          description: submitData.description,
           params,
-          enabled: formData.enabled,
+          enabled: submitData.enabled,
         })
       } else {
         await api.createCronJob({
-          name: formData.name,
-          schedule: formData.schedule,
-          target: formData.target,
-          job_type: formData.type,
-          description: formData.description,
+          name: submitData.name,
+          schedule: submitData.schedule,
+          target: submitData.target,
+          job_type: submitData.type,
+          description: submitData.description,
           params,
-          enabled: formData.enabled,
+          enabled: submitData.enabled,
         })
       }
 
@@ -99,8 +98,7 @@ export default function Scheduler() {
       resetForm()
       await loadJobs()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save job')
-      console.error(err)
+      throw err
     }
   }
 
