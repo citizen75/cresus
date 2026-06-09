@@ -18,6 +18,35 @@ interface ConversationMessage {
   widget?: MessageWidget
 }
 
+// Parse alert content to extract portfolio, signal, and tickers
+function parseAlertContent(content: string): { portfolio?: string; signal?: string; tickers: string[] } {
+  const result = { portfolio: undefined, signal: undefined, tickers: [] }
+  const lines = content.split('\n')
+
+  for (const line of lines) {
+    // Extract portfolio: **Portfolio:** xxx
+    if (line.startsWith('**Portfolio:**')) {
+      result.portfolio = line.replace('**Portfolio:**', '').trim()
+    }
+    // Extract signal from line with emoji: ⚠️ **sha_red**
+    if ((line.includes('🚨') || line.includes('⚠️')) && line.includes('**')) {
+      const match = line.match(/\*\*([^*]+)\*\*/)
+      if (match) {
+        result.signal = match[1]
+      }
+    }
+    // Extract tickers from bullet points: • AAPL: xxx
+    if (line.trim().startsWith('•')) {
+      const match = line.match(/•\s+([A-Z0-9.-]+):/)
+      if (match) {
+        result.tickers.push(match[1])
+      }
+    }
+  }
+
+  return result
+}
+
 interface ConversationWidgetProps {
   portfolioName: string
   sourceFilter?: string
@@ -241,54 +270,58 @@ export function ConversationWidget({
           <p className="text-xs text-slate-500 text-center py-8">No messages yet</p>
         )}
 
-        {messages.map((msg, idx) => (
-          <div key={msg.id || idx} className="rounded-lg p-3 bg-slate-800/50 border border-slate-700/50 space-y-2">
-            {/* Header: Icon + Portfolio + Signal */}
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm font-semibold text-slate-300">
-                  {msg.portfolio && (
-                    <>
-                      {msg.signal ? '⚠' : '💬'} {msg.portfolio}
-                      {msg.signal && <span className="text-red-400 ml-1">{msg.signal}</span>}
-                    </>
-                  )}
-                </span>
-              </div>
-              <span className="text-xs text-slate-500">{formatMessageDate(msg.datetime)}</span>
-            </div>
+        {messages.map((msg, idx) => {
+          // Parse alert content to extract structured data
+          const parsedAlert = msg.source === 'alert' ? parseAlertContent(msg.content) : null
+          const portfolio = msg.portfolio || parsedAlert?.portfolio
+          const signal = msg.signal || parsedAlert?.signal
+          const tickers = msg.tickers || parsedAlert?.tickers || []
 
-            {/* Tickers (compact inline) */}
-            {msg.tickers && msg.tickers.length > 0 && (
-              <div className="flex gap-1 flex-wrap">
-                {msg.tickers.map((ticker) => (
-                  <span
-                    key={ticker}
-                    className="px-2 py-0.5 bg-purple-600/80 text-white text-xs rounded font-semibold"
-                  >
-                    ◀ {ticker}
+          return (
+            <div key={msg.id || idx} className="rounded-lg p-3 bg-slate-800/50 border border-slate-700/50 space-y-2">
+              {/* Header: Icon + Portfolio + Signal + Time */}
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-slate-300">
+                    {signal ? '⚠️' : msg.source === 'alert' ? '🔔' : '💬'} {portfolio || 'Global'}
+                    {signal && <span className="text-red-400 ml-1">{signal}</span>}
                   </span>
-                ))}
+                </div>
+                <span className="text-xs text-slate-500">{formatMessageDate(msg.datetime)}</span>
               </div>
-            )}
 
-            {/* Content Preview (truncated) */}
-            <div className="text-xs text-slate-300">
-              {msg.source === 'alert' ? (
-                <AlertMessageRenderer content={msg.content} />
-              ) : (
-                <div className="line-clamp-2">{msg.content}</div>
+              {/* Tickers (compact inline) */}
+              {tickers.length > 0 && (
+                <div className="flex gap-1 flex-wrap">
+                  {tickers.map((ticker) => (
+                    <span
+                      key={ticker}
+                      className="px-2 py-0.5 bg-purple-600/80 text-white text-xs rounded font-semibold"
+                    >
+                      ◀ {ticker}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Content Preview (truncated) */}
+              <div className="text-xs text-slate-300">
+                {msg.source === 'alert' ? (
+                  <AlertMessageRenderer content={msg.content} />
+                ) : (
+                  <div className="line-clamp-2">{msg.content}</div>
+                )}
+              </div>
+
+              {/* Embedded Widget */}
+              {msg.widget && (
+                <Suspense fallback={<div className="text-xs text-slate-400">Loading widget...</div>}>
+                  <WidgetRenderer widget={msg.widget} />
+                </Suspense>
               )}
             </div>
-
-            {/* Embedded Widget */}
-            {msg.widget && (
-              <Suspense fallback={<div className="text-xs text-slate-400">Loading widget...</div>}>
-                <WidgetRenderer widget={msg.widget} />
-              </Suspense>
-            )}
-          </div>
-        ))}
+          )
+        })}
 
         <div ref={messagesEndRef} />
       </div>
