@@ -441,6 +441,7 @@ async def delete_message(
             manager.add_message(
                 source=msg.source,
                 content=msg.content,
+                portfolio=msg.portfolio,
                 timestamp=msg.timestamp,
             )
 
