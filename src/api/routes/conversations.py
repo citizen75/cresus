@@ -23,6 +23,7 @@ class MessageResponse(BaseModel):
     source: str
     content: str
     datetime: str
+    portfolio: Optional[str] = None
 
 
 class ConversationHistoryResponse(BaseModel):
