@@ -76,6 +76,7 @@ export default function Dashboard() {
 
             if (alertInfo.tickers.length > 0) {
               const alertId = `${i}-${msg.datetime}`
+              console.log(`[Dashboard] Parsed alert: portfolio="${alertInfo.portfolio}", tickers=${alertInfo.tickers.length}`)
               setAlertGridView(alertInfo)
               setSelectedAlertId(alertId)
               setAlertHistory([{ id: alertId, info: alertInfo }])
@@ -157,12 +158,14 @@ export default function Dashboard() {
 
   // Load portfolio positions and their fundamental data when alert has a portfolio
   useEffect(() => {
+    console.log(`[Dashboard] Portfolio effect: alertGridView?.portfolio="${alertGridView?.portfolio}"`)
     if (!alertGridView?.portfolio) {
       setPortfolioPositions([])
       return
     }
 
     const loadPositionsAndFundamental = async () => {
+      console.log(`[Dashboard] Loading positions for portfolio: ${alertGridView.portfolio}`)
       try {
         const response = await api.listPortfolios()
         const portfolio = response.portfolios?.find(
