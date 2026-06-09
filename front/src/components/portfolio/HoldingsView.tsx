@@ -33,8 +33,10 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
   const [chartPosition, setChartPosition] = useState<any>(null)
   const [fundamentalData, setFundamentalData] = useState<Record<string, any>>({})
   const [hoverData, setHoverData] = useState<any>(null)
+  const [enrichedPositions, setEnrichedPositions] = useState<any[]>([])
 
-  const positions = priceData?.positions || []
+  const rawPositions = priceData?.positions || []
+  const positions = enrichedPositions.length > 0 ? enrichedPositions : rawPositions
   const totalValue = priceData?.total_value || 0
   const cash = priceData?.cash || 0
   const totalPortfolioValue = priceData?.total_portfolio_value || totalValue
@@ -80,7 +82,7 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
     const loadHistoricalData = async () => {
       const data: Record<string, any[]> = {}
       const days = 1825 // Always fetch full history (~5 years), filter on demand
-      for (const pos of positions) {
+      for (const pos of rawPositions) {
         try {
           const result = await api.getHistoricalData(pos.ticker, days)
 
@@ -115,16 +117,16 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
       setHistoricalData(data)
     }
 
-    if (positions.length > 0) {
+    if (rawPositions.length > 0) {
       loadHistoricalData()
     }
-  }, [positions])
+  }, [rawPositions])
 
-  // Fetch fundamental data for daily changes
+  // Fetch fundamental data and enrich positions with daily changes
   useEffect(() => {
     const fetchFundamentals = async () => {
       const data: Record<string, any> = {}
-      for (const pos of positions) {
+      for (const pos of rawPositions) {
         try {
           const result = await api.getFundamental(pos.ticker)
           data[pos.ticker] = result?.data?.quotation || {}
@@ -134,12 +136,32 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
         }
       }
       setFundamentalData(data)
+
+      // Enrich positions with daily changes (not unrealized P&L)
+      const enriched = rawPositions.map((pos: any) => {
+        const fund = data[pos.ticker] || {}
+        const currentPrice = pos.current_price || 0
+        const previousClose = fund.previous_close || currentPrice
+
+        // Daily change per share
+        const dailyChange = currentPrice - previousClose
+        const dailyChangePct = previousClose && previousClose !== 0 ? ((currentPrice - previousClose) / previousClose) * 100 : 0
+
+        return {
+          ...pos,
+          position_gain: dailyChange,
+          position_gain_pct: dailyChangePct,
+          asset_type: fund.asset_type || 'Stock',
+          sector: fund.sector || 'Unknown',
+        }
+      })
+      setEnrichedPositions(enriched)
     }
 
-    if (positions.length > 0) {
+    if (rawPositions.length > 0) {
       fetchFundamentals()
     }
-  }, [positions])
+  }, [rawPositions])
 
   // Handle ESC key to close chart modal
   useEffect(() => {
