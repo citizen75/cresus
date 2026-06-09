@@ -250,10 +250,6 @@ export function PortfolioHoldingsTable({
                 const dailyChange = (pos.current_price || 0) - (previousClose || 0)
                 const dailyChangePct = (previousClose || 0) > 0 ? (dailyChange / previousClose) * 100 : 0
 
-                if (!fundamental?.previous_close && Object.keys(fundamentalData).length > 0) {
-                  console.warn(`[PortfolioHoldingsTable] ${pos.ticker}: missing previous_close. fundamental=`, fundamental, 'fundamentalData=', fundamentalData)
-                }
-
                 return (
                   <tr
                     key={pos.ticker}
