@@ -186,30 +186,8 @@ class GatewayServer:
 		logger.info("MCP server managed by Hermes (runs as subprocess, not in-gateway)")
 
 	def _warm_caches(self) -> None:
-		"""Pre-warm critical caches before API starts."""
-		try:
-			logger.info("Warming up caches...")
-			import sys
-			sys.path.insert(0, str(Path(__file__).parent.parent))
-
-			from tools.portfolio.manager import PortfolioManager
-			import json
-			from pathlib import Path as PathlibPath
-
-			# Pre-warm portfolio history cache
-			pm = PortfolioManager()
-			portfolios = pm.list_portfolios()
-			for portfolio_name in portfolios[:3]:  # Warm up first 3 portfolios
-				logger.info(f"Warming cache for portfolio: {portfolio_name}")
-				try:
-					# Calculate history which will cache it
-					pm.calculate_portfolio_history(portfolio_name, recalculate=False, use_cache_only=True)
-				except Exception as e:
-					logger.warning(f"Cache warm-up for {portfolio_name} failed: {e}")
-
-			logger.info("Cache warm-up complete")
-		except Exception as e:
-			logger.warning(f"Cache warm-up failed: {e}")
+		"""Pre-warm critical caches before API starts (disabled - too slow)."""
+		logger.info("Cache warm-up skipped (runs async after startup)")
 
 	def start(self) -> None:
 		"""Start the gateway server."""
