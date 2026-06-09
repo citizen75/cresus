@@ -159,7 +159,13 @@ export function ConversationWidget({
         {messages.map((msg, idx) => (
           <div key={idx} className="bg-slate-800/50 border border-slate-700 rounded p-3 text-xs">
             <div className="mb-2">
-              <AlertMessageRenderer content={msg.content} />
+              {msg.source === 'alert' ? (
+                <AlertMessageRenderer content={msg.content} />
+              ) : (
+                <div className="text-slate-300 whitespace-pre-wrap break-words">
+                  {msg.content}
+                </div>
+              )}
             </div>
             <p className="text-slate-500">{formatMessageDate(msg.datetime)}</p>
           </div>
