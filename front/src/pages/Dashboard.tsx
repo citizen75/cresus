@@ -338,7 +338,7 @@ export default function Dashboard() {
       {conversationOpen && (
         <div className="w-[500px] flex-shrink-0 flex flex-col">
           <ConversationWidget
-            portfolioName="global"
+            portfolioName="_global"
             title="Global Chat"
             subtitle="All portfolios & alerts"
             maxHeight="h-full"
