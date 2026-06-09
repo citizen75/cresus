@@ -355,7 +355,8 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
             horzLines: { visible: false },
           },
           watermark: {
-            visible: false,
+            color: 'rgba(0, 0, 0, 0)',
+            text: '',
           },
         })
 
