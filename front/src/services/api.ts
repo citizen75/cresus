@@ -421,6 +421,17 @@ class CresusAPI {
   async runAlert(name: string) {
     return (await this.longTimeoutClient.post(`/alerts/${name}/run`)).data
   }
+
+  async getConversationHistory(
+    portfolioName: string,
+    limit?: number,
+    source?: string
+  ) {
+    const params: any = {}
+    if (limit) params.limit = limit
+    if (source) params.source = source
+    return (await this.client.get(`/conversations/${portfolioName}`, { params })).data
+  }
 }
 
 export const api = new CresusAPI()

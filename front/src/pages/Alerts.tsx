@@ -15,6 +15,12 @@ interface Alert {
   tags?: string[]
 }
 
+interface ConversationMessage {
+  source: string
+  content: string
+  datetime: string
+}
+
 export default function Alerts() {
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [loading, setLoading] = useState(true)
@@ -25,6 +31,12 @@ export default function Alerts() {
   const [runResults, setRunResults] = useState<any>(null)
   const [showRunResults, setShowRunResults] = useState(false)
 
+  // Conversation widget state
+  const [alertMessages, setAlertMessages] = useState<ConversationMessage[]>([])
+  const [loadingConversation, setLoadingConversation] = useState(false)
+  const [selectedPortfolio, setSelectedPortfolio] = useState<string>('')
+  const [portfolios, setPortfolios] = useState<string[]>([])
+
   const [formData, setFormData] = useState({
     name: '',
     source: 'ticker',
@@ -34,9 +46,38 @@ export default function Alerts() {
     description: '',
   })
 
-  // Fetch alerts
+  // Fetch alerts on mount and periodically
   useEffect(() => {
     fetchAlerts()
+    const interval = setInterval(fetchAlerts, 5000) // Refresh every 5 seconds
+    return () => clearInterval(interval)
+  }, [])
+
+  // Fetch conversation when portfolio is selected
+  useEffect(() => {
+    if (selectedPortfolio) {
+      fetchAlertMessages()
+      const interval = setInterval(fetchAlertMessages, 3000) // Refresh every 3 seconds
+      return () => clearInterval(interval)
+    }
+  }, [selectedPortfolio])
+
+  // Fetch portfolios on mount
+  useEffect(() => {
+    const fetchPortfolios = async () => {
+      try {
+        const response = await api.listPortfolios()
+        const portfolioList = response.portfolios || []
+        const realPortfolios = portfolioList.filter((p: any) => p.type === 'real')
+        setPortfolios(realPortfolios.map((p: any) => p.name))
+        if (realPortfolios.length > 0) {
+          setSelectedPortfolio(realPortfolios[0].name)
+        }
+      } catch (err) {
+        console.error('Error fetching portfolios:', err)
+      }
+    }
+    fetchPortfolios()
   }, [])
 
   const fetchAlerts = async () => {
@@ -52,6 +93,20 @@ export default function Alerts() {
       setError(errorMsg)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchAlertMessages = async () => {
+    if (!selectedPortfolio) return
+    try {
+      setLoadingConversation(true)
+      const response = await api.getConversationHistory(selectedPortfolio, 50, 'alert')
+      const messages = response.history || []
+      setAlertMessages(messages.reverse()) // Reverse to show newest at bottom
+    } catch (err) {
+      console.error('Error fetching conversation:', err)
+    } finally {
+      setLoadingConversation(false)
     }
   }
 
@@ -117,7 +172,10 @@ export default function Alerts() {
       const response = await api.runAlert(name)
       setRunResults(response)
       setShowRunResults(true)
-      await fetchAlerts() // Refresh to get updated last_run timestamp
+      await fetchAlerts()
+      if (selectedPortfolio) {
+        await fetchAlertMessages()
+      }
     } catch (err) {
       setError(`Failed to run alert: ${err instanceof Error ? err.message : 'Unknown error'}`)
     } finally {
@@ -176,13 +234,28 @@ export default function Alerts() {
     })
   }
 
+  const formatMessageDate = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diff = now.getTime() - date.getTime()
+    const minutes = Math.floor(diff / 60000)
+    const hours = Math.floor(diff / 3600000)
+    const days = Math.floor(diff / 86400000)
+
+    if (minutes < 1) return 'Just now'
+    if (minutes < 60) return `${minutes}m ago`
+    if (hours < 24) return `${hours}h ago`
+    if (days < 7) return `${days}d ago`
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="h-full flex flex-col gap-4">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between px-4 py-3 border-b border-slate-800">
         <div>
-          <h1 className="text-4xl font-bold text-white mb-2">Alerts</h1>
-          <p className="text-slate-400">Create and manage screener formula alerts</p>
+          <h1 className="text-3xl font-bold text-white mb-1">Alerts</h1>
+          <p className="text-slate-400 text-sm">Create and manage screener formula alerts</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -205,114 +278,166 @@ export default function Alerts() {
         </div>
       </div>
 
-      {/* Error Message */}
-      {error && (
-        <div className="bg-red-900/50 border border-red-700 rounded-lg p-4 text-red-300 flex items-start justify-between gap-4">
-          <div>
-            <p className="font-bold mb-1">Error</p>
-            <p className="text-sm">{error}</p>
-          </div>
-          <button
-            onClick={() => setError(null)}
-            className="text-red-300 hover:text-red-100 flex-shrink-0"
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
-      {/* Alerts List */}
-      {loading ? (
-        <div className="bg-slate-900/50 rounded-lg p-12 border border-slate-800 text-center">
-          <p className="text-slate-400">Loading alerts...</p>
-        </div>
-      ) : alerts.length === 0 ? (
-        <div className="bg-slate-900/50 rounded-lg p-12 border border-slate-800 text-center">
-          <p className="text-slate-400 text-lg mb-2">No alerts configured</p>
-          <p className="text-slate-500 text-sm mb-4">Create your first alert to monitor screener formulas</p>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition"
-          >
-            Create Alert
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-1.5">
-          {alerts.map((alert) => (
-            <div
-              key={alert.name}
-              className="bg-slate-900/30 border border-slate-800 rounded p-2.5 hover:border-slate-700 hover:bg-slate-900/50 transition"
-            >
-              <div className="flex items-center justify-between gap-3">
-                {/* Alert Info - Compact */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-sm font-bold text-white">{alert.name}</h3>
-                    <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${
-                      alert.enabled
-                        ? 'bg-green-900/30 border border-green-800 text-green-400'
-                        : 'bg-slate-800 text-slate-400'
-                    }`}>
-                      {alert.enabled ? '✓' : '○'}
-                    </span>
-                    <span className="text-xs text-slate-500">
-                      {alert.source}
-                      {alert.source_value && ` (${alert.source_value})`}
-                    </span>
-                    <span className="text-xs text-slate-400">•</span>
-                    <code className="text-xs text-slate-400 overflow-hidden text-ellipsis max-w-xs">
-                      {alert.formula.substring(0, 50)}{alert.formula.length > 50 ? '...' : ''}
-                    </code>
-                  </div>
-                  <div className="text-xs text-slate-500 mt-1 flex gap-3">
-                    <span>{alert.notify}</span>
-                    <span>Last: {formatDate(alert.last_run)}</span>
-                    {alert.description && <span className="text-slate-600 italic truncate">{alert.description}</span>}
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <button
-                    onClick={() => handleRunAlert(alert.name)}
-                    disabled={runningAlert === alert.name}
-                    className="px-2 py-1 text-xs bg-blue-900/30 hover:bg-blue-900/50 border border-blue-800 text-blue-400 rounded transition disabled:opacity-50"
-                    title="Run alert"
-                  >
-                    {runningAlert === alert.name ? '⟳' : '▶'}
-                  </button>
-                  <button
-                    onClick={() => handleToggleEnabled(alert)}
-                    className={`px-2 py-1 text-xs rounded transition border ${
-                      alert.enabled
-                        ? 'bg-green-900/30 hover:bg-green-900/50 border-green-800 text-green-400'
-                        : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-400'
-                    }`}
-                    title={alert.enabled ? 'Disable' : 'Enable'}
-                  >
-                    {alert.enabled ? '✓' : '○'}
-                  </button>
-                  <button
-                    onClick={() => openEditModal(alert)}
-                    className="px-2 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition"
-                    title="Edit"
-                  >
-                    ✎
-                  </button>
-                  <button
-                    onClick={() => handleDeleteAlert(alert.name)}
-                    className="px-2 py-1 text-xs bg-slate-800 hover:bg-red-900/20 text-slate-300 hover:text-red-400 rounded transition"
-                    title="Delete"
-                  >
-                    ✕
-                  </button>
-                </div>
+      {/* Split Layout */}
+      <div className="flex-1 flex gap-4 px-4 min-h-0 overflow-hidden">
+        {/* Left: Alerts Management */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-900/50 border border-red-700 rounded-lg p-4 text-red-300 flex items-start justify-between gap-4 mb-4">
+              <div>
+                <p className="font-bold mb-1">Error</p>
+                <p className="text-sm">{error}</p>
               </div>
+              <button
+                onClick={() => setError(null)}
+                className="text-red-300 hover:text-red-100 flex-shrink-0"
+              >
+                ✕
+              </button>
             </div>
-          ))}
+          )}
+
+          {/* Alerts List */}
+          <div className="flex-1 overflow-y-auto">
+            {loading ? (
+              <div className="bg-slate-900/50 rounded-lg p-12 border border-slate-800 text-center">
+                <p className="text-slate-400">Loading alerts...</p>
+              </div>
+            ) : alerts.length === 0 ? (
+              <div className="bg-slate-900/50 rounded-lg p-8 border border-slate-800 text-center">
+                <p className="text-slate-400 text-lg mb-2">No alerts configured</p>
+                <p className="text-slate-500 text-sm">Create your first alert to monitor screener formulas</p>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {alerts.map((alert) => (
+                  <div
+                    key={alert.name}
+                    className="bg-slate-900/30 border border-slate-800 rounded p-2.5 hover:border-slate-700 hover:bg-slate-900/50 transition"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      {/* Alert Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-sm font-bold text-white">{alert.name}</h3>
+                          <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${
+                            alert.enabled
+                              ? 'bg-green-900/30 border border-green-800 text-green-400'
+                              : 'bg-slate-800 text-slate-400'
+                          }`}>
+                            {alert.enabled ? '✓' : '○'}
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            {alert.source}
+                            {alert.source_value && ` (${alert.source_value})`}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-500 mt-1 flex gap-3 overflow-hidden">
+                          <code className="text-slate-400 overflow-hidden text-ellipsis">
+                            {alert.formula.substring(0, 40)}{alert.formula.length > 40 ? '...' : ''}
+                          </code>
+                          <span>Last: {formatDate(alert.last_run)}</span>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <button
+                          onClick={() => handleRunAlert(alert.name)}
+                          disabled={runningAlert === alert.name}
+                          className="px-2 py-1 text-xs bg-blue-900/30 hover:bg-blue-900/50 border border-blue-800 text-blue-400 rounded transition disabled:opacity-50"
+                          title="Run alert"
+                        >
+                          {runningAlert === alert.name ? '⟳' : '▶'}
+                        </button>
+                        <button
+                          onClick={() => handleToggleEnabled(alert)}
+                          className={`px-2 py-1 text-xs rounded transition border ${
+                            alert.enabled
+                              ? 'bg-green-900/30 hover:bg-green-900/50 border-green-800 text-green-400'
+                              : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-400'
+                          }`}
+                          title={alert.enabled ? 'Disable' : 'Enable'}
+                        >
+                          {alert.enabled ? '✓' : '○'}
+                        </button>
+                        <button
+                          onClick={() => openEditModal(alert)}
+                          className="px-2 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition"
+                          title="Edit"
+                        >
+                          ✎
+                        </button>
+                        <button
+                          onClick={() => handleDeleteAlert(alert.name)}
+                          className="px-2 py-1 text-xs bg-slate-800 hover:bg-red-900/20 text-slate-300 hover:text-red-400 rounded transition"
+                          title="Delete"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      )}
+
+        {/* Right: Conversation Alerts Widget */}
+        <div className="w-96 flex flex-col bg-slate-900/30 border border-slate-800 rounded-lg overflow-hidden">
+          {/* Header */}
+          <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-bold text-white">Alert Activity</h2>
+              <p className="text-xs text-slate-400">Latest alerts from</p>
+            </div>
+            <button
+              onClick={fetchAlertMessages}
+              disabled={loadingConversation}
+              className="px-2 py-1 text-xs bg-slate-800 hover:bg-slate-700 rounded transition disabled:opacity-50"
+            >
+              ⟳
+            </button>
+          </div>
+
+          {/* Portfolio Selector */}
+          {portfolios.length > 0 && (
+            <div className="px-4 py-2 border-b border-slate-800">
+              <select
+                value={selectedPortfolio}
+                onChange={(e) => setSelectedPortfolio(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-purple-600"
+              >
+                {portfolios.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {loadingConversation ? (
+              <p className="text-xs text-slate-500 text-center py-4">Loading alerts...</p>
+            ) : alertMessages.length === 0 ? (
+              <p className="text-xs text-slate-500 text-center py-8">No alerts yet</p>
+            ) : (
+              alertMessages.map((msg, idx) => (
+                <div key={idx} className="bg-slate-800/50 border border-slate-700 rounded p-3 text-xs">
+                  <div className="text-slate-300 whitespace-pre-wrap break-words line-clamp-6">
+                    {msg.content}
+                  </div>
+                  <p className="text-slate-500 text-xs mt-2">
+                    {formatMessageDate(msg.datetime)}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Create/Edit Modal */}
       {showCreateModal && (
@@ -334,7 +459,6 @@ export default function Alerts() {
               onSubmit={editingAlert ? handleUpdateAlert : handleCreateAlert}
               className="p-6 space-y-4"
             >
-              {/* Name */}
               {!editingAlert && (
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
@@ -351,7 +475,6 @@ export default function Alerts() {
                 </div>
               )}
 
-              {/* Source (read-only when editing, editable when creating) */}
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
                   Source *
@@ -376,7 +499,6 @@ export default function Alerts() {
                 )}
               </div>
 
-              {/* Source Value */}
               {!editingAlert && formData.source !== 'all_portfolios' && (
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
@@ -399,7 +521,6 @@ export default function Alerts() {
                 </div>
               )}
 
-              {/* Formula */}
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
                   DSL Formula *
@@ -412,12 +533,8 @@ export default function Alerts() {
                   className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-purple-600 font-mono text-sm"
                   required
                 />
-                <p className="text-xs text-slate-500 mt-1">
-                  Use DSL syntax: rsi_14[0], ema_20[-1], close[0], volume[0], etc.
-                </p>
               </div>
 
-              {/* Notify Target */}
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
                   Notify Target
@@ -435,7 +552,6 @@ export default function Alerts() {
                 </select>
               </div>
 
-              {/* Description */}
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
                   Description
@@ -449,7 +565,6 @@ export default function Alerts() {
                 />
               </div>
 
-              {/* Actions */}
               <div className="flex items-center gap-3 pt-4">
                 <button
                   type="submit"
@@ -494,7 +609,6 @@ export default function Alerts() {
                 </div>
               ) : (
                 <>
-                  {/* Summary */}
                   <div className="grid grid-cols-3 gap-3">
                     <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
                       <p className="text-slate-400 text-sm mb-1">Status</p>
@@ -512,7 +626,6 @@ export default function Alerts() {
                     </div>
                   </div>
 
-                  {/* Matches Table */}
                   {runResults.matches && runResults.matches.length > 0 && (
                     <div>
                       <p className="text-sm font-medium text-slate-300 mb-2">Top Matches (max 50)</p>
