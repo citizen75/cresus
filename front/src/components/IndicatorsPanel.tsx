@@ -256,9 +256,12 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
     }
   }, [visibleWindow, chartData])
 
-  // Sync indicator charts with main chart using continuous RAF polling
+  // Sync indicator charts with main chart
   useEffect(() => {
-    if (!chartsRef?.current?.mainChart) return
+    if (!chartsRef?.current?.mainChart) {
+      console.warn('mainChart not available for sync')
+      return
+    }
 
     const mainChart = chartsRef.current.mainChart
     let lastRange: any = null
@@ -271,37 +274,40 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
       try {
         const visibleRange = mainChart.timeScale().getVisibleRange()
 
-        // Check if range changed by comparing string representation
-        const rangeStr = visibleRange ? `${visibleRange.from}-${visibleRange.to}` : null
-        const lastRangeStr = lastRange ? `${lastRange.from}-${lastRange.to}` : null
+        // Check if range changed
+        const rangeStr = visibleRange ? JSON.stringify(visibleRange) : null
+        const lastRangeStr = lastRange ? JSON.stringify(lastRange) : null
 
-        if (rangeStr !== lastRangeStr && visibleRange) {
+        if (rangeStr && rangeStr !== lastRangeStr) {
+          console.log('Range changed:', visibleRange)
           lastRange = { ...visibleRange }
 
-          if (rsiChartRef.current && selectedIndicators.has('RSI 14')) {
+          // Sync RSI
+          if (rsiChartRef.current) {
             try {
               rsiChartRef.current.timeScale().setVisibleRange(visibleRange)
             } catch (e) {
-              // Ignore
+              console.warn('RSI sync error:', e)
             }
           }
-          if (macdChartRef.current && selectedIndicators.has('MACD')) {
+
+          // Sync MACD
+          if (macdChartRef.current) {
             try {
               macdChartRef.current.timeScale().setVisibleRange(visibleRange)
             } catch (e) {
-              // Ignore
+              console.warn('MACD sync error:', e)
             }
           }
         }
       } catch (error) {
-        // Ignore errors during sync
+        console.warn('Sync error:', error)
       }
 
-      // Continue polling
       rafId = requestAnimationFrame(syncRanges)
     }
 
-    // Start continuous polling
+    // Start polling
     rafId = requestAnimationFrame(syncRanges)
 
     return () => {
@@ -310,7 +316,7 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
         cancelAnimationFrame(rafId)
       }
     }
-  }, [chartsRef?.current?.mainChart, selectedIndicators])
+  }, [chartsRef?.current?.mainChart])
 
   if (selectedIndicators.size === 0) return null
 
