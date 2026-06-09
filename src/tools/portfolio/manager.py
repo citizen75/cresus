@@ -388,6 +388,11 @@ class PortfolioManager:
             dh = DataHistory(ticker)
             current_price = dh.get_current_price() or avg_entry_price
             company_name = self._get_company_name(ticker)
+
+            # Calculate unrealized P&L
+            position_gain = round((current_price - avg_entry_price) * quantity, 2)
+            position_gain_pct = round(((current_price - avg_entry_price) / avg_entry_price * 100) if avg_entry_price > 0 else 0, 2)
+
             positions.append({
                 "ticker": ticker,
                 "company_name": company_name,
@@ -395,6 +400,8 @@ class PortfolioManager:
                 "avg_entry_price": avg_entry_price,
                 "current_price": current_price,
                 "position_value": round(quantity * current_price, 2),
+                "position_gain": position_gain,
+                "position_gain_pct": position_gain_pct,
             })
         return {"positions": positions, "total_value": sum(p["position_value"] for p in positions)}
 
