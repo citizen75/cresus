@@ -249,6 +249,9 @@ export function PortfolioHoldingsTable({
                 const previousClose = fundamental?.previous_close || pos.current_price || 0
                 const dailyChange = (pos.current_price || 0) - (previousClose || 0)
                 const dailyChangePct = (previousClose || 0) > 0 ? (dailyChange / previousClose) * 100 : 0
+                if (!fundamental?.previous_close) {
+                  console.log(`[PortfolioHoldingsTable] ${pos.ticker}: fundamentalData=${JSON.stringify(fundamental)}, pos.current_price=${pos.current_price}, previousClose=${previousClose}`)
+                }
 
                 return (
                   <tr

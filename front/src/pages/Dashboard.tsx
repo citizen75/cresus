@@ -184,10 +184,11 @@ export default function Dashboard() {
                 // Check cache first
                 if (fundamentalCache[pos.ticker]) {
                   fundData[pos.ticker] = fundamentalCache[pos.ticker]
-                  console.log(`[Dashboard] Using cached portfolio data for ${pos.ticker}`)
+                  console.log(`[Dashboard] Using cached portfolio data for ${pos.ticker}:`, fundData[pos.ticker])
                 } else {
                   const result = await api.getFundamental(pos.ticker)
                   fundData[pos.ticker] = result?.data?.quotation || {}
+                  console.log(`[Dashboard] Fetched fundamental for ${pos.ticker}:`, fundData[pos.ticker])
                   setFundamentalCache((prev) => ({ ...prev, [pos.ticker]: fundData[pos.ticker] }))
                 }
               } catch (err) {
@@ -195,6 +196,7 @@ export default function Dashboard() {
                 fundData[pos.ticker] = {}
               }
             }
+            console.log(`[Dashboard] Setting portfolio fundamental data:`, fundData)
             setFundamentalData(fundData)
           }
         }
