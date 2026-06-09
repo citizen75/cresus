@@ -20,6 +20,7 @@ from cli.commands.portfolio import PortfolioCommands
 from cli.commands.scheduler import SchedulerCommands
 from cli.commands.info import InfoCommands
 from cli.commands.strategy import StrategyCommands
+from cli.commands.alerts import AlertCommands
 from tools.data.manager import DataManager
 
 console = Console()
@@ -47,6 +48,7 @@ class CresusCLI(cmd2.Cmd):
 		self.scheduler_commands = SchedulerCommands()
 		self.info_commands = InfoCommands()
 		self.strategy_commands = StrategyCommands(self.project_root)
+		self.alert_commands = AlertCommands()
 
 		self._setup_history()
 		self._setup_prompt()
@@ -83,6 +85,7 @@ class CresusCLI(cmd2.Cmd):
 		info_table.add_row("[bold]watchlist[/bold]", "View strategy watchlist (e.g., watchlist show momentum_cac)")
 		info_table.add_row("[bold]orders[/bold]", "View pending/executed orders (e.g., orders list momentum_cac)")
 		info_table.add_row("[bold]cron[/bold]", "View scheduled cron jobs and next run times")
+		info_table.add_row("[bold]alerts[/bold]", "Manage and run alerts (e.g., alerts create --name rsi_low --source all_portfolios --formula 'rsi_14[0]<50')")
 		info_table.add_row("[bold]status[/bold]", "Show system status")
 		info_table.add_row("[bold]update[/bold]", "Update cresus from git")
 		info_table.add_row("[bold]history[/bold]", "View command history")
@@ -1545,6 +1548,36 @@ class CresusCLI(cmd2.Cmd):
 
 		except Exception as e:
 			console.print(f"[yellow]⚠ Could not display backtest results: {e}[/yellow]")
+
+	def do_alerts(self, args):
+		"""Manage and run alerts for monitoring screener formulas.
+
+		Usage:
+			alerts                              List all alerts
+			alerts list                         List all alerts
+			alerts create --name <name> --source <source> --formula <formula> [--value <value>] [--notify <target>] [--description <desc>]
+			alerts show <name>                  Show alert details
+			alerts run <name>                   Run alert evaluation
+			alerts enable <name>                Enable alert
+			alerts disable <name>               Disable alert
+			alerts delete <name>                Delete alert
+
+		Sources:
+			ticker                Single ticker
+			tickers               Comma-separated tickers
+			universe              Universe name
+			portfolio             Portfolio name
+			all_portfolios        All open positions
+
+		Examples:
+			alerts create --name rsi_low --source all_portfolios --formula "rsi_14[0]<50"
+			alerts run rsi_low
+			alerts show rsi_low
+		"""
+		try:
+			self.alert_commands.handle(args)
+		except Exception as e:
+			console.print(f"[red]✗ Error: {e}[/red]")
 
 	def do_screener(self, args):
 		"""Manage and run screeners.
