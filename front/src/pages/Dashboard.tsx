@@ -132,42 +132,88 @@ export default function Dashboard() {
         {/* Content */}
         <div className="flex-1 overflow-hidden p-4">
           {alertGridView ? (
-            // Grid View - All Tickers
+            // Grid View - All Tickers (Same layout as HoldingsView)
             <div className="h-full overflow-y-auto">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {alertGridView.tickers.map((ticker) => (
-                  <div
-                    key={ticker}
-                    className="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden hover:border-purple-600/50 transition cursor-pointer"
-                    onClick={() => handleSelectTicker(ticker)}
-                  >
-                    {/* Card Header */}
-                    <div className="bg-slate-800/50 border-b border-slate-800 p-3">
-                      <div className="flex items-center justify-between">
-                        <p className="text-white font-bold">{ticker}</p>
-                        <span className="text-xl">📈</span>
+                {alertGridView.tickers.map((ticker) => {
+                  const tickerData = historicalData[ticker]
+                  const change = (() => {
+                    if (!tickerData || tickerData.length < 2) return 0
+                    const firstPrice = tickerData[0]?.close
+                    const lastPrice = tickerData[tickerData.length - 1]?.close
+                    return firstPrice ? ((lastPrice - firstPrice) / firstPrice) * 100 : 0
+                  })()
+
+                  return (
+                    <div
+                      key={ticker}
+                      className="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden hover:border-purple-600/50 transition cursor-pointer"
+                      onClick={() => handleSelectTicker(ticker)}
+                    >
+                      {/* Card Header */}
+                      <div className="bg-slate-800/50 border-b border-slate-800 p-4">
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <p className="text-white font-bold text-lg">{ticker}</p>
+                            <p className="text-slate-400 text-xs">Alert Ticker</p>
+                          </div>
+                          <div className="text-right">
+                            <p className={`text-2xl font-bold ${change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              {change.toFixed(1)}%
+                            </p>
+                            <p className="text-slate-400 text-xs">Change</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Chart */}
+                      {tickerData && tickerData.length > 0 ? (
+                        <CardChart
+                          data={tickerData}
+                          ticker={ticker}
+                          showVariation={false}
+                        />
+                      ) : (
+                        <div className="p-4 h-48 bg-slate-800/20 flex flex-col items-center justify-center gap-2">
+                          <p className="text-slate-500 text-sm">Loading chart...</p>
+                        </div>
+                      )}
+
+                      {/* Price Range Row */}
+                      {tickerData && tickerData.length > 0 && (() => {
+                        const firstPrice = tickerData[0]?.close
+                        const lastPrice = tickerData[tickerData.length - 1]?.close
+                        const minPrice = Math.min(...tickerData.map((d: any) => d.close))
+                        const maxPrice = Math.max(...tickerData.map((d: any) => d.close))
+                        return (
+                          <div className="border-t border-slate-800 px-4 py-3 bg-slate-800/30">
+                            <div className="flex justify-between items-center text-xs">
+                              <div className="flex flex-col items-center flex-1">
+                                <p className="text-slate-500 text-xs mb-1">Low</p>
+                                <p className="text-white font-medium">€{minPrice?.toFixed(3)}</p>
+                              </div>
+                              <div className="flex flex-col items-center flex-1">
+                                <p className="text-slate-500 text-xs mb-1">Current</p>
+                                <p className={`font-medium ${change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                  €{lastPrice?.toFixed(2)}
+                                </p>
+                              </div>
+                              <div className="flex flex-col items-center flex-1">
+                                <p className="text-slate-500 text-xs mb-1">High</p>
+                                <p className="text-white font-medium">€{maxPrice?.toFixed(3)}</p>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })()}
+
+                      {/* Card Footer */}
+                      <div className="border-t border-slate-800 p-4 text-center">
+                        <p className="text-xs text-slate-400">Click to expand chart</p>
                       </div>
                     </div>
-
-                    {/* Chart */}
-                    {historicalData[ticker] && historicalData[ticker].length > 0 ? (
-                      <CardChart
-                        data={historicalData[ticker].slice(-30)}
-                        ticker={ticker}
-                        showVariation={false}
-                      />
-                    ) : (
-                      <div className="p-4 h-48 bg-slate-800/20 flex items-center justify-center">
-                        <p className="text-slate-500 text-xs">Loading chart...</p>
-                      </div>
-                    )}
-
-                    {/* Footer */}
-                    <div className="border-t border-slate-800 px-3 py-2 bg-slate-800/30 text-center">
-                      <p className="text-xs text-slate-400">Click to expand</p>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           ) : selectedTicker ? (
