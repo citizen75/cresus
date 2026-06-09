@@ -256,43 +256,61 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
     }
   }, [visibleWindow, chartData])
 
-  // Sync indicator charts with main chart by polling for range changes
+  // Sync indicator charts with main chart using continuous RAF polling
   useEffect(() => {
     if (!chartsRef?.current?.mainChart) return
 
     const mainChart = chartsRef.current.mainChart
     let lastRange: any = null
-    let intervalId: any = null
+    let rafId: any = null
+    let isMounted = true
 
     const syncRanges = () => {
+      if (!isMounted) return
+
       try {
         const visibleRange = mainChart.timeScale().getVisibleRange()
 
-        // Check if range changed
-        if (visibleRange && (lastRange === null || lastRange.from !== visibleRange.from || lastRange.to !== visibleRange.to)) {
-          lastRange = visibleRange
+        // Check if range changed by comparing string representation
+        const rangeStr = visibleRange ? `${visibleRange.from}-${visibleRange.to}` : null
+        const lastRangeStr = lastRange ? `${lastRange.from}-${lastRange.to}` : null
 
-          if (rsiChartRef.current) {
-            rsiChartRef.current.timeScale().setVisibleRange(visibleRange)
+        if (rangeStr !== lastRangeStr && visibleRange) {
+          lastRange = { ...visibleRange }
+
+          if (rsiChartRef.current && selectedIndicators.has('RSI 14')) {
+            try {
+              rsiChartRef.current.timeScale().setVisibleRange(visibleRange)
+            } catch (e) {
+              // Ignore
+            }
           }
-          if (macdChartRef.current) {
-            macdChartRef.current.timeScale().setVisibleRange(visibleRange)
+          if (macdChartRef.current && selectedIndicators.has('MACD')) {
+            try {
+              macdChartRef.current.timeScale().setVisibleRange(visibleRange)
+            } catch (e) {
+              // Ignore
+            }
           }
         }
       } catch (error) {
         // Ignore errors during sync
       }
+
+      // Continue polling
+      rafId = requestAnimationFrame(syncRanges)
     }
 
-    // Poll for range changes every 100ms
-    intervalId = setInterval(syncRanges, 100)
+    // Start continuous polling
+    rafId = requestAnimationFrame(syncRanges)
 
     return () => {
-      if (intervalId) {
-        clearInterval(intervalId)
+      isMounted = false
+      if (rafId) {
+        cancelAnimationFrame(rafId)
       }
     }
-  }, [chartsRef?.current?.mainChart])
+  }, [chartsRef?.current?.mainChart, selectedIndicators])
 
   if (selectedIndicators.size === 0) return null
 
