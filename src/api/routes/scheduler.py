@@ -226,7 +226,7 @@ async def disable_job(request: Request, name: str):
 async def run_job(request: Request, name: str):
 	"""Run a cron job immediately (fire-and-forget)."""
 	from threading import Thread
-	from logger import logger
+	from loguru import logger
 
 	try:
 		manager = CronManager()
