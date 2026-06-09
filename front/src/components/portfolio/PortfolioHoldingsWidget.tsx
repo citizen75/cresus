@@ -177,7 +177,7 @@ export default function PortfolioHoldingsWidget({
         {/* Asset Type Filter */}
         <select className="px-3 py-1.5 bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded hover:border-slate-600 transition whitespace-nowrap">
           <option>All assets</option>
-          {Array.from(new Set(positions.map((p: any) => p.asset_type || 'Stock')) as Set<string>)
+          {Array.from(new Set(filteredPositions.map((p: any) => p.asset_type || 'Stock')) as Set<string>)
             .sort()
             .map((type: string) => (
               <option key={type} value={type}>
