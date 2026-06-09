@@ -400,99 +400,94 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
 
           {/* Filters and Search - Only for Positions tab */}
           {activeTab === 'positions' && (
-            <>
-              <div className="flex gap-3 mb-4 items-center justify-between">
-                <div className="flex gap-3 flex-1">
-                  <div className="flex-1 relative">
-                    <input
-                      type="text"
-                      placeholder="Search by symbol or company..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full px-4 py-2 bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg focus:outline-none focus:border-purple-600"
-                    />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500">🔍</span>
-                  </div>
-
-                  <select className="px-4 py-2 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:border-slate-600 transition">
-                    <option>All positions</option>
-                    <option>Long only</option>
-                    <option>Short only</option>
-                  </select>
-
-                  <select
-                    value={sectorFilter}
-                    onChange={(e) => setSectorFilter(e.target.value)}
-                    className="px-4 py-2 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:border-slate-600 transition"
-                  >
-                    <option>All sectors</option>
-                    {Array.from(sectorMap.keys())
-                      .sort()
-                      .map((sector: string) => (
-                        <option key={sector} value={sector}>
-                          {sector}
-                        </option>
-                      ))}
-                  </select>
-
-                  <select className="px-4 py-2 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:border-slate-600 transition">
-                    <option>All assets</option>
-                    {Array.from(new Set(positions.map((p: any) => p.asset_type || 'Stock')) as Set<string>)
-                      .sort()
-                      .map((type: string) => (
-                        <option key={type} value={type}>
-                          {type}
-                        </option>
-                      ))}
-                  </select>
-
-                  <button className="px-4 py-2 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:bg-slate-700 transition">
-                    ⚙️
-                  </button>
-                </div>
-
-                {/* Table/Charts Toggle and Timeframe */}
-                <div className="flex gap-2">
-                  <div className="flex gap-2 bg-slate-800 border border-slate-700 rounded-lg p-1">
-                    <button
-                      onClick={() => setViewMode('table')}
-                      className={`px-4 py-1.5 rounded transition font-medium text-sm ${
-                        viewMode === 'table'
-                          ? 'bg-purple-600 text-white'
-                          : 'text-slate-400 hover:text-slate-300'
-                      }`}
-                    >
-                      📊 Table
-                    </button>
-                    <button
-                      onClick={() => setViewMode('charts')}
-                      className={`px-4 py-1.5 rounded transition font-medium text-sm ${
-                        viewMode === 'charts'
-                          ? 'bg-purple-600 text-white'
-                          : 'text-slate-400 hover:text-slate-300'
-                      }`}
-                    >
-                      📈 Charts
-                    </button>
-                  </div>
-
-                  {/* Timeframe Dropdown - Only visible in charts mode */}
-                  {viewMode === 'charts' && (
-                    <select
-                      value={timeframe}
-                      onChange={(e) => setTimeframe(e.target.value as '1W' | '1M' | '3M' | 'YTD' | 'ALL')}
-                      className="px-4 py-1.5 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:border-slate-600 transition font-medium text-sm"
-                    >
-                      <option value="1W">1W</option>
-                      <option value="1M">1M</option>
-                      <option value="3M">3M</option>
-                      <option value="YTD">YTD</option>
-                      <option value="ALL">ALL</option>
-                    </select>
-                  )}
-                </div>
+            <div className="flex gap-3 mb-4 items-center">
+              {/* Search and Filters */}
+              <div className="flex-1 relative">
+                <input
+                  type="text"
+                  placeholder="Search by symbol or company..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full px-4 py-2 bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg focus:outline-none focus:border-purple-600"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500">🔍</span>
               </div>
-            </>
+
+              <select className="px-4 py-2 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:border-slate-600 transition whitespace-nowrap">
+                <option>All positions</option>
+                <option>Long only</option>
+                <option>Short only</option>
+              </select>
+
+              <select
+                value={sectorFilter}
+                onChange={(e) => setSectorFilter(e.target.value)}
+                className="px-4 py-2 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:border-slate-600 transition whitespace-nowrap"
+              >
+                <option>All sectors</option>
+                {Array.from(sectorMap.keys())
+                  .sort()
+                  .map((sector: string) => (
+                    <option key={sector} value={sector}>
+                      {sector}
+                    </option>
+                  ))}
+              </select>
+
+              <select className="px-4 py-2 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:border-slate-600 transition whitespace-nowrap">
+                <option>All assets</option>
+                {Array.from(new Set(positions.map((p: any) => p.asset_type || 'Stock')) as Set<string>)
+                  .sort()
+                  .map((type: string) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+              </select>
+
+              <button className="px-4 py-2 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:bg-slate-700 transition flex-shrink-0">
+                ⚙️
+              </button>
+
+              {/* Table/Charts Toggle */}
+              <div className="flex gap-2 bg-slate-800 border border-slate-700 rounded-lg p-1 flex-shrink-0">
+                <button
+                  onClick={() => setViewMode('table')}
+                  className={`px-4 py-1.5 rounded transition font-medium text-sm ${
+                    viewMode === 'table'
+                      ? 'bg-purple-600 text-white'
+                      : 'text-slate-400 hover:text-slate-300'
+                  }`}
+                >
+                  📊 Table
+                </button>
+                <button
+                  onClick={() => setViewMode('charts')}
+                  className={`px-4 py-1.5 rounded transition font-medium text-sm ${
+                    viewMode === 'charts'
+                      ? 'bg-purple-600 text-white'
+                      : 'text-slate-400 hover:text-slate-300'
+                  }`}
+                >
+                  📈 Charts
+                </button>
+              </div>
+
+              {/* Timeframe Dropdown - Only visible in charts mode */}
+              {viewMode === 'charts' && (
+                <select
+                  value={timeframe}
+                  onChange={(e) => setTimeframe(e.target.value as '1W' | '1M' | '3M' | 'YTD' | 'ALL')}
+                  className="px-4 py-1.5 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:border-slate-600 transition font-medium text-sm flex-shrink-0"
+                >
+                  <option value="1W">1W</option>
+                  <option value="1M">1M</option>
+                  <option value="3M">3M</option>
+                  <option value="YTD">YTD</option>
+                  <option value="ALL">ALL</option>
+                </select>
+              )}
+            </div>
           )}
 
           {/* Tab Content - Table View */}
