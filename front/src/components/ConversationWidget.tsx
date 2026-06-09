@@ -181,20 +181,7 @@ export function ConversationWidget({
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   }
 
-  const getMessageBgColor = (msgType?: string) => {
-    switch (msgType) {
-      case 'alert':
-        return 'bg-red-900/20 border-red-800'
-      case 'signal':
-        return 'bg-blue-900/20 border-blue-800'
-      case 'portfolio':
-        return 'bg-purple-900/20 border-purple-800'
-      case 'user':
-        return 'bg-green-900/20 border-green-800'
-      default:
-        return 'bg-slate-800/50 border-slate-700'
-    }
-  }
+  // Removed getMessageBgColor - using inline styles now for compact format
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() || !onSendMessage) return
@@ -255,43 +242,43 @@ export function ConversationWidget({
         )}
 
         {messages.map((msg, idx) => (
-          <div key={msg.id || idx} className={`border rounded p-3 text-xs ${getMessageBgColor(msg.type)}`}>
-            {/* Message Header */}
-            <div className="mb-2">
-              {msg.portfolio && (
-                <div className="font-semibold text-white mb-1">
-                  Portfolio: {msg.portfolio}
-                  {msg.signal && (
+          <div key={msg.id || idx} className="rounded-lg p-3 bg-slate-800/50 border border-slate-700/50 space-y-2">
+            {/* Header: Icon + Portfolio + Signal */}
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-semibold text-slate-300">
+                  {msg.portfolio && (
                     <>
-                      {' '}
-                      <span className="text-red-400">⚠ {msg.signal}</span>
+                      {msg.signal ? '⚠' : '💬'} {msg.portfolio}
+                      {msg.signal && <span className="text-red-400 ml-1">{msg.signal}</span>}
                     </>
                   )}
-                </div>
-              )}
-
-              {/* Tickers */}
-              {msg.tickers && msg.tickers.length > 0 && (
-                <div className="flex gap-2 flex-wrap mb-2">
-                  {msg.tickers.map((ticker) => (
-                    <span
-                      key={ticker}
-                      className="px-2 py-1 bg-purple-600 text-white text-xs rounded font-medium"
-                    >
-                      {ticker}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {/* Content */}
-              <div className="text-slate-300 whitespace-pre-wrap break-words">
-                {msg.source === 'alert' ? (
-                  <AlertMessageRenderer content={msg.content} />
-                ) : (
-                  msg.content
-                )}
+                </span>
               </div>
+              <span className="text-xs text-slate-500">{formatMessageDate(msg.datetime)}</span>
+            </div>
+
+            {/* Tickers (compact inline) */}
+            {msg.tickers && msg.tickers.length > 0 && (
+              <div className="flex gap-1 flex-wrap">
+                {msg.tickers.map((ticker) => (
+                  <span
+                    key={ticker}
+                    className="px-2 py-0.5 bg-purple-600/80 text-white text-xs rounded font-semibold"
+                  >
+                    ◀ {ticker}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Content Preview (truncated) */}
+            <div className="text-xs text-slate-300">
+              {msg.source === 'alert' ? (
+                <AlertMessageRenderer content={msg.content} />
+              ) : (
+                <div className="line-clamp-2">{msg.content}</div>
+              )}
             </div>
 
             {/* Embedded Widget */}
@@ -300,9 +287,6 @@ export function ConversationWidget({
                 <WidgetRenderer widget={msg.widget} />
               </Suspense>
             )}
-
-            {/* Timestamp */}
-            <p className="text-slate-500 mt-2">{formatMessageDate(msg.datetime)}</p>
           </div>
         ))}
 
