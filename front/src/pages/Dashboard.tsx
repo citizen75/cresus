@@ -1,5 +1,4 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { ConversationWidget } from '@/components/ConversationWidget'
 import TradingChart from '@/components/TradingChart'
 import CardChart from '@/components/CardChart'
@@ -16,11 +15,9 @@ interface AlertInfo {
 }
 
 export default function Dashboard() {
-  const navigate = useNavigate()
   const conversationPanelRef = useRef<{ scrollToBottom: () => void } | null>(null)
   const [conversationOpen, setConversationOpen] = useState(true)
   const [rightPanelOpen, setRightPanelOpen] = useState(false)
-  const [selectedPortfolioForHoldings, setSelectedPortfolioForHoldings] = useState<string | null>(null)
   const [chartModalTicker, setChartModalTicker] = useState<string | null>(null)
   const [chartHistory, setChartHistory] = useState<string[]>([])
   const [alertHistory, setAlertHistory] = useState<{ id: string; info: AlertInfo }[]>([])
@@ -345,10 +342,6 @@ export default function Dashboard() {
             title="Global Chat"
             subtitle="All portfolios & alerts"
             maxHeight="h-full"
-            onPortfolioClick={(portfolio) => {
-              // Show portfolio holdings in right panel
-              setSelectedPortfolioForHoldings(portfolio)
-            }}
             onSendMessage={async (message) => {
               const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
               const response = await fetch(`${baseUrl}/api/v1/conversations/_global/message`, {
@@ -366,30 +359,9 @@ export default function Dashboard() {
       )}
 
       {/* Right Column - Portfolio Holdings Widget */}
-      {(rightPanelOpen || selectedPortfolioForHoldings) && (
+      {rightPanelOpen && (
       <div className="flex-1 flex flex-col bg-slate-900 rounded-lg border border-slate-800 overflow-auto">
-        {/* Holdings Panel Header */}
-        {selectedPortfolioForHoldings && (
-          <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between flex-shrink-0">
-            <h3 className="text-sm font-semibold text-white capitalize">{selectedPortfolioForHoldings} Holdings</h3>
-            <button
-              onClick={() => setSelectedPortfolioForHoldings(null)}
-              className="text-slate-400 hover:text-white transition"
-              title="Close"
-            >
-              ✕
-            </button>
-          </div>
-        )}
-
-        {/* Holdings Widget - Show when portfolio selected */}
-        {selectedPortfolioForHoldings ? (
-          <div className="flex-1 overflow-auto p-4">
-            <PortfolioHoldingsWidget portfolioName={selectedPortfolioForHoldings} />
-          </div>
-        ) : (
-          <>
-            {/* Recent Alerts & Charts */}
+        {/* Recent Alerts & Charts */}
         {alertGridView && (alertHistory.length > 0 || chartHistory.length > 0) && (
           <div className="border-b border-slate-800 bg-slate-950 px-4 py-3 flex-shrink-0">
             <div className="text-xs font-semibold text-slate-400 mb-2">Recent</div>
@@ -428,8 +400,17 @@ export default function Dashboard() {
             </div>
           </div>
         )}
-          </>
-        )}
+
+        {/* Portfolio Holdings Widget */}
+        <div className="flex-1 overflow-auto p-4">
+          {alertGridView?.portfolio && (
+            <PortfolioHoldingsWidget
+              portfolioName={alertGridView.portfolio}
+              onClose={() => setRightPanelOpen(false)}
+              filterTickers={alertGridView?.tickers}
+            />
+          )}
+        </div>
       </div>
       )}
 
@@ -694,8 +675,7 @@ export default function Dashboard() {
               </div>
             </div>
           )}
-          </>
-        )}
+        </div>
       </div>
       )}
 
