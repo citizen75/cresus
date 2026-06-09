@@ -342,12 +342,12 @@ export default function Dashboard() {
             title="Global Chat"
             subtitle="All portfolios & alerts"
             maxHeight="h-full"
-            onPortfolioClick={(portfolio) => {
-              // Create alert info object and display holdings
+            onPortfolioClick={(portfolio, tickers) => {
+              // Create alert info object and display holdings filtered by tickers
               const alertInfo: AlertInfo = {
                 title: '',
                 portfolio: portfolio,
-                tickers: [],
+                tickers: tickers,
                 content: `Portfolio: ${portfolio}`,
               }
               setAlertGridView(alertInfo)
