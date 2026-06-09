@@ -26,7 +26,6 @@ export default function Dashboard() {
   const [historicalData, setHistoricalData] = useState<Record<string, any[]>>({})
   const [tickerInfo, setTickerInfo] = useState<Record<string, any>>({})
   const [fundamentalData, setFundamentalData] = useState<Record<string, any>>({})
-  const [fundamentalCache, setFundamentalCache] = useState<Record<string, any>>({})
   const [viewMode, setViewMode] = useState<'table' | 'charts'>('table')
   const [timeframe, setTimeframe] = useState<'1W' | '1M' | '3M' | 'YTD' | 'ALL'>('1M')
   const [searchQuery, setSearchQuery] = useState<string>('')
@@ -180,27 +179,18 @@ export default function Dashboard() {
             const positions = data.positions || []
             setPortfolioPositions(positions)
 
-            // Fetch fundamental data for portfolio positions (with cache)
+            // Fetch fundamental data for portfolio positions
             const fundData: Record<string, any> = {}
             for (const pos of positions) {
               try {
-                // Check cache first
-                if (fundamentalCache[pos.ticker]) {
-                  fundData[pos.ticker] = fundamentalCache[pos.ticker]
-                  console.log(`[Dashboard] Using cached portfolio data for ${pos.ticker}:`, fundData[pos.ticker])
-                } else {
-                  const result = await api.getFundamental(pos.ticker)
-                  fundData[pos.ticker] = result?.data?.quotation || {}
-                  console.log(`[Dashboard] Fetched fundamental for ${pos.ticker}:`, fundData[pos.ticker])
-                  setFundamentalCache((prev) => ({ ...prev, [pos.ticker]: fundData[pos.ticker] }))
-                }
+                const result = await api.getFundamental(pos.ticker)
+                fundData[pos.ticker] = result?.data?.quotation || {}
               } catch (err) {
                 console.error(`Failed to load fundamental data for ${pos.ticker}:`, err)
                 fundData[pos.ticker] = {}
               }
             }
-            console.log(`[Dashboard] Setting portfolio fundamental data:`, fundData)
-            setFundamentalData((prev) => ({ ...prev, ...fundData }))
+            setFundamentalData(fundData)
           }
         }
       } catch (err) {
@@ -229,7 +219,7 @@ export default function Dashboard() {
           let currentPrice = 0
           let previousClose = 0
 
-          // Always load historical data (needed for fallback prices in table)
+          // Load historical data
           const result = await api.getHistoricalData(ticker, 1825) // ~5 years
           let historyArray = []
           if (result && Array.isArray(result)) {
@@ -249,38 +239,31 @@ export default function Dashboard() {
             previousClose = historyArray.length > 1 ? parseFloat(historyArray[historyArray.length - 2]?.close || currentPrice) : currentPrice
           }
 
-          // Check cache for fundamental data
-          if (fundamentalCache[ticker]) {
-            fundamental[ticker] = fundamentalCache[ticker]
-            console.log(`[Dashboard] Using cached fundamental data for ${ticker}`)
-            info[ticker] = { company_name: fundamental[ticker].company_name || ticker }
-          } else {
-            // Fetch fundamental data for real company info and prices
-            const baseUrl = getApiBaseUrl()
-            const fundResponse = await fetch(`${baseUrl}/api/v1/data/fundamental/${ticker}`)
-            const fundData = await fundResponse.json()
+          // Fetch fundamental data for company info and prices
+          const baseUrl = getApiBaseUrl()
+          const fundResponse = await fetch(`${baseUrl}/api/v1/data/fundamental/${ticker}`)
+          const fundData = await fundResponse.json()
 
-            // Use fundamental data if available
-            if (fundResponse.ok && fundData?.data?.company?.name) {
-              companyName = fundData.data.company.name
-              sector = fundData.data.company.sector || 'Unknown'
-            }
-
-            // Use quotation data from fundamental endpoint if available
-            if (fundResponse.ok && fundData?.data?.quotation) {
-              currentPrice = fundData.data.quotation.current_price || currentPrice
-              previousClose = fundData.data.quotation.previous_close || previousClose
-            }
-
-            info[ticker] = { company_name: companyName }
-            fundamental[ticker] = {
-              company_name: companyName,
-              current_price: currentPrice,
-              previous_close: previousClose,
-              sector: sector,
-            }
-            console.log(`[Dashboard] ✓ ${ticker}: previous_close=${previousClose}`)
+          // Use fundamental data if available
+          if (fundResponse.ok && fundData?.data?.company?.name) {
+            companyName = fundData.data.company.name
+            sector = fundData.data.company.sector || 'Unknown'
           }
+
+          // Use quotation data from fundamental endpoint if available
+          if (fundResponse.ok && fundData?.data?.quotation) {
+            currentPrice = fundData.data.quotation.current_price || currentPrice
+            previousClose = fundData.data.quotation.previous_close || previousClose
+          }
+
+          info[ticker] = { company_name: companyName }
+          fundamental[ticker] = {
+            company_name: companyName,
+            current_price: currentPrice,
+            previous_close: previousClose,
+            sector: sector,
+          }
+          console.log(`[Dashboard] ✓ ${ticker}: previous_close=${previousClose}`)
         } catch (err) {
           console.error(`[Dashboard] ✗ Failed to load data for ${ticker}:`, err)
           info[ticker] = { company_name: ticker }
@@ -289,10 +272,8 @@ export default function Dashboard() {
       }
       setHistoricalData(data)
       setTickerInfo(info)
-      // Cache the fundamental data and merge with existing
-      setFundamentalCache((prev) => ({ ...prev, ...fundamental }))
       console.log(`[Dashboard] Setting fundamental data:`, fundamental)
-      setFundamentalData((prev) => ({ ...prev, ...fundamental }))
+      setFundamentalData(fundamental)
     }
 
     loadData()
