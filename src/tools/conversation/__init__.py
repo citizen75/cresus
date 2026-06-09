@@ -60,7 +60,7 @@ class ConversationManager:
 	with portfolio metadata. Filters applied at query time.
 	"""
 
-	_lock = threading.Lock()  # For thread-safe file access
+	_lock = threading.RLock()  # Reentrant lock for thread-safe file access
 	_global_history: Optional[List[ConversationMessage]] = None
 	_cache_path: Optional[Path] = None
 
