@@ -288,17 +288,93 @@ export default function Scheduler() {
               />
             </div>
 
-            {/* Parameters */}
-            <div>
-              <label className="block text-sm text-slate-300 mb-2">Parameters (JSON)</label>
-              <textarea
-                name="params"
-                value={formData.params}
-                onChange={handleFormChange}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500 font-mono"
-                placeholder='{}'
-                rows={3}
-              />
+            {/* Parameters - Dynamic based on target */}
+            <div className="bg-slate-800/50 border border-slate-700 rounded p-4">
+              <label className="block text-sm text-slate-300 mb-3 font-semibold">Parameters</label>
+
+              {formData.target === 'http' ? (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Method</label>
+                    <select
+                      value={(() => {
+                        try {
+                          const p = JSON.parse(formData.params)
+                          return p.method || 'POST'
+                        } catch {
+                          return 'POST'
+                        }
+                      })()}
+                      onChange={(e) => {
+                        const p = JSON.parse(formData.params || '{}')
+                        p.method = e.target.value
+                        setFormData({ ...formData, params: JSON.stringify(p) })
+                      }}
+                      className="w-full px-2 py-1 bg-slate-700 border border-slate-600 text-white rounded text-xs"
+                    >
+                      <option>GET</option>
+                      <option>POST</option>
+                      <option>PUT</option>
+                      <option>DELETE</option>
+                      <option>PATCH</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">URL</label>
+                    <input
+                      type="text"
+                      value={(() => {
+                        try {
+                          const p = JSON.parse(formData.params)
+                          return p.url || ''
+                        } catch {
+                          return ''
+                        }
+                      })()}
+                      onChange={(e) => {
+                        const p = JSON.parse(formData.params || '{}')
+                        p.url = e.target.value
+                        setFormData({ ...formData, params: JSON.stringify(p) })
+                      }}
+                      placeholder="http://localhost:8000/api/..."
+                      className="w-full px-2 py-1 bg-slate-700 border border-slate-600 text-white rounded text-xs focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+                </div>
+              ) : formData.target === 'shell_exec' ? (
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Command</label>
+                  <input
+                    type="text"
+                    value={(() => {
+                      try {
+                        const p = JSON.parse(formData.params)
+                        return p.command || ''
+                      } catch {
+                        return ''
+                      }
+                    })()}
+                    onChange={(e) => {
+                      const p = JSON.parse(formData.params || '{}')
+                      p.command = e.target.value
+                      setFormData({ ...formData, params: JSON.stringify(p) })
+                    }}
+                    placeholder="cresus data fetch all --portfolio all"
+                    className="w-full px-2 py-1 bg-slate-700 border border-slate-600 text-white rounded text-xs focus:outline-none focus:border-purple-500 font-mono"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Parameters (JSON)</label>
+                  <textarea
+                    value={formData.params}
+                    onChange={(e) => setFormData({ ...formData, params: e.target.value })}
+                    className="w-full px-2 py-1 bg-slate-700 border border-slate-600 text-white rounded text-xs focus:outline-none focus:border-purple-500 font-mono"
+                    placeholder='{}'
+                    rows={3}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Enabled */}
