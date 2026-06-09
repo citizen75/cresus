@@ -224,7 +224,9 @@ async def disable_job(request: Request, name: str):
 
 @router.post("/scheduler/jobs/{name}/run")
 async def run_job(request: Request, name: str):
-	"""Run a cron job immediately."""
+	"""Run a cron job immediately (fire-and-forget)."""
+	import asyncio
+
 	try:
 		manager = CronManager()
 		job = manager.get_job(name)
@@ -232,15 +234,18 @@ async def run_job(request: Request, name: str):
 		if not job:
 			raise HTTPException(status_code=404, detail=f"Job '{name}' not found")
 
-		# Execute the job immediately using scheduler's execution methods
+		# Execute the job in background (fire-and-forget)
 		cron_scheduler = get_cron_scheduler(request)
 		if cron_scheduler:
-			# Get the job execution function and run it
+			# Get the job execution function
 			job_func = cron_scheduler._create_job_function(job)
-			job_func()
+
+			# Run in background - don't wait for completion
+			asyncio.create_task(asyncio.to_thread(job_func))
+
 			return {
-				"status": "success",
-				"message": f"Job '{name}' executed successfully",
+				"status": "queued",
+				"message": f"Job '{name}' queued for execution (running in background)",
 			}
 		else:
 			raise HTTPException(status_code=500, detail="Cron scheduler not available")
