@@ -256,6 +256,40 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
     }
   }, [visibleWindow, chartData])
 
+  // Subscribe to main chart's timeScale changes and sync indicator charts
+  useEffect(() => {
+    if (!chartsRef?.current?.mainChart) return
+
+    const mainChart = chartsRef.current.mainChart
+    let unsubscribe: any = null
+
+    try {
+      unsubscribe = mainChart.timeScale().subscribe('logicalRangeChanged', () => {
+        const logicalRange = mainChart.timeScale().getVisibleLogicalRange()
+        if (logicalRange) {
+          if (rsiChartRef.current) {
+            rsiChartRef.current.timeScale().setVisibleLogicalRange(logicalRange, false)
+          }
+          if (macdChartRef.current) {
+            macdChartRef.current.timeScale().setVisibleLogicalRange(logicalRange, false)
+          }
+        }
+      })
+    } catch (error) {
+      console.warn('Failed to subscribe to main chart timeScale:', error)
+    }
+
+    return () => {
+      if (unsubscribe) {
+        try {
+          unsubscribe()
+        } catch (e) {
+          // Ignore
+        }
+      }
+    }
+  }, [chartsRef, selectedIndicators])
+
   if (selectedIndicators.size === 0) return null
 
   return (
