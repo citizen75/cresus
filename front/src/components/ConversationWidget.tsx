@@ -304,14 +304,10 @@ export function ConversationWidget({
                 </div>
               )}
 
-              {/* Content Preview (truncated) */}
-              <div className="text-xs text-slate-300">
-                {msg.source === 'alert' ? (
-                  <AlertMessageRenderer content={msg.content} />
-                ) : (
-                  <div className="line-clamp-2">{msg.content}</div>
-                )}
-              </div>
+              {/* Content Preview (only for non-alerts) */}
+              {msg.source !== 'alert' && (
+                <div className="text-xs text-slate-300 line-clamp-2">{msg.content}</div>
+              )}
 
               {/* Embedded Widget */}
               {msg.widget && (
