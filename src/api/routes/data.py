@@ -262,17 +262,63 @@ async def get_ticker_fundamental(ticker: str):
 	"""
 	try:
 		fundamental = Fundamental(ticker)
+
+		# Try to load from cache first
+		cached = fundamental.load()
+		if cached and cached.get("status") == "success":
+			return cached
+
+		# Fetch fresh data
 		data = fundamental.fetch()
 
 		if data.get("status") == "error":
-			raise HTTPException(500, f"Error fetching fundamental data: {data.get('message')}")
+			# Return cached data if available, even if stale
+			if cached:
+				return cached
+			# Return minimal error response instead of 500
+			return {
+				"ticker": ticker,
+				"status": "error",
+				"message": data.get("message", "Could not fetch fundamental data"),
+				"data": {
+					"quotation": {
+						"current_price": None,
+						"previous_close": None,
+						"bid": None,
+						"ask": None,
+					},
+					"company": {
+						"name": ticker,
+						"sector": None,
+						"industry": None,
+					},
+				}
+			}
 
 		return data
 
 	except HTTPException:
 		raise
 	except Exception as e:
-		raise HTTPException(500, f"Error loading fundamental data: {str(e)}")
+		# Return minimal response instead of 500
+		return {
+			"ticker": ticker,
+			"status": "error",
+			"message": f"Error loading fundamental data: {str(e)}",
+			"data": {
+				"quotation": {
+					"current_price": None,
+					"previous_close": None,
+					"bid": None,
+					"ask": None,
+				},
+				"company": {
+					"name": ticker,
+					"sector": None,
+					"industry": None,
+				},
+			}
+		}
 
 
 @router.post("/cache/refresh")
