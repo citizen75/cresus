@@ -23,6 +23,7 @@ export default function Dashboard() {
   const [fundamentalData, setFundamentalData] = useState<Record<string, any>>({})
   const [viewMode, setViewMode] = useState<'table' | 'charts'>('table')
   const [timeframe, setTimeframe] = useState<'1W' | '1M' | '3M' | 'YTD' | 'ALL'>('1M')
+  const [searchQuery, setSearchQuery] = useState<string>('')
   const [portfolioPositions, setPortfolioPositions] = useState<any[]>([])
 
   const handleSelectTicker = useCallback((ticker: string) => {
@@ -201,49 +202,72 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Tabs and Controls */}
+        {/* Tabs and Controls - Always visible */}
         {alertGridView && (
           <>
-            {/* Tab Navigation */}
-            <div className="border-b border-slate-800">
-              <div className="flex gap-8 px-4">
-                {(['table', 'charts'] as const).map((mode) => (
-                  <button
-                    key={mode}
-                    onClick={() => setViewMode(mode)}
-                    className={`px-1 py-3 font-medium text-sm transition border-b-2 ${
-                      viewMode === mode
-                        ? 'border-purple-600 text-white'
-                        : 'border-transparent text-slate-400 hover:text-slate-300'
-                    }`}
-                  >
-                    {mode === 'table' ? 'Table' : 'Charts'}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Timeframe Selector */}
-            <div className="border-b border-slate-800 bg-slate-950 px-4 py-3">
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-semibold text-slate-400">Period:</span>
-                <div className="flex gap-2">
-                  {(['1W', '1M', '3M', 'YTD', 'ALL'] as const).map((tf) => (
+            <div className="border-b border-slate-800 bg-slate-900">
+              <div className="flex items-center justify-between px-4 py-3 gap-4">
+                {/* Tab Navigation */}
+                <div className="flex gap-8">
+                  {(['table', 'charts'] as const).map((mode) => (
                     <button
-                      key={tf}
-                      onClick={() => setTimeframe(tf)}
-                      className={`px-3 py-1 rounded text-xs font-medium transition ${
-                        timeframe === tf
-                          ? 'bg-purple-600 text-white'
-                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                      key={mode}
+                      onClick={() => setViewMode(mode)}
+                      className={`px-1 py-2 font-medium text-sm transition border-b-2 ${
+                        viewMode === mode
+                          ? 'border-purple-600 text-white'
+                          : 'border-transparent text-slate-400 hover:text-slate-300'
                       }`}
                     >
-                      {tf}
+                      {mode === 'table' ? 'Table' : 'Charts'}
                     </button>
                   ))}
                 </div>
+
+                {/* Timeframe Selector */}
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <span className="text-xs font-semibold text-slate-400">Period:</span>
+                  <div className="flex gap-2">
+                    {(['1W', '1M', '3M', 'YTD', 'ALL'] as const).map((tf) => (
+                      <button
+                        key={tf}
+                        onClick={() => setTimeframe(tf)}
+                        className={`px-3 py-1 rounded text-xs font-medium transition ${
+                          timeframe === tf
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                        }`}
+                      >
+                        {tf}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
+
+            {/* Search Bar - Inline with controls */}
+            {viewMode === 'table' && (
+              <div className="border-b border-slate-800 bg-slate-950 px-4 py-3">
+                <div className="flex gap-3">
+                  <input
+                    type="text"
+                    placeholder="Search by symbol or company..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="flex-1 px-4 py-2 bg-slate-800 border border-slate-700 rounded text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-600"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-sm transition flex-shrink-0"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </>
         )}
 
@@ -258,8 +282,9 @@ export default function Dashboard() {
                     totalValue={portfolioPositions.reduce((sum: number, p: any) => sum + (p.position_value || 0), 0)}
                     currency="EUR"
                     filterTickers={alertGridView.tickers}
-                    showSearch={true}
+                    showSearch={false}
                     showActions={true}
+                    externalSearchQuery={searchQuery}
                     onSelectPosition={(ticker) => handleSelectTicker(ticker)}
                   />
                 ) : (
@@ -288,8 +313,9 @@ export default function Dashboard() {
                     }, 0)}
                     currency="EUR"
                     fundamentalData={fundamentalData}
-                    showSearch={true}
+                    showSearch={false}
                     showActions={true}
+                    externalSearchQuery={searchQuery}
                     onSelectPosition={(ticker) => handleSelectTicker(ticker)}
                   />
                 )}

@@ -11,6 +11,8 @@ interface PortfolioHoldingsTableProps {
   showSearch?: boolean
   showActions?: boolean
   filterTickers?: string[] // Optional: filter positions to only these tickers
+  externalSearchQuery?: string // Optional: search query from parent
+  onSearchChange?: (query: string) => void // Callback when search changes
 }
 
 export function PortfolioHoldingsTable({
@@ -23,8 +25,11 @@ export function PortfolioHoldingsTable({
   showSearch = true,
   showActions = true,
   filterTickers,
+  externalSearchQuery = '',
+  onSearchChange,
 }: PortfolioHoldingsTableProps) {
-  const [searchQuery, setSearchQuery] = useState<string>('')
+  const [internalSearchQuery, setInternalSearchQuery] = useState<string>('')
+  const searchQuery = externalSearchQuery !== undefined ? externalSearchQuery : internalSearchQuery
   const [sortColumn, setSortColumn] = useState<string | null>('weight')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
 
@@ -141,19 +146,19 @@ export function PortfolioHoldingsTable({
 
   return (
     <div className="space-y-4">
-      {/* Search Bar */}
-      {showSearch && (
+      {/* Search Bar - Only show if not using external search */}
+      {showSearch && !externalSearchQuery && (
         <div className="flex gap-3">
           <input
             type="text"
             placeholder="Search by symbol or company..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            value={internalSearchQuery}
+            onChange={(e) => setInternalSearchQuery(e.target.value)}
             className="flex-1 px-4 py-2 bg-slate-800 border border-slate-700 rounded text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-600"
           />
-          {searchQuery && (
+          {internalSearchQuery && (
             <button
-              onClick={() => setSearchQuery('')}
+              onClick={() => setInternalSearchQuery('')}
               className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-sm transition"
             >
               Clear
