@@ -214,9 +214,9 @@ export default function ChartPage() {
                   onChange={(e) => setSelectedPortfolio(e.target.value)}
                   className="w-full bg-slate-800 border border-slate-700 text-white rounded px-3 py-2 text-sm focus:border-purple-500 focus:outline-none"
                 >
-                  {portfolios.map((p) => (
-                    <option key={p.name} value={p.name}>
-                      {p.name}
+                  {Array.from(new Set(portfolios.map(p => p.name))).map((name) => (
+                    <option key={name} value={name}>
+                      {name}
                     </option>
                   ))}
                 </select>
