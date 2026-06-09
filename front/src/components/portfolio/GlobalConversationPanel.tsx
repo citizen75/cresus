@@ -246,7 +246,7 @@ export default function GlobalConversationPanel({ onClose, onAlertClick, onAlert
                       <div className="flex items-start justify-between mb-2">
                         <div
                           className="flex-1"
-                          onClick={() => setGridViewAlert(alertInfo)}
+                          onClick={() => onAlertGridClick?.(alertInfo)}
                         >
                           {alertInfo.portfolio && (
                             <p className="text-xs text-red-300 font-medium mb-1">

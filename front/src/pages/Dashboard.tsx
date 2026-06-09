@@ -72,7 +72,7 @@ export default function Dashboard() {
         )
         if (portfolio) {
           const positionResponse = await fetch(
-            `/api/v1/portfolios/${encodeURIComponent(alertGridView.portfolio)}/positions`
+            `/api/v1/portfolios/${encodeURIComponent(alertGridView.portfolio || '')}/positions`
           )
           if (positionResponse.ok) {
             const data = await positionResponse.json()
@@ -411,7 +411,6 @@ export default function Dashboard() {
 
                       {/* Price Range Row */}
                       {filteredData && filteredData.length > 0 && (() => {
-                        const firstPrice = filteredData[0]?.close
                         const lastPrice = filteredData[filteredData.length - 1]?.close
                         const minPrice = Math.min(...filteredData.map((d: any) => d.close))
                         const maxPrice = Math.max(...filteredData.map((d: any) => d.close))
@@ -449,7 +448,7 @@ export default function Dashboard() {
             )
           ) : selectedTicker ? (
             // Single Chart View
-            <TradingChart ticker={selectedTicker} />
+            <TradingChart ticker={selectedTicker} timeframe={timeframe} />
           ) : (
             // Empty State
             <div className="flex items-center justify-center h-full">
