@@ -20,6 +20,7 @@ export default function Dashboard() {
   const [alertGridView, setAlertGridView] = useState<AlertInfo | null>(null)
   const [historicalData, setHistoricalData] = useState<Record<string, any[]>>({})
   const [tickerInfo, setTickerInfo] = useState<Record<string, any>>({})
+  const [fundamentalData, setFundamentalData] = useState<Record<string, any>>({})
   const [viewMode, setViewMode] = useState<'table' | 'charts'>('table')
   const [timeframe, setTimeframe] = useState<'1W' | '1M' | '3M' | 'YTD' | 'ALL'>('1M')
   const [portfolioPositions, setPortfolioPositions] = useState<any[]>([])
@@ -89,16 +90,18 @@ export default function Dashboard() {
     loadPositions()
   }, [alertGridView?.portfolio])
 
-  // Load historical data and ticker info when grid view is activated
+  // Load historical data, ticker info and fundamental data when grid view is activated
   useEffect(() => {
     if (!alertGridView || alertGridView.tickers.length === 0) return
 
     const loadData = async () => {
       const data: Record<string, any[]> = {}
       const info: Record<string, any> = {}
+      const fundamental: Record<string, any> = {}
 
       for (const ticker of alertGridView.tickers) {
         try {
+          // Fetch historical data
           const result = await api.getHistoricalData(ticker, 1825) // ~5 years
           let historyArray = []
           if (result && Array.isArray(result)) {
@@ -115,19 +118,30 @@ export default function Dashboard() {
             }))
           }
 
-          // Store company name if available (extract from first history item or use ticker)
+          // Extract company info from historical data
+          let companyName = ticker
+          let previousClose = historyArray.length > 1 ? parseFloat(historyArray[historyArray.length - 2]?.close || 0) : 0
+          let currentPrice = historyArray.length > 0 ? parseFloat(historyArray[historyArray.length - 1]?.close || 0) : 0
+
           if (historyArray.length > 0 && historyArray[0].company_name) {
-            info[ticker] = { company_name: historyArray[0].company_name }
-          } else {
-            info[ticker] = { company_name: ticker }
+            companyName = historyArray[0].company_name
+          }
+
+          info[ticker] = { company_name: companyName }
+          fundamental[ticker] = {
+            company_name: companyName,
+            current_price: currentPrice,
+            previous_close: previousClose,
           }
         } catch (err) {
           console.error(`Failed to load data for ${ticker}:`, err)
           info[ticker] = { company_name: ticker }
+          fundamental[ticker] = { company_name: ticker, current_price: 0, previous_close: 0 }
         }
       }
       setHistoricalData(data)
       setTickerInfo(info)
+      setFundamentalData(fundamental)
     }
 
     loadData()
@@ -237,28 +251,29 @@ export default function Dashboard() {
                 ) : (
                   <PortfolioHoldingsTable
                     positions={alertGridView.tickers.map((ticker) => {
-                      const tickerData = historicalData[ticker]
-                      const filteredData = filterDataByTimeframe(tickerData || [], timeframe)
-                      const firstPrice = filteredData?.[0]?.close
-                      const lastPrice = filteredData?.[filteredData.length - 1]?.close
-                      const change =
-                        firstPrice && lastPrice
-                          ? ((lastPrice - firstPrice) / firstPrice) * 100
-                          : 0
+                      const tickerData = historicalData[ticker] || []
+                      const fund = fundamentalData[ticker] || {}
+                      const filteredData = filterDataByTimeframe(tickerData, timeframe)
+                      const currentPrice = fund.current_price || (tickerData.length > 0 ? tickerData[tickerData.length - 1].close : 0)
+                      const previousClose = fund.previous_close || (tickerData.length > 1 ? tickerData[tickerData.length - 2].close : currentPrice)
 
                       return {
                         ticker,
-                        company_name: tickerInfo[ticker]?.company_name || ticker,
+                        company_name: fund.company_name || ticker,
                         quantity: 1,
-                        avg_entry_price: firstPrice || 0,
-                        current_price: lastPrice || 0,
-                        position_value: lastPrice || 0,
-                        position_gain: (lastPrice || 0) - (firstPrice || 0),
-                        position_gain_pct: change,
+                        avg_entry_price: previousClose || 0,
+                        current_price: currentPrice || 0,
+                        position_value: currentPrice || 0,
+                        position_gain: (currentPrice || 0) - (previousClose || 0),
+                        position_gain_pct: previousClose ? (((currentPrice || 0) - (previousClose || 0)) / previousClose) * 100 : 0,
                       }
                     })}
-                    totalValue={alertGridView.tickers.length}
+                    totalValue={alertGridView.tickers.reduce((sum, ticker) => {
+                      const fund = fundamentalData[ticker] || {}
+                      return sum + (fund.current_price || 0)
+                    }, 0)}
                     currency="EUR"
+                    fundamentalData={fundamentalData}
                     showSearch={true}
                     showActions={true}
                     onSelectPosition={(ticker) => handleSelectTicker(ticker)}
@@ -269,8 +284,12 @@ export default function Dashboard() {
               <div className="h-full overflow-y-auto">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {alertGridView.tickers.map((ticker) => {
-                    const tickerData = historicalData[ticker]
-                    const filteredData = filterDataByTimeframe(tickerData || [], timeframe)
+                    const tickerData = historicalData[ticker] || []
+                    const fund = fundamentalData[ticker] || {}
+                    const filteredData = filterDataByTimeframe(tickerData, timeframe)
+                    const currentPrice = fund.current_price || (tickerData.length > 0 ? tickerData[tickerData.length - 1].close : 0)
+                    const previousClose = fund.previous_close || (tickerData.length > 1 ? tickerData[tickerData.length - 2].close : currentPrice)
+
                     const change = (() => {
                       if (!filteredData || filteredData.length < 2) return 0
                       const firstPrice = filteredData[0]?.close
@@ -288,7 +307,7 @@ export default function Dashboard() {
                           <div className="flex items-start justify-between mb-3">
                             <div>
                               <p className="text-white font-bold text-lg">{ticker}</p>
-                              <p className="text-slate-400 text-xs">{tickerInfo[ticker]?.company_name || ticker}</p>
+                              <p className="text-slate-400 text-xs">{fund.company_name || ticker}</p>
                             </div>
                             <div className="text-right">
                               <p className={`text-2xl font-bold ${change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
