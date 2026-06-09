@@ -20,7 +20,7 @@ class CresusAPI {
     })
     this.longTimeoutClient = axios.create({
       baseURL: `${baseURL}/api/v1`,
-      timeout: 120000, // 2 minutes for long-running operations
+      timeout: 150000, // 2.5 minutes for long-running operations
     })
   }
 
@@ -31,7 +31,7 @@ class CresusAPI {
     })
     this.longTimeoutClient = axios.create({
       baseURL: `${baseURL}/api/v1`,
-      timeout: 120000,
+      timeout: 150000, // 2.5 minutes
     })
   }
 
