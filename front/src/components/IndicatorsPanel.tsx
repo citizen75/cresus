@@ -129,8 +129,9 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
         const rsiData = chartData
           .map((candle, i) => ({
             time: candle.time,
-            value: rsi[i] === null ? NaN : rsi[i],
+            value: rsi[i],
           }))
+          .filter(d => d.value !== null)
 
         const chart = createChart(rsiContainerRef.current, {
           layout: { background: { color: '#0f172a' }, textColor: '#94a3b8' },
@@ -191,8 +192,9 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
         const macdData = chartData
           .map((candle, i) => ({
             time: candle.time,
-            value: macd.histogram[i] === null ? NaN : macd.histogram[i],
+            value: macd.histogram[i],
           }))
+          .filter(d => d.value !== null)
 
         const chart = createChart(macdContainerRef.current, {
           layout: { background: { color: '#0f172a' }, textColor: '#94a3b8' },
@@ -254,72 +256,6 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
     }
   }, [visibleWindow, chartData])
 
-  // Sync indicator charts with main chart
-  useEffect(() => {
-    if (!chartsRef?.current?.mainChart) {
-      console.warn('mainChart not available for sync')
-      return
-    }
-
-    const mainChart = chartsRef.current.mainChart
-    let lastRange: any = null
-    let rafId: any = null
-    let isMounted = true
-
-    const syncRanges = () => {
-      if (!isMounted) return
-
-      try {
-        const visibleRange = mainChart.timeScale().getVisibleRange()
-
-        // Check if range changed
-        const rangeStr = visibleRange ? JSON.stringify(visibleRange) : null
-        const lastRangeStr = lastRange ? JSON.stringify(lastRange) : null
-
-        if (rangeStr && rangeStr !== lastRangeStr) {
-          console.log('Range changed:', visibleRange)
-          console.log('RSI chart exists:', !!rsiChartRef.current, 'MACD chart exists:', !!macdChartRef.current)
-          lastRange = { ...visibleRange }
-
-          // Sync RSI
-          if (rsiChartRef.current) {
-            try {
-              const rsiTimeScale = rsiChartRef.current.timeScale()
-              rsiTimeScale.setVisibleRange(visibleRange, false)
-              rsiChartRef.current.applyOptions({})
-            } catch (e) {
-              console.warn('RSI sync error:', e)
-            }
-          }
-
-          // Sync MACD
-          if (macdChartRef.current) {
-            try {
-              const macdTimeScale = macdChartRef.current.timeScale()
-              macdTimeScale.setVisibleRange(visibleRange, false)
-              macdChartRef.current.applyOptions({})
-            } catch (e) {
-              console.warn('MACD sync error:', e)
-            }
-          }
-        }
-      } catch (error) {
-        console.warn('Sync error:', error)
-      }
-
-      rafId = requestAnimationFrame(syncRanges)
-    }
-
-    // Start polling
-    rafId = requestAnimationFrame(syncRanges)
-
-    return () => {
-      isMounted = false
-      if (rafId) {
-        cancelAnimationFrame(rafId)
-      }
-    }
-  }, [chartsRef?.current?.mainChart])
 
   if (selectedIndicators.size === 0) return null
 
