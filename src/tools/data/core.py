@@ -83,6 +83,22 @@ class Fundamental:
 				elif ask:
 					current_price = ask
 
+			# Extract previous_close, fallback to historical data
+			previous_close = info.get("previousClose")
+			if not previous_close:
+				try:
+					# Try to get previous close from historical data
+					history = DataHistory(self.ticker)
+					df = history.load_all()
+					if len(df) >= 2:
+						# Get last two days
+						last_close = float(df.iloc[-1].get('close', df.iloc[-1].get('Close')))
+						prev_close_historical = float(df.iloc[-2].get('close', df.iloc[-2].get('Close')))
+						current_price = current_price or last_close
+						previous_close = prev_close_historical
+				except Exception as e:
+					logger.debug(f"Could not get historical previous_close for {self.ticker}: {e}")
+
 			# Extract analyst data
 			target_price = info.get("targetMeanPrice") or info.get("targetPrice")
 			recommendation = info.get("recommendationKey")
@@ -103,7 +119,7 @@ class Fundamental:
 				"data": {
 					"quotation": {
 						"current_price": current_price,
-						"previous_close": info.get("previousClose"),
+						"previous_close": previous_close,
 						"bid": info.get("bid"),
 						"ask": info.get("ask"),
 					},
