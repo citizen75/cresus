@@ -17,6 +17,8 @@ export default function Dashboard() {
   const [chartHistory, setChartHistory] = useState<string[]>([])
   const [alertGridView, setAlertGridView] = useState<AlertInfo | null>(null)
   const [historicalData, setHistoricalData] = useState<Record<string, any[]>>({})
+  const [viewMode, setViewMode] = useState<'table' | 'charts'>('table')
+  const [timeframe, setTimeframe] = useState<'1W' | '1M' | '3M' | 'YTD' | 'ALL'>('1M')
 
   const handleSelectTicker = useCallback((ticker: string) => {
     setSelectedTicker(ticker)
@@ -32,6 +34,27 @@ export default function Dashboard() {
     setAlertGridView(alertInfo)
     setSelectedTicker(null) // Close single chart when opening grid
   }, [])
+
+  const filterDataByTimeframe = (data: any[], tf: string) => {
+    if (tf === 'ALL' || !data || data.length === 0) return data
+
+    let cutoffDate = new Date()
+
+    if (tf === 'YTD') {
+      // Year To Date: from Jan 1 to today
+      cutoffDate = new Date(cutoffDate.getFullYear(), 0, 1)
+    } else {
+      // Other periods: N days back from today
+      const days =
+        tf === '1W' ? 7 : tf === '1M' ? 30 : tf === '3M' ? 90 : 365
+      cutoffDate.setDate(cutoffDate.getDate() - days)
+    }
+
+    return data.filter((item: any) => {
+      const itemDate = new Date(item.date)
+      return itemDate >= cutoffDate
+    })
+  }
 
   // Load historical data when grid view is activated
   useEffect(() => {
@@ -107,6 +130,52 @@ export default function Dashboard() {
           )}
         </div>
 
+        {/* Tabs and Controls - Show when alert grid is open */}
+        {alertGridView && (
+          <>
+            {/* Tab Navigation */}
+            <div className="border-b border-slate-800">
+              <div className="flex gap-8 px-4">
+                {(['table', 'charts'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => setViewMode(mode)}
+                    className={`px-1 py-3 font-medium text-sm transition border-b-2 ${
+                      viewMode === mode
+                        ? 'border-purple-600 text-white'
+                        : 'border-transparent text-slate-400 hover:text-slate-300'
+                    }`}
+                  >
+                    {mode === 'table' ? 'Table' : 'Charts'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Timeframe Selector - Show in both modes */}
+            <div className="border-b border-slate-800 bg-slate-950 px-4 py-3">
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-semibold text-slate-400">Period:</span>
+                <div className="flex gap-2">
+                  {(['1W', '1M', '3M', 'YTD', 'ALL'] as const).map((tf) => (
+                    <button
+                      key={tf}
+                      onClick={() => setTimeframe(tf)}
+                      className={`px-3 py-1 rounded text-xs font-medium transition ${
+                        timeframe === tf
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      {tf}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
         {/* Chart History */}
         {chartHistory.length > 0 && !alertGridView && (
           <div className="border-b border-slate-800 bg-slate-950 px-4 py-3">
@@ -132,15 +201,67 @@ export default function Dashboard() {
         {/* Content */}
         <div className="flex-1 overflow-hidden p-4">
           {alertGridView ? (
-            // Grid View - All Tickers (Same layout as HoldingsView)
+            // Alert View - Table or Charts
+            viewMode === 'table' ? (
+              // Table View
+              <div className="h-full overflow-auto">
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-slate-800/50 border-b border-slate-700">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-300">Ticker</th>
+                      <th className="px-4 py-3 text-right font-semibold text-slate-300">Current</th>
+                      <th className="px-4 py-3 text-right font-semibold text-slate-300">Change %</th>
+                      <th className="px-4 py-3 text-right font-semibold text-slate-300">Low</th>
+                      <th className="px-4 py-3 text-right font-semibold text-slate-300">High</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700">
+                    {alertGridView.tickers.map((ticker) => {
+                      const tickerData = historicalData[ticker]
+                      const filteredData = filterDataByTimeframe(tickerData || [], timeframe)
+                      const firstPrice = filteredData?.[0]?.close
+                      const lastPrice = filteredData?.[filteredData.length - 1]?.close
+                      const minPrice = filteredData?.length
+                        ? Math.min(...filteredData.map((d: any) => d.close))
+                        : 0
+                      const maxPrice = filteredData?.length
+                        ? Math.max(...filteredData.map((d: any) => d.close))
+                        : 0
+                      const change =
+                        firstPrice && lastPrice
+                          ? ((lastPrice - firstPrice) / firstPrice) * 100
+                          : 0
+
+                      return (
+                        <tr
+                          key={ticker}
+                          onClick={() => handleSelectTicker(ticker)}
+                          className="hover:bg-slate-800/50 cursor-pointer transition"
+                        >
+                          <td className="px-4 py-3 font-medium text-white">{ticker}</td>
+                          <td className="px-4 py-3 text-right text-slate-300">€{lastPrice?.toFixed(2)}</td>
+                          <td className={`px-4 py-3 text-right font-medium ${change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {change.toFixed(2)}%
+                          </td>
+                          <td className="px-4 py-3 text-right text-slate-300">€{minPrice?.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right text-slate-300">€{maxPrice?.toFixed(2)}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              // Grid View - All Tickers (Same layout as HoldingsView)
             <div className="h-full overflow-y-auto">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {alertGridView.tickers.map((ticker) => {
                   const tickerData = historicalData[ticker]
+                  const filteredData = filterDataByTimeframe(tickerData || [], timeframe)
                   const change = (() => {
-                    if (!tickerData || tickerData.length < 2) return 0
-                    const firstPrice = tickerData[0]?.close
-                    const lastPrice = tickerData[tickerData.length - 1]?.close
+                    if (!filteredData || filteredData.length < 2) return 0
+                    const firstPrice = filteredData[0]?.close
+                    const lastPrice = filteredData[filteredData.length - 1]?.close
                     return firstPrice ? ((lastPrice - firstPrice) / firstPrice) * 100 : 0
                   })()
 
@@ -167,9 +288,9 @@ export default function Dashboard() {
                       </div>
 
                       {/* Chart */}
-                      {tickerData && tickerData.length > 0 ? (
+                      {filteredData && filteredData.length > 0 ? (
                         <CardChart
-                          data={tickerData}
+                          data={filteredData}
                           ticker={ticker}
                           showVariation={false}
                         />
@@ -180,11 +301,11 @@ export default function Dashboard() {
                       )}
 
                       {/* Price Range Row */}
-                      {tickerData && tickerData.length > 0 && (() => {
-                        const firstPrice = tickerData[0]?.close
-                        const lastPrice = tickerData[tickerData.length - 1]?.close
-                        const minPrice = Math.min(...tickerData.map((d: any) => d.close))
-                        const maxPrice = Math.max(...tickerData.map((d: any) => d.close))
+                      {filteredData && filteredData.length > 0 && (() => {
+                        const firstPrice = filteredData[0]?.close
+                        const lastPrice = filteredData[filteredData.length - 1]?.close
+                        const minPrice = Math.min(...filteredData.map((d: any) => d.close))
+                        const maxPrice = Math.max(...filteredData.map((d: any) => d.close))
                         return (
                           <div className="border-t border-slate-800 px-4 py-3 bg-slate-800/30">
                             <div className="flex justify-between items-center text-xs">
@@ -216,6 +337,7 @@ export default function Dashboard() {
                 })}
               </div>
             </div>
+            )
           ) : selectedTicker ? (
             // Single Chart View
             <TradingChart ticker={selectedTicker} />
