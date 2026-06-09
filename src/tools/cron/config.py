@@ -35,8 +35,8 @@ class CronJobConfig:
 			logger.warning(f"Job '{self.name}': missing schedule")
 			return False
 
-		if self.type not in ("flow", "agent"):
-			logger.warning(f"Job '{self.name}': invalid type '{self.type}', must be 'flow' or 'agent'")
+		if self.type not in ("http", "shell_exec", "flow", "agent"):
+			logger.warning(f"Job '{self.name}': invalid type '{self.type}', must be 'http', 'shell_exec', 'flow', or 'agent'")
 			return False
 
 		if not self.target:
