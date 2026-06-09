@@ -245,13 +245,8 @@ export function PortfolioHoldingsTable({
             ) : (
               sortedPositions.map((pos: any) => {
                 const weight = totalValue > 0 ? ((pos.position_value || 0) / totalValue) * 100 : 0
-                const fundamental = fundamentalData[pos.ticker] || {}
-                const previousClose = fundamental?.previous_close || pos.current_price || 0
-                const dailyChange = (pos.current_price || 0) - (previousClose || 0)
-                const dailyChangePct = (previousClose || 0) > 0 ? (dailyChange / previousClose) * 100 : 0
-                if (!fundamental?.previous_close) {
-                  console.log(`[PortfolioHoldingsTable] ${pos.ticker}: fundamentalData=${JSON.stringify(fundamental)}, pos.current_price=${pos.current_price}, previousClose=${previousClose}`)
-                }
+                const dailyChange = pos.position_gain || 0
+                const dailyChangePct = pos.position_gain_pct || 0
 
                 return (
                   <tr
