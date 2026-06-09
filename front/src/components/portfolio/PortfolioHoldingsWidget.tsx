@@ -25,6 +25,11 @@ export default function PortfolioHoldingsWidget({
   const [viewMode, setViewMode] = useState<'table' | 'charts'>('table')
   const [timeframe, setTimeframe] = useState<'1W' | '1M' | '3M' | 'YTD' | 'ALL'>('1M')
 
+  // Filter positions if filterTickers is provided (calculate early, before useEffects)
+  const filteredPositions = filterTickers && filterTickers.length > 0
+    ? positions.filter((pos: any) => filterTickers.includes(pos.ticker))
+    : positions
+
   // Load positions for the portfolio
   useEffect(() => {
     const loadPositionsAndFundamental = async () => {
@@ -151,11 +156,6 @@ export default function PortfolioHoldingsWidget({
       loadHistoricalData()
     }
   }, [filteredPositions, viewMode])
-
-  // Filter positions if filterTickers is provided
-  const filteredPositions = filterTickers && filterTickers.length > 0
-    ? positions.filter((pos: any) => filterTickers.includes(pos.ticker))
-    : positions
 
   const getDaysForTimeframe = (tf: string) => {
     switch (tf) {
