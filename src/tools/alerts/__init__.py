@@ -3,6 +3,7 @@
 from .models import Alert, AlertSource, AlertNotifyTarget, AlertResult
 from .manager import AlertManager
 from .evaluator import AlertEvaluator
+from .notifier import AlertNotifier
 
 __all__ = [
     "Alert",
@@ -11,4 +12,5 @@ __all__ = [
     "AlertResult",
     "AlertManager",
     "AlertEvaluator",
+    "AlertNotifier",
 ]

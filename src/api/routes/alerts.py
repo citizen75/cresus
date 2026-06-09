@@ -8,6 +8,7 @@ import json
 import math
 
 from tools.alerts import AlertManager, AlertEvaluator, Alert
+from tools.alerts.notifier import AlertNotifier
 
 router = APIRouter(tags=["alerts"])
 
@@ -193,6 +194,7 @@ async def run_alert(name: str):
     try:
         manager = AlertManager()
         evaluator = AlertEvaluator()
+        notifier = AlertNotifier()
 
         alert = manager.get_alert(name)
         if not alert:
@@ -203,6 +205,10 @@ async def run_alert(name: str):
 
         # Update last_run timestamp
         manager.update_last_run(name)
+
+        # Send notification if alert matched and is enabled
+        if alert.enabled and result.matched:
+            notifier.send_alert(alert, result)
 
         return {
             "status": "success",
