@@ -138,15 +138,18 @@ export function ConversationWidget({
     scrollToBottom()
   }, [messages])
 
-  // Subscribe to conversation on mount
+  // Subscribe to conversation (keep open across page changes)
   useEffect(() => {
     conversationKeyRef.current = key
+    console.log(`[ConversationWidget] Subscribing to: ${key}`)
     subscribeToConversation(portfolioName, sourceFilter, onNewMessage)
 
+    // Don't unsubscribe on unmount - keep connection alive across pages!
+    // Only cleanup the callback listener if component unmounts
     return () => {
-      unsubscribeFromConversation(portfolioName, sourceFilter)
+      console.log(`[ConversationWidget] Component unmounting: ${key} (connection stays open)`)
     }
-  }, [portfolioName, sourceFilter, subscribeToConversation, unsubscribeFromConversation, onNewMessage])
+  }, [portfolioName, sourceFilter, subscribeToConversation, onNewMessage])
 
   const formatMessageDate = (dateString: string) => {
     const date = new Date(dateString)
