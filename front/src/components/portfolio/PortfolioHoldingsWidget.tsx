@@ -19,38 +19,18 @@ export default function PortfolioHoldingsWidget({
   const [sectorFilter, setSectorFilter] = useState('All sectors')
   const [selectedPosition, setSelectedPosition] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'table' | 'charts'>('table')
-  const [portfolios, setPortfolios] = useState<string[]>([])
-  const [selectedPortfolio, setSelectedPortfolio] = useState(portfolioName)
 
-  // Fetch available portfolios
-  useEffect(() => {
-    const fetchPortfolios = async () => {
-      try {
-        const baseUrl = getApiBaseUrl()
-        const response = await fetch(`${baseUrl}/api/v1/portfolios`)
-        if (response.ok) {
-          const data = await response.json()
-          const portfolioNames = data.map((p: any) => p.name || p)
-          setPortfolios(portfolioNames)
-        }
-      } catch (err) {
-        console.error('Failed to fetch portfolios:', err)
-      }
-    }
-    fetchPortfolios()
-  }, [])
-
-  // Load positions when portfolio changes
+  // Load positions for the portfolio
   useEffect(() => {
     const loadPositionsAndFundamental = async () => {
-      if (!selectedPortfolio) return
+      if (!portfolioName) return
 
       setIsLoading(true)
       try {
         const baseUrl = getApiBaseUrl()
 
         // Fetch positions
-        const posResponse = await fetch(`${baseUrl}/api/v1/portfolios/${selectedPortfolio}/positions`)
+        const posResponse = await fetch(`${baseUrl}/api/v1/portfolios/${portfolioName}/positions`)
         if (!posResponse.ok) {
           console.error('Failed to fetch positions')
           setPositions([])
@@ -63,7 +43,7 @@ export default function PortfolioHoldingsWidget({
         }
 
         let positions = posData
-        console.log(`[PortfolioHoldingsWidget] Loaded ${positions.length} positions for ${selectedPortfolio}`)
+        console.log(`[PortfolioHoldingsWidget] Loaded ${positions.length} positions for ${portfolioName}`)
 
         if (positions.length > 0) {
           // Fetch fundamental data for all tickers
@@ -125,7 +105,7 @@ export default function PortfolioHoldingsWidget({
     }
 
     loadPositionsAndFundamental()
-  }, [selectedPortfolio, fundamentalCache])
+  }, [portfolioName, fundamentalCache])
 
   const totalValue = positions.reduce((sum: any, pos: any) => sum + (pos.position_value || 0), 0)
 
@@ -149,21 +129,6 @@ export default function PortfolioHoldingsWidget({
             ✕
           </button>
         )}
-      </div>
-
-      {/* Portfolio Selector */}
-      <div>
-        <select
-          value={selectedPortfolio}
-          onChange={(e) => setSelectedPortfolio(e.target.value)}
-          className="w-full px-4 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg hover:border-slate-600 transition"
-        >
-          {portfolios.map((portfolio) => (
-            <option key={portfolio} value={portfolio}>
-              {portfolio}
-            </option>
-          ))}
-        </select>
       </div>
 
       {/* Filters - All on one line */}
