@@ -129,7 +129,13 @@ class GatewayServer:
 			logger.error(f"Error restarting cron scheduler: {e}", exc_info=True)
 
 	def _start_api(self) -> None:
-		"""Start the API server in a separate thread."""
+		"""Start the API server in a separate thread.
+
+		Note: Workers config removed - uvicorn.Server().run() doesn't spawn multiple
+		worker processes. The event loop handles concurrent async requests efficiently
+		within a single process. Async handlers with asyncio.to_thread() enable true
+		parallelism for blocking operations.
+		"""
 		try:
 			logger.info(f"Starting API server on {self.api_host}:{self.api_port}")
 
@@ -137,7 +143,6 @@ class GatewayServer:
 				"api.app:create_app",
 				host=self.api_host,
 				port=self.api_port,
-				workers=4,
 				factory=True,
 				log_level="info",
 			)
