@@ -207,6 +207,49 @@ export default function Dashboard() {
           )}
         </div>
 
+        {/* Alert Info Section */}
+        {alertGridView && (
+          <div className="border-b border-slate-800 bg-slate-950 px-4 py-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-xs font-semibold text-slate-400">Alert Details</p>
+                <p className="text-sm font-medium text-white">{alertGridView.title}</p>
+              </div>
+              {alertGridView.portfolio && (
+                <div className="text-right">
+                  <p className="text-xs text-slate-400">Portfolio</p>
+                  <p className="text-sm font-medium text-purple-300">{alertGridView.portfolio}</p>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-4 text-xs">
+              <span className="text-slate-400">Tickers: <span className="text-white font-medium">{alertGridView.tickers.length}</span></span>
+            </div>
+          </div>
+        )}
+
+        {/* Chart History Section */}
+        {alertGridView && chartHistory.length > 0 && (
+          <div className="border-b border-slate-800 bg-slate-950 px-4 py-3">
+            <div className="text-xs font-semibold text-slate-400 mb-2">Recent Charts</div>
+            <div className="flex gap-2 overflow-x-auto pb-2">
+              {chartHistory.map((ticker) => (
+                <button
+                  key={ticker}
+                  onClick={() => handleSelectTicker(ticker)}
+                  className={`px-3 py-1 rounded text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
+                    selectedTableTicker === ticker
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  {ticker}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Tabs and Controls - Always visible */}
         {alertGridView && (
           <>
