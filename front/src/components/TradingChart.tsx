@@ -354,6 +354,9 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
             vertLines: { visible: false },
             horzLines: { visible: false },
           },
+          watermark: {
+            visible: false,
+          },
         })
 
         if (!isMounted) {
