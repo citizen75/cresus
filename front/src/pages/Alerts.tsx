@@ -408,16 +408,14 @@ export default function Alerts() {
             </div>
           )}
 
-          {/* Conversation Widget */}
-          {selectedPortfolio && (
-            <ConversationWidget
-              portfolioName={selectedPortfolio}
-              sourceFilter="alert"
-              title="Alert Activity"
-              subtitle="Latest alerts"
-              maxHeight="flex-1"
-            />
-          )}
+          {/* Conversation Widget - show global alerts by default */}
+          <ConversationWidget
+            portfolioName="_global"
+            sourceFilter="alert"
+            title="Alert Activity"
+            subtitle="Latest alerts (all portfolios)"
+            maxHeight="flex-1"
+          />
         </div>
       </div>
 
