@@ -797,8 +797,8 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
         </div>
       )}
 
-      <div className="flex-1 flex flex-col min-h-0 relative">
-        <div className="flex-grow" ref={containerRef} />
+      <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden">
+        <div className="flex-1 w-full" ref={containerRef} />
         {/* Legend Overlay */}
         <button
           onClick={() => setShowSHA10(!showSHA10)}
