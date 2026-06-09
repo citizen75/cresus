@@ -2,5 +2,6 @@
 
 from .watchlist import WatchlistFlow
 from .train_rank import TrainRankFlow
+from .http import HttpFlow
 
-__all__ = ["WatchlistFlow", "TrainRankFlow"]
+__all__ = ["WatchlistFlow", "TrainRankFlow", "HttpFlow"]

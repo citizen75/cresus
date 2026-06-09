@@ -61,3 +61,14 @@ jobs:
     target: shell_exec
     params:
       command: "cresus data fetch all --portfolio all"
+
+  # Alert on SHA red signal
+  - name: alert_sha_red
+    description: "Alert when SHA turns red - every 30 minutes during market hours"
+    enabled: true
+    schedule: "*/30 9-18 * * 1-5"  # Every 30 minutes, 9:00-18:00, Monday-Friday
+    type: flow
+    target: http
+    params:
+      method: POST
+      url: "http://localhost:8000/api/alerts/sha_red/run"
