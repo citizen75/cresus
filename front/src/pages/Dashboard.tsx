@@ -349,7 +349,7 @@ export default function Dashboard() {
       {/* Right Column - Portfolio Holdings Widget */}
       {rightPanelOpen && (
       <div className="flex-1 flex flex-col bg-slate-900 rounded-lg border border-slate-800 p-4 overflow-auto">
-        <PortfolioHoldingsWidget portfolioName="bnp" />
+        <PortfolioHoldingsWidget portfolioName="bnp" onClose={() => setRightPanelOpen(false)} />
       </div>
       )}
 
