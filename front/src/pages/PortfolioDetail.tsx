@@ -1,6 +1,7 @@
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import { PortfolioProvider, usePortfolioContext } from '@/context/PortfolioContext'
+import { getApiBaseUrl } from '@/services/api'
 import PortfolioOverview from '@/components/portfolio/PortfolioOverview'
 import StrategyBuilder from '@/components/portfolio/StrategyBuilder'
 import AIWatchlist from '@/components/portfolio/AIWatchlist'
@@ -166,7 +167,7 @@ function PortfolioDetailContent() {
           subtitle={`${name.charAt(0).toUpperCase() + name.slice(1)} Portfolio`}
           maxHeight="h-full"
           onSendMessage={async (message) => {
-            const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+            const baseUrl = getApiBaseUrl()
             const response = await fetch(`${baseUrl}/api/v1/conversations/${encodeURIComponent(name)}/message`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
