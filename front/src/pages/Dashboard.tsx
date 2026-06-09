@@ -3,6 +3,7 @@ import GlobalConversationPanel from '@/components/portfolio/GlobalConversationPa
 import TradingChart from '@/components/TradingChart'
 import CardChart from '@/components/CardChart'
 import { PortfolioHoldingsTable } from '@/components/portfolio/PortfolioHoldingsTable'
+import { ChartModal } from '@/components/ChartModal'
 import { api } from '@/services/api'
 
 interface AlertInfo {
@@ -14,17 +15,17 @@ interface AlertInfo {
 
 export default function Dashboard() {
   const [conversationOpen, setConversationOpen] = useState(true)
-  const [selectedTicker, setSelectedTicker] = useState<string | null>(null)
+  const [chartModalTicker, setChartModalTicker] = useState<string | null>(null)
   const [chartHistory, setChartHistory] = useState<string[]>([])
   const [alertGridView, setAlertGridView] = useState<AlertInfo | null>(null)
   const [historicalData, setHistoricalData] = useState<Record<string, any[]>>({})
+  const [tickerInfo, setTickerInfo] = useState<Record<string, any>>({})
   const [viewMode, setViewMode] = useState<'table' | 'charts'>('table')
   const [timeframe, setTimeframe] = useState<'1W' | '1M' | '3M' | 'YTD' | 'ALL'>('1M')
   const [portfolioPositions, setPortfolioPositions] = useState<any[]>([])
 
   const handleSelectTicker = useCallback((ticker: string) => {
-    setSelectedTicker(ticker)
-    setAlertGridView(null) // Close grid view when selecting a single ticker
+    setChartModalTicker(ticker)
     // Add to history if not already there, keep last 10
     setChartHistory((prev) => {
       const filtered = prev.filter((t) => t !== ticker)
@@ -88,12 +89,14 @@ export default function Dashboard() {
     loadPositions()
   }, [alertGridView?.portfolio])
 
-  // Load historical data when grid view is activated
+  // Load historical data and ticker info when grid view is activated
   useEffect(() => {
     if (!alertGridView || alertGridView.tickers.length === 0) return
 
     const loadData = async () => {
       const data: Record<string, any[]> = {}
+      const info: Record<string, any> = {}
+
       for (const ticker of alertGridView.tickers) {
         try {
           const result = await api.getHistoricalData(ticker, 1825) // ~5 years
@@ -111,11 +114,20 @@ export default function Dashboard() {
               close: parseFloat(item.close || item.Close),
             }))
           }
+
+          // Store company name if available (extract from first history item or use ticker)
+          if (historyArray.length > 0 && historyArray[0].company_name) {
+            info[ticker] = { company_name: historyArray[0].company_name }
+          } else {
+            info[ticker] = { company_name: ticker }
+          }
         } catch (err) {
           console.error(`Failed to load data for ${ticker}:`, err)
+          info[ticker] = { company_name: ticker }
         }
       }
       setHistoricalData(data)
+      setTickerInfo(info)
     }
 
     loadData()
@@ -134,25 +146,24 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Right Column - Chart or Grid */}
+      {/* Right Column - Alert Grid View */}
       <div className="flex-1 flex flex-col bg-slate-900 rounded-lg border border-slate-800">
         {/* Header */}
         <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-lg">{alertGridView ? '📊' : '📈'}</span>
+            <span className="text-lg">📊</span>
             <div>
               <h3 className="text-sm font-semibold text-white">
-                {alertGridView ? alertGridView.title : selectedTicker ? selectedTicker : 'Chart'}
+                {alertGridView ? alertGridView.title : 'Alert'}
               </h3>
               {alertGridView?.portfolio && (
                 <p className="text-xs text-slate-400">Portfolio: {alertGridView.portfolio}</p>
               )}
             </div>
           </div>
-          {(selectedTicker || alertGridView) && (
+          {alertGridView && (
             <button
               onClick={() => {
-                setSelectedTicker(null)
                 setAlertGridView(null)
               }}
               className="text-slate-500 hover:text-slate-400"
@@ -162,7 +173,7 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Tabs and Controls - Show when alert grid is open */}
+        {/* Tabs and Controls */}
         {alertGridView && (
           <>
             {/* Tab Navigation */}
@@ -184,7 +195,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Timeframe Selector - Show in both modes */}
+            {/* Timeframe Selector */}
             <div className="border-b border-slate-800 bg-slate-950 px-4 py-3">
               <div className="flex items-center gap-3">
                 <span className="text-xs font-semibold text-slate-400">Period:</span>
@@ -208,34 +219,11 @@ export default function Dashboard() {
           </>
         )}
 
-        {/* Chart History */}
-        {chartHistory.length > 0 && !alertGridView && (
-          <div className="border-b border-slate-800 bg-slate-950 px-4 py-3">
-            <div className="text-xs font-semibold text-slate-400 mb-2">History</div>
-            <div className="flex gap-2 overflow-x-auto pb-2">
-              {chartHistory.map((ticker) => (
-                <button
-                  key={ticker}
-                  onClick={() => handleSelectTicker(ticker)}
-                  className={`px-3 py-1 rounded text-sm font-medium whitespace-nowrap transition-colors ${
-                    selectedTicker === ticker
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                  }`}
-                >
-                  {ticker}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Content */}
         <div className="flex-1 overflow-hidden p-4">
           {alertGridView ? (
-            // Alert View - Table or Charts
             viewMode === 'table' ? (
-              <div className="h-full overflow-auto p-4">
+              <div className="h-full overflow-auto">
                 {alertGridView.portfolio && portfolioPositions.length > 0 ? (
                   <PortfolioHoldingsTable
                     positions={portfolioPositions}
@@ -260,7 +248,7 @@ export default function Dashboard() {
 
                       return {
                         ticker,
-                        company_name: '',
+                        company_name: tickerInfo[ticker]?.company_name || ticker,
                         quantity: 1,
                         avg_entry_price: firstPrice || 0,
                         current_price: lastPrice || 0,
@@ -278,105 +266,105 @@ export default function Dashboard() {
                 )}
               </div>
             ) : (
-              // Grid View - All Tickers (Same layout as HoldingsView)
-            <div className="h-full overflow-y-auto">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {alertGridView.tickers.map((ticker) => {
-                  const tickerData = historicalData[ticker]
-                  const filteredData = filterDataByTimeframe(tickerData || [], timeframe)
-                  const change = (() => {
-                    if (!filteredData || filteredData.length < 2) return 0
-                    const firstPrice = filteredData[0]?.close
-                    const lastPrice = filteredData[filteredData.length - 1]?.close
-                    return firstPrice ? ((lastPrice - firstPrice) / firstPrice) * 100 : 0
-                  })()
+              <div className="h-full overflow-y-auto">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {alertGridView.tickers.map((ticker) => {
+                    const tickerData = historicalData[ticker]
+                    const filteredData = filterDataByTimeframe(tickerData || [], timeframe)
+                    const change = (() => {
+                      if (!filteredData || filteredData.length < 2) return 0
+                      const firstPrice = filteredData[0]?.close
+                      const lastPrice = filteredData[filteredData.length - 1]?.close
+                      return firstPrice ? ((lastPrice - firstPrice) / firstPrice) * 100 : 0
+                    })()
 
-                  return (
-                    <div
-                      key={ticker}
-                      className="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden hover:border-purple-600/50 transition cursor-pointer"
-                      onClick={() => handleSelectTicker(ticker)}
-                    >
-                      {/* Card Header */}
-                      <div className="bg-slate-800/50 border-b border-slate-800 p-4">
-                        <div className="flex items-start justify-between mb-3">
-                          <div>
-                            <p className="text-white font-bold text-lg">{ticker}</p>
-                            <p className="text-slate-400 text-xs">Alert Ticker</p>
-                          </div>
-                          <div className="text-right">
-                            <p className={`text-2xl font-bold ${change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                              {change.toFixed(1)}%
-                            </p>
-                            <p className="text-slate-400 text-xs">Change</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Chart */}
-                      {filteredData && filteredData.length > 0 ? (
-                        <CardChart
-                          data={filteredData}
-                          ticker={ticker}
-                          showVariation={false}
-                        />
-                      ) : (
-                        <div className="p-4 h-48 bg-slate-800/20 flex flex-col items-center justify-center gap-2">
-                          <p className="text-slate-500 text-sm">Loading chart...</p>
-                        </div>
-                      )}
-
-                      {/* Price Range Row */}
-                      {filteredData && filteredData.length > 0 && (() => {
-                        const lastPrice = filteredData[filteredData.length - 1]?.close
-                        const minPrice = Math.min(...filteredData.map((d: any) => d.close))
-                        const maxPrice = Math.max(...filteredData.map((d: any) => d.close))
-                        return (
-                          <div className="border-t border-slate-800 px-4 py-3 bg-slate-800/30">
-                            <div className="flex justify-between items-center text-xs">
-                              <div className="flex flex-col items-center flex-1">
-                                <p className="text-slate-500 text-xs mb-1">Low</p>
-                                <p className="text-white font-medium">€{minPrice?.toFixed(3)}</p>
-                              </div>
-                              <div className="flex flex-col items-center flex-1">
-                                <p className="text-slate-500 text-xs mb-1">Current</p>
-                                <p className={`font-medium ${change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                  €{lastPrice?.toFixed(2)}
-                                </p>
-                              </div>
-                              <div className="flex flex-col items-center flex-1">
-                                <p className="text-slate-500 text-xs mb-1">High</p>
-                                <p className="text-white font-medium">€{maxPrice?.toFixed(3)}</p>
-                              </div>
+                    return (
+                      <div
+                        key={ticker}
+                        className="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden hover:border-purple-600/50 transition cursor-pointer"
+                        onClick={() => handleSelectTicker(ticker)}
+                      >
+                        <div className="bg-slate-800/50 border-b border-slate-800 p-4">
+                          <div className="flex items-start justify-between mb-3">
+                            <div>
+                              <p className="text-white font-bold text-lg">{ticker}</p>
+                              <p className="text-slate-400 text-xs">{tickerInfo[ticker]?.company_name || ticker}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className={`text-2xl font-bold ${change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                {change.toFixed(1)}%
+                              </p>
+                              <p className="text-slate-400 text-xs">Change</p>
                             </div>
                           </div>
-                        )
-                      })()}
+                        </div>
 
-                      {/* Card Footer */}
-                      <div className="border-t border-slate-800 p-4 text-center">
-                        <p className="text-xs text-slate-400">Click to expand chart</p>
+                        {filteredData && filteredData.length > 0 ? (
+                          <CardChart
+                            data={filteredData}
+                            ticker={ticker}
+                            showVariation={false}
+                          />
+                        ) : (
+                          <div className="p-4 h-48 bg-slate-800/20 flex flex-col items-center justify-center gap-2">
+                            <p className="text-slate-500 text-sm">Loading chart...</p>
+                          </div>
+                        )}
+
+                        {filteredData && filteredData.length > 0 && (() => {
+                          const lastPrice = filteredData[filteredData.length - 1]?.close
+                          const minPrice = Math.min(...filteredData.map((d: any) => d.close))
+                          const maxPrice = Math.max(...filteredData.map((d: any) => d.close))
+                          return (
+                            <div className="border-t border-slate-800 px-4 py-3 bg-slate-800/30">
+                              <div className="flex justify-between items-center text-xs">
+                                <div className="flex flex-col items-center flex-1">
+                                  <p className="text-slate-500 text-xs mb-1">Low</p>
+                                  <p className="text-white font-medium">€{minPrice?.toFixed(3)}</p>
+                                </div>
+                                <div className="flex flex-col items-center flex-1">
+                                  <p className="text-slate-500 text-xs mb-1">Current</p>
+                                  <p className={`font-medium ${change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                    €{lastPrice?.toFixed(2)}
+                                  </p>
+                                </div>
+                                <div className="flex flex-col items-center flex-1">
+                                  <p className="text-slate-500 text-xs mb-1">High</p>
+                                  <p className="text-white font-medium">€{maxPrice?.toFixed(3)}</p>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })()}
+
+                        <div className="border-t border-slate-800 p-4 text-center">
+                          <p className="text-xs text-slate-400">Click to view chart</p>
+                        </div>
                       </div>
-                    </div>
-                  )
-                })}
+                    )
+                  })}
+                </div>
               </div>
-            </div>
             )
-          ) : selectedTicker ? (
-            // Single Chart View
-            <TradingChart ticker={selectedTicker} timeframe={timeframe} />
           ) : (
-            // Empty State
             <div className="flex items-center justify-center h-full">
               <div className="text-center text-slate-500">
-                <div className="text-4xl mb-2">📌</div>
-                <div className="text-xs">Click on an alert to view chart</div>
+                <div className="text-4xl mb-2">📢</div>
+                <div className="text-sm">Click on an alert to view tickers</div>
               </div>
             </div>
           )}
         </div>
       </div>
+
+      {/* Chart Modal */}
+      {chartModalTicker && (
+        <ChartModal
+          ticker={chartModalTicker}
+          onClose={() => setChartModalTicker(null)}
+          timeframe={timeframe}
+        />
+      )}
     </div>
   )
 }
