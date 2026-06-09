@@ -265,13 +265,21 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
 
     try {
       unsubscribe = mainChart.timeScale().subscribe('logicalRangeChanged', () => {
-        const logicalRange = mainChart.timeScale().getVisibleLogicalRange()
-        if (logicalRange) {
-          if (rsiChartRef.current) {
-            rsiChartRef.current.timeScale().setVisibleLogicalRange(logicalRange, false)
+        const visibleRange = mainChart.timeScale().getVisibleRange()
+        if (visibleRange && visibleRange.from && visibleRange.to) {
+          if (rsiChartRef.current && selectedIndicators.has('RSI 14')) {
+            try {
+              rsiChartRef.current.timeScale().setVisibleRange(visibleRange)
+            } catch (e) {
+              console.warn('Failed to sync RSI:', e)
+            }
           }
-          if (macdChartRef.current) {
-            macdChartRef.current.timeScale().setVisibleLogicalRange(logicalRange, false)
+          if (macdChartRef.current && selectedIndicators.has('MACD')) {
+            try {
+              macdChartRef.current.timeScale().setVisibleRange(visibleRange)
+            } catch (e) {
+              console.warn('Failed to sync MACD:', e)
+            }
           }
         }
       })
