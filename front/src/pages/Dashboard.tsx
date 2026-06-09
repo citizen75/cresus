@@ -391,8 +391,9 @@ export default function Dashboard() {
 
         {/* Original alert grid and holdings content */}
         {!selectedPortfolioForHoldings && (
-        {/* Recent Alerts & Charts */}
-        {alertGridView && (alertHistory.length > 0 || chartHistory.length > 0) && (
+          <>
+            {/* Recent Alerts & Charts */}
+            {alertGridView && (alertHistory.length > 0 || chartHistory.length > 0) && (
           <div className="border-b border-slate-800 bg-slate-950 px-4 py-3 flex-shrink-0">
             <div className="text-xs font-semibold text-slate-400 mb-2">Recent</div>
             <div className="flex gap-2 overflow-x-auto pb-2">
@@ -704,8 +705,9 @@ export default function Dashboard() {
                 <div className="text-sm">Click on an alert to view tickers</div>
               </div>
             </div>
-          )}
-        </div>
+            )}
+            </div>
+          </>
         )}
       </div>
       )}
