@@ -32,25 +32,18 @@ export function useEnrichedPositions(positions: any[], portfolioName?: string) {
         setFundamentalData(data)
 
         // Enrich positions with fundamental data and daily changes
+        // Note: position_gain and position_gain_pct come from the API (calculated in backend)
         const enriched = positions.map((pos: any) => {
           const fund = data[pos.ticker] || {}
           const currentPrice = pos.current_price || 0
           const previousClose = fund.previous_close || currentPrice
-          const quantity = pos.quantity || 0
-          const avgEntryPrice = pos.avg_entry_price || 0
 
           // Daily change per share (not unrealized P&L)
           const daily_change = currentPrice - previousClose
           const daily_change_pct = previousClose && previousClose !== 0 ? ((currentPrice - previousClose) / previousClose) * 100 : 0
 
-          // Unrealized P&L (total position gain/loss)
-          const position_gain = pos.position_gain !== undefined ? pos.position_gain : (currentPrice - avgEntryPrice) * quantity
-          const position_gain_pct = avgEntryPrice && avgEntryPrice !== 0 ? ((currentPrice - avgEntryPrice) / avgEntryPrice) * 100 : 0
-
           return {
             ...pos,
-            position_gain,
-            position_gain_pct,
             daily_change,
             daily_change_pct,
             asset_type: fund.asset_type || 'Stock',
