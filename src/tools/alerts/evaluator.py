@@ -92,10 +92,8 @@ class AlertEvaluator:
                 if not alert.source_value:
                     return []
                 pm = PortfolioManager()
-                positions = pm.get_portfolio_positions(alert.source_value)
-                if positions:
-                    return [p.get('ticker') for p in positions.get('positions', [])]
-                return []
+                tickers = self._get_portfolio_tickers_fast(pm, alert.source_value)
+                return tickers
 
             elif alert.source == AlertSource.ALL_PORTFOLIOS:
                 pm = PortfolioManager()
@@ -104,16 +102,25 @@ class AlertEvaluator:
                 real_portfolios = [p for p in all_portfolios if p.get('type') == 'real']
                 tickers = set()
                 for pf in real_portfolios:
-                    positions = pm.get_portfolio_positions(pf.get('name'))
-                    if positions:
-                        for p in positions.get('positions', []):
-                            tickers.add(p.get('ticker'))
+                    pf_tickers = self._get_portfolio_tickers_fast(pm, pf.get('name'))
+                    tickers.update(pf_tickers)
                 return list(tickers)
 
             return []
 
         except Exception as e:
             self.logger.error(f"Error getting tickers for {alert.source.value}: {e}")
+            return []
+
+    def _get_portfolio_tickers_fast(self, pm: PortfolioManager, portfolio_name: str) -> List[str]:
+        """Get tickers from portfolio without fetching prices (fast for alerts)."""
+        try:
+            from tools.portfolio.journal import Journal
+            journal = Journal(portfolio_name)
+            open_pos = journal.get_open_positions()
+            return [ticker for ticker in open_pos['ticker'].unique()]
+        except Exception as e:
+            self.logger.debug(f"Error getting tickers for portfolio {portfolio_name}: {e}")
             return []
 
     def _extract_indicators(self, formula: str) -> List[str]:
@@ -141,8 +148,9 @@ class AlertEvaluator:
             List of matching rows
         """
         try:
-            # Load historical data
+            # Load historical data (limit to last 90 days for alert evaluation)
             dh = DataHistory(ticker)
+            # Load with limit for performance - alerts only need recent data
             history_df = dh.get_all()
 
             if history_df is None or history_df.empty:
@@ -151,12 +159,10 @@ class AlertEvaluator:
             # Determine date column
             date_col = 'timestamp' if 'timestamp' in history_df.columns else 'date'
 
-            # Sort by date
+            # Sort by date and keep only last 90 days (enough for most indicators)
             history_df = history_df.sort_values(date_col).reset_index(drop=True)
-
-            # Limit to last 60 days for performance
-            if len(history_df) > 60:
-                history_df = history_df.iloc[-60:].reset_index(drop=True)
+            if len(history_df) > 90:
+                history_df = history_df.iloc[-90:].reset_index(drop=True)
 
             # Calculate missing indicators
             missing_indicators = [ind for ind in indicators if ind.lower() not in history_df.columns]
