@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '@/services/api'
+import { JobModal } from '@/components/JobModal'
 
 interface CronJob {
   name: string
@@ -25,7 +26,7 @@ export default function Scheduler() {
   const [jobs, setJobs] = useState<CronJob[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [showForm, setShowForm] = useState(false)
+  const [modalOpen, setModalOpen] = useState(false)
   const [editingJob, setEditingJob] = useState<string | null>(null)
   const [formData, setFormData] = useState<FormState>({
     name: '',
@@ -109,12 +110,12 @@ export default function Scheduler() {
       name: job.name,
       schedule: job.schedule,
       target: job.target,
-      type: job.type as 'flow' | 'agent',
+      type: job.type as 'http' | 'shell_exec' | 'flow' | 'agent',
       description: job.description,
       params: JSON.stringify(job.params || {}),
       enabled: job.enabled,
     })
-    setShowForm(true)
+    setModalOpen(true)
   }
 
   const handleDelete = async (name: string) => {
@@ -180,7 +181,7 @@ export default function Scheduler() {
       params: '{}',
       enabled: false,
     })
-    setShowForm(false)
+    setModalOpen(false)
     setEditingJob(null)
   }
 
@@ -193,10 +194,10 @@ export default function Scheduler() {
           <p className="text-sm text-slate-400 mt-1">Manage cron jobs and scheduled tasks</p>
         </div>
         <button
-          onClick={() => (showForm ? resetForm() : setShowForm(true))}
+          onClick={() => setModalOpen(true)}
           className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition"
         >
-          {showForm ? 'Cancel' : '+ New Job'}
+          + New Job
         </button>
       </div>
 
@@ -208,218 +209,17 @@ export default function Scheduler() {
       )}
 
       {/* Form */}
-      {showForm && (
-        <div className="bg-slate-900 border border-slate-800 rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">
-            {editingJob ? 'Edit Job' : 'Create New Job'}
-          </h2>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Name */}
-              <div>
-                <label className="block text-sm text-slate-300 mb-2">Job Name</label>
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleFormChange}
-                  disabled={!!editingJob}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500 disabled:opacity-50"
-                  placeholder="e.g., daily_backup"
-                  required
-                />
-              </div>
-
-              {/* Schedule (with underscore hint) */}
-              <div>
-                <label className="block text-sm text-slate-300 mb-2">Schedule (Cron)</label>
-                <input
-                  type="text"
-                  name="schedule"
-                  value={formData.schedule}
-                  onChange={handleFormChange}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
-                  placeholder="e.g., 0_10_*_*_*"
-                  required
-                />
-                <p className="text-xs text-slate-500 mt-1">Use underscores for spaces: 0_10_*_*_*</p>
-              </div>
-
-              {/* Target */}
-              <div>
-                <label className="block text-sm text-slate-300 mb-2">
-                  {formData.type === 'http' ? 'URL' : formData.type === 'shell_exec' ? 'Command' : 'Target'}
-                </label>
-                <input
-                  type="text"
-                  name="target"
-                  value={formData.target}
-                  onChange={handleFormChange}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
-                  placeholder={
-                    formData.type === 'http'
-                      ? 'e.g., http://localhost:8000/api/...'
-                      : formData.type === 'shell_exec'
-                        ? 'e.g., cresus data fetch all'
-                        : 'e.g., premarket or strategy'
-                  }
-                  required
-                />
-              </div>
-
-              {/* Type */}
-              <div>
-                <label className="block text-sm text-slate-300 mb-2">Job Type</label>
-                <select
-                  name="type"
-                  value={formData.type}
-                  onChange={handleFormChange}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
-                >
-                  <option value="http">HTTP Request</option>
-                  <option value="shell_exec">Shell Command</option>
-                  <option value="flow">Flow</option>
-                  <option value="agent">Agent</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Description */}
-            <div>
-              <label className="block text-sm text-slate-300 mb-2">Description</label>
-              <input
-                type="text"
-                name="description"
-                value={formData.description}
-                onChange={handleFormChange}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
-                placeholder="Optional description"
-              />
-            </div>
-
-            {/* Parameters - Dynamic based on type */}
-            <div className="bg-slate-800/50 border border-slate-700 rounded p-4">
-              <label className="block text-sm text-slate-300 mb-3 font-semibold">
-                {formData.type === 'http' ? 'HTTP Options' : formData.type === 'shell_exec' ? 'Shell Options' : 'Parameters'}
-              </label>
-
-              {formData.type === 'http' ? (
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1">Method</label>
-                    <select
-                      value={(() => {
-                        try {
-                          const p = JSON.parse(formData.params)
-                          return p.method || 'POST'
-                        } catch {
-                          return 'POST'
-                        }
-                      })()}
-                      onChange={(e) => {
-                        const p = JSON.parse(formData.params || '{}')
-                        p.method = e.target.value
-                        setFormData({ ...formData, params: JSON.stringify(p) })
-                      }}
-                      className="w-full px-2 py-1 bg-slate-700 border border-slate-600 text-white rounded text-xs"
-                    >
-                      <option>GET</option>
-                      <option>POST</option>
-                      <option>PUT</option>
-                      <option>DELETE</option>
-                      <option>PATCH</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1">Timeout (seconds)</label>
-                    <input
-                      type="number"
-                      value={(() => {
-                        try {
-                          const p = JSON.parse(formData.params)
-                          return p.timeout || 30
-                        } catch {
-                          return 30
-                        }
-                      })()}
-                      onChange={(e) => {
-                        const p = JSON.parse(formData.params || '{}')
-                        p.timeout = parseInt(e.target.value)
-                        setFormData({ ...formData, params: JSON.stringify(p) })
-                      }}
-                      className="w-full px-2 py-1 bg-slate-700 border border-slate-600 text-white rounded text-xs"
-                      min="1"
-                    />
-                  </div>
-                </div>
-              ) : formData.type === 'shell_exec' ? (
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Timeout (seconds)</label>
-                  <input
-                    type="number"
-                    value={(() => {
-                      try {
-                        const p = JSON.parse(formData.params)
-                        return p.timeout || 300
-                      } catch {
-                        return 300
-                      }
-                    })()}
-                    onChange={(e) => {
-                      const p = JSON.parse(formData.params || '{}')
-                      p.timeout = parseInt(e.target.value)
-                      setFormData({ ...formData, params: JSON.stringify(p) })
-                    }}
-                    className="w-full px-2 py-1 bg-slate-700 border border-slate-600 text-white rounded text-xs"
-                    min="1"
-                  />
-                </div>
-              ) : (
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Parameters (JSON)</label>
-                  <textarea
-                    value={formData.params}
-                    onChange={(e) => setFormData({ ...formData, params: e.target.value })}
-                    className="w-full px-2 py-1 bg-slate-700 border border-slate-600 text-white rounded text-xs focus:outline-none focus:border-purple-500 font-mono"
-                    placeholder='{}'
-                    rows={3}
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Enabled */}
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                name="enabled"
-                checked={formData.enabled}
-                onChange={handleFormChange}
-                className="w-4 h-4 rounded"
-              />
-              <label className="ml-2 text-sm text-slate-300">Enable job on creation</label>
-            </div>
-
-            {/* Buttons */}
-            <div className="flex gap-3 pt-4">
-              <button
-                type="submit"
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded font-medium transition"
-              >
-                {editingJob ? 'Update' : 'Create'}
-              </button>
-              <button
-                type="button"
-                onClick={resetForm}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-medium transition"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+      {/* Job Modal */}
+      <JobModal
+        isOpen={modalOpen}
+        onClose={() => {
+          setModalOpen(false)
+          setEditingJob(null)
+        }}
+        onSubmit={handleSubmit}
+        editingJob={editingJob}
+        initialData={editingJob ? formData : undefined}
+      />
 
       {/* Jobs List */}
       <div className="space-y-3">
