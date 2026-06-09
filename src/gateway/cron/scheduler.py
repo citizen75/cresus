@@ -271,3 +271,78 @@ class CronScheduler:
 			List of APScheduler Job objects
 		"""
 		return self.scheduler.get_jobs()
+
+	def reload_job(self, job_name: str) -> bool:
+		"""Reload a single job from config and update scheduler.
+
+		Used when a job is updated in config to apply changes to running scheduler.
+
+		Args:
+			job_name: Name of the job to reload
+
+		Returns:
+			True if job was reloaded, False otherwise
+		"""
+		try:
+			# Get updated job config
+			self.config.reload()
+			job_config = self.config.get_job(job_name)
+
+			if not job_config:
+				logger.warning(f"Job '{job_name}' not found in config after reload")
+				return False
+
+			# Remove old job from scheduler
+			try:
+				self.scheduler.remove_job(job_name)
+			except Exception:
+				pass  # Job might not be running
+
+			# Add updated job to scheduler
+			self._add_job(job_config)
+			logger.info(f"Reloaded cron job '{job_name}' in running scheduler")
+			return True
+
+		except Exception as e:
+			logger.error(f"Failed to reload job '{job_name}': {e}", exc_info=True)
+			return False
+
+	def add_job_to_scheduler(self, job_name: str) -> bool:
+		"""Add a job to the running scheduler.
+
+		Args:
+			job_name: Name of the job
+
+		Returns:
+			True if job was added, False otherwise
+		"""
+		try:
+			job_config = self.config.get_job(job_name)
+			if not job_config:
+				logger.error(f"Job '{job_name}' not found in config")
+				return False
+
+			self._add_job(job_config)
+			return True
+
+		except Exception as e:
+			logger.error(f"Failed to add job '{job_name}' to scheduler: {e}", exc_info=True)
+			return False
+
+	def remove_job_from_scheduler(self, job_name: str) -> bool:
+		"""Remove a job from the running scheduler.
+
+		Args:
+			job_name: Name of the job
+
+		Returns:
+			True if job was removed, False otherwise
+		"""
+		try:
+			self.scheduler.remove_job(job_name)
+			logger.info(f"Removed job '{job_name}' from running scheduler")
+			return True
+
+		except Exception as e:
+			logger.error(f"Failed to remove job '{job_name}' from scheduler: {e}", exc_info=True)
+			return False

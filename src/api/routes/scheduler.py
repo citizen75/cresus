@@ -1,12 +1,19 @@
 """Scheduler (cron) management API routes."""
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from typing import Optional
 import json
 
 from tools.cron import CronManager
 
 router = APIRouter(tags=["scheduler"])
+
+
+def get_cron_scheduler(request: Request):
+	"""Get the cron scheduler instance from app state."""
+	if not hasattr(request.app.state, 'cron_scheduler'):
+		return None
+	return request.app.state.cron_scheduler
 
 
 @router.get("/scheduler/jobs")
@@ -66,6 +73,7 @@ async def get_job(name: str):
 
 @router.post("/scheduler/jobs")
 async def create_job(
+	request: Request,
 	name: str,
 	schedule: str,
 	target: str,
@@ -98,6 +106,12 @@ async def create_job(
 		if not success:
 			raise HTTPException(status_code=400, detail=message)
 
+		# Add to running scheduler if enabled
+		if enabled:
+			cron_scheduler = get_cron_scheduler(request)
+			if cron_scheduler:
+				cron_scheduler.add_job_to_scheduler(name)
+
 		return {
 			"status": "success",
 			"message": message,
@@ -110,6 +124,7 @@ async def create_job(
 
 @router.put("/scheduler/jobs/{name}")
 async def update_job(
+	request: Request,
 	name: str,
 	schedule: Optional[str] = None,
 	target: Optional[str] = None,
@@ -142,6 +157,11 @@ async def update_job(
 		if not success:
 			raise HTTPException(status_code=400, detail=message)
 
+		# Reload job in running scheduler
+		cron_scheduler = get_cron_scheduler(request)
+		if cron_scheduler:
+			cron_scheduler.reload_job(name)
+
 		return {
 			"status": "success",
 			"message": message,
@@ -153,7 +173,7 @@ async def update_job(
 
 
 @router.post("/scheduler/jobs/{name}/enable")
-async def enable_job(name: str):
+async def enable_job(request: Request, name: str):
 	"""Enable a cron job."""
 	try:
 		manager = CronManager()
@@ -161,6 +181,11 @@ async def enable_job(name: str):
 
 		if not success:
 			raise HTTPException(status_code=400, detail=message)
+
+		# Add to running scheduler
+		cron_scheduler = get_cron_scheduler(request)
+		if cron_scheduler:
+			cron_scheduler.add_job_to_scheduler(name)
 
 		return {
 			"status": "success",
@@ -173,7 +198,7 @@ async def enable_job(name: str):
 
 
 @router.post("/scheduler/jobs/{name}/disable")
-async def disable_job(name: str):
+async def disable_job(request: Request, name: str):
 	"""Disable a cron job."""
 	try:
 		manager = CronManager()
@@ -181,6 +206,11 @@ async def disable_job(name: str):
 
 		if not success:
 			raise HTTPException(status_code=400, detail=message)
+
+		# Remove from running scheduler
+		cron_scheduler = get_cron_scheduler(request)
+		if cron_scheduler:
+			cron_scheduler.remove_job_from_scheduler(name)
 
 		return {
 			"status": "success",
@@ -236,7 +266,7 @@ async def duplicate_job(name: str, new_name: str = Query(...)):
 
 
 @router.delete("/scheduler/jobs/{name}")
-async def delete_job(name: str):
+async def delete_job(request: Request, name: str):
 	"""Delete a cron job."""
 	try:
 		manager = CronManager()
@@ -244,6 +274,11 @@ async def delete_job(name: str):
 
 		if not success:
 			raise HTTPException(status_code=400, detail=message)
+
+		# Remove from running scheduler
+		cron_scheduler = get_cron_scheduler(request)
+		if cron_scheduler:
+			cron_scheduler.remove_job_from_scheduler(name)
 
 		return {
 			"status": "success",

@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 from apscheduler.schedulers.background import BackgroundScheduler
+from gateway.cron import CronScheduler
 
 
 def setup_scheduler(app: FastAPI) -> None:
@@ -48,6 +49,29 @@ def setup_scheduler(app: FastAPI) -> None:
     def shutdown_scheduler():
         scheduler.shutdown()
         logger.info("Scheduler shutdown")
+
+
+def setup_cron_scheduler(app: FastAPI) -> None:
+    """Set up cron job scheduler for dynamic job management."""
+    try:
+        from utils.env import get_config_root
+        cron_config_path = get_config_root() / "cron.yml"
+
+        cron_scheduler = CronScheduler(cron_config_path)
+        cron_scheduler.start()
+
+        # Store in app state for API access
+        app.state.cron_scheduler = cron_scheduler
+        logger.info(f"Cron scheduler started with {len(cron_scheduler.get_jobs())} jobs")
+
+        # Add shutdown event
+        @app.on_event("shutdown")
+        def shutdown_cron_scheduler():
+            cron_scheduler.stop()
+            logger.info("Cron scheduler shutdown")
+
+    except Exception as e:
+        logger.error(f"Failed to set up cron scheduler: {e}", exc_info=True)
 
 
 def create_app() -> FastAPI:
@@ -97,6 +121,9 @@ def create_app() -> FastAPI:
 
     # Setup background scheduler for data fetching
     setup_scheduler(app)
+
+    # Setup cron scheduler for dynamic job management
+    setup_cron_scheduler(app)
 
     return app
 
