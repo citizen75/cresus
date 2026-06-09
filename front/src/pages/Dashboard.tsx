@@ -379,12 +379,6 @@ export default function Dashboard() {
               }
             }}
             onPortfolioClick={(portfolio, tickers, widget) => {
-              // Find the alert that matches this portfolio and mark it as selected
-              const matchingAlert = alertHistory.find((a) => a.info.portfolio === portfolio)
-              if (matchingAlert) {
-                setSelectedAlertId(matchingAlert.id)
-              }
-
               // Create alert info object and display holdings filtered by tickers
               const alertInfo: AlertInfo = {
                 title: '',
@@ -392,6 +386,19 @@ export default function Dashboard() {
                 tickers: tickers,
                 content: `Portfolio: ${portfolio}`,
               }
+
+              // Find the alert that matches this portfolio
+              const matchingAlert = alertHistory.find((a) => a.info.portfolio === portfolio)
+              if (matchingAlert) {
+                // Use existing alert
+                setSelectedAlertId(matchingAlert.id)
+              } else {
+                // Add new entry to Recent for this portfolio view
+                const alertId = `${Date.now()}-${portfolio}`
+                setAlertHistory((prev) => [{ id: alertId, info: alertInfo }, ...prev].slice(0, 10))
+                setSelectedAlertId(alertId)
+              }
+
               setAlertGridView(alertInfo)
               setRightPanelOpen(true)
               // Widget data is available if message has widget field
