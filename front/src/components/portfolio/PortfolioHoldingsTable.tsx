@@ -13,6 +13,9 @@ interface PortfolioHoldingsTableProps {
   filterTickers?: string[] // Optional: filter positions to only these tickers
   externalSearchQuery?: string // Optional: search query from parent
   onSearchChange?: (query: string) => void // Callback when search changes
+  viewMode?: 'table' | 'charts' // View mode toggle
+  onViewModeChange?: (mode: 'table' | 'charts') => void // Callback when view mode changes
+  showViewToggle?: boolean // Show table/charts toggle
 }
 
 export function PortfolioHoldingsTable({
@@ -27,6 +30,9 @@ export function PortfolioHoldingsTable({
   filterTickers,
   externalSearchQuery = '',
   onSearchChange,
+  viewMode = 'table',
+  onViewModeChange,
+  showViewToggle = false,
 }: PortfolioHoldingsTableProps) {
   const [internalSearchQuery, setInternalSearchQuery] = useState<string>('')
   const searchQuery = externalSearchQuery !== undefined ? externalSearchQuery : internalSearchQuery
@@ -148,21 +154,49 @@ export function PortfolioHoldingsTable({
     <div className="space-y-4">
       {/* Search Bar - Only show if not using external search */}
       {showSearch && !externalSearchQuery && (
-        <div className="flex gap-3">
-          <input
-            type="text"
-            placeholder="Search by symbol or company..."
-            value={internalSearchQuery}
-            onChange={(e) => setInternalSearchQuery(e.target.value)}
-            className="flex-1 px-4 py-2 bg-slate-800 border border-slate-700 rounded text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-600"
-          />
-          {internalSearchQuery && (
-            <button
-              onClick={() => setInternalSearchQuery('')}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-sm transition"
-            >
-              Clear
-            </button>
+        <div className="flex gap-3 items-center justify-between">
+          <div className="flex gap-3 flex-1">
+            <input
+              type="text"
+              placeholder="Search by symbol or company..."
+              value={internalSearchQuery}
+              onChange={(e) => setInternalSearchQuery(e.target.value)}
+              className="flex-1 px-4 py-2 bg-slate-800 border border-slate-700 rounded text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-600"
+            />
+            {internalSearchQuery && (
+              <button
+                onClick={() => setInternalSearchQuery('')}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-sm transition"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          {/* View Toggle - Show if enabled */}
+          {showViewToggle && onViewModeChange && (
+            <div className="flex gap-2 bg-slate-800 border border-slate-700 rounded p-1 flex-shrink-0">
+              <button
+                onClick={() => onViewModeChange('table')}
+                className={`px-4 py-1.5 rounded transition font-medium text-sm ${
+                  viewMode === 'table'
+                    ? 'bg-purple-600 text-white'
+                    : 'text-slate-400 hover:text-slate-300'
+                }`}
+              >
+                📊 Table
+              </button>
+              <button
+                onClick={() => onViewModeChange('charts')}
+                className={`px-4 py-1.5 rounded transition font-medium text-sm ${
+                  viewMode === 'charts'
+                    ? 'bg-purple-600 text-white'
+                    : 'text-slate-400 hover:text-slate-300'
+                }`}
+              >
+                📈 Charts
+              </button>
+            </div>
           )}
         </div>
       )}
