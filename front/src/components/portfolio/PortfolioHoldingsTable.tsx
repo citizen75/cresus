@@ -268,7 +268,7 @@ export function PortfolioHoldingsTable({
                     </td>
                     <td className="px-4 py-3 text-slate-300 truncate max-w-xs">{pos.company_name || '-'}</td>
                     <td className="px-4 py-3 text-white font-medium">{weight.toFixed(1)}%</td>
-                    <td className="px-4 py-3 text-right text-slate-300">{pos.quantity}</td>
+                    <td className="px-4 py-3 text-right text-slate-300">{pos.quantity !== null && pos.quantity !== undefined ? pos.quantity : '-'}</td>
                     <td className="px-4 py-3 text-right text-slate-300">{formatCurrency(pos.avg_entry_price, currency)}</td>
                     <td className="px-4 py-3 text-right text-white font-medium">{formatCurrency(pos.current_price, currency)}</td>
                     <td className="px-4 py-3 text-right">

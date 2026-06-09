@@ -224,29 +224,31 @@ export default function Dashboard() {
                   ))}
                 </div>
 
-                {/* Timeframe Selector */}
-                <div className="flex items-center gap-3 flex-shrink-0">
-                  <span className="text-xs font-semibold text-slate-400">Period:</span>
-                  <div className="flex gap-2">
-                    {(['1W', '1M', '3M', 'YTD', 'ALL'] as const).map((tf) => (
-                      <button
-                        key={tf}
-                        onClick={() => setTimeframe(tf)}
-                        className={`px-3 py-1 rounded text-xs font-medium transition ${
-                          timeframe === tf
-                            ? 'bg-purple-600 text-white'
-                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                        }`}
-                      >
-                        {tf}
-                      </button>
-                    ))}
+                {/* Timeframe Selector - Only show in charts view */}
+                {viewMode === 'charts' && (
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <span className="text-xs font-semibold text-slate-400">Period:</span>
+                    <div className="flex gap-2">
+                      {(['1W', '1M', '3M', 'YTD', 'ALL'] as const).map((tf) => (
+                        <button
+                          key={tf}
+                          onClick={() => setTimeframe(tf)}
+                          className={`px-3 py-1 rounded text-xs font-medium transition ${
+                            timeframe === tf
+                              ? 'bg-purple-600 text-white'
+                              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                          }`}
+                        >
+                          {tf}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
 
-            {/* Search Bar - Inline with controls */}
+            {/* Search Bar - Only show in table view */}
             {viewMode === 'table' && (
               <div className="border-b border-slate-800 bg-slate-950 px-4 py-3">
                 <div className="flex gap-3">
@@ -299,7 +301,7 @@ export default function Dashboard() {
                       return {
                         ticker,
                         company_name: fund.company_name || ticker,
-                        quantity: 1,
+                        quantity: null, // Hide shares for non-portfolio alerts
                         avg_entry_price: previousClose || 0,
                         current_price: currentPrice || 0,
                         position_value: currentPrice || 0,
