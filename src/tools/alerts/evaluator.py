@@ -100,8 +100,10 @@ class AlertEvaluator:
             elif alert.source == AlertSource.ALL_PORTFOLIOS:
                 pm = PortfolioManager()
                 all_portfolios = pm.list_portfolios()
+                # Only include real portfolios, not paper trading simulations
+                real_portfolios = [p for p in all_portfolios if p.get('type') == 'real']
                 tickers = set()
-                for pf in all_portfolios:
+                for pf in real_portfolios:
                     positions = pm.get_portfolio_positions(pf.get('name'))
                     if positions:
                         for p in positions.get('positions', []):
