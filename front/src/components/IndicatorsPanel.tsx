@@ -131,7 +131,7 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
             time: candle.time,
             value: rsi[i],
           }))
-          .filter(d => d.value !== null)
+          // Keep all data points (including nulls) so range syncing works for all dates
 
         const chart = createChart(rsiContainerRef.current, {
           layout: { background: { color: '#0f172a' }, textColor: '#94a3b8' },
@@ -194,7 +194,7 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
             time: candle.time,
             value: macd.histogram[i],
           }))
-          .filter(d => d.value !== null)
+          // Keep all data points (including nulls) so range syncing works for all dates
 
         const chart = createChart(macdContainerRef.current, {
           layout: { background: { color: '#0f172a' }, textColor: '#94a3b8' },
