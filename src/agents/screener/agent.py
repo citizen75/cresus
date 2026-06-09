@@ -379,11 +379,10 @@ class ScreenerAgent(Agent):
 					"matches": all_results[:100],  # Return first 100 matches
 					"screening_date": str(most_recent_date),
 					"timing": {
-						"load": round(total_load, 2),
-						"calc": round(total_calc, 2),
-						"eval": round(total_eval, 2),
-						"info": round(total_info, 2),
-						"total": round(total_ticker_time, 2),
+						"total": round(parallel_time, 2),
+						"per_ticker": round(avg_ticker_time, 3),
+						"workers": max_workers,
+						"speedup": round(speedup, 1),
 					}
 				}
 
