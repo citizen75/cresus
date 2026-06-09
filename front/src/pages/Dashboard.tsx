@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ConversationWidget } from '@/components/ConversationWidget'
 import TradingChart from '@/components/TradingChart'
 import CardChart from '@/components/CardChart'
@@ -15,6 +16,7 @@ interface AlertInfo {
 }
 
 export default function Dashboard() {
+  const navigate = useNavigate()
   const conversationPanelRef = useRef<{ scrollToBottom: () => void } | null>(null)
   const [conversationOpen, setConversationOpen] = useState(true)
   const [rightPanelOpen, setRightPanelOpen] = useState(false)
@@ -342,6 +344,10 @@ export default function Dashboard() {
             title="Global Chat"
             subtitle="All portfolios & alerts"
             maxHeight="h-full"
+            onPortfolioClick={(portfolio) => {
+              // Navigate to portfolio holdings page
+              navigate(`/portfolios/${encodeURIComponent(portfolio)}/holdings`)
+            }}
             onSendMessage={async (message) => {
               const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
               const response = await fetch(`${baseUrl}/api/v1/conversations/_global/message`, {

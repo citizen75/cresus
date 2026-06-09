@@ -56,6 +56,7 @@ interface ConversationWidgetProps {
   onRefresh?: () => void
   maxHeight?: string
   onSendMessage?: (message: string) => Promise<void>
+  onPortfolioClick?: (portfolioName: string) => void
 }
 
 // Dynamic widget loader
@@ -121,7 +122,8 @@ export function ConversationWidget({
   showRefreshButton = true,
   onRefresh,
   maxHeight = 'h-96',
-  onSendMessage
+  onSendMessage,
+  onPortfolioClick
 }: ConversationWidgetProps) {
   const [messages, setMessages] = useState<ConversationMessage[]>([])
   const [loading, setLoading] = useState(true)
@@ -273,8 +275,18 @@ export function ConversationWidget({
           const signal = msg.signal || parsedAlert?.signal
           const tickers = msg.tickers || parsedAlert?.tickers || []
 
+          const handleMessageClick = () => {
+            if (portfolio && onPortfolioClick) {
+              onPortfolioClick(portfolio)
+            }
+          }
+
           return (
-            <div key={msg.id || idx} className="rounded-lg p-3 bg-slate-800/50 border border-slate-700/50 space-y-2">
+            <div
+              key={msg.id || idx}
+              className="rounded-lg p-3 bg-slate-800/50 border border-slate-700/50 space-y-2 cursor-pointer hover:bg-slate-700/50 transition"
+              onClick={handleMessageClick}
+            >
               {/* Header: Icon + Portfolio + Signal + Time */}
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2">
