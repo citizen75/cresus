@@ -30,6 +30,7 @@ export default function Dashboard() {
   const [timeframe, setTimeframe] = useState<'1W' | '1M' | '3M' | 'YTD' | 'ALL'>('1M')
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [portfolioPositions, setPortfolioPositions] = useState<any[]>([])
+  const [fundamentalCache, setFundamentalCache] = useState<Record<string, any>>({})
 
   // Fetch and auto-select most recent alert on mount
   useEffect(() => {
@@ -180,9 +181,14 @@ export default function Dashboard() {
             let positions = data.positions || []
             console.log(`[Dashboard] Loaded portfolio ${alertGridView.portfolio}: ${positions.length} positions`)
 
-            // Fetch fundamental data for portfolio positions
-            const fundData: Record<string, any> = {}
+            // Fetch fundamental data for portfolio positions (using cache)
+            const fundData: Record<string, any> = { ...fundamentalCache }
             for (const pos of positions) {
+              // Skip if already cached
+              if (fundData[pos.ticker]) {
+                console.log(`[Dashboard] Using cached fundamental data for ${pos.ticker}`)
+                continue
+              }
               try {
                 const result = await api.getFundamental(pos.ticker)
                 fundData[pos.ticker] = result?.data?.quotation || {}
@@ -191,6 +197,8 @@ export default function Dashboard() {
                 fundData[pos.ticker] = {}
               }
             }
+            // Update cache for future use
+            setFundamentalCache(fundData)
 
             // Enrich positions with calculated daily changes
             positions = positions.map((pos: any) => {
@@ -265,11 +273,24 @@ export default function Dashboard() {
             console.log(`[Dashboard] ${ticker}: currentPrice=${currentPrice}, previousClose=${previousClose}`)
           }
 
-          // Fetch fundamental data for company info and prices
-          const baseUrl = getApiBaseUrl()
-          const fundResponse = await fetch(`${baseUrl}/api/v1/data/fundamental/${ticker}`)
-          const fundData = await fundResponse.json()
-          console.log(`[Dashboard] ${ticker} fundResponse.ok=${fundResponse.ok}, has quotation=${!!fundData?.data?.quotation}`)
+          // Fetch fundamental data for company info and prices (using cache)
+          let fundData = { data: {} }
+          if (fundamentalCache[ticker]?.current_price) {
+            console.log(`[Dashboard] Using cached fundamental data for ${ticker}`)
+            fundData = { data: { quotation: fundamentalCache[ticker] } }
+          } else {
+            const baseUrl = getApiBaseUrl()
+            const fundResponse = await fetch(`${baseUrl}/api/v1/data/fundamental/${ticker}`)
+            fundData = await fundResponse.json()
+            console.log(`[Dashboard] ${ticker} fundResponse.ok=${fundResponse.ok}, has quotation=${!!fundData?.data?.quotation}`)
+            // Cache the result
+            if (fundData?.data?.quotation) {
+              setFundamentalCache((prev) => ({
+                ...prev,
+                [ticker]: fundData.data.quotation,
+              }))
+            }
+          }
 
           // Use fundamental data if available
           if (fundResponse.ok && fundData?.data?.company?.name) {
