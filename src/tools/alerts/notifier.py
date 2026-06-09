@@ -89,14 +89,30 @@ class AlertNotifier:
                         f"Error sending alert to portfolio '{portfolio_name}': {e}"
                     )
 
-            # For all_portfolios alerts, also send unfiltered alert to global chat
+            # For all_portfolios alerts, send individual messages to global chat for each portfolio
             if alert.source == AlertSource.ALL_PORTFOLIOS:
-                try:
-                    message = self._format_alert_message(alert, result, result.matches)
-                    manager.add_message("alert", message, portfolio=None)  # None = global
-                    self.logger.info(
-                        f"Sent alert '{alert.name}' to global chat: {len(result.matches)} match(es)"
-                    )
+                for portfolio_name in portfolios:
+                    try:
+                        # Get this portfolio's matches
+                        holdings = pm.get_portfolio_positions(portfolio_name)
+                        portfolio_tickers = set()
+                        if holdings:
+                            portfolio_tickers = {p.get('ticker') for p in holdings.get('positions', [])}
+
+                        filtered_matches = [
+                            m for m in result.matches
+                            if m.get('ticker') in portfolio_tickers
+                        ]
+
+                        if filtered_matches:
+                            # Format message with portfolio prefix
+                            message = f"**Portfolio:** {portfolio_name}\n{self._format_alert_message(alert, result, filtered_matches)}"
+                            manager.add_message("alert", message, portfolio=None)  # None = global
+                            self.logger.info(
+                                f"Sent alert '{alert.name}' to global chat for {portfolio_name}: {len(filtered_matches)} match(es)"
+                            )
+                    except Exception as e:
+                        self.logger.error(f"Error sending alert to global for {portfolio_name}: {e}")
                 except Exception as e:
                     self.logger.error(f"Error sending alert to global chat: {e}")
 

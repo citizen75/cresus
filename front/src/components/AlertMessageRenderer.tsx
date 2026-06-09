@@ -29,54 +29,49 @@ function renderLineContent(line: string) {
   const parts: React.ReactNode[] = []
   let currentPos = 0
 
-  // Regex to match: bold (**text**), code (`text`), or bullet points
-  const regex = /(\*\*[^*]+\*\*|`[^`]+`|•\s+[^:]+:|[^*`•]+)/g
+  // Better regex to match: bold (**text**), code (`text`), or bullet points
+  const regex = /\*\*([^*]+)\*\*|`([^`]+)`|•\s+([^:]+):\s+(.+?)(?=•|$)|([^*`•]+)/g
   let match
 
   while ((match = regex.exec(line)) !== null) {
-    const text = match[0]
-
-    if (text.startsWith('**') && text.endsWith('**')) {
+    if (match[1]) {
       // Bold text
-      const boldText = text.slice(2, -2)
       parts.push(
         <span key={`bold-${match.index}`} className="font-bold text-white">
-          {boldText}
+          {match[1]}
         </span>
       )
-    } else if (text.startsWith('`') && text.endsWith('`')) {
+    } else if (match[2]) {
       // Code text
-      const codeText = text.slice(1, -1)
       parts.push(
         <code
           key={`code-${match.index}`}
           className="bg-black/30 px-1.5 py-0.5 rounded text-xs font-mono text-slate-200"
         >
-          {codeText}
+          {match[2]}
         </code>
       )
-    } else if (text.startsWith('•')) {
+    } else if (match[3]) {
       // Bullet point - highlight ticker
-      const parts2 = text.split(':')
-      const ticker = parts2[0].replace('•', '').trim()
-      const rest = parts2.slice(1).join(':')
-
       parts.push(
         <span key={`bullet-${match.index}`}>
           <span className="text-yellow-400">•</span>
-          <span className="font-bold text-purple-400 ml-1">{ticker}</span>
-          <span>{rest}</span>
+          <span className="font-bold text-purple-400 ml-1">{match[3]}</span>
+          <span>: {match[4]}</span>
         </span>
       )
-    } else {
+    } else if (match[5]) {
       // Regular text
-      parts.push(
-        <span key={`text-${match.index}`} className="text-slate-300">
-          {text}
-        </span>
-      )
+      const text = match[5].trim()
+      if (text) {
+        parts.push(
+          <span key={`text-${match.index}`} className="text-slate-300">
+            {text}
+          </span>
+        )
+      }
     }
   }
 
-  return parts
+  return parts.length > 0 ? parts : [<span key="empty">{line}</span>]
 }
