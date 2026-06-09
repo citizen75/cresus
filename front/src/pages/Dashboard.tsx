@@ -440,8 +440,10 @@ export default function Dashboard() {
               onClose={() => setRightPanelOpen(false)}
               filterTickers={alertGridView?.tickers}
             />
-          )}
-        </div>
+            )}
+          </div>
+          </>
+        )}
       </div>
       )}
 
