@@ -57,15 +57,7 @@ export default function Alerts() {
     try {
       setError(null)
       await api.createAlert(formData)
-      setShowCreateModal(false)
-      setFormData({
-        name: '',
-        source: 'ticker',
-        source_value: '',
-        formula: '',
-        notify: 'conversation',
-        description: '',
-      })
+      closeModals()
       await fetchAlerts()
     } catch (err) {
       setError(`Failed to create alert: ${err instanceof Error ? err.message : 'Unknown error'}`)
@@ -84,15 +76,7 @@ export default function Alerts() {
         description: formData.description,
         enabled: editingAlert.enabled,
       })
-      setEditingAlert(null)
-      setFormData({
-        name: '',
-        source: 'ticker',
-        source_value: '',
-        formula: '',
-        notify: 'conversation',
-        description: '',
-      })
+      closeModals()
       await fetchAlerts()
     } catch (err) {
       setError(`Failed to update alert: ${err instanceof Error ? err.message : 'Unknown error'}`)
