@@ -368,7 +368,7 @@ export default function Dashboard() {
       {/* Right Column - Portfolio Holdings Widget */}
       {(rightPanelOpen || selectedPortfolioForHoldings) && (
       <div className="flex-1 flex flex-col bg-slate-900 rounded-lg border border-slate-800 overflow-auto">
-        {/* Close button for holdings panel */}
+        {/* Holdings Panel Header */}
         {selectedPortfolioForHoldings && (
           <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between flex-shrink-0">
             <h3 className="text-sm font-semibold text-white capitalize">{selectedPortfolioForHoldings} Holdings</h3>
@@ -382,18 +382,15 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Show holdings widget when portfolio is selected */}
-        {selectedPortfolioForHoldings && (
+        {/* Holdings Widget - Show when portfolio selected */}
+        {selectedPortfolioForHoldings ? (
           <div className="flex-1 overflow-auto p-4">
             <PortfolioHoldingsWidget portfolioName={selectedPortfolioForHoldings} />
           </div>
-        )}
-
-        {/* Original alert grid and holdings content */}
-        {!selectedPortfolioForHoldings && (
-          <>
-            {/* Recent Alerts & Charts */}
-            {alertGridView && (alertHistory.length > 0 || chartHistory.length > 0) && (
+        ) : (
+        <div className="flex-1 flex flex-col bg-slate-900 rounded-lg border border-slate-800 overflow-auto">
+        {/* Recent Alerts & Charts */}
+        {alertGridView && (alertHistory.length > 0 || chartHistory.length > 0) && (
           <div className="border-b border-slate-800 bg-slate-950 px-4 py-3 flex-shrink-0">
             <div className="text-xs font-semibold text-slate-400 mb-2">Recent</div>
             <div className="flex gap-2 overflow-x-auto pb-2">
@@ -440,10 +437,8 @@ export default function Dashboard() {
               onClose={() => setRightPanelOpen(false)}
               filterTickers={alertGridView?.tickers}
             />
-            )}
-          </div>
-          </>
-        )}
+          )}
+        </div>
       </div>
       )}
 
@@ -707,8 +702,8 @@ export default function Dashboard() {
                 <div className="text-sm">Click on an alert to view tickers</div>
               </div>
             </div>
-            )}
-          </>
+          )}
+        </div>
         )}
       </div>
       )}
