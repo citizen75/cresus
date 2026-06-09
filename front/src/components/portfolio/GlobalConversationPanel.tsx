@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react'
 import { getApiBaseUrl } from '@/services/api'
 import { AlertMessageRenderer } from '@/components/AlertMessageRenderer'
 
@@ -70,12 +70,24 @@ function parseAlertContent(content: string): AlertInfo {
   return info
 }
 
-export default function GlobalConversationPanel({ onClose, onAlertClick, onAlertGridClick, selectedAlertId }: GlobalConversationPanelProps) {
+const GlobalConversationPanel = forwardRef<
+  { scrollToBottom: () => void },
+  GlobalConversationPanelProps
+>(({ onClose, onAlertClick, onAlertGridClick, selectedAlertId }, ref) => {
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [newMessage, setNewMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useImperativeHandle(ref, () => ({
+    scrollToBottom: () => {
+      if (messagesContainerRef.current) {
+        messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight
+      }
+    },
+  }))
 
   useEffect(() => {
     const fetchMessages = async () => {
@@ -143,15 +155,24 @@ export default function GlobalConversationPanel({ onClose, onAlertClick, onAlert
     try {
       const date = new Date(datetime)
       const now = new Date()
+
+      // Format time as HH:MM (24-hour format)
+      const hours = String(date.getHours()).padStart(2, '0')
+      const minutes = String(date.getMinutes()).padStart(2, '0')
+      const timeStr = `${hours}:${minutes}`
+
       const diffMs = now.getTime() - date.getTime()
       const diffMins = Math.floor(diffMs / 60000)
 
-      if (diffMins < 1) return 'now'
-      if (diffMins < 60) return `${diffMins}m ago`
-      const diffHours = Math.floor(diffMins / 60)
-      if (diffHours < 24) return `${diffHours}h ago`
-      const diffDays = Math.floor(diffHours / 24)
-      return `${diffDays}d ago`
+      // For today's messages, just show time
+      const isToday = date.toDateString() === now.toDateString()
+      if (isToday) return timeStr
+
+      // For other days, show date and time
+      return date.toLocaleString([], {
+        month: 'short',
+        day: 'numeric'
+      }) + ` ${timeStr}`
     } catch {
       return datetime
     }
@@ -217,7 +238,7 @@ export default function GlobalConversationPanel({ onClose, onAlertClick, onAlert
       )}
 
       {/* Messages Container */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-slate-400 text-sm">Loading conversations...</div>
@@ -247,24 +268,24 @@ export default function GlobalConversationPanel({ onClose, onAlertClick, onAlert
                   // Alert Card View
                   <div className="space-y-0">
                     {/* Alert Header */}
-                    <div className="bg-red-900/40 border-b border-red-800/50 p-3">
-                      <div className="flex items-start justify-between mb-2">
+                    <div className="bg-gradient-to-r from-rose-600/50 to-pink-600/50 border-b border-rose-500/40 p-3">
+                      <div className="flex items-center justify-between">
                         <div
-                          className="flex-1"
+                          className="flex-1 flex items-center gap-3"
                           onClick={() => onAlertGridClick?.(alertInfo, alertId)}
                         >
                           {alertInfo.portfolio && (
-                            <p className="text-xs text-red-300 font-medium mb-1">
-                              Portfolio: <span className="font-bold">{alertInfo.portfolio}</span>
+                            <p className="text-xs text-rose-200 font-medium">
+                              Portfolio: <span className="font-bold text-rose-100">{alertInfo.portfolio}</span>
                             </p>
                           )}
-                          <p className="text-sm font-bold text-red-200">
+                          <p className="text-sm font-bold text-white">
                             ⚠️ {alertInfo.title} 🚨
                           </p>
                         </div>
                         <button
                           onClick={() => handleDeleteMessage(msg)}
-                          className="text-slate-500 hover:text-red-400 text-xs flex-shrink-0"
+                          className="text-slate-400 hover:text-rose-300 text-xs flex-shrink-0 transition"
                           title="Delete message"
                         >
                           ✕
@@ -274,41 +295,29 @@ export default function GlobalConversationPanel({ onClose, onAlertClick, onAlert
 
                     {/* Tickers List - Compact */}
                     {alertInfo.tickers.length > 0 && (
-                      <div className="border-t border-slate-700/50 px-3 py-2 bg-slate-800/50 flex items-center gap-2 flex-wrap">
-                        <p className="text-xs text-slate-400 font-medium">Tickers:</p>
+                      <div className="border-t border-rose-500/30 px-3 py-3 bg-slate-800/80 flex items-center gap-2 flex-wrap">
+                        <p className="text-xs text-rose-300 font-semibold">Tickers:</p>
                         {alertInfo.tickers.slice(0, 8).map((ticker) => (
                           <button
                             key={ticker}
                             onClick={() => {
                               if (onAlertClick) onAlertClick(ticker)
                             }}
-                            className="px-2 py-1 bg-slate-700/50 hover:bg-purple-600/50 text-slate-200 hover:text-white rounded text-xs font-medium transition inline-block"
+                            className="px-2.5 py-1.5 bg-gradient-to-r from-purple-600/70 to-violet-600/70 hover:from-purple-500 hover:to-violet-500 text-white rounded text-xs font-semibold transition inline-block shadow-sm"
                             title={`View ${ticker} chart`}
                           >
                             📈 {ticker}
                           </button>
                         ))}
                         {alertInfo.tickers.length > 8 && (
-                          <span className="text-xs text-slate-400">+{alertInfo.tickers.length - 8} more</span>
+                          <span className="text-xs text-slate-400 font-medium">+{alertInfo.tickers.length - 8} more</span>
                         )}
                       </div>
                     )}
 
-                    {/* View All Button */}
-                    <div className="border-t border-slate-700/50 p-2 bg-slate-800/30">
-                      <button
-                        onClick={() => {
-                          if (onAlertGridClick) onAlertGridClick(alertInfo, alertId)
-                        }}
-                        className="w-full text-xs text-purple-300 hover:text-purple-200 py-1 font-medium transition"
-                      >
-                        View all {alertInfo.tickers.length} tickers →
-                      </button>
-                    </div>
-
                     {/* Timestamp */}
-                    <div className="px-3 py-2 border-t border-slate-700/50 flex items-center justify-between bg-slate-900/50">
-                      <span className="text-xs text-slate-500">{formatTime(msg.datetime)}</span>
+                    <div className="px-3 py-2 border-t border-rose-500/20 flex items-center justify-between bg-slate-900/70">
+                      <span className="text-xs text-slate-400 font-medium">{formatTime(msg.datetime)}</span>
                     </div>
                   </div>
                 ) : (
@@ -369,4 +378,8 @@ export default function GlobalConversationPanel({ onClose, onAlertClick, onAlert
       </form>
     </div>
   )
-}
+})
+
+GlobalConversationPanel.displayName = 'GlobalConversationPanel'
+
+export default GlobalConversationPanel

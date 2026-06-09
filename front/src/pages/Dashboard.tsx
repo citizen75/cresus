@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import GlobalConversationPanel from '@/components/portfolio/GlobalConversationPanel'
 import TradingChart from '@/components/TradingChart'
 import CardChart from '@/components/CardChart'
@@ -14,9 +14,12 @@ interface AlertInfo {
 }
 
 export default function Dashboard() {
+  const conversationPanelRef = useRef<{ scrollToBottom: () => void } | null>(null)
   const [conversationOpen, setConversationOpen] = useState(true)
+  const [rightPanelOpen, setRightPanelOpen] = useState(false)
   const [chartModalTicker, setChartModalTicker] = useState<string | null>(null)
   const [chartHistory, setChartHistory] = useState<string[]>([])
+  const [alertHistory, setAlertHistory] = useState<{ id: string; info: AlertInfo }[]>([])
   const [alertGridView, setAlertGridView] = useState<AlertInfo | null>(null)
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null)
   const [selectedTableTicker, setSelectedTableTicker] = useState<string | null>(null)
@@ -27,6 +30,69 @@ export default function Dashboard() {
   const [timeframe, setTimeframe] = useState<'1W' | '1M' | '3M' | 'YTD' | 'ALL'>('1M')
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [portfolioPositions, setPortfolioPositions] = useState<any[]>([])
+
+  // Fetch and auto-select most recent alert on mount
+  useEffect(() => {
+    const loadMostRecentAlert = async () => {
+      try {
+        const baseUrl = getApiBaseUrl()
+        const response = await fetch(`${baseUrl}/api/v1/conversations/_global`)
+        if (!response.ok) return
+
+        const data = await response.json()
+        const messages = data.history || []
+
+        // Find the most recent alert message
+        for (let i = messages.length - 1; i >= 0; i--) {
+          const msg = messages[i]
+          if (msg.source === 'alert') {
+            // Parse alert content
+            const lines = msg.content.split('\n')
+            const alertInfo: AlertInfo = {
+              title: '',
+              portfolio: undefined,
+              tickers: [],
+              content: msg.content,
+            }
+
+            for (const line of lines) {
+              if (line.startsWith('**Portfolio:**')) {
+                alertInfo.portfolio = line.replace('**Portfolio:**', '').trim()
+              }
+              if (line.includes('🚨') || line.includes('⚠️')) {
+                const match = line.match(/\*\*([^*]+)\*\*/)
+                if (match) {
+                  alertInfo.title = match[1]
+                }
+              }
+              if (line.startsWith('  •')) {
+                const match = line.match(/•\s+([A-Z0-9.-]+):/)
+                if (match) {
+                  alertInfo.tickers.push(match[1])
+                }
+              }
+            }
+
+            if (alertInfo.tickers.length > 0) {
+              const alertId = `${i}-${msg.datetime}`
+              setAlertGridView(alertInfo)
+              setSelectedAlertId(alertId)
+              setAlertHistory([{ id: alertId, info: alertInfo }])
+              setRightPanelOpen(true)
+              setTimeout(() => {
+                conversationPanelRef.current?.scrollToBottom()
+              }, 100)
+              break
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load most recent alert:', err)
+      }
+    }
+
+    loadMostRecentAlert()
+  }, [])
 
   const handleSelectTicker = useCallback((ticker: string) => {
     setChartModalTicker(ticker)
@@ -40,8 +106,17 @@ export default function Dashboard() {
 
   const handleAlertGridClick = useCallback((alertInfo: AlertInfo, alertId?: string) => {
     setAlertGridView(alertInfo)
+    setRightPanelOpen(true)
     setSelectedAlertId(alertId || null)
     setSelectedTableTicker(null)
+
+    // Add to alert history (keep last 10)
+    if (alertId) {
+      setAlertHistory((prev) => {
+        const filtered = prev.filter((a) => a.id !== alertId)
+        return [{ id: alertId, info: alertInfo }, ...filtered].slice(0, 10)
+      })
+    }
   }, [])
 
   const filterDataByTimeframe = (data: any[], tf: string) => {
@@ -64,6 +139,20 @@ export default function Dashboard() {
       return itemDate >= cutoffDate
     })
   }
+
+  // Auto-select most recent alert when none is selected
+  useEffect(() => {
+    if (!alertGridView && alertHistory.length > 0) {
+      const mostRecentAlert = alertHistory[0]
+      setAlertGridView(mostRecentAlert.info)
+      setSelectedAlertId(mostRecentAlert.id)
+      setRightPanelOpen(true)
+      // Scroll conversation to bottom
+      setTimeout(() => {
+        conversationPanelRef.current?.scrollToBottom()
+      }, 0)
+    }
+  }, [alertHistory])
 
   // Load portfolio positions when alert has a portfolio
   useEffect(() => {
@@ -172,6 +261,7 @@ export default function Dashboard() {
       {conversationOpen && (
         <div className="w-[500px] flex-shrink-0">
           <GlobalConversationPanel
+            ref={conversationPanelRef}
             onClose={() => setConversationOpen(false)}
             onAlertClick={handleSelectTicker}
             onAlertGridClick={handleAlertGridClick}
@@ -181,58 +271,30 @@ export default function Dashboard() {
       )}
 
       {/* Right Column - Alert Grid View */}
+      {rightPanelOpen && (
       <div className="flex-1 flex flex-col bg-slate-900 rounded-lg border border-slate-800">
-        {/* Header */}
-        <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-lg">📊</span>
-            <div>
-              <h3 className="text-sm font-semibold text-white">
-                {alertGridView ? alertGridView.title : 'Alert'}
-              </h3>
-              {alertGridView?.portfolio && (
-                <p className="text-xs text-slate-400">Portfolio: {alertGridView.portfolio}</p>
-              )}
-            </div>
-          </div>
-          {alertGridView && (
-            <button
-              onClick={() => {
-                setAlertGridView(null)
-              }}
-              className="text-slate-500 hover:text-slate-400"
-            >
-              ✕
-            </button>
-          )}
-        </div>
-
-        {/* Alert Info Section */}
-        {alertGridView && (
-          <div className="border-b border-slate-800 bg-slate-950 px-4 py-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <p className="text-xs font-semibold text-slate-400">Alert Details</p>
-                <p className="text-sm font-medium text-white">{alertGridView.title}</p>
-              </div>
-              {alertGridView.portfolio && (
-                <div className="text-right">
-                  <p className="text-xs text-slate-400">Portfolio</p>
-                  <p className="text-sm font-medium text-purple-300">{alertGridView.portfolio}</p>
-                </div>
-              )}
-            </div>
-            <div className="flex items-center gap-4 text-xs">
-              <span className="text-slate-400">Tickers: <span className="text-white font-medium">{alertGridView.tickers.length}</span></span>
-            </div>
-          </div>
-        )}
-
-        {/* Chart History Section */}
-        {alertGridView && chartHistory.length > 0 && (
+        {/* Mixed Recent Alerts & Charts Section - Top only */}
+        {alertGridView && (alertHistory.length > 0 || chartHistory.length > 0) && (
           <div className="border-b border-slate-800 bg-slate-950 px-4 py-3">
-            <div className="text-xs font-semibold text-slate-400 mb-2">Recent Charts</div>
+            <div className="text-xs font-semibold text-slate-400 mb-2">Recent</div>
             <div className="flex gap-2 overflow-x-auto pb-2">
+              {/* Recent Alerts */}
+              {alertHistory.map((alert) => (
+                <button
+                  key={alert.id}
+                  onClick={() => handleAlertGridClick(alert.info, alert.id)}
+                  className={`px-3 py-1 rounded text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
+                    selectedAlertId === alert.id
+                      ? 'bg-red-600 text-white'
+                      : 'bg-red-900/30 text-red-300 hover:bg-red-900/50'
+                  }`}
+                  title={`${alert.info.title}${alert.info.portfolio ? ` - ${alert.info.portfolio}` : ''}`}
+                >
+                  🚨 {alert.info.portfolio || alert.info.title}
+                </button>
+              ))}
+
+              {/* Recent Charts */}
               {chartHistory.map((ticker) => (
                 <button
                   key={ticker}
@@ -242,8 +304,9 @@ export default function Dashboard() {
                       ? 'bg-blue-600 text-white'
                       : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                   }`}
+                  title={`View ${ticker} chart`}
                 >
-                  {ticker}
+                  📈 {ticker}
                 </button>
               ))}
             </div>
@@ -334,7 +397,7 @@ export default function Dashboard() {
                     filterTickers={alertGridView.tickers}
                     selectedPosition={selectedTableTicker}
                     showSearch={false}
-                    showActions={true}
+                    showActions={false}
                     externalSearchQuery={searchQuery}
                     onSelectPosition={(ticker) => handleSelectTicker(ticker)}
                   />
@@ -366,7 +429,7 @@ export default function Dashboard() {
                     fundamentalData={fundamentalData}
                     selectedPosition={selectedTableTicker}
                     showSearch={false}
-                    showActions={true}
+                    showActions={false}
                     externalSearchQuery={searchQuery}
                     onSelectPosition={(ticker) => handleSelectTicker(ticker)}
                   />
@@ -467,6 +530,7 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+      )}
 
       {/* Chart Modal */}
       {chartModalTicker && (
