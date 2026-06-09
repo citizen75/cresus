@@ -256,20 +256,22 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
     }
   }, [visibleWindow, chartData])
 
-  // Sync indicator charts with main chart using subscribeCrosshairMove
+  // Sync indicator charts with main chart by polling for range changes
   useEffect(() => {
     if (!chartsRef?.current?.mainChart) return
 
     const mainChart = chartsRef.current.mainChart
-    let unsubscribe: any = null
+    let lastRange: any = null
+    let intervalId: any = null
 
-    try {
-      // Use the chart's built-in method to track when the visible range changes
-      // This fires whenever the user zooms/pans the chart
-      unsubscribe = mainChart.subscribe('draw', () => {
+    const syncRanges = () => {
+      try {
         const visibleRange = mainChart.timeScale().getVisibleRange()
 
-        if (visibleRange?.from !== undefined && visibleRange?.to !== undefined) {
+        // Check if range changed
+        if (visibleRange && (lastRange === null || lastRange.from !== visibleRange.from || lastRange.to !== visibleRange.to)) {
+          lastRange = visibleRange
+
           if (rsiChartRef.current) {
             rsiChartRef.current.timeScale().setVisibleRange(visibleRange)
           }
@@ -277,18 +279,17 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
             macdChartRef.current.timeScale().setVisibleRange(visibleRange)
           }
         }
-      })
-    } catch (error) {
-      console.warn('Failed to set up chart sync:', error)
+      } catch (error) {
+        // Ignore errors during sync
+      }
     }
 
+    // Poll for range changes every 100ms
+    intervalId = setInterval(syncRanges, 100)
+
     return () => {
-      if (unsubscribe) {
-        try {
-          unsubscribe()
-        } catch (e) {
-          // Ignore
-        }
+      if (intervalId) {
+        clearInterval(intervalId)
       }
     }
   }, [chartsRef?.current?.mainChart])
