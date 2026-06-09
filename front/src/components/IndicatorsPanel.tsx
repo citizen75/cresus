@@ -288,7 +288,8 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
             try {
               const rsiTimeScale = rsiChartRef.current.timeScale()
               console.log('Setting RSI range:', visibleRange)
-              rsiTimeScale.setVisibleRange(visibleRange)
+              rsiTimeScale.setVisibleRange(visibleRange, false)
+              rsiChartRef.current.applyOptions({})
               console.log('RSI range set successfully')
             } catch (e) {
               console.warn('RSI sync error:', e)
@@ -302,7 +303,8 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
             try {
               const macdTimeScale = macdChartRef.current.timeScale()
               console.log('Setting MACD range:', visibleRange)
-              macdTimeScale.setVisibleRange(visibleRange)
+              macdTimeScale.setVisibleRange(visibleRange, false)
+              macdChartRef.current.applyOptions({})
               console.log('MACD range set successfully')
             } catch (e) {
               console.warn('MACD sync error:', e)
