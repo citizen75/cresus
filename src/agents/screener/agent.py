@@ -1,10 +1,12 @@
 """Screener agent for screening stocks against criteria."""
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List, Tuple
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import warnings
 import sys
 from io import StringIO
 import pandas as pd
+import time
 
 from core.agent import Agent
 from core.context import AgentContext
@@ -28,6 +30,145 @@ class ScreenerAgent(Agent):
 			context: Shared agent context
 		"""
 		super().__init__(name, context)
+		self._fundamental_cache: Dict[str, str] = {}  # Cache for company names
+
+	def _get_fundamental(self, ticker: str) -> str:
+		"""Get company name with caching. Returns ticker if name can't be found."""
+		if ticker in self._fundamental_cache:
+			return self._fundamental_cache[ticker]
+
+		try:
+			from tools.data.core import Fundamental
+			fundamental = Fundamental(ticker)
+			# Try cache first, then fetch if needed
+			cached = fundamental.load()
+			if cached:
+				name = cached.get("data", {}).get("company", {}).get("name", ticker)
+			else:
+				info = fundamental.get_company_info()
+				name = info.get("company_name", ticker)
+			self._fundamental_cache[ticker] = name
+			return name
+		except Exception as e:
+			self.logger.debug(f"Could not fetch fundamental for {ticker}: {e}")
+			self._fundamental_cache[ticker] = ticker
+			return ticker
+
+	def _process_ticker(
+		self,
+		ticker: str,
+		data_history: Optional[Dict[str, pd.DataFrame]],
+		screener_config: Any,
+		most_recent_date: Any,
+	) -> Tuple[List[Dict[str, Any]], int, float]:
+		"""Process a single ticker and return matching results.
+
+		Returns:
+			Tuple of (results, skip_count, processing_time)
+		"""
+		ticker_start = time.time()
+		skip_count = 0
+		results = []
+
+		try:
+			from tools.data.core import DataHistory
+			from tools.indicators import calculate
+			from tools.formula.dsl_parser import evaluate_dsl_vectorized
+
+			# Get historical data from cache or load directly
+			load_start = time.time()
+			if data_history and ticker in data_history:
+				history_df = data_history[ticker].copy()
+			else:
+				dh = DataHistory(ticker)
+				history_df = dh.get_all()
+			load_time = time.time() - load_start
+
+			if history_df is None or history_df.empty:
+				return [], 1, time.time() - ticker_start
+
+			# Determine date column
+			date_col = 'timestamp' if 'timestamp' in history_df.columns else 'date'
+
+			# Sort by date to ensure proper ordering
+			history_df = history_df.sort_values(date_col).reset_index(drop=True)
+
+			# Limit to last 60 days for performance
+			if len(history_df) > 60:
+				history_df = history_df.iloc[-60:].reset_index(drop=True)
+
+			# Calculate required indicators
+			try:
+				calc_start = time.time()
+				missing_indicators = [ind for ind in screener_config.indicators
+									  if ind.lower() not in history_df.columns]
+
+				if missing_indicators:
+					self.logger.debug(f"Calculating missing indicators for {ticker}: {missing_indicators}")
+
+					# Delete any existing indicator columns
+					ohlcv_cols = {'timestamp', 'open', 'high', 'low', 'close', 'volume', 'ticker', 'date'}
+					indicator_cols = [col for col in history_df.columns if col.lower() not in ohlcv_cols]
+					if indicator_cols:
+						history_df = history_df.drop(columns=indicator_cols)
+
+					# Calculate fresh indicators
+					indicator_results = calculate(missing_indicators, history_df)
+
+					# Add fresh indicators to dataframe
+					for indicator_name, indicator_series in indicator_results.items():
+						history_df[indicator_name.lower()] = indicator_series
+				calc_time = time.time() - calc_start
+			except Exception as e:
+				self.logger.debug(f"Indicator calculation failed for {ticker}: {e}")
+				return [], 1, time.time() - ticker_start
+
+			# Evaluate formula on full history
+			try:
+				eval_start = time.time()
+				all_matches = evaluate_dsl_vectorized(screener_config.formula, history_df)
+				screening_mask = history_df[date_col] == most_recent_date
+				matches = all_matches[screening_mask]
+				eval_time = time.time() - eval_start
+			except Exception as e:
+				self.logger.debug(f"Formula evaluation failed for {ticker}: {e}")
+				return [], 1, time.time() - ticker_start
+
+			# Get screening data
+			screening_df = history_df[screening_mask]
+			if screening_df.empty:
+				return [], 1, time.time() - ticker_start
+
+			# Get company name from cache
+			company_name = self._get_fundamental(ticker)
+
+			# Collect matching rows
+			for idx, (is_match, row) in enumerate(zip(matches, screening_df.itertuples(index=False))):
+				if is_match:
+					row_dict = row._asdict() if hasattr(row, '_asdict') else dict(row)
+					result_row = {
+						'date': str(row_dict.get('timestamp', row_dict.get('date', ''))),
+						'ticker': ticker,
+						'name': company_name,
+						'open': float(row_dict.get('open', 0)) if pd.notna(row_dict.get('open')) else None,
+						'high': float(row_dict.get('high', 0)) if pd.notna(row_dict.get('high')) else None,
+						'low': float(row_dict.get('low', 0)) if pd.notna(row_dict.get('low')) else None,
+						'close': float(row_dict.get('close', 0)) if pd.notna(row_dict.get('close')) else None,
+						'volume': float(row_dict.get('volume', 0)) if pd.notna(row_dict.get('volume')) else None,
+					}
+
+					# Add all calculated indicators
+					for indicator_name in screener_config.indicators:
+						value = row_dict.get(indicator_name.lower()) or row_dict.get(indicator_name)
+						result_row[indicator_name] = float(value) if pd.notna(value) else None
+
+					results.append(result_row)
+
+		except Exception as e:
+			self.logger.debug(f"Error processing {ticker}: {e}")
+			skip_count = 1
+
+		return results, skip_count, time.time() - ticker_start
 
 	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
 		"""Run a screener on a specific date (defaults to most recent date).
@@ -163,30 +304,6 @@ class ScreenerAgent(Agent):
 
 			self.logger.info(f"Screening date: {most_recent_date}")
 
-			# Pre-fetch fundamentals for all tickers to avoid per-ticker yfinance calls
-			fundamentals = {}
-			prefetch_start = time.time()
-			try:
-				from tools.data.core import Fundamental
-				self.logger.debug(f"Pre-fetching fundamentals for {len(tickers)} tickers")
-				for ticker in tickers:
-					try:
-						fundamental = Fundamental(ticker)
-						# Try cache first, then fetch if needed
-						cached = fundamental.load()
-						if cached:
-							fundamentals[ticker] = cached.get("data", {}).get("company", {}).get("name", ticker)
-						else:
-							info = fundamental.get_company_info()
-							fundamentals[ticker] = info.get("company_name", ticker)
-					except Exception as e:
-						self.logger.debug(f"Could not fetch fundamental for {ticker}: {e}")
-						fundamentals[ticker] = ticker
-			except Exception as e:
-				self.logger.warning(f"Error pre-fetching fundamentals: {e}")
-			prefetch_time = time.time() - prefetch_start
-			print(f"⏱️  Pre-fetch fundamentals: {prefetch_time:.2f}s")
-
 			# Collect all results
 			all_results = []
 			ticker_count = 0
@@ -197,141 +314,54 @@ class ScreenerAgent(Agent):
 			if max_tickers and max_tickers > 0:
 				self.logger.info(f"Limiting screening to {len(tickers_to_process)} of {len(tickers)} tickers")
 
-			# Process each ticker
+			# Process tickers in parallel using thread pool (4-8 workers)
+			max_workers = min(8, len(tickers_to_process))
+			parallel_start = time.time()
 			ticker_times = {}
-			for ticker in tickers_to_process:
-				ticker_start = time.time()
-				try:
-					# Get historical data from cache or load directly
-					load_start = time.time()
-					if data_history and ticker in data_history:
-						history_df = data_history[ticker].copy()
-					else:
-						# Load historical data if not in cache
-						dh = DataHistory(ticker)
-						history_df = dh.get_all()
-					ticker_times[ticker] = {'load': time.time() - load_start}
+			results_by_ticker = {}
 
-					if history_df is None or history_df.empty:
-						skip_count += 1
-						continue
+			self.logger.info(f"Processing {len(tickers_to_process)} tickers in parallel with {max_workers} workers")
 
-					# Determine date column
-					date_col = 'timestamp' if 'timestamp' in history_df.columns else 'date'
+			with ThreadPoolExecutor(max_workers=max_workers) as executor:
+				# Submit all ticker processing tasks
+				futures = {
+					executor.submit(
+						self._process_ticker,
+						ticker,
+						data_history,
+						screener_config,
+						most_recent_date
+					): ticker for ticker in tickers_to_process
+				}
 
-					# Sort by date to ensure proper ordering (required for indicators)
-					history_df = history_df.sort_values(date_col).reset_index(drop=True)
-
-					# Limit to last 60 days for performance (recent data is sufficient for indicators)
-					# This dramatically speeds up screening without affecting screening date results
-					if len(history_df) > 60:
-						history_df = history_df.iloc[-60:].reset_index(drop=True)
-
-					# Calculate required indicators
+				# Collect results as they complete
+				for future in as_completed(futures):
+					ticker = futures[future]
 					try:
-						calc_start = time.time()
-						# Check which indicators are missing
-						missing_indicators = [ind for ind in screener_config.indicators
-											 if ind.lower() not in history_df.columns]
-
-						if missing_indicators:
-							self.logger.debug(f"Calculating missing indicators for {ticker}: {missing_indicators}")
-
-							# Delete any existing indicator columns to ensure data consistency
-							# (avoids mixing old and new data if cache was invalidated)
-							ohlcv_cols = {'timestamp', 'open', 'high', 'low', 'close', 'volume', 'ticker', 'date'}
-							indicator_cols = [col for col in history_df.columns if col.lower() not in ohlcv_cols]
-							if indicator_cols:
-								self.logger.debug(f"Clearing old indicator columns for {ticker}: {indicator_cols}")
-								history_df = history_df.drop(columns=indicator_cols)
-
-							# Calculate fresh indicators
-							indicator_results = calculate(missing_indicators, history_df)
-
-							# Add fresh indicators to dataframe (use lowercase column names for consistency)
-							for indicator_name, indicator_series in indicator_results.items():
-								history_df[indicator_name.lower()] = indicator_series
-						else:
-							self.logger.debug(f"All indicators already cached for {ticker}")
-						ticker_times[ticker]['calc'] = time.time() - calc_start
+						results, ticker_skip, proc_time = future.result()
+						all_results.extend(results)
+						skip_count += ticker_skip
+						if results:
+							ticker_count += 1
+							self.logger.debug(f"{ticker}: {len(results)} matches ({proc_time:.3f}s)")
+						ticker_times[ticker] = proc_time
 					except Exception as e:
-						self.logger.debug(f"Indicator calculation failed for {ticker}: {e}")
+						self.logger.error(f"Failed to process {ticker}: {e}")
 						skip_count += 1
-						continue
 
-					# Evaluate formula on full history first (so shift notation works)
-					try:
-						eval_start = time.time()
-						all_matches = evaluate_dsl_vectorized(screener_config.formula, history_df)
-						# Filter to screening date
-						screening_mask = history_df[date_col] == most_recent_date
-						matches = all_matches[screening_mask]
-						ticker_times[ticker]['eval'] = time.time() - eval_start
-					except Exception as e:
-						self.logger.debug(f"Formula evaluation failed for {ticker}: {e}")
-						skip_count += 1
-						continue
+			parallel_time = time.time() - parallel_start
 
-					# Get screening data
-					screening_df = history_df[screening_mask]
-					if screening_df.empty:
-						skip_count += 1
-						continue
+			# Calculate timing
+			total_ticker_time = sum(ticker_times.values())
+			avg_ticker_time = total_ticker_time / len(tickers_to_process) if tickers_to_process else 0
+			speedup = total_ticker_time / parallel_time if parallel_time > 0 else 1
 
-					# Get company name from pre-fetched fundamentals
-					info_start = time.time()
-					company_name = fundamentals.get(ticker, ticker)
-					ticker_times[ticker]['info'] = time.time() - info_start
-
-					# Collect matching rows
-					match_count = 0
-					for idx, (is_match, row) in enumerate(zip(matches, screening_df.itertuples(index=False))):
-						if is_match:
-							# Add matching row to results
-							row_dict = row._asdict() if hasattr(row, '_asdict') else dict(row)
-							result_row = {
-								'date': str(row_dict.get('timestamp', row_dict.get('date', ''))),
-								'ticker': ticker,
-								'name': company_name,
-								'open': float(row_dict.get('open', 0)) if pd.notna(row_dict.get('open')) else None,
-								'high': float(row_dict.get('high', 0)) if pd.notna(row_dict.get('high')) else None,
-								'low': float(row_dict.get('low', 0)) if pd.notna(row_dict.get('low')) else None,
-								'close': float(row_dict.get('close', 0)) if pd.notna(row_dict.get('close')) else None,
-								'volume': float(row_dict.get('volume', 0)) if pd.notna(row_dict.get('volume')) else None,
-							}
-
-							# Add all calculated indicators
-							for indicator_name in screener_config.indicators:
-								# Try both lowercase and original case
-								value = row_dict.get(indicator_name.lower()) or row_dict.get(indicator_name)
-								result_row[indicator_name] = float(value) if pd.notna(value) else None
-
-							all_results.append(result_row)
-							match_count += 1
-
-					if match_count > 0:
-						ticker_count += 1
-						self.logger.debug(f"{ticker}: {match_count} matches")
-
-				except Exception as e:
-					self.logger.debug(f"Error processing {ticker}: {e}")
-					skip_count += 1
-					continue
-
-			# Calculate timing breakdown
-			total_load = sum(t.get('load', 0) for t in ticker_times.values())
-			total_calc = sum(t.get('calc', 0) for t in ticker_times.values())
-			total_eval = sum(t.get('eval', 0) for t in ticker_times.values())
-			total_info = sum(t.get('info', 0) for t in ticker_times.values())
-			total_ticker_time = total_load + total_calc + total_eval + total_info
-
-			self.logger.info(f"Timing breakdown: load={total_load:.2f}s, calc={total_calc:.2f}s, eval={total_eval:.2f}s, info={total_info:.2f}s, total={total_ticker_time:.2f}s")
-			print(f"\n⏱️  Timing Breakdown (per ticker):")
-			print(f"  Load:  {total_load:.2f}s ({total_load/len(tickers_to_process):.3f}s/ticker)")
-			print(f"  Calc:  {total_calc:.2f}s ({total_calc/len(tickers_to_process):.3f}s/ticker)")
-			print(f"  Eval:  {total_eval:.2f}s ({total_eval/len(tickers_to_process):.3f}s/ticker)")
-			print(f"  Info:  {total_info:.2f}s ({total_info/len(tickers_to_process):.3f}s/ticker)")
-			print(f"  Total: {total_ticker_time:.2f}s ({total_ticker_time/len(tickers_to_process):.3f}s/ticker)")
+			self.logger.info(f"Parallel screening: {len(tickers_to_process)} tickers in {parallel_time:.2f}s ({max_workers} workers, {speedup:.1f}x speedup)")
+			print(f"\n⏱️  Parallel Processing Summary:")
+			print(f"  Total time:    {parallel_time:.2f}s")
+			print(f"  Per ticker:    {avg_ticker_time:.3f}s")
+			print(f"  Speedup:       {speedup:.1f}x (vs sequential)")
+			print(f"  Workers:       {max_workers}")
 
 			# Save results using manager (skip if screener name starts with "_")
 			skip_save = screener_config.name.startswith("_") or not screener_config.name
