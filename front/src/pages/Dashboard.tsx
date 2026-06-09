@@ -342,6 +342,17 @@ export default function Dashboard() {
             title="Global Chat"
             subtitle="All portfolios & alerts"
             maxHeight="h-full"
+            onPortfolioClick={(portfolio) => {
+              // Create alert info object and display holdings
+              const alertInfo: AlertInfo = {
+                title: '',
+                portfolio: portfolio,
+                tickers: [],
+                content: `Portfolio: ${portfolio}`,
+              }
+              setAlertGridView(alertInfo)
+              setRightPanelOpen(true)
+            }}
             onSendMessage={async (message) => {
               const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
               const response = await fetch(`${baseUrl}/api/v1/conversations/_global/message`, {
