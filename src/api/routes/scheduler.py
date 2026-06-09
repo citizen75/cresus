@@ -223,23 +223,32 @@ async def disable_job(request: Request, name: str):
 
 
 @router.post("/scheduler/jobs/{name}/run")
-async def run_job(name: str):
+async def run_job(request: Request, name: str):
 	"""Run a cron job immediately."""
 	try:
 		manager = CronManager()
-		success, message = manager.run_job(name)
+		job = manager.get_job(name)
 
-		if not success:
-			raise HTTPException(status_code=400, detail=message)
+		if not job:
+			raise HTTPException(status_code=404, detail=f"Job '{name}' not found")
 
-		return {
-			"status": "success",
-			"message": message,
-		}
+		# Execute the job immediately using scheduler's execution methods
+		cron_scheduler = get_cron_scheduler(request)
+		if cron_scheduler:
+			# Get the job execution function and run it
+			job_func = cron_scheduler._create_job_function(job)
+			job_func()
+			return {
+				"status": "success",
+				"message": f"Job '{name}' executed successfully",
+			}
+		else:
+			raise HTTPException(status_code=500, detail="Cron scheduler not available")
+
 	except HTTPException:
 		raise
 	except Exception as e:
-		raise HTTPException(status_code=500, detail=str(e))
+		raise HTTPException(status_code=500, detail=f"Failed to run job: {str(e)}")
 
 
 @router.post("/scheduler/jobs/{name}/duplicate")
