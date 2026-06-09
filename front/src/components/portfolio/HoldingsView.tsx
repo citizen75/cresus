@@ -1,6 +1,7 @@
 import { usePortfolioContext } from '@/context/PortfolioContext'
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useEnrichedPositions } from '@/hooks/useEnrichedPositions'
 import PositionModal from './PositionModal'
 import CardChart from '@/components/CardChart'
 import TradingChart from '@/components/TradingChart'
@@ -31,11 +32,10 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [sectorFilter, setSectorFilter] = useState<string>('All sectors')
   const [chartPosition, setChartPosition] = useState<any>(null)
-  const [fundamentalData, setFundamentalData] = useState<Record<string, any>>({})
   const [hoverData, setHoverData] = useState<any>(null)
-  const [enrichedPositions, setEnrichedPositions] = useState<any[]>([])
 
   const rawPositions = priceData?.positions || []
+  const { enrichedPositions, fundamentalData } = useEnrichedPositions(rawPositions, name)
   const positions = enrichedPositions.length > 0 ? enrichedPositions : rawPositions
   const totalValue = priceData?.total_value || 0
   const cash = priceData?.cash || 0
@@ -119,47 +119,6 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
 
     if (rawPositions.length > 0) {
       loadHistoricalData()
-    }
-  }, [rawPositions])
-
-  // Fetch fundamental data and enrich positions with daily changes
-  useEffect(() => {
-    const fetchFundamentals = async () => {
-      const data: Record<string, any> = {}
-      for (const pos of rawPositions) {
-        try {
-          const result = await api.getFundamental(pos.ticker)
-          data[pos.ticker] = result?.data?.quotation || {}
-        } catch (error) {
-          console.error(`Failed to load fundamental data for ${pos.ticker}:`, error)
-          data[pos.ticker] = {}
-        }
-      }
-      setFundamentalData(data)
-
-      // Enrich positions with daily changes (not unrealized P&L)
-      const enriched = rawPositions.map((pos: any) => {
-        const fund = data[pos.ticker] || {}
-        const currentPrice = pos.current_price || 0
-        const previousClose = fund.previous_close || currentPrice
-
-        // Daily change per share
-        const dailyChange = currentPrice - previousClose
-        const dailyChangePct = previousClose && previousClose !== 0 ? ((currentPrice - previousClose) / previousClose) * 100 : 0
-
-        return {
-          ...pos,
-          position_gain: dailyChange,
-          position_gain_pct: dailyChangePct,
-          asset_type: fund.asset_type || 'Stock',
-          sector: fund.sector || 'Unknown',
-        }
-      })
-      setEnrichedPositions(enriched)
-    }
-
-    if (rawPositions.length > 0) {
-      fetchFundamentals()
     }
   }, [rawPositions])
 
