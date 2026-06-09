@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import PositionModal from './PositionModal'
 import CardChart from '@/components/CardChart'
 import TradingChart from '@/components/TradingChart'
+import { PortfolioHoldingsTable } from './PortfolioHoldingsTable'
 import { api } from '@/services/api'
 import { formatCurrency } from '@/utils/currency'
 
@@ -496,156 +497,20 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
 
           {/* Tab Content - Table View */}
           {activeTab === 'positions' && viewMode === 'table' && (
-          <div className="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden flex flex-col">
-            {positions.length === 0 ? (
-              <div className="p-12 text-center text-slate-400">
-                {isPricesLoading ? (
-                  <p>Loading positions...</p>
-                ) : (
-                  <p>No positions in this portfolio</p>
-                )}
-              </div>
-            ) : (
-              <>
-                <div className="overflow-x-auto overflow-y-auto max-h-[600px]">
-                  <table className="w-full text-sm">
-                    <thead className="bg-slate-800/50 border-b border-slate-800">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-slate-400 font-medium cursor-pointer hover:text-slate-200 transition" onClick={() => handleColumnSort('symbol')}>
-                          Symbol{getSortIndicator('symbol')}
-                        </th>
-                        <th className="px-4 py-3 text-left text-slate-400 font-medium cursor-pointer hover:text-slate-200 transition" onClick={() => handleColumnSort('company')}>
-                          Company{getSortIndicator('company')}
-                        </th>
-                        <th className="px-4 py-3 text-left text-slate-400 font-medium cursor-pointer hover:text-slate-200 transition" onClick={() => handleColumnSort('sector')}>
-                          Sector{getSortIndicator('sector')}
-                        </th>
-                        <th className="px-4 py-3 text-left text-slate-400 font-medium cursor-pointer hover:text-slate-200 transition" onClick={() => handleColumnSort('type')}>
-                          Type{getSortIndicator('type')}
-                        </th>
-                        <th className="px-4 py-3 text-left text-slate-400 font-medium cursor-pointer hover:text-slate-200 transition" onClick={() => handleColumnSort('weight')}>
-                          Weight{getSortIndicator('weight')}
-                        </th>
-                        <th className="px-4 py-3 text-left text-slate-400 font-medium cursor-pointer hover:text-slate-200 transition" onClick={() => handleColumnSort('shares')}>
-                          Shares{getSortIndicator('shares')}
-                        </th>
-                        <th className="px-4 py-3 text-left text-slate-400 font-medium cursor-pointer hover:text-slate-200 transition" onClick={() => handleColumnSort('avg_cost')}>
-                          Avg. Cost{getSortIndicator('avg_cost')}
-                        </th>
-                        <th className="px-4 py-3 text-left text-slate-400 font-medium cursor-pointer hover:text-slate-200 transition" onClick={() => handleColumnSort('price')}>
-                          Price{getSortIndicator('price')}
-                        </th>
-                        <th className="px-4 py-3 text-left text-slate-400 font-medium cursor-pointer hover:text-slate-200 transition" onClick={() => handleColumnSort('daily_change')}>
-                          Daily Change{getSortIndicator('daily_change')}
-                        </th>
-                        <th className="px-4 py-3 text-left text-slate-400 font-medium cursor-pointer hover:text-slate-200 transition" onClick={() => handleColumnSort('market_value')}>
-                          Market Value{getSortIndicator('market_value')}
-                        </th>
-                        <th className="px-4 py-3 text-left text-slate-400 font-medium cursor-pointer hover:text-slate-200 transition" onClick={() => handleColumnSort('unrealized_pnl')}>
-                          Unrealized P&L{getSortIndicator('unrealized_pnl')}
-                        </th>
-                        <th className="px-4 py-3 text-left text-slate-400 font-medium cursor-pointer hover:text-slate-200 transition" onClick={() => handleColumnSort('pnl_pct')}>
-                          P&L %{getSortIndicator('pnl_pct')}
-                        </th>
-                        <th className="px-4 py-3 text-left text-slate-400 font-medium">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sortedPositions.map((pos: any) => {
-                    const weight = (pos.position_value / totalValue * 100)
-                    return (
-                      <tr
-                        key={pos.ticker}
-                        onClick={() => {
-                          setSelectedPosition(pos.ticker)
-                          setChartPosition(pos)
-                        }}
-                        className={`border-t border-slate-800 hover:bg-slate-800/30 transition cursor-pointer ${
-                          selectedPosition === pos.ticker ? 'bg-slate-800/50' : ''
-                        }`}
-                      >
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 bg-gradient-to-br from-purple-500 to-violet-600 rounded flex items-center justify-center text-xs font-bold text-white">
-                              {pos.ticker.charAt(0)}
-                            </div>
-                            <span className="text-white font-medium">{pos.ticker}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-slate-300 text-sm font-medium">{pos.company_name || pos.ticker}</td>
-                        <td className="px-4 py-3 text-slate-300 text-sm">
-                          <span className="inline-block px-2 py-1 rounded bg-slate-800/50 text-xs">
-                            {pos.sector || 'Unknown'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-slate-300 text-sm">{pos.asset_type || 'Stock'}</td>
-                        <td className="px-4 py-3 text-white font-medium">{weight.toFixed(2)}%</td>
-                        <td className="px-4 py-3 text-white">{pos.quantity}</td>
-                        <td className="px-4 py-3 text-white">{formatCurrency(pos.avg_entry_price, details?.currency || 'USD')}</td>
-                        <td className="px-4 py-3 text-white">{formatCurrency(pos.current_price, details?.currency || 'USD')}</td>
-                        <td className="px-4 py-3">
-                          {(() => {
-                            const fundamental = fundamentalData[pos.ticker]
-                            const previousClose = fundamental?.previous_close || pos.current_price
-                            const dailyChange = pos.current_price - previousClose
-                            const dailyChangePct = previousClose > 0 ? (dailyChange / previousClose) * 100 : 0
-                            return (
-                              <div className="flex flex-col">
-                                <span className={`font-medium ${dailyChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                  {dailyChange >= 0 ? '+' : ''}{formatCurrency(Math.abs(dailyChange), details?.currency || 'USD')}
-                                </span>
-                                <span className={`text-xs ${dailyChangePct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                  {dailyChangePct >= 0 ? '+' : ''}{dailyChangePct.toFixed(2)}%
-                                </span>
-                              </div>
-                            )
-                          })()}
-                        </td>
-                        <td className="px-4 py-3 text-white font-medium">{formatCurrency(pos.position_value, details?.currency || 'USD')}</td>
-                        <td className={`px-4 py-3 font-medium ${pos.position_gain >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                          {pos.position_gain >= 0 ? '+' : ''}{formatCurrency(Math.abs(pos.position_gain), details?.currency || 'USD')}
-                        </td>
-                        <td className={`px-4 py-3 font-medium ${pos.position_gain_pct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                          {pos.position_gain_pct > 0 ? '+' : ''}{pos.position_gain_pct.toFixed(2)}%
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex gap-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setChartPosition({
-                                  ticker: pos.ticker,
-                                  company_name: pos.company_name,
-                                  current_price: pos.current_price,
-                                  quantity: pos.quantity
-                                })
-                              }}
-                              className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded transition"
-                              title="View chart"
-                            >
-                              📊 Chart
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                navigate(`/portfolios/${encodeURIComponent(name)}/holdings/transactions?ticker=${encodeURIComponent(pos.ticker)}`)
-                              }}
-                              className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded transition"
-                              title="View and edit transactions"
-                            >
-                              Transactions
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-            </>
-            )}
-          </div>
+            <PortfolioHoldingsTable
+              positions={positions}
+              totalValue={totalValue}
+              currency={details?.currency || 'USD'}
+              fundamentalData={fundamentalData}
+              selectedPosition={selectedPosition}
+              onSelectPosition={(ticker) => {
+                setSelectedPosition(ticker)
+                const pos = positions.find((p: any) => p.ticker === ticker)
+                if (pos) setChartPosition(pos)
+              }}
+              showSearch={true}
+              showActions={true}
+            />
           )}
 
           {/* Cards View - Position Cards */}
