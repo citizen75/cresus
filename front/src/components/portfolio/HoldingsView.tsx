@@ -512,7 +512,7 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
 
           {/* Cards View - Position Cards */}
           {activeTab === 'positions' && viewMode === 'charts' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {positions.map((pos: any) => (
               <div key={pos.ticker} className="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden hover:border-purple-600/50 transition">
                 {/* Card Header */}
