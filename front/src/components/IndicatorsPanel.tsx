@@ -256,47 +256,47 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
     }
   }, [visibleWindow, chartData])
 
-  // Subscribe to main chart's timeScale changes and sync indicator charts
+  // Sync indicator charts with main chart
   useEffect(() => {
     if (!chartsRef?.current?.mainChart) return
 
     const mainChart = chartsRef.current.mainChart
-    let unsubscribe: any = null
+    const subscriptions: any[] = []
 
+    // Subscribe to timeScale changes on main chart
     try {
-      unsubscribe = mainChart.timeScale().subscribe('logicalRangeChanged', () => {
-        const visibleRange = mainChart.timeScale().getVisibleRange()
-        if (visibleRange && visibleRange.from && visibleRange.to) {
-          if (rsiChartRef.current && selectedIndicators.has('RSI 14')) {
-            try {
-              rsiChartRef.current.timeScale().setVisibleRange(visibleRange)
-            } catch (e) {
-              console.warn('Failed to sync RSI:', e)
-            }
+      const timeScale = mainChart.timeScale()
+
+      // Try the correct event name for this version
+      const sub = timeScale.subscribe('visibleRangeChanged', () => {
+        const visibleRange = timeScale.getVisibleRange()
+
+        if (visibleRange?.from !== undefined && visibleRange?.to !== undefined) {
+          console.log('Main chart visible range changed:', visibleRange)
+
+          if (rsiChartRef.current) {
+            rsiChartRef.current.timeScale().setVisibleRange(visibleRange)
           }
-          if (macdChartRef.current && selectedIndicators.has('MACD')) {
-            try {
-              macdChartRef.current.timeScale().setVisibleRange(visibleRange)
-            } catch (e) {
-              console.warn('Failed to sync MACD:', e)
-            }
+          if (macdChartRef.current) {
+            macdChartRef.current.timeScale().setVisibleRange(visibleRange)
           }
         }
       })
+      subscriptions.push(sub)
     } catch (error) {
-      console.warn('Failed to subscribe to main chart timeScale:', error)
+      console.warn('Failed to set up timeScale sync:', error)
     }
 
     return () => {
-      if (unsubscribe) {
+      subscriptions.forEach(sub => {
         try {
-          unsubscribe()
+          sub()
         } catch (e) {
           // Ignore
         }
-      }
+      })
     }
-  }, [chartsRef, selectedIndicators])
+  }, [chartsRef?.current?.mainChart])
 
   if (selectedIndicators.size === 0) return null
 
