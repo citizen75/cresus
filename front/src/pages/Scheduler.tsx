@@ -144,13 +144,17 @@ export default function Scheduler() {
 
   const handleRun = async (name: string) => {
     try {
-      await api.runCronJob(name)
       setError(null)
-      // Show success message briefly
-      const msg = `Job '${name}' queued for execution`
+      // Fire-and-forget: start the job and return immediately
+      api.runCronJob(name).catch((err) => {
+        console.error(`Job '${name}' execution error:`, err)
+        setError(`Job '${name}' failed to start`)
+      })
+      // Show success message immediately (before job completes)
+      const msg = `Job '${name}' started (running in background)`
       alert(msg)
     } catch (err) {
-      setError('Failed to run job')
+      setError('Failed to start job')
       console.error(err)
     }
   }
