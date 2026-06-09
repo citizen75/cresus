@@ -179,7 +179,6 @@ export default function Alerts() {
       const response = await api.runAlert(name)
       setRunResults(response)
       setShowRunResults(true)
-      await fetchAlerts()
       if (selectedPortfolio) {
         await fetchAlertMessages()
       }
