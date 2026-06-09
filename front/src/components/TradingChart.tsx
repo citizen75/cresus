@@ -617,22 +617,31 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
 
         window.addEventListener('resize', resizeHandler)
 
-        // Sync timeScale changes from main chart to indicator charts
-        const unsubscribeTimeScale = chart.timeScale().subscribe('visibleLogicalRangeChanged', () => {
-          const range = chart.timeScale().getVisibleRange()
-          if (range && indicatorChartsRef.current) {
-            if (indicatorChartsRef.current.rsi) {
-              indicatorChartsRef.current.rsi.timeScale().setVisibleLogicalRange(range)
+        // Sync timeScale when user drags/resizes main chart
+        let unsubscribeTimeScale: any = null
+        try {
+          unsubscribeTimeScale = chart.timeScale().subscribe('logicalRangeChanged', () => {
+            if (indicatorChartsRef.current?.rsi || indicatorChartsRef.current?.macd) {
+              const mainRange = chart.timeScale().getVisibleLogicalRange()
+              if (mainRange) {
+                if (indicatorChartsRef.current.rsi) {
+                  indicatorChartsRef.current.rsi.timeScale().setVisibleLogicalRange(mainRange, false)
+                }
+                if (indicatorChartsRef.current.macd) {
+                  indicatorChartsRef.current.macd.timeScale().setVisibleLogicalRange(mainRange, false)
+                }
+              }
             }
-            if (indicatorChartsRef.current.macd) {
-              indicatorChartsRef.current.macd.timeScale().setVisibleLogicalRange(range)
-            }
-          }
-        })
+          })
+        } catch (e) {
+          console.warn('Could not subscribe to timeScale changes:', e)
+        }
 
         // Store unsubscribe function for cleanup
         if (!chartRef.current) chartRef.current = {}
-        chartRef.current.unsubscribeTimeScale = unsubscribeTimeScale
+        if (unsubscribeTimeScale) {
+          chartRef.current.unsubscribeTimeScale = unsubscribeTimeScale
+        }
 
         setIsLoading(false)
 
