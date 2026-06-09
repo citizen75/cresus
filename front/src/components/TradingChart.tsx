@@ -616,6 +616,24 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
         }
 
         window.addEventListener('resize', resizeHandler)
+
+        // Sync timeScale changes from main chart to indicator charts
+        const unsubscribeTimeScale = chart.timeScale().subscribe('visibleLogicalRangeChanged', () => {
+          const range = chart.timeScale().getVisibleRange()
+          if (range && indicatorChartsRef.current) {
+            if (indicatorChartsRef.current.rsi) {
+              indicatorChartsRef.current.rsi.timeScale().setVisibleLogicalRange(range)
+            }
+            if (indicatorChartsRef.current.macd) {
+              indicatorChartsRef.current.macd.timeScale().setVisibleLogicalRange(range)
+            }
+          }
+        })
+
+        // Store unsubscribe function for cleanup
+        if (!chartRef.current) chartRef.current = {}
+        chartRef.current.unsubscribeTimeScale = unsubscribeTimeScale
+
         setIsLoading(false)
 
         // Store unsubscribe function for cleanup
@@ -638,6 +656,9 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
         try {
           if (chartRef.current.unsubscribeCrosshair) {
             chartRef.current.unsubscribeCrosshair()
+          }
+          if (chartRef.current.unsubscribeTimeScale) {
+            chartRef.current.unsubscribeTimeScale()
           }
           chartRef.current.remove()
         } catch (e) {
