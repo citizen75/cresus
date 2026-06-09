@@ -193,8 +193,10 @@ class ConversationManager:
 
 		# Filter by portfolio
 		if portfolio_filter == "_global":
-			messages = [m for m in messages if m.portfolio is None]
+			# Global view shows ALL messages from all portfolios
+			pass  # Don't filter, show everything
 		elif portfolio_filter:
+			# Specific portfolio view shows messages for that portfolio
 			messages = [m for m in messages if m.portfolio == portfolio_filter]
 
 		# Filter by source
