@@ -93,7 +93,7 @@ class AlertNotifier:
             if alert.source == AlertSource.ALL_PORTFOLIOS:
                 try:
                     message = self._format_alert_message(alert, result, result.matches)
-                    manager = ConversationManager("global")
+                    manager = ConversationManager("_global")
                     manager.add_alert(message)
                     self.logger.info(
                         f"Sent alert '{alert.name}' to global chat: {len(result.matches)} match(es)"
