@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getApiBaseUrl } from '@/services/api'
 import { AlertMessageRenderer } from '@/components/AlertMessageRenderer'
-import CardChart from '@/components/CardChart'
-import { api } from '@/services/api'
 
 interface Message {
   source: 'user' | 'chatbot' | 'alert' | 'notification'
@@ -14,6 +12,7 @@ interface Message {
 interface GlobalConversationPanelProps {
   onClose?: () => void
   onAlertClick?: (ticker: string) => void
+  onAlertGridClick?: (alertInfo: AlertInfo) => void
 }
 
 const SOURCE_COLORS = {
@@ -70,14 +69,12 @@ function parseAlertContent(content: string): AlertInfo {
   return info
 }
 
-export default function GlobalConversationPanel({ onClose, onAlertClick }: GlobalConversationPanelProps) {
+export default function GlobalConversationPanel({ onClose, onAlertClick, onAlertGridClick }: GlobalConversationPanelProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [newMessage, setNewMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [gridViewAlert, setGridViewAlert] = useState<AlertInfo | null>(null)
-  const [historicalData, setHistoricalData] = useState<Record<string, any[]>>({})
 
   useEffect(() => {
     const fetchMessages = async () => {
@@ -103,38 +100,6 @@ export default function GlobalConversationPanel({ onClose, onAlertClick }: Globa
     fetchMessages()
   }, [])
 
-  // Load historical data when grid view is activated
-  useEffect(() => {
-    if (!gridViewAlert || gridViewAlert.tickers.length === 0) return
-
-    const loadData = async () => {
-      const data: Record<string, any[]> = {}
-      for (const ticker of gridViewAlert.tickers) {
-        try {
-          const result = await api.getHistoricalData(ticker, 1825) // ~5 years
-          let historyArray = []
-          if (result && Array.isArray(result)) {
-            historyArray = result
-          } else if (result && result.history && Array.isArray(result.history)) {
-            historyArray = result.history
-          } else if (result && result.data && Array.isArray(result.data)) {
-            historyArray = result.data
-          }
-          if (historyArray.length > 0) {
-            data[ticker] = historyArray.map((item: any) => ({
-              date: item.date || item.timestamp || item.Date,
-              close: parseFloat(item.close || item.Close),
-            }))
-          }
-        } catch (err) {
-          console.error(`Failed to load data for ${ticker}:`, err)
-        }
-      }
-      setHistoricalData(data)
-    }
-
-    loadData()
-  }, [gridViewAlert])
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -213,78 +178,6 @@ export default function GlobalConversationPanel({ onClose, onAlertClick }: Globa
     }
   }
 
-  // Grid view for all tickers in alert
-  if (gridViewAlert) {
-    return (
-      <div className="flex h-full bg-slate-900 rounded-lg border border-slate-800 flex-col">
-        {/* Header with back button */}
-        <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setGridViewAlert(null)}
-              className="text-slate-400 hover:text-slate-300 transition"
-              title="Back to messages"
-            >
-              ← Back
-            </button>
-            <span className="text-lg">📊</span>
-            <div>
-              <h3 className="text-sm font-semibold text-white">{gridViewAlert.title}</h3>
-              {gridViewAlert.portfolio && (
-                <p className="text-xs text-slate-400">Portfolio: {gridViewAlert.portfolio}</p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Charts Grid */}
-        <div className="flex-1 overflow-y-auto p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {gridViewAlert.tickers.map((ticker) => (
-              <div
-                key={ticker}
-                className="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden hover:border-purple-600/50 transition cursor-pointer"
-                onClick={() => {
-                  if (onAlertClick) onAlertClick(ticker)
-                  setGridViewAlert(null)
-                }}
-              >
-                {/* Card Header */}
-                <div className="bg-slate-800/50 border-b border-slate-800 p-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-white font-bold">{ticker}</p>
-                    </div>
-                    <span className="text-xl">📈</span>
-                  </div>
-                </div>
-
-                {/* Chart */}
-                {historicalData[ticker] && historicalData[ticker].length > 0 ? (
-                  <CardChart
-                    data={historicalData[ticker].slice(-30)} // Last 30 days
-                    ticker={ticker}
-                    showVariation={false}
-                  />
-                ) : (
-                  <div className="p-4 h-48 bg-slate-800/20 flex items-center justify-center">
-                    <p className="text-slate-500 text-xs">Loading chart...</p>
-                  </div>
-                )}
-
-                {/* Footer */}
-                <div className="border-t border-slate-800 px-3 py-2 bg-slate-800/30 text-center">
-                  <p className="text-xs text-slate-400">Click to expand chart</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Regular message view
   return (
     <div className="flex h-full bg-slate-900 rounded-lg border border-slate-800 flex-col">
       {/* Header */}
@@ -399,7 +292,9 @@ export default function GlobalConversationPanel({ onClose, onAlertClick }: Globa
                     {/* View All Button */}
                     <div className="border-t border-slate-700/50 p-2 bg-slate-800/30">
                       <button
-                        onClick={() => setGridViewAlert(alertInfo)}
+                        onClick={() => {
+                          if (onAlertGridClick) onAlertGridClick(alertInfo)
+                        }}
                         className="w-full text-xs text-purple-300 hover:text-purple-200 py-1 font-medium transition"
                       >
                         View all {alertInfo.tickers.length} tickers →
