@@ -152,26 +152,29 @@ export function PortfolioHoldingsTable({
 
   return (
     <div className="space-y-4">
-      {/* Search Bar - Only show if not using external search */}
-      {showSearch && !externalSearchQuery && (
+      {/* Search Bar and View Toggle */}
+      {(showSearch && !externalSearchQuery) || (showViewToggle && onViewModeChange) ? (
         <div className="flex gap-3 items-center justify-between">
-          <div className="flex gap-3 flex-1">
-            <input
-              type="text"
-              placeholder="Search by symbol or company..."
-              value={internalSearchQuery}
-              onChange={(e) => setInternalSearchQuery(e.target.value)}
-              className="flex-1 px-4 py-2 bg-slate-800 border border-slate-700 rounded text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-600"
-            />
-            {internalSearchQuery && (
-              <button
-                onClick={() => setInternalSearchQuery('')}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-sm transition"
-              >
-                Clear
-              </button>
-            )}
-          </div>
+          {/* Search Bar - Only show if enabled */}
+          {showSearch && !externalSearchQuery && (
+            <div className="flex gap-3 flex-1">
+              <input
+                type="text"
+                placeholder="Search by symbol or company..."
+                value={internalSearchQuery}
+                onChange={(e) => setInternalSearchQuery(e.target.value)}
+                className="flex-1 px-4 py-2 bg-slate-800 border border-slate-700 rounded text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-600"
+              />
+              {internalSearchQuery && (
+                <button
+                  onClick={() => setInternalSearchQuery('')}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-sm transition"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          )}
 
           {/* View Toggle - Show if enabled */}
           {showViewToggle && onViewModeChange && (
@@ -199,7 +202,7 @@ export function PortfolioHoldingsTable({
             </div>
           )}
         </div>
-      )}
+      ) : null}
 
       {/* Table */}
       <div className="overflow-x-auto overflow-y-auto max-h-[600px] rounded border border-slate-800">
