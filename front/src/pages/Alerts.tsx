@@ -727,8 +727,9 @@ export default function Alerts() {
       {/* Chart Modal */}
       {showChartModal && chartTicker && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-lg max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="sticky top-0 bg-slate-900 border-b border-slate-800 px-6 py-4 flex items-center justify-between">
+          <div className="bg-slate-900 border border-slate-800 rounded-lg w-full h-[90vh] max-w-7xl flex flex-col">
+            {/* Header */}
+            <div className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex items-center justify-between flex-shrink-0">
               <div>
                 <h2 className="text-2xl font-bold text-white">{chartTicker}</h2>
                 <p className="text-sm text-slate-400">Chart View</p>
@@ -755,10 +756,9 @@ export default function Alerts() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-auto bg-slate-900/50">
-              <div className="w-full h-full">
-                <TradingChart ticker={chartTicker} interval={chartTimeframe} />
-              </div>
+            {/* Chart Container */}
+            <div className="flex-1 overflow-hidden bg-slate-900/50 w-full">
+              <TradingChart ticker={chartTicker} interval={chartTimeframe} />
             </div>
           </div>
         </div>
