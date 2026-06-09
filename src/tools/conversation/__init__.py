@@ -1,12 +1,24 @@
 """Unified conversation manager with single file storage and filtering."""
 
 import json
+import re
 import threading
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Literal
 
 ConversationSource = Literal["user", "chatbot", "alert", "notification"]
+
+
+def extract_portfolio_from_alert(content: str) -> Optional[str]:
+	"""Extract portfolio name from alert content.
+
+	Looks for pattern: **Portfolio:** portfolio_name
+	"""
+	match = re.search(r'\*\*Portfolio:\*\*\s+(\S+)', content)
+	if match:
+		return match.group(1)
+	return None
 
 
 class ConversationMessage:
@@ -145,8 +157,16 @@ class ConversationManager:
 		self.add_message("chatbot", content, self.portfolio_name)
 
 	def add_alert(self, content: str) -> None:
-		"""Add an alert message to this portfolio."""
-		self.add_message("alert", content, self.portfolio_name)
+		"""Add an alert message to this portfolio.
+
+		Extracts portfolio from alert content if available.
+		"""
+		# Try to extract portfolio from alert content
+		portfolio = extract_portfolio_from_alert(content)
+		# If no portfolio in content, use the manager's portfolio_name
+		if not portfolio and self.portfolio_name != "_global":
+			portfolio = self.portfolio_name
+		self.add_message("alert", content, portfolio)
 
 	def add_notification(self, content: str) -> None:
 		"""Add a notification message to this portfolio."""
