@@ -374,24 +374,25 @@ export default function GlobalConversationPanel({ onClose, onAlertClick }: Globa
                       </div>
                     </div>
 
-                    {/* Tickers List */}
+                    {/* Tickers List - Compact */}
                     {alertInfo.tickers.length > 0 && (
-                      <div className="border-t border-slate-700/50 p-3 bg-slate-800/50">
-                        <p className="text-xs text-slate-400 mb-2 font-medium">Matching tickers:</p>
-                        <div className="grid grid-cols-2 gap-2">
-                          {alertInfo.tickers.map((ticker) => (
-                            <button
-                              key={ticker}
-                              onClick={() => {
-                                if (onAlertClick) onAlertClick(ticker)
-                              }}
-                              className="px-3 py-2 bg-slate-700/50 hover:bg-purple-600/50 text-slate-200 hover:text-white rounded text-xs font-medium transition flex items-center gap-2 group"
-                            >
-                              <span className="group-hover:scale-110 transition">📈</span>
-                              {ticker}
-                            </button>
-                          ))}
-                        </div>
+                      <div className="border-t border-slate-700/50 px-3 py-2 bg-slate-800/50 flex items-center gap-2 flex-wrap">
+                        <p className="text-xs text-slate-400 font-medium">Tickers:</p>
+                        {alertInfo.tickers.slice(0, 8).map((ticker) => (
+                          <button
+                            key={ticker}
+                            onClick={() => {
+                              if (onAlertClick) onAlertClick(ticker)
+                            }}
+                            className="px-2 py-1 bg-slate-700/50 hover:bg-purple-600/50 text-slate-200 hover:text-white rounded text-xs font-medium transition inline-block"
+                            title={`View ${ticker} chart`}
+                          >
+                            📈 {ticker}
+                          </button>
+                        ))}
+                        {alertInfo.tickers.length > 8 && (
+                          <span className="text-xs text-slate-400">+{alertInfo.tickers.length - 8} more</span>
+                        )}
                       </div>
                     )}
 
