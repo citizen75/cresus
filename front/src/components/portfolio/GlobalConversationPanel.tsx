@@ -12,7 +12,8 @@ interface Message {
 interface GlobalConversationPanelProps {
   onClose?: () => void
   onAlertClick?: (ticker: string) => void
-  onAlertGridClick?: (alertInfo: AlertInfo) => void
+  onAlertGridClick?: (alertInfo: AlertInfo, alertId?: string) => void
+  selectedAlertId?: string | null
 }
 
 const SOURCE_COLORS = {
@@ -69,7 +70,7 @@ function parseAlertContent(content: string): AlertInfo {
   return info
 }
 
-export default function GlobalConversationPanel({ onClose, onAlertClick, onAlertGridClick }: GlobalConversationPanelProps) {
+export default function GlobalConversationPanel({ onClose, onAlertClick, onAlertGridClick, selectedAlertId }: GlobalConversationPanelProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -230,12 +231,16 @@ export default function GlobalConversationPanel({ onClose, onAlertClick, onAlert
         ) : (
           messages.map((msg, idx) => {
             const alertInfo = msg.source === 'alert' ? parseAlertContent(msg.content) : null
+            const alertId = `${idx}-${msg.datetime}`
+            const isSelected = selectedAlertId === alertId
 
             return (
               <div
                 key={idx}
-                className={`rounded-lg border bg-slate-800/50 border-slate-700/50 transition-all ${
-                  msg.source === 'alert' ? 'cursor-pointer hover:bg-slate-800/80 hover:border-red-700/50 p-0' : 'p-3 space-y-1'
+                className={`rounded-lg border transition-all ${
+                  msg.source === 'alert'
+                    ? `cursor-pointer hover:bg-slate-800/80 p-0 ${isSelected ? 'bg-slate-800 border-purple-600/50' : 'bg-slate-800/50 border-slate-700/50'}`
+                    : 'p-3 space-y-1 bg-slate-800/50 border-slate-700/50'
                 }`}
               >
                 {msg.source === 'alert' && alertInfo ? (
@@ -246,7 +251,7 @@ export default function GlobalConversationPanel({ onClose, onAlertClick, onAlert
                       <div className="flex items-start justify-between mb-2">
                         <div
                           className="flex-1"
-                          onClick={() => onAlertGridClick?.(alertInfo)}
+                          onClick={() => onAlertGridClick?.(alertInfo, alertId)}
                         >
                           {alertInfo.portfolio && (
                             <p className="text-xs text-red-300 font-medium mb-1">
@@ -293,7 +298,7 @@ export default function GlobalConversationPanel({ onClose, onAlertClick, onAlert
                     <div className="border-t border-slate-700/50 p-2 bg-slate-800/30">
                       <button
                         onClick={() => {
-                          if (onAlertGridClick) onAlertGridClick(alertInfo)
+                          if (onAlertGridClick) onAlertGridClick(alertInfo, alertId)
                         }}
                         className="w-full text-xs text-purple-300 hover:text-purple-200 py-1 font-medium transition"
                       >

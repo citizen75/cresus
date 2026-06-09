@@ -18,6 +18,8 @@ export default function Dashboard() {
   const [chartModalTicker, setChartModalTicker] = useState<string | null>(null)
   const [chartHistory, setChartHistory] = useState<string[]>([])
   const [alertGridView, setAlertGridView] = useState<AlertInfo | null>(null)
+  const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null)
+  const [selectedTableTicker, setSelectedTableTicker] = useState<string | null>(null)
   const [historicalData, setHistoricalData] = useState<Record<string, any[]>>({})
   const [tickerInfo, setTickerInfo] = useState<Record<string, any>>({})
   const [fundamentalData, setFundamentalData] = useState<Record<string, any>>({})
@@ -28,6 +30,7 @@ export default function Dashboard() {
 
   const handleSelectTicker = useCallback((ticker: string) => {
     setChartModalTicker(ticker)
+    setSelectedTableTicker(ticker)
     // Add to history if not already there, keep last 10
     setChartHistory((prev) => {
       const filtered = prev.filter((t) => t !== ticker)
@@ -35,9 +38,10 @@ export default function Dashboard() {
     })
   }, [])
 
-  const handleAlertGridClick = useCallback((alertInfo: AlertInfo) => {
+  const handleAlertGridClick = useCallback((alertInfo: AlertInfo, alertId?: string) => {
     setAlertGridView(alertInfo)
-    setSelectedTicker(null) // Close single chart when opening grid
+    setSelectedAlertId(alertId || null)
+    setSelectedTableTicker(null)
   }, [])
 
   const filterDataByTimeframe = (data: any[], tf: string) => {
@@ -171,6 +175,7 @@ export default function Dashboard() {
             onClose={() => setConversationOpen(false)}
             onAlertClick={handleSelectTicker}
             onAlertGridClick={handleAlertGridClick}
+            selectedAlertId={selectedAlertId}
           />
         </div>
       )}
@@ -284,6 +289,7 @@ export default function Dashboard() {
                     totalValue={portfolioPositions.reduce((sum: number, p: any) => sum + (p.position_value || 0), 0)}
                     currency="EUR"
                     filterTickers={alertGridView.tickers}
+                    selectedPosition={selectedTableTicker}
                     showSearch={false}
                     showActions={true}
                     externalSearchQuery={searchQuery}
@@ -315,6 +321,7 @@ export default function Dashboard() {
                     }, 0)}
                     currency="EUR"
                     fundamentalData={fundamentalData}
+                    selectedPosition={selectedTableTicker}
                     showSearch={false}
                     showActions={true}
                     externalSearchQuery={searchQuery}
