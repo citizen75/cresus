@@ -291,8 +291,9 @@ export function ConversationWidget({
           const handleDeleteMessage = async (e: React.MouseEvent) => {
             e.stopPropagation()
             try {
-              const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+              const baseUrl = getApiBaseUrl()
               const timestamp = encodeURIComponent(msg.datetime)
+              console.log(`[Delete Message] Deleting: ${portfolioName}/${msg.datetime}`)
               const response = await fetch(
                 `${baseUrl}/api/v1/conversations/${encodeURIComponent(portfolioName)}/message?timestamp=${timestamp}`,
                 {
@@ -300,11 +301,14 @@ export function ConversationWidget({
                 }
               )
               if (response.ok) {
+                console.log(`[Delete Message] Success`)
                 // Remove message from state
                 setMessages((prev) => prev.filter((m) => m.datetime !== msg.datetime))
+              } else {
+                console.error(`[Delete Message] Failed: ${response.status} ${response.statusText}`)
               }
             } catch (err) {
-              console.error('Failed to delete message:', err)
+              console.error('[Delete Message] Error:', err)
             }
           }
 
