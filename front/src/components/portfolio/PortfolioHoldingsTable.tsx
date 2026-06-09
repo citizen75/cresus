@@ -251,8 +251,6 @@ export function PortfolioHoldingsTable({
             ) : (
               sortedPositions.map((pos: any) => {
                 const weight = totalValue > 0 ? ((pos.position_value || 0) / totalValue) * 100 : 0
-                const dailyChange = pos.position_gain || 0
-                const dailyChangePct = pos.position_gain_pct || 0
 
                 return (
                   <tr
@@ -277,11 +275,11 @@ export function PortfolioHoldingsTable({
                     <td className="px-4 py-3 text-right text-white font-medium">{formatCurrency(pos.current_price || 0, currency)}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex flex-col items-end">
-                        <span className={`font-medium text-sm ${dailyChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                          {dailyChange >= 0 ? '+' : ''}{formatCurrency(Math.abs(dailyChange || 0), currency)}
+                        <span className={`font-medium text-sm ${(pos.daily_change || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          {(pos.daily_change || 0) >= 0 ? '+' : ''}{formatCurrency(Math.abs(pos.daily_change || 0), currency)}
                         </span>
-                        <span className={`text-xs ${(dailyChangePct || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                          {(dailyChangePct || 0) >= 0 ? '+' : ''}{(dailyChangePct || 0).toFixed(2)}%
+                        <span className={`text-xs ${(pos.daily_change_pct || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          {(pos.daily_change_pct || 0) >= 0 ? '+' : ''}{(pos.daily_change_pct || 0).toFixed(2)}%
                         </span>
                       </div>
                     </td>
