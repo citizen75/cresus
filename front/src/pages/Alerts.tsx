@@ -680,12 +680,54 @@ export default function Alerts() {
                           className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
                         >
                           <option value="">Select source...</option>
-                          <option value="screener">Screener</option>
-                          <option value="backtest">Backtest</option>
-                          <option value="signal">Signal</option>
-                          <option value="performance">Performance</option>
-                          <option value="custom">Custom</option>
+                          <option value="universe">Universe</option>
+                          <option value="ticker">Ticker</option>
+                          <option value="tickers">Tickers</option>
+                          <option value="portfolio">Portfolio</option>
+                          <option value="all_portfolios">All Portfolios</option>
                         </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm text-slate-400 mb-2">
+                          {(formData.source || currentAlert?.source) === 'universe' ? 'Universe' : 'Source Value'}
+                        </label>
+                        {(formData.source || currentAlert?.source) === 'universe' ? (
+                          <select
+                            name="source_value"
+                            value={formData.source_value || currentAlert?.source_value || ''}
+                            onChange={handleFormChange}
+                            className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
+                          >
+                            <option value="">Select universe...</option>
+                            <option value="cac40">CAC 40</option>
+                            <option value="srd">SRD</option>
+                            <option value="enx_large">Euronext Large</option>
+                            <option value="enx_mid">Euronext Mid</option>
+                            <option value="enx_small">Euronext Small</option>
+                            <option value="nasdaq_100">Nasdaq 100</option>
+                            <option value="nasdaq_tech">Nasdaq Tech</option>
+                            <option value="etf_pea">ETF PEA</option>
+                            <option value="etf_fr">ETF FR</option>
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            name="source_value"
+                            value={formData.source_value || currentAlert?.source_value || ''}
+                            onChange={handleFormChange}
+                            className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
+                            placeholder={
+                              (formData.source || currentAlert?.source) === 'ticker'
+                                ? 'e.g., AAPL, AF.PA'
+                                : (formData.source || currentAlert?.source) === 'tickers'
+                                ? 'e.g., AAPL,AF.PA,MSFT'
+                                : (formData.source || currentAlert?.source) === 'portfolio'
+                                ? 'e.g., my_portfolio'
+                                : 'Enter source value'
+                            }
+                          />
+                        )}
                       </div>
 
                       <div>
