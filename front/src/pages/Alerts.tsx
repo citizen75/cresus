@@ -869,17 +869,35 @@ export default function Alerts() {
                               {getDisplayColumns().map((key) => {
                                 const value = row[key]
                                 let displayValue = String(value || '')
-                                const numValue = typeof value === 'number' ? value : parseFloat(String(value || 0))
 
-                                if (!isNaN(numValue)) {
-                                  // Format volume with 0 decimal places
-                                  if (key.toLowerCase().includes('volume') || key.toLowerCase().includes('vol')) {
-                                    displayValue = numValue.toFixed(0)
-                                  } else {
-                                    // Format other numbers with 3 decimal places
-                                    displayValue = numValue.toFixed(3)
+                                // Check if this is a date/timestamp column
+                                const isDateColumn = key.toLowerCase().includes('date') || key.toLowerCase().includes('timestamp') || key.toLowerCase().includes('time')
+                                if (isDateColumn && value) {
+                                  try {
+                                    const date = new Date(String(value))
+                                    if (!isNaN(date.getTime())) {
+                                      const day = String(date.getDate()).padStart(2, '0')
+                                      const month = String(date.getMonth() + 1).padStart(2, '0')
+                                      const year = String(date.getFullYear()).slice(-2)
+                                      displayValue = `${day}/${month}/${year}`
+                                    }
+                                  } catch (e) {
+                                    // If date parsing fails, use original value
+                                  }
+                                } else {
+                                  // Numeric formatting
+                                  const numValue = typeof value === 'number' ? value : parseFloat(String(value || 0))
+                                  if (!isNaN(numValue)) {
+                                    // Format volume with 0 decimal places
+                                    if (key.toLowerCase().includes('volume') || key.toLowerCase().includes('vol')) {
+                                      displayValue = numValue.toFixed(0)
+                                    } else {
+                                      // Format other numbers with 3 decimal places
+                                      displayValue = numValue.toFixed(3)
+                                    }
                                   }
                                 }
+
                                 return (
                                   <td key={key} className="px-6 py-3 text-slate-300">
                                     {displayValue}
