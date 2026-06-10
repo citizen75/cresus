@@ -265,6 +265,10 @@ async def run_alert(name: str):
         manager.update_last_run(name)
         task_logger.info(f"Last run timestamp updated")
 
+        # Enrich matches with company names before saving
+        enriched_matches = enrich_with_company_names(result.matches)
+        result.matches = enriched_matches
+
         # Save result to disk
         save_result = manager.save_alert_result(name, result)
         task_logger.info(f"Result saved: {save_result['status']}")
