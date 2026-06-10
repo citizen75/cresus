@@ -281,20 +281,30 @@ export default function Alerts() {
   const loadChartsData = async () => {
     if (!sortedResults || sortedResults.length === 0) {
       console.log('No results to load charts for')
+      setLoadingCharts(false)
       return
     }
 
     setLoadingCharts(true)
     setHistoricalData({}) // Clear previous data
     const data: { [ticker: string]: any[] } = {}
+    let loadedCount = 0
 
-    for (const match of sortedResults) {
+    // Limit to first 9 tickers to avoid too many requests
+    const tickersToLoad = sortedResults.slice(0, 9)
+
+    for (const match of tickersToLoad) {
       const ticker = match.ticker
       if (!ticker) continue
 
       try {
         console.log(`Loading chart data for ${ticker}...`)
-        const response = await api.getHistoricalData(ticker, getDaysForTimeframe(chartTimeframe))
+        const response = await Promise.race([
+          api.getHistoricalData(ticker, getDaysForTimeframe(chartTimeframe)),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Timeout')), 10000) // 10 second timeout per ticker
+          )
+        ])
 
         let historyArray: any[] = []
         if (Array.isArray(response)) {
@@ -307,14 +317,16 @@ export default function Alerts() {
 
         if (historyArray.length > 0) {
           data[ticker] = historyArray
+          loadedCount++
           console.log(`Loaded ${historyArray.length} rows for ${ticker}`)
         }
       } catch (err) {
         console.error(`Failed to load data for ${ticker}:`, err)
+        // Continue with next ticker instead of blocking
       }
     }
 
-    console.log('Chart data loaded:', Object.keys(data).length, 'tickers')
+    console.log('Chart data loaded:', loadedCount, 'tickers')
     setHistoricalData(data)
     setLoadingCharts(false)
   }
