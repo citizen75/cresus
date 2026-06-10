@@ -191,20 +191,23 @@ class AlertEvaluator:
                 for indicator_name, indicator_series in indicator_results.items():
                     history_df[indicator_name.lower()] = indicator_series
 
-            # For alerts, only evaluate the latest row (current candle [0])
-            # This prevents returning all historical matches when using [0] notation
+            # Evaluate formula using vectorized evaluation (supports shift notation like [-1])
             if len(history_df) > 0:
-                latest_row = history_df.iloc[-1]
-                latest_dict = latest_row.to_dict()
-
-                # Evaluate formula on latest row only
                 try:
-                    from tools.formula.dsl_parser import evaluate_dsl
-                    if evaluate_dsl(formula, latest_dict):
+                    from tools.formula.dsl_parser import evaluate_dsl_vectorized
+                    # Vectorized evaluation returns a Series of boolean results
+                    results = evaluate_dsl_vectorized(formula, history_df)
+
+                    # Check if the latest row matches
+                    if results.iloc[-1]:
+                        latest_row = history_df.iloc[-1]
+                        latest_dict = latest_row.to_dict()
                         latest_dict['ticker'] = ticker
                         return [latest_dict]
                 except Exception as e:
                     self.logger.warning(f"Error evaluating formula for {ticker}: {e}")
+                    if self.task_logger:
+                        self.task_logger.warning(f"Error evaluating formula for {ticker}: {e}")
                     # Return empty list instead of falling back to all historical matches
                     return []
 
