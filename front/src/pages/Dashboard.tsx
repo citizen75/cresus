@@ -287,13 +287,11 @@ export default function Dashboard() {
           }
           console.log(`[Dashboard] ${ticker} history: ${historyArray.length} rows`)
           if (historyArray.length > 0) {
-            data[ticker] = historyArray.map((item: any) => ({
-              date: item.date || item.timestamp || item.Date,
-              close: parseFloat(item.close || item.Close),
-            }))
+            // Pass raw data - ResultsWidget will handle transformation
+            data[ticker] = historyArray
             // Get prices from historical data
-            currentPrice = parseFloat(historyArray[historyArray.length - 1]?.close || 0)
-            previousClose = historyArray.length > 1 ? parseFloat(historyArray[historyArray.length - 2]?.close || currentPrice) : currentPrice
+            currentPrice = parseFloat(historyArray[historyArray.length - 1]?.close || historyArray[historyArray.length - 1]?.Close || 0)
+            previousClose = historyArray.length > 1 ? parseFloat(historyArray[historyArray.length - 2]?.close || historyArray[historyArray.length - 2]?.Close || currentPrice) : currentPrice
             console.log(`[Dashboard] ${ticker}: currentPrice=${currentPrice}, previousClose=${previousClose}`)
           }
 
