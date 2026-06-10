@@ -439,9 +439,17 @@ export default function Alerts() {
     if (!currentAlert || !sortedResults.length) return
 
     try {
+      // Format tickers list with arrow
+      const tickersList = sortedResults
+        .map(r => `◀ ${r.ticker}`)
+        .join('\n')
+
+      // Create message with alert name and tickers
+      const messageContent = `⚠️ ${currentAlert.name}\n${tickersList}`
+
       // Send message to conversation with results data and widget info
       await api.sendConversationMessage({
-        text: `Alert "${currentAlert.name}" results: ${sortedResults.length} matches found`,
+        text: messageContent,
         widget: 'results_widget',
         data: {
           results: sortedResults,
