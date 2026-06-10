@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../services/api'
 import CardChart from '@/components/CardChart'
 import TradingChartWidget from '@/components/TradingChartWidget'
+import ResultsWidget from '@/components/ResultsWidget'
 
 interface Alert {
   name: string

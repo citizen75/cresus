@@ -13,6 +13,8 @@ interface ResultsWidgetProps {
   loadingCharts?: boolean
   chartTimeframe?: '1W' | '1M' | '3M' | 'YTD' | 'ALL'
   onChartTimeframeChange?: (timeframe: '1W' | '1M' | '3M' | 'YTD' | 'ALL') => void
+  viewMode?: 'table' | 'charts'
+  onViewModeChange?: (mode: 'table' | 'charts') => void
 }
 
 export default function ResultsWidget({
@@ -27,8 +29,23 @@ export default function ResultsWidget({
   loadingCharts = false,
   chartTimeframe = '1M',
   onChartTimeframeChange,
+  viewMode: externalViewMode,
+  onViewModeChange,
 }: ResultsWidgetProps) {
-  const [viewMode, setViewMode] = useState<'table' | 'charts'>('table')
+  const [viewMode, setViewMode] = useState<'table' | 'charts'>(externalViewMode || 'table')
+
+  // Update internal viewMode when external viewMode changes
+  useEffect(() => {
+    if (externalViewMode) {
+      setViewMode(externalViewMode)
+    }
+  }, [externalViewMode])
+
+  // Notify parent when viewMode changes
+  const handleViewModeChange = (newMode: 'table' | 'charts') => {
+    setViewMode(newMode)
+    onViewModeChange?.(newMode)
+  }
 
   // Filter data based on search query
   const filteredData = data.filter(row => {
@@ -138,7 +155,7 @@ export default function ResultsWidget({
           {/* Table/Charts Toggle */}
           <div className="flex gap-2 bg-slate-800 border border-slate-700 rounded-lg p-1">
             <button
-              onClick={() => setViewMode('table')}
+              onClick={() => handleViewModeChange('table')}
               className={`px-4 py-1.5 rounded transition font-medium text-sm whitespace-nowrap ${
                 viewMode === 'table'
                   ? 'bg-purple-600 text-white'
@@ -148,7 +165,7 @@ export default function ResultsWidget({
               📊 Table
             </button>
             <button
-              onClick={() => setViewMode('charts')}
+              onClick={() => handleViewModeChange('charts')}
               className={`px-4 py-1.5 rounded transition font-medium text-sm whitespace-nowrap ${
                 viewMode === 'charts'
                   ? 'bg-purple-600 text-white'

@@ -735,6 +735,8 @@ export default function ScreenerDetail() {
             loadingCharts={loadingCharts}
             chartTimeframe={chartTimeframe}
             onChartTimeframeChange={setChartTimeframe}
+            viewMode={resultViewMode}
+            onViewModeChange={setResultViewMode}
           />
         </div>
       )}
