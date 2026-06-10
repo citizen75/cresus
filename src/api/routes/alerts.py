@@ -13,10 +13,47 @@ from tools.alerts.notifier import AlertNotifier
 router = APIRouter(tags=["alerts"])
 
 
-def clean_matches(matches: List[dict]) -> List[dict]:
-    """Convert NaN and Inf values to None for JSON serialization."""
-    cleaned = []
+def enrich_with_company_names(matches: List[dict]) -> List[dict]:
+    """Add company_name to matches if not already present."""
+    if not matches:
+        return matches
+
+    # Cache for company names to avoid repeated lookups
+    company_cache = {}
+    enriched = []
+
     for match in matches:
+        enriched_match = dict(match)  # Create a copy
+
+        # If company_name is missing, try to get it
+        if 'company_name' not in enriched_match or not enriched_match.get('company_name'):
+            ticker = enriched_match.get('ticker', '')
+            if ticker:
+                # Check cache first
+                if ticker not in company_cache:
+                    try:
+                        import yfinance as yf
+                        info = yf.Ticker(ticker).info
+                        company_name = info.get('longName', info.get('shortName', ticker))
+                        company_cache[ticker] = company_name
+                    except Exception:
+                        company_cache[ticker] = ticker
+
+                enriched_match['company_name'] = company_cache[ticker]
+
+        enriched.append(enriched_match)
+
+    return enriched
+
+
+def clean_matches(matches: List[dict]) -> List[dict]:
+    """Convert NaN and Inf values to None for JSON serialization, and add company names."""
+    # First enrich with company names
+    enriched = enrich_with_company_names(matches)
+
+    # Then clean NaN/Inf values
+    cleaned = []
+    for match in enriched:
         clean_match = {}
         for key, value in match.items():
             if isinstance(value, float):
