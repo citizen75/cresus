@@ -18,6 +18,7 @@ export default function WatchlistPage() {
   // Determine view mode from URL
   const isChartsView = location.pathname.includes('/charts')
   const [viewMode, setViewMode] = useState<'table' | 'charts'>(isChartsView ? 'charts' : 'table')
+  const [chartTimeframe, setChartTimeframe] = useState<'1W' | '1M' | '3M' | 'YTD' | 'ALL'>('1M')
 
   useEffect(() => {
     // Load global watchlist on mount
@@ -132,6 +133,8 @@ export default function WatchlistPage() {
             onViewModeChange={handleViewModeChange}
             historicalData={historicalData}
             loadingCharts={loadingData}
+            chartTimeframe={chartTimeframe}
+            onChartTimeframeChange={setChartTimeframe}
             onDeleteRow={handleDeleteTicker}
             watchlistName="global"
           />
