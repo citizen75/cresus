@@ -450,7 +450,13 @@ class CresusAPI {
     widget?: string
     data?: any
   }) {
-    return (await this.client.post('/conversations/message', data)).data
+    // Send to global conversation (portfolio_name = "global")
+    // Format: { source, content }
+    const message = {
+      source: 'alert',
+      content: data.text,
+    }
+    return (await this.client.post('/conversations/global/message', message)).data
   }
 }
 
