@@ -403,6 +403,8 @@ class CresusAPI {
     description?: string
     tags?: string[]
     notify?: string
+    source?: string
+    source_value?: string
   }) {
     const params = new URLSearchParams()
     if (data.formula) params.append('formula', data.formula)
@@ -410,6 +412,8 @@ class CresusAPI {
     if (data.description) params.append('description', data.description)
     if (data.tags) params.append('tags', data.tags.join(','))
     if (data.notify) params.append('notify', data.notify)
+    if (data.source) params.append('source', data.source)
+    if (data.source_value) params.append('source_value', data.source_value)
 
     return (await this.client.put(`/alerts/${name}`, null, { params })).data
   }

@@ -253,7 +253,14 @@ export default function Alerts() {
         navigate(`/alerts/${encodeURIComponent(newName)}`)
       } else {
         // Regular update without rename
-        await api.updateAlert(name, formData)
+        await api.updateAlert(name, {
+          formula: formData.formula,
+          description: formData.description,
+          notify: formData.notify,
+          enabled: formData.enabled,
+          source: formData.source,
+          source_value: formData.source_value,
+        })
       }
 
       cancelEdit()
