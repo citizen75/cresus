@@ -169,7 +169,9 @@ export default function PortfolioHoldingsWidget({
       const response = await fetch(`${baseUrl}/api/v1/portfolios/${portfolioName}/transactions`)
       if (response.ok) {
         const data = await response.json()
-        setTransactions(Array.isArray(data) ? data : data.transactions || [])
+        const txs = Array.isArray(data) ? data : data.transactions || []
+        console.log('[PortfolioHoldingsWidget] Transaction sample:', txs[0])
+        setTransactions(txs)
       }
     } catch (err) {
       console.error('Failed to load transactions:', err)
@@ -409,15 +411,18 @@ export default function PortfolioHoldingsWidget({
                 </thead>
                 <tbody className="divide-y divide-slate-800">
                   {transactions.map((tx: any, idx: number) => {
-                    // Parse date properly
-                    let dateStr = 'N/A'
+                    // Parse date - try different field names
+                    let dateStr = '—'
                     try {
-                      const dateObj = new Date(tx.date || tx.timestamp)
-                      if (!isNaN(dateObj.getTime())) {
-                        dateStr = dateObj.toLocaleDateString('en-US', { year: '2-digit', month: '2-digit', day: '2-digit' })
+                      const dateValue = tx.date || tx.timestamp || tx.Date || tx.Timestamp || tx.entry_date || tx.created_at
+                      if (dateValue) {
+                        const dateObj = new Date(dateValue)
+                        if (!isNaN(dateObj.getTime())) {
+                          dateStr = dateObj.toLocaleDateString('en-US', { year: '2-digit', month: '2-digit', day: '2-digit' })
+                        }
                       }
                     } catch (e) {
-                      // Keep dateStr as 'N/A'
+                      console.log('[PortfolioHoldingsWidget] Date parse error for tx:', tx, e)
                     }
 
                     return (
@@ -426,13 +431,21 @@ export default function PortfolioHoldingsWidget({
                         <td className="px-3 py-2 font-medium text-white">{tx.ticker}</td>
                         <td className="px-3 py-2 text-slate-400">{tx.name || tx.company_name || '—'}</td>
                         <td className="px-3 py-2 text-center">
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${
-                            tx.type?.toLowerCase() === 'buy'
-                              ? 'bg-green-900/30 text-green-300'
-                              : 'bg-red-900/30 text-red-300'
-                          }`}>
-                            {tx.type}
-                          </span>
+                          {(() => {
+                            // Try different field names for transaction type
+                            const type = tx.type || tx.side || tx.action || tx.direction || tx.operation || tx.Type || tx.Side
+                            const isBuy = type?.toLowerCase() === 'buy' || type?.toLowerCase() === 'long'
+
+                            return (
+                              <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                isBuy
+                                  ? 'bg-green-900/30 text-green-300'
+                                  : 'bg-red-900/30 text-red-300'
+                              }`}>
+                                {type || '—'}
+                              </span>
+                            )
+                          })()}
                         </td>
                         <td className="px-3 py-2 text-right text-slate-300">{tx.quantity}</td>
                         <td className="px-3 py-2 text-right text-slate-300">€{parseFloat(tx.price || 0).toFixed(2)}</td>
