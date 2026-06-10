@@ -10,7 +10,7 @@ const menuItems = [
   { icon: '🎯', label: 'Strategies', path: '/strategies' },
   { icon: '📊', label: 'Insights', path: '/insights' },
   { icon: '🔍', label: 'Screener', path: '/screener' },
-  { icon: '🔖', label: 'Watchlist', path: '#' },
+  { icon: '🔖', label: 'Watchlist', path: '/watchlist' },
   { icon: '⚡', label: 'Backtest', path: '/backtests' },
   { icon: '📈', label: 'Chart', path: '/chart' },
   { icon: '⏰', label: 'Scheduler', path: '/scheduler' },
