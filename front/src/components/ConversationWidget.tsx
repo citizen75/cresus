@@ -260,11 +260,11 @@ export function ConversationWidget({
           </div>
         )}
 
-        {!loading && messages.filter(m => m.widget !== 'results_widget').length === 0 && (
+        {!loading && messages.length === 0 && (
           <p className="text-xs text-slate-500 text-center py-8">No messages yet</p>
         )}
 
-        {messages.filter(m => m.widget !== 'results_widget').map((msg, idx) => {
+        {messages.map((msg, idx) => {
           // Parse alert content to extract structured data
           const parsedAlert = msg.source === 'alert' ? parseAlertContent(msg.content) : null
           const portfolio = msg.portfolio || parsedAlert?.portfolio

@@ -342,7 +342,6 @@ export default function Dashboard() {
             title="Global Chat"
             subtitle="All portfolios & alerts"
             maxHeight="h-full"
-            showResultsPanel={false}
             onNewMessage={(msg) => {
               // Update recent alerts when new message arrives
               if (msg.source === 'alert') {
