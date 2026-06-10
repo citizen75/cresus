@@ -328,7 +328,6 @@ export default function PortfolioHoldingsWidget({
                       </div>
                     )
                   })()}
-                  }
 
                   {/* Card Footer */}
                   <div className="border-t border-slate-700 p-3 space-y-2 bg-slate-800/30 text-xs">
