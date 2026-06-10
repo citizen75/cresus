@@ -1201,7 +1201,11 @@ export default function Alerts() {
 
             {/* Chart Widget - Full Height */}
             <div className="flex-1 overflow-hidden">
-              <TradingChart ticker={selectedTickerForChart} />
+              <TradingChart
+                timeframe="1Y"
+                ticker={selectedTickerForChart}
+                visibleWindow="1Y"
+              />
             </div>
           </div>
         </div>
