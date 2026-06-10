@@ -332,7 +332,13 @@ export default function Alerts() {
     try {
       setLoadingSavedResults(true)
       const response = await api.getAlertResults(alertName, 10)
-      setSavedResults(response.results || [])
+      const results = response.results || []
+      setSavedResults(results)
+
+      // Set runResults to the latest result for chart display
+      if (results.length > 0 && !runResults) {
+        setRunResults(results[0])
+      }
     } catch (err) {
       console.error('Failed to load saved results:', err)
     } finally {
