@@ -300,21 +300,8 @@ export default function Alerts() {
           const response = await api.getHistoricalData(ticker, 1825) // ~5 years
 
           if (response && response.data) {
-            // Map and sort by date (oldest to newest) - same as ScreenerDetail
+            // Pass raw data - ResultsWidget will handle transformation
             data[ticker] = response.data
-              .map((item: any) => ({
-                date: item.date || item.timestamp,
-                close: parseFloat(item.close),
-                open: parseFloat(item.open),
-                high: parseFloat(item.high),
-                low: parseFloat(item.low),
-                volume: parseFloat(item.volume),
-              }))
-              .sort((a: any, b: any) => {
-                const dateA = new Date(a.date)
-                const dateB = new Date(b.date)
-                return dateA.getTime() - dateB.getTime()
-              })
             console.log(`✓ Loaded ${data[ticker].length} rows for ${ticker}`)
           } else {
             data[ticker] = []

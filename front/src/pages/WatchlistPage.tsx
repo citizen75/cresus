@@ -67,7 +67,8 @@ export default function WatchlistPage() {
       setLoadingData(true)
       const data: { [ticker: string]: any[] } = {}
 
-      // Load historical data for each ticker
+      // Load raw historical data for each ticker
+      // ResultsWidget will handle transformation
       for (const row of watchlistData) {
         const ticker = row.ticker
         if (!ticker) continue
@@ -75,21 +76,7 @@ export default function WatchlistPage() {
         try {
           const response = await api.getHistoricalData(ticker, 1825) // ~5 years for better charts
           if (response && response.data) {
-            // Transform data to match ResultsWidget format (same as Alerts page)
             data[ticker] = response.data
-              .map((item: any) => ({
-                date: item.date || item.timestamp,
-                close: parseFloat(item.close) || 0,
-                open: parseFloat(item.open) || 0,
-                high: parseFloat(item.high) || 0,
-                low: parseFloat(item.low) || 0,
-                volume: parseFloat(item.volume) || 0,
-              }))
-              .sort((a: any, b: any) => {
-                const dateA = new Date(a.date)
-                const dateB = new Date(b.date)
-                return dateA.getTime() - dateB.getTime()
-              })
           }
         } catch (err) {
           console.error(`Failed to load history for ${ticker}:`, err)

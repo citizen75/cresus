@@ -161,6 +161,26 @@ export default function ResultsWidget({
     return orderedCols
   }
 
+  // Transform raw API data to chart format
+  const transformHistoricalData = (rawData: any[]): any[] => {
+    if (!rawData || rawData.length === 0) return []
+
+    return rawData
+      .map((item: any) => ({
+        date: item.date || item.timestamp || item.Date,
+        close: parseFloat(item.close || item.Close || 0),
+        open: parseFloat(item.open || item.Open || 0),
+        high: parseFloat(item.high || item.High || 0),
+        low: parseFloat(item.low || item.Low || 0),
+        volume: parseFloat(item.volume || item.Volume || 0),
+      }))
+      .sort((a: any, b: any) => {
+        const dateA = new Date(a.date)
+        const dateB = new Date(b.date)
+        return dateA.getTime() - dateB.getTime()
+      })
+  }
+
   // Filter chart data by timeframe
   const filterDataByTimeframe = (data: any[], timeframe: '1W' | '1M' | '3M' | 'YTD' | 'ALL') => {
     if (!data || data.length === 0) return []
@@ -387,8 +407,9 @@ export default function ResultsWidget({
                 const ticker = row.ticker
                 if (!ticker) return null
 
-                const allData = historicalData[ticker] || []
-                const chartData = filterDataByTimeframe(allData, chartTimeframe)
+                const rawData = historicalData[ticker] || []
+                const transformedData = transformHistoricalData(rawData)
+                const chartData = filterDataByTimeframe(transformedData, chartTimeframe)
 
                 // Calculate change percentage
                 let changePercent = 0
