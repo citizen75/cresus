@@ -451,17 +451,31 @@ export default function Alerts() {
       // Create message with signal and tickers
       const messageContent = `${signalLine}\n${tickerLines}`
 
+      // Get only the visible columns
+      const displayColumns = getDisplayColumns()
+
+      // Filter results to only include visible columns
+      const filteredResults = sortedResults.map(row => {
+        const filtered: any = {}
+        displayColumns.forEach(col => {
+          if (col in row) {
+            filtered[col] = row[col]
+          }
+        })
+        return filtered
+      })
+
       // Send message to conversation with results data and widget info
       await api.sendConversationMessage({
         text: messageContent,
         widget: 'results_widget',
         data: {
-          results: sortedResults,
+          results: filteredResults,
           alert_name: currentAlert.name,
           alert_formula: currentAlert.formula,
           historicalData,
           chartTimeframe,
-          columnInfo: getDisplayColumns(),
+          columnInfo: displayColumns,
         },
       })
       // Show success message
