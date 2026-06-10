@@ -431,30 +431,30 @@ async def delete_message(
         manager = ConversationManager(portfolio_name)
         all_messages = manager.get_history()
 
-        # Find and remove the message with matching ID
-        remaining = [
-            msg for msg in all_messages
-            if msg.id != message_id
-        ]
+        # Find the message to delete
+        message_to_delete = None
+        remaining = []
 
-        if len(remaining) == len(all_messages):
+        for msg in all_messages:
+            if msg.id == message_id:
+                message_to_delete = msg
+            else:
+                remaining.append(msg)
+
+        if message_to_delete is None:
             raise HTTPException(status_code=404, detail=f"Message '{message_id}' not found")
 
-        # Clear and re-add remaining messages (preserve all fields including ID)
+        # Clear and re-add remaining messages
         manager.clear_history()
         for msg in remaining:
-            # Re-create message directly to preserve ID and all fields
-            preserved_msg = ConversationMessage(
+            manager.add_message(
                 source=msg.source,
                 content=msg.content,
                 portfolio=msg.portfolio,
                 timestamp=msg.timestamp,
-                message_id=msg.id,
                 widget=msg.widget,
                 data=msg.data,
             )
-            ConversationManager._global_history.append(preserved_msg)
-        manager._save_history()
 
         # Return updated history
         history = manager.get_history_dicts()
