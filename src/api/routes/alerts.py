@@ -195,7 +195,7 @@ async def update_alert(name: str, request: Request):
 
         # Build kwargs for update
         kwargs = {}
-        for key in ["formula", "enabled", "description", "tags", "notify"]:
+        for key in ["formula", "enabled", "description", "tags", "notify", "source", "source_value"]:
             if key in params:
                 kwargs[key] = params[key]
 
