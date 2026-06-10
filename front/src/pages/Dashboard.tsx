@@ -374,7 +374,11 @@ export default function Dashboard() {
 
                 if (alertInfo.tickers.length > 0) {
                   const alertId = `${Date.now()}-${msg.datetime}`
-                  setAlertHistory((prev) => [{ id: alertId, info: alertInfo }, ...prev].slice(0, 10))
+                  setAlertHistory((prev) => {
+                    // Remove duplicate portfolio alerts, keep only the newest
+                    const filtered = prev.filter((a) => a.info.portfolio !== alertInfo.portfolio)
+                    return [{ id: alertId, info: alertInfo }, ...filtered].slice(0, 10)
+                  })
                 }
               }
             }}
@@ -393,9 +397,12 @@ export default function Dashboard() {
                 // Use existing alert
                 setSelectedAlertId(matchingAlert.id)
               } else {
-                // Add new entry to Recent for this portfolio view
+                // Add new entry to Recent for this portfolio view (remove duplicates)
                 const alertId = `${Date.now()}-${portfolio}`
-                setAlertHistory((prev) => [{ id: alertId, info: alertInfo }, ...prev].slice(0, 10))
+                setAlertHistory((prev) => {
+                  const filtered = prev.filter((a) => a.info.portfolio !== portfolio)
+                  return [{ id: alertId, info: alertInfo }, ...filtered].slice(0, 10)
+                })
                 setSelectedAlertId(alertId)
               }
 
