@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../services/api'
 import CardChart from '@/components/CardChart'
-import Chart from './Chart'
+import TradingChart from '@/components/TradingChart'
 
 interface Alert {
   name: string
@@ -1184,9 +1184,9 @@ export default function Alerts() {
       {/* Trading Chart Modal */}
       {selectedTickerForChart && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-lg w-full h-[90vh] max-w-6xl flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-slate-800 sticky top-0 bg-slate-900">
+            <div className="flex items-center justify-between p-6 border-b border-slate-800 flex-shrink-0">
               <div>
                 <h2 className="text-2xl font-bold text-white">{selectedTickerForChart}</h2>
                 <p className="text-slate-400 text-sm mt-1">Trading Chart</p>
@@ -1199,9 +1199,9 @@ export default function Alerts() {
               </button>
             </div>
 
-            {/* Chart Widget */}
-            <div className="p-6">
-              <Chart ticker={selectedTickerForChart} />
+            {/* Chart Widget - Full Height */}
+            <div className="flex-1 overflow-hidden">
+              <TradingChart ticker={selectedTickerForChart} />
             </div>
           </div>
         </div>
