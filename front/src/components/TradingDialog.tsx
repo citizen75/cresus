@@ -109,9 +109,12 @@ export function TradingDialog({
       <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 max-w-sm w-full mx-4">
         {/* Header */}
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-bold text-white">
-            {mode === 'buy' ? '📈' : '📉'} {ticker || '...'}
-          </h2>
+          <div>
+            <h2 className="text-lg font-bold text-white">
+              {mode === 'buy' ? '📈' : '📉'} {ticker || '...'}
+            </h2>
+            {tickerName && <p className="text-xs text-slate-400">{tickerName}</p>}
+          </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-200">✕</button>
         </div>
 
