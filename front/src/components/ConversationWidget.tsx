@@ -287,7 +287,7 @@ export function ConversationWidget({
           const handleDeleteMessage = async (e: React.MouseEvent) => {
             e.stopPropagation()
             try {
-              const messageId = msg.id || msg.datetime // Fallback to datetime for backward compatibility
+              const messageId = msg.id
               console.log(`[Delete Message] Deleting: ${portfolioName}/${messageId}`)
               await deleteMessage(portfolioName, messageId)
               console.log(`[Delete Message] Success`)
