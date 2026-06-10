@@ -106,171 +106,122 @@ export function TradingDialog({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-900 border border-slate-800 rounded-lg p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 max-w-sm w-full mx-4">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-white">
-            {mode === 'buy' ? '📈 Buy' : '📉 Sell'} {ticker || '...'}
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-bold text-white">
+            {mode === 'buy' ? '📈' : '📉'} {ticker || '...'}
           </h2>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-200 text-xl"
-          >
-            ✕
-          </button>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-200">✕</button>
         </div>
 
-        {/* Ticker Input */}
-        <div className="mb-4">
-          <label className="block text-sm text-slate-400 mb-2">Ticker</label>
-          <input
-            type="text"
-            placeholder="e.g., AAPL, AF.PA"
-            value={ticker}
-            onChange={(e) => setTicker(e.target.value.toUpperCase())}
-            disabled={initialTicker ? true : false}
-            className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded focus:outline-none focus:border-purple-600 disabled:opacity-50"
-          />
-          {tickerName && <p className="text-xs text-slate-400 mt-1">📊 {tickerName}</p>}
-          {loadingTicker && <p className="text-xs text-slate-500 mt-1">Loading...</p>}
-        </div>
-
-        {/* Current Price */}
-        <div className="bg-slate-800/50 rounded p-3 mb-4">
-          <div className="text-sm text-slate-400">Current Price</div>
-          <div className="text-lg font-bold text-white">{formatCurrency(initialPrice)}</div>
-        </div>
-
-        {/* Holdings Info (for sell) */}
-        {mode === 'sell' && (
-          <div className="bg-slate-800/50 rounded p-3 mb-4">
-            <div className="text-sm text-slate-400">Current Holdings</div>
-            <div className="text-lg font-bold text-white">{currentHoldings} shares</div>
+        {/* Price & Holdings */}
+        <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
+          <div className="bg-slate-800/50 rounded p-2">
+            <div className="text-slate-400">Price</div>
+            <div className="font-bold text-white">{formatCurrency(initialPrice)}</div>
           </div>
-        )}
-
-        {/* Price Input */}
-        <div className="mb-4">
-          <label className="block text-sm text-slate-400 mb-2">Price</label>
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            placeholder={`Default: ${initialPrice}`}
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded focus:outline-none focus:border-purple-600"
-          />
-        </div>
-
-        {/* Quantity Input */}
-        <div className="mb-4">
-          <label className="block text-sm text-slate-400 mb-2">Quantity</label>
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            placeholder="Enter quantity"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded focus:outline-none focus:border-purple-600"
-          />
-        </div>
-
-        {/* Fees Input */}
-        <div className="mb-4">
-          <label className="block text-sm text-slate-400 mb-2">Fees</label>
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            placeholder="0.00"
-            value={fees}
-            onChange={(e) => setFees(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded focus:outline-none focus:border-purple-600"
-          />
-        </div>
-
-        {/* Stop Loss Input */}
-        <div className="mb-4">
-          <label className="block text-sm text-slate-400 mb-2">Stop Loss (%) - Default 7%</label>
-          <div className="flex gap-2">
-            <input
-              type="number"
-              min="0"
-              step="0.1"
-              value={stopLoss}
-              onChange={(e) => setStopLoss(e.target.value)}
-              className="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded focus:outline-none focus:border-purple-600"
-            />
-            <button
-              onClick={() => setStopLoss('7')}
-              className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-sm transition"
-            >
-              Reset
-            </button>
-          </div>
-          {priceVal > 0 && (
-            <p className="text-xs text-slate-500 mt-1">
-              Stop at: €{(priceVal * (1 - parseFloat(stopLoss) / 100)).toFixed(2)}
-            </p>
-          )}
-        </div>
-
-        {/* Take Profit Input */}
-        <div className="mb-4">
-          <label className="block text-sm text-slate-400 mb-2">Target Profit (%) - Default 2%</label>
-          <div className="flex gap-2">
-            <input
-              type="number"
-              min="0"
-              step="0.1"
-              value={takeProfit}
-              onChange={(e) => setTakeProfit(e.target.value)}
-              className="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded focus:outline-none focus:border-purple-600"
-            />
-            <button
-              onClick={() => setTakeProfit('2')}
-              className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-sm transition"
-            >
-              Reset
-            </button>
-          </div>
-          {priceVal > 0 && (
-            <p className="text-xs text-slate-500 mt-1">
-              Target at: €{(priceVal * (1 + parseFloat(takeProfit) / 100)).toFixed(2)}
-            </p>
-          )}
-        </div>
-
-        {/* Total Amount */}
-        {quantity && (
-          <div className="bg-slate-800/50 rounded p-3 mb-4">
-            <div className="flex justify-between items-center">
-              <span className="text-slate-400">Total Amount</span>
-              <span className={`text-lg font-bold ${totalAmount > 0 ? 'text-green-400' : 'text-slate-500'}`}>
-                {formatCurrency(totalAmount)}
-              </span>
+          {mode === 'sell' && (
+            <div className="bg-slate-800/50 rounded p-2">
+              <div className="text-slate-400">Holdings</div>
+              <div className="font-bold text-white">{currentHoldings}</div>
             </div>
-            {fees && parseFloat(fees) > 0 && (
-              <div className="flex justify-between items-center text-xs text-slate-500 mt-2">
-                <span>({qtyVal} × €{priceVal.toFixed(2)} - €{feesVal.toFixed(2)})</span>
-              </div>
-            )}
+          )}
+        </div>
+
+        {/* Inputs Grid */}
+        <div className="space-y-2 mb-3">
+          {!initialTicker && (
+            <div>
+              <label className="text-xs text-slate-400">Ticker</label>
+              <input
+                type="text"
+                placeholder="AAPL"
+                value={ticker}
+                onChange={(e) => setTicker(e.target.value.toUpperCase())}
+                className="w-full px-2 py-1 bg-slate-800 border border-slate-700 text-white text-sm rounded focus:outline-none focus:border-purple-600"
+              />
+              {tickerName && <p className="text-xs text-slate-500">{tickerName}</p>}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs text-slate-400">Price</label>
+              <input
+                type="number"
+                step="0.01"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                className="w-full px-2 py-1 bg-slate-800 border border-slate-700 text-white text-sm rounded focus:outline-none focus:border-purple-600"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400">Qty</label>
+              <input
+                type="number"
+                step="0.01"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                className="w-full px-2 py-1 bg-slate-800 border border-slate-700 text-white text-sm rounded focus:outline-none focus:border-purple-600"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <label className="text-xs text-slate-400">Fees</label>
+              <input
+                type="number"
+                step="0.01"
+                value={fees}
+                onChange={(e) => setFees(e.target.value)}
+                className="w-full px-2 py-1 bg-slate-800 border border-slate-700 text-white text-sm rounded focus:outline-none focus:border-purple-600"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400">Stop %</label>
+              <input
+                type="number"
+                step="0.1"
+                value={stopLoss}
+                onChange={(e) => setStopLoss(e.target.value)}
+                className="w-full px-2 py-1 bg-slate-800 border border-slate-700 text-white text-sm rounded focus:outline-none focus:border-purple-600"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400">Target %</label>
+              <input
+                type="number"
+                step="0.1"
+                value={takeProfit}
+                onChange={(e) => setTakeProfit(e.target.value)}
+                className="w-full px-2 py-1 bg-slate-800 border border-slate-700 text-white text-sm rounded focus:outline-none focus:border-purple-600"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Calculations */}
+        {priceVal > 0 && (
+          <div className="bg-slate-800/30 rounded p-2 mb-3 text-xs space-y-1">
+            {stopLoss && <p className="text-slate-400">Stop: <span className="text-white">€{(priceVal * (1 - parseFloat(stopLoss) / 100)).toFixed(2)}</span></p>}
+            {takeProfit && <p className="text-slate-400">Target: <span className="text-white">€{(priceVal * (1 + parseFloat(takeProfit) / 100)).toFixed(2)}</span></p>}
+            {quantity && <p className="text-slate-400">Total: <span className={totalAmount > 0 ? 'text-green-400' : 'text-slate-400'}>€{totalAmount.toFixed(2)}</span></p>}
           </div>
         )}
 
         {/* Actions */}
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-medium transition"
+            className="flex-1 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-sm font-medium transition"
           >
             Cancel
           </button>
           <button
             onClick={handleConfirm}
-            className={`flex-1 px-4 py-2 rounded font-medium transition text-white ${
+            className={`flex-1 px-3 py-2 rounded text-sm font-medium transition text-white ${
               mode === 'buy'
                 ? 'bg-green-600 hover:bg-green-700'
                 : 'bg-red-600 hover:bg-red-700'
