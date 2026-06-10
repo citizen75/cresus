@@ -517,15 +517,22 @@ export default function Alerts() {
               {/* Results Table (Bottom) */}
               {currentAlert && runResults && runResults.matches && runResults.matches.length > 0 && (
                 <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden flex flex-col flex-1 min-h-0">
-                  {/* Results Header */}
-                  <div className="bg-slate-800 px-6 py-4 border-b border-slate-700 flex items-center justify-between flex-shrink-0">
-                    <h3 className="font-semibold text-white">
+                  {/* Results Header with Search */}
+                  <div className="bg-slate-800 px-6 py-4 border-b border-slate-700 flex items-center justify-between gap-4 flex-shrink-0">
+                    <h3 className="font-semibold text-white whitespace-nowrap">
                       Results ({filteredResults.length} of {runResults.matches.length} matches)
                     </h3>
-                    <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Search results..."
+                      value={resultSearchQuery}
+                      onChange={(e) => setResultSearchQuery(e.target.value)}
+                      className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 text-white rounded text-sm placeholder-slate-400 focus:outline-none focus:border-purple-500"
+                    />
+                    <div className="flex gap-2 flex-shrink-0">
                       <button
                         onClick={() => setResultViewMode('table')}
-                        className={`px-3 py-1 rounded text-sm font-medium transition ${
+                        className={`px-3 py-2 rounded text-sm font-medium transition ${
                           resultViewMode === 'table'
                             ? 'bg-purple-600 text-white'
                             : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
@@ -535,7 +542,7 @@ export default function Alerts() {
                       </button>
                       <button
                         onClick={() => setResultViewMode('charts')}
-                        className={`px-3 py-1 rounded text-sm font-medium transition ${
+                        className={`px-3 py-2 rounded text-sm font-medium transition ${
                           resultViewMode === 'charts'
                             ? 'bg-purple-600 text-white'
                             : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
@@ -544,17 +551,6 @@ export default function Alerts() {
                         📈 Charts
                       </button>
                     </div>
-                  </div>
-
-                  {/* Search Bar */}
-                  <div className="px-6 py-3 border-b border-slate-700 flex-shrink-0">
-                    <input
-                      type="text"
-                      placeholder="Search results..."
-                      value={resultSearchQuery}
-                      onChange={(e) => setResultSearchQuery(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm placeholder-slate-500 focus:outline-none focus:border-purple-500"
-                    />
                   </div>
 
                   {/* Table View */}
