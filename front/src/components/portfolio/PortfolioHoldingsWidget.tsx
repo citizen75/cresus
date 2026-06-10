@@ -392,40 +392,59 @@ export default function PortfolioHoldingsWidget({
                 <p className="text-slate-400">No transactions yet</p>
               </div>
             ) : (
-              <table className="w-full">
+              <table className="w-full text-xs">
                 <thead className="bg-slate-800/50 sticky top-0">
                   <tr>
-                    <th className="px-4 py-2 text-left text-xs text-slate-300">Date</th>
-                    <th className="px-4 py-2 text-left text-xs text-slate-300">Ticker</th>
-                    <th className="px-4 py-2 text-left text-xs text-slate-300">Type</th>
-                    <th className="px-4 py-2 text-right text-xs text-slate-300">Qty</th>
-                    <th className="px-4 py-2 text-right text-xs text-slate-300">Price</th>
-                    <th className="px-4 py-2 text-right text-xs text-slate-300">Total</th>
+                    <th className="px-3 py-2 text-left text-slate-300">Date</th>
+                    <th className="px-3 py-2 text-left text-slate-300">Ticker</th>
+                    <th className="px-3 py-2 text-left text-slate-300">Name</th>
+                    <th className="px-3 py-2 text-center text-slate-300">Type</th>
+                    <th className="px-3 py-2 text-right text-slate-300">Qty</th>
+                    <th className="px-3 py-2 text-right text-slate-300">Price</th>
+                    <th className="px-3 py-2 text-right text-slate-300">Fees</th>
+                    <th className="px-3 py-2 text-right text-slate-300">Stop Loss</th>
+                    <th className="px-3 py-2 text-right text-slate-300">Target</th>
+                    <th className="px-3 py-2 text-right text-slate-300">Total</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800">
-                  {transactions.map((tx: any, idx: number) => (
-                    <tr key={idx} className="hover:bg-slate-800/30">
-                      <td className="px-4 py-2 text-xs text-slate-300">
-                        {new Date(tx.date || tx.timestamp).toLocaleDateString()}
-                      </td>
-                      <td className="px-4 py-2 text-xs font-medium text-white">{tx.ticker}</td>
-                      <td className="px-4 py-2 text-xs">
-                        <span className={`px-2 py-1 rounded ${
-                          tx.type?.toLowerCase() === 'buy'
-                            ? 'bg-green-900/30 text-green-300'
-                            : 'bg-red-900/30 text-red-300'
-                        }`}>
-                          {tx.type}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2 text-xs text-right text-slate-300">{tx.quantity}</td>
-                      <td className="px-4 py-2 text-xs text-right text-slate-300">€{parseFloat(tx.price || 0).toFixed(2)}</td>
-                      <td className="px-4 py-2 text-xs text-right text-white font-medium">
-                        €{(tx.quantity * parseFloat(tx.price || 0)).toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
+                  {transactions.map((tx: any, idx: number) => {
+                    // Parse date properly
+                    let dateStr = 'N/A'
+                    try {
+                      const dateObj = new Date(tx.date || tx.timestamp)
+                      if (!isNaN(dateObj.getTime())) {
+                        dateStr = dateObj.toLocaleDateString('en-US', { year: '2-digit', month: '2-digit', day: '2-digit' })
+                      }
+                    } catch (e) {
+                      // Keep dateStr as 'N/A'
+                    }
+
+                    return (
+                      <tr key={idx} className="hover:bg-slate-800/30">
+                        <td className="px-3 py-2 text-slate-300">{dateStr}</td>
+                        <td className="px-3 py-2 font-medium text-white">{tx.ticker}</td>
+                        <td className="px-3 py-2 text-slate-400">{tx.name || tx.company_name || '—'}</td>
+                        <td className="px-3 py-2 text-center">
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${
+                            tx.type?.toLowerCase() === 'buy'
+                              ? 'bg-green-900/30 text-green-300'
+                              : 'bg-red-900/30 text-red-300'
+                          }`}>
+                            {tx.type}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-right text-slate-300">{tx.quantity}</td>
+                        <td className="px-3 py-2 text-right text-slate-300">€{parseFloat(tx.price || 0).toFixed(2)}</td>
+                        <td className="px-3 py-2 text-right text-slate-300">€{parseFloat(tx.fees || 0).toFixed(2)}</td>
+                        <td className="px-3 py-2 text-right text-slate-300">{tx.stop_loss ? `€${parseFloat(tx.stop_loss).toFixed(2)}` : '—'}</td>
+                        <td className="px-3 py-2 text-right text-slate-300">{tx.target_profit ? `€${parseFloat(tx.target_profit).toFixed(2)}` : '—'}</td>
+                        <td className="px-3 py-2 text-right text-white font-medium">
+                          €{((tx.quantity * parseFloat(tx.price || 0)) - parseFloat(tx.fees || 0)).toFixed(2)}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             )}
