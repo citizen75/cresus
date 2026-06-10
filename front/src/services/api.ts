@@ -444,6 +444,14 @@ class CresusAPI {
     if (source) params.source = source
     return (await this.client.get(`/conversations/${portfolioName}`, { params })).data
   }
+
+  async sendConversationMessage(data: {
+    text: string
+    widget?: string
+    data?: any
+  }) {
+    return (await this.client.post('/conversations/message', data)).data
+  }
 }
 
 export const api = new CresusAPI()

@@ -435,6 +435,31 @@ export default function Alerts() {
     return ordered
   }
 
+  const handleNotifyConversation = async () => {
+    if (!currentAlert || !sortedResults.length) return
+
+    try {
+      // Send message to conversation with results data and widget info
+      await api.sendConversationMessage({
+        text: `Alert "${currentAlert.name}" results: ${sortedResults.length} matches found`,
+        widget: 'results_widget',
+        data: {
+          results: sortedResults,
+          alert_name: currentAlert.name,
+          alert_formula: currentAlert.formula,
+          historicalData,
+          chartTimeframe,
+          columnInfo: getDisplayColumns(),
+        },
+      })
+      // Show success message
+      alert('Results sent to conversation!')
+    } catch (err) {
+      console.error('Failed to send to conversation:', err)
+      alert('Failed to send to conversation')
+    }
+  }
+
   return (
     <div className="h-full flex flex-col gap-4">
       {/* Header */}
@@ -788,6 +813,15 @@ export default function Alerts() {
                         onChange={(e) => setResultSearchQuery(e.target.value)}
                         className="flex-1 px-4 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-slate-600"
                       />
+
+                      {/* Notify Button */}
+                      <button
+                        onClick={() => handleNotifyConversation()}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition text-sm"
+                        title="Send to conversation"
+                      >
+                        🔔 Notify
+                      </button>
 
                       {/* Timeframe Selector - shown only in charts view */}
                       {resultViewMode === 'charts' && (
