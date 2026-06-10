@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from typing import List, Optional, Literal
 from datetime import datetime, timedelta
-from tools.conversation import ConversationManager
+from tools.conversation import ConversationManager, ConversationMessage
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 
@@ -439,15 +439,21 @@ async def delete_message(
         if len(remaining) == len(all_messages):
             raise HTTPException(status_code=404, detail=f"Message '{message_id}' not found")
 
-        # Clear and re-add remaining messages
+        # Clear and re-add remaining messages (preserve all fields including ID)
         manager.clear_history()
         for msg in remaining:
-            manager.add_message(
+            # Re-create message directly to preserve ID and all fields
+            preserved_msg = ConversationMessage(
                 source=msg.source,
                 content=msg.content,
                 portfolio=msg.portfolio,
                 timestamp=msg.timestamp,
+                message_id=msg.id,
+                widget=msg.widget,
+                data=msg.data,
             )
+            ConversationManager._global_history.append(preserved_msg)
+        manager._save_history()
 
         # Return updated history
         history = manager.get_history_dicts()
