@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '@/services/api'
+import ResultsWidget from '@/components/ResultsWidget'
 
 interface Watchlist {
   name: string
@@ -12,9 +13,13 @@ export default function WatchlistPage() {
   const [watchlists, setWatchlists] = useState<Watchlist[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedWatchlist, setSelectedWatchlist] = useState<string | null>(null)
-  const [watchlistTickers, setWatchlistTickers] = useState<string[]>([])
-  const [removingTicker, setRemovingTicker] = useState<Set<string>>(new Set())
+  const [selectedWatchlist, setSelectedWatchlist] = useState<string>('global')
+  const [watchlistData, setWatchlistData] = useState<any[]>([])
+  const [loadingData, setLoadingData] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortColumn, setSortColumn] = useState<string | null>('ticker')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [viewMode, setViewMode] = useState<'table' | 'charts'>('table')
 
   useEffect(() => {
     fetchWatchlists()
@@ -22,7 +27,7 @@ export default function WatchlistPage() {
 
   useEffect(() => {
     if (selectedWatchlist) {
-      loadWatchlistTickers(selectedWatchlist)
+      loadWatchlistData(selectedWatchlist)
     }
   }, [selectedWatchlist])
 
@@ -31,7 +36,14 @@ export default function WatchlistPage() {
       setLoading(true)
       setError(null)
       const response = await api.listWatchlists()
-      setWatchlists(response.watchlists || [])
+      const lists = response.watchlists || []
+      setWatchlists(lists)
+      // Set global as default if it exists
+      if (lists.some(w => w.name === 'global')) {
+        setSelectedWatchlist('global')
+      } else if (lists.length > 0) {
+        setSelectedWatchlist(lists[0].name)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load watchlists')
     } finally {
@@ -39,31 +51,24 @@ export default function WatchlistPage() {
     }
   }
 
-  const loadWatchlistTickers = async (watchlistName: string) => {
+  const loadWatchlistData = async (watchlistName: string) => {
     try {
-      const response = await api.getWatchlistTickers(watchlistName)
-      setWatchlistTickers(response.tickers || [])
-    } catch (err) {
-      console.error('Failed to load watchlist tickers:', err)
-    }
-  }
+      setLoadingData(true)
+      const response = await api.getWatchlist(watchlistName, 1000)
 
-  const handleRemoveTicker = async (ticker: string) => {
-    if (!selectedWatchlist) return
+      // Format tickers as results array with ticker and empty company_name
+      const results = (response.tickers || []).map((ticker: string) => ({
+        ticker,
+        company_name: '',
+      }))
 
-    try {
-      setRemovingTicker(prev => new Set([...prev, ticker]))
-      await api.removeFromWatchlist(selectedWatchlist, ticker)
-      setWatchlistTickers(prev => prev.filter(t => t !== ticker))
+      setWatchlistData(results)
     } catch (err) {
-      console.error('Failed to remove ticker:', err)
-      setError('Failed to remove ticker from watchlist')
+      console.error('Failed to load watchlist data:', err)
+      setError('Failed to load watchlist data')
+      setWatchlistData([])
     } finally {
-      setRemovingTicker(prev => {
-        const next = new Set(prev)
-        next.delete(ticker)
-        return next
-      })
+      setLoadingData(false)
     }
   }
 
@@ -91,9 +96,9 @@ export default function WatchlistPage() {
       ) : watchlists.length === 0 ? (
         <div className="text-center py-12 text-slate-400">No watchlists found</div>
       ) : (
-        <div className="flex gap-6 h-full">
-          {/* Watchlist List */}
-          <div className="w-64 flex-shrink-0 bg-slate-800/50 rounded-lg border border-slate-700 overflow-auto">
+        <div className="flex gap-6 h-full overflow-hidden">
+          {/* Watchlist Selector */}
+          <div className="w-56 flex-shrink-0 bg-slate-800/50 rounded-lg border border-slate-700 overflow-auto">
             <div className="space-y-2 p-4">
               {watchlists.map((wl) => (
                 <button
@@ -112,38 +117,28 @@ export default function WatchlistPage() {
             </div>
           </div>
 
-          {/* Watchlist Details */}
-          {selectedWatchlist ? (
-            <div className="flex-1 bg-slate-800/50 rounded-lg border border-slate-700 overflow-auto">
-              <div className="p-6">
-                <h2 className="text-xl font-bold text-white mb-6">{selectedWatchlist}</h2>
-
-                {watchlistTickers.length === 0 ? (
-                  <p className="text-slate-400 text-center py-8">No tickers in this watchlist</p>
-                ) : (
-                  <div className="space-y-2">
-                    {watchlistTickers.map((ticker) => (
-                      <div
-                        key={ticker}
-                        className="flex items-center justify-between bg-slate-700/50 p-4 rounded-lg border border-slate-600 hover:border-slate-500 transition"
-                      >
-                        <div className="text-white font-medium">{ticker}</div>
-                        <button
-                          onClick={() => handleRemoveTicker(ticker)}
-                          disabled={removingTicker.has(ticker)}
-                          className="px-3 py-1 bg-red-600/50 hover:bg-red-600 text-red-200 rounded text-sm transition disabled:opacity-50"
-                        >
-                          {removingTicker.has(ticker) ? 'Removing...' : 'Remove'}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+          {/* Results Widget */}
+          {selectedWatchlist && !loadingData ? (
+            <div className="flex-1 bg-slate-800/50 rounded-lg border border-slate-700 overflow-hidden flex flex-col">
+              <ResultsWidget
+                data={watchlistData}
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                sortColumn={sortColumn}
+                onSortChange={setSortColumn}
+                sortDirection={sortDirection}
+                onSortDirectionChange={setSortDirection}
+                viewMode={viewMode}
+                onViewModeChange={setViewMode}
+              />
+            </div>
+          ) : loadingData ? (
+            <div className="flex-1 bg-slate-800/50 rounded-lg border border-slate-700 flex items-center justify-center">
+              <p className="text-slate-400">Loading watchlist data...</p>
             </div>
           ) : (
             <div className="flex-1 bg-slate-800/50 rounded-lg border border-slate-700 flex items-center justify-center">
-              <p className="text-slate-400">Select a watchlist to view tickers</p>
+              <p className="text-slate-400">Select a watchlist</p>
             </div>
           )}
         </div>
