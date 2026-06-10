@@ -95,9 +95,27 @@ export default function ResultsWidget({
     }
   })
 
-  // Get columns from first row
+  // Get columns from first row - always put ticker and company_name first
   const getColumns = (): string[] => {
-    return data.length > 0 ? Object.keys(data[0]) : []
+    if (data.length === 0) return []
+
+    const allCols = Object.keys(data[0])
+    const ticker = allCols.find(col => col.toLowerCase() === 'ticker')
+    const companyName = allCols.find(col => col.toLowerCase() === 'company_name' || col.toLowerCase() === 'name')
+
+    // Build ordered columns: ticker, company_name, then rest
+    const orderedCols: string[] = []
+    if (ticker) orderedCols.push(ticker)
+    if (companyName) orderedCols.push(companyName)
+
+    // Add remaining columns (excluding ticker and company_name)
+    for (const col of allCols) {
+      if (col !== ticker && col !== companyName) {
+        orderedCols.push(col)
+      }
+    }
+
+    return orderedCols
   }
 
   // Filter chart data by timeframe
