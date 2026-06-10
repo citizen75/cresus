@@ -64,6 +64,9 @@ export default function Dashboard() {
             console.log(`[Dashboard] ✓ Auto-selecting alert message:`, { id: msg.id, datetime: msg.datetime, source: msg.source })
             setSelectedAlertMessage(msg)
 
+            // IMPORTANT: Break here to select the FIRST (most recent) alert only!
+            break
+
             // Parse alert content for legacy support
             const lines = msg.content.split('\n')
             const alertInfo: AlertInfo = {
@@ -101,7 +104,6 @@ export default function Dashboard() {
               setTimeout(() => {
                 conversationPanelRef.current?.scrollToBottom()
               }, 100)
-              break
             }
           }
         }
