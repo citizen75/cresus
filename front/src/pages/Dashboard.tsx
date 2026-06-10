@@ -43,13 +43,21 @@ export default function Dashboard() {
     const loadMostRecentAlert = async () => {
       try {
         const baseUrl = getApiBaseUrl()
-        const response = await fetch(`${baseUrl}/api/v1/conversations/_global`)
+        const url = `${baseUrl}/api/v1/conversations/_global`
+        console.log(`[Dashboard] Fetching conversations from: ${url}`)
+
+        const response = await fetch(url)
+        console.log(`[Dashboard] Response status: ${response.status}`)
+
         if (!response.ok) {
-          console.log(`[Dashboard] Failed to fetch conversations: ${response.status}`)
+          const errorText = await response.text()
+          console.error(`[Dashboard] Failed to fetch conversations: ${response.status}`)
+          console.error(`[Dashboard] Error response:`, errorText)
           return
         }
 
         const data = await response.json()
+        console.log(`[Dashboard] Response data:`, data)
         const messages = data.history || []
         console.log(`[Dashboard] Loaded ${messages.length} messages, looking for alert...`)
 
