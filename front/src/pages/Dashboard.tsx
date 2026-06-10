@@ -257,34 +257,6 @@ export default function Dashboard() {
     loadPositionsAndFundamental()
   }, [alertGridView?.portfolio])
 
-  // Load historical data for charts
-  const loadChartsData = async () => {
-    if (!selectedAlertMessage?.data?.results) return
-
-    try {
-      const data: Record<string, any[]> = {}
-      const results = selectedAlertMessage.data.results
-
-      for (const row of results) {
-        const ticker = row.ticker
-        if (!ticker || data[ticker]) continue
-
-        try {
-          const response = await api.getHistoricalData(ticker, 1825)
-          if (response && response.data) {
-            data[ticker] = response.data
-          }
-        } catch (err) {
-          console.error(`Failed to load history for ${ticker}:`, err)
-        }
-      }
-
-      setHistoricalData(data)
-    } catch (err) {
-      console.error('Failed to load chart data:', err)
-    }
-  }
-
   // Load historical data, ticker info and fundamental data when grid view is activated
   useEffect(() => {
     if (!alertGridView || alertGridView.tickers.length === 0) return
@@ -571,12 +543,13 @@ export default function Dashboard() {
               sortDirection="asc"
               onSortDirectionChange={() => {}}
               historicalData={historicalData}
+              onSetHistoricalData={setHistoricalData}
               loadingCharts={false}
               chartTimeframe={timeframe}
               onChartTimeframeChange={setTimeframe}
               viewMode={viewMode}
               onViewModeChange={setViewMode}
-              onLoadCharts={loadChartsData}
+              onGetHistoricalData={api.getHistoricalData.bind(api)}
             />
           ) : selectedPortfolioWidget ? (
             <div className="p-4">

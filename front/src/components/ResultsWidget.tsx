@@ -11,12 +11,13 @@ interface ResultsWidgetProps {
   sortDirection: 'asc' | 'desc'
   onSortDirectionChange: (direction: 'asc' | 'desc') => void
   historicalData?: { [ticker: string]: any[] }
+  onSetHistoricalData?: (data: { [ticker: string]: any[] }) => void // Callback to set historical data
   loadingCharts?: boolean
   chartTimeframe?: '1W' | '1M' | '3M' | 'YTD' | 'ALL'
   onChartTimeframeChange?: (timeframe: '1W' | '1M' | '3M' | 'YTD' | 'ALL') => void
   viewMode?: 'table' | 'charts'
   onViewModeChange?: (mode: 'table' | 'charts') => void
-  onLoadCharts?: () => Promise<void> // Callback to load charts data
+  onGetHistoricalData?: (ticker: string, days: number) => Promise<any> // API method to fetch data
   onDeleteRow?: (ticker: string) => Promise<void>
   watchlistName?: string
 }
@@ -30,12 +31,13 @@ export default function ResultsWidget({
   sortDirection,
   onSortDirectionChange,
   historicalData = {},
+  onSetHistoricalData,
   loadingCharts = false,
   chartTimeframe = '1M',
   onChartTimeframeChange,
   viewMode: externalViewMode,
   onViewModeChange,
-  onLoadCharts,
+  onGetHistoricalData,
   onDeleteRow,
   watchlistName,
 }: ResultsWidgetProps) {
@@ -51,13 +53,41 @@ export default function ResultsWidget({
     }
   }, [externalViewMode])
 
+  // Load historical data for charts
+  const loadChartsData = async () => {
+    if (!onGetHistoricalData || !onSetHistoricalData || data.length === 0) return
+
+    try {
+      const loaded: { [ticker: string]: any[] } = {}
+      const tickers = Array.from(new Set(data.map((row: any) => row.ticker).filter(Boolean)))
+
+      console.log(`[ResultsWidget] Loading historical data for ${tickers.length} tickers`)
+
+      for (const ticker of tickers) {
+        try {
+          const response = await onGetHistoricalData(ticker, 1825)
+          if (response && response.data) {
+            loaded[ticker] = response.data
+          }
+        } catch (err) {
+          console.error(`[ResultsWidget] Failed to load data for ${ticker}:`, err)
+        }
+      }
+
+      onSetHistoricalData(loaded)
+      console.log(`[ResultsWidget] Loaded data for ${Object.keys(loaded).length} tickers`)
+    } catch (err) {
+      console.error('[ResultsWidget] Failed to load chart data:', err)
+    }
+  }
+
   // Auto-load historical data when switching to charts view
   useEffect(() => {
-    if (viewMode === 'charts' && data.length > 0 && Object.keys(historicalData).length === 0 && onLoadCharts) {
+    if (viewMode === 'charts' && data.length > 0 && Object.keys(historicalData).length === 0) {
       console.log('[ResultsWidget] Loading charts data')
-      onLoadCharts()
+      loadChartsData()
     }
-  }, [viewMode, data.length, historicalData, onLoadCharts])
+  }, [viewMode, data.length, historicalData, loadChartsData])
 
   // Handle ESC key to close chart modal
   useEffect(() => {

@@ -25,14 +25,6 @@ export default function WatchlistPage() {
     loadWatchlistData('global')
   }, [])
 
-  useEffect(() => {
-    // Load historical data when watchlist data is loaded and we're in charts view
-    if (watchlistData.length > 0 && viewMode === 'charts' && Object.keys(historicalData).length === 0) {
-      console.log('[WatchlistPage] Loading historical data for charts view')
-      loadHistoricalData()
-    }
-  }, [viewMode, watchlistData.length])
-
   const loadWatchlistData = async (watchlistName: string) => {
     try {
       setLoading(true)
@@ -59,33 +51,6 @@ export default function WatchlistPage() {
     } catch (err) {
       console.error('Failed to delete ticker from watchlist:', err)
       throw err
-    }
-  }
-
-  const loadHistoricalData = async () => {
-    try {
-      setLoadingData(true)
-      const data: { [ticker: string]: any[] } = {}
-
-      // Load raw historical data for each ticker
-      // ResultsWidget will handle transformation
-      for (const row of watchlistData) {
-        const ticker = row.ticker
-        if (!ticker) continue
-
-        try {
-          const response = await api.getHistoricalData(ticker, 1825) // ~5 years for better charts
-          if (response && response.data) {
-            data[ticker] = response.data
-          }
-        } catch (err) {
-          console.error(`Failed to load history for ${ticker}:`, err)
-        }
-      }
-
-      setHistoricalData(data)
-    } finally {
-      setLoadingData(false)
     }
   }
 
@@ -130,10 +95,11 @@ export default function WatchlistPage() {
             viewMode={viewMode}
             onViewModeChange={handleViewModeChange}
             historicalData={historicalData}
+            onSetHistoricalData={setHistoricalData}
             loadingCharts={loadingData}
             chartTimeframe={chartTimeframe}
             onChartTimeframeChange={setChartTimeframe}
-            onLoadCharts={loadHistoricalData}
+            onGetHistoricalData={api.getHistoricalData.bind(api)}
             onDeleteRow={handleDeleteTicker}
             watchlistName="global"
           />
