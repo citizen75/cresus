@@ -864,6 +864,7 @@ export default function Alerts() {
                           {sortedResults.map((row, idx) => (
                             <tr
                               key={idx}
+                              onClick={() => navigate(`/chart/${row.ticker}`)}
                               className="hover:bg-slate-800/50 cursor-pointer transition"
                             >
                               {getDisplayColumns().map((key) => {
