@@ -64,6 +64,7 @@ export default function Dashboard() {
             console.log(`[Dashboard] ✓ Auto-selecting alert message:`, { id: msg.id, datetime: msg.datetime, source: msg.source })
             console.log(`[Dashboard] Full selected message structure:`, msg)
             setSelectedAlertMessage(msg)
+            setRightPanelOpen(true)  // Open right panel to show results
 
             // IMPORTANT: Break here to select the FIRST (most recent) alert only!
             break
