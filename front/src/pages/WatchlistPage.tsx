@@ -1,21 +1,35 @@
 import { useState, useEffect } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { api } from '@/services/api'
 import ResultsWidget from '@/components/ResultsWidget'
 
 export default function WatchlistPage() {
+  const location = useLocation()
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [watchlistData, setWatchlistData] = useState<any[]>([])
+  const [historicalData, setHistoricalData] = useState<{ [ticker: string]: any[] }>({})
   const [loadingData, setLoadingData] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [sortColumn, setSortColumn] = useState<string | null>('ticker')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
-  const [viewMode, setViewMode] = useState<'table' | 'charts'>('table')
+
+  // Determine view mode from URL
+  const isChartsView = location.pathname.includes('/charts')
+  const [viewMode, setViewMode] = useState<'table' | 'charts'>(isChartsView ? 'charts' : 'table')
 
   useEffect(() => {
     // Load global watchlist on mount
     loadWatchlistData('global')
   }, [])
+
+  useEffect(() => {
+    // Load historical data when view mode changes to charts
+    if (viewMode === 'charts' && watchlistData.length > 0) {
+      loadHistoricalData()
+    }
+  }, [viewMode, watchlistData.length])
 
   const loadWatchlistData = async (watchlistName: string) => {
     try {
@@ -43,6 +57,42 @@ export default function WatchlistPage() {
     } catch (err) {
       console.error('Failed to delete ticker from watchlist:', err)
       throw err
+    }
+  }
+
+  const loadHistoricalData = async () => {
+    try {
+      setLoadingData(true)
+      const data: { [ticker: string]: any[] } = {}
+
+      // Load historical data for each ticker
+      for (const row of watchlistData) {
+        const ticker = row.ticker
+        if (!ticker) continue
+
+        try {
+          const history = await api.getHistoricalData(ticker, 365)
+          if (history && history.data) {
+            data[ticker] = history.data
+          }
+        } catch (err) {
+          console.error(`Failed to load history for ${ticker}:`, err)
+        }
+      }
+
+      setHistoricalData(data)
+    } finally {
+      setLoadingData(false)
+    }
+  }
+
+  const handleViewModeChange = (mode: 'table' | 'charts') => {
+    setViewMode(mode)
+    // Update URL based on view mode
+    if (mode === 'charts') {
+      navigate('/watchlist/charts')
+    } else {
+      navigate('/watchlist')
     }
   }
 
@@ -79,7 +129,9 @@ export default function WatchlistPage() {
             sortDirection={sortDirection}
             onSortDirectionChange={setSortDirection}
             viewMode={viewMode}
-            onViewModeChange={setViewMode}
+            onViewModeChange={handleViewModeChange}
+            historicalData={historicalData}
+            loadingCharts={loadingData}
             onDeleteRow={handleDeleteTicker}
             watchlistName="global"
           />
