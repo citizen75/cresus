@@ -11,6 +11,31 @@ from tools.strategy import StrategyManager
 from pathlib import Path
 import os
 
+# For fetching price data
+def _get_ticker_data(ticker: str) -> Dict[str, Any]:
+	"""Fetch current price and name for a ticker."""
+	try:
+		import yfinance as yf
+		data = yf.download(ticker, period="1d", progress=False)
+
+		if data.empty:
+			return {}
+
+		close_price = float(data['Close'].iloc[-1]) if 'Close' in data.columns else None
+		date = str(data.index[-1].date())
+
+		# Get company name
+		info = yf.Ticker(ticker).info
+		name = info.get('longName', info.get('shortName', ''))
+
+		return {
+			'date': date,
+			'close': close_price,
+			'name': name
+		}
+	except:
+		return {}
+
 
 def _get_watchlist_root() -> Path:
 	"""Get watchlist root - always use ~/.cresus for user data."""
@@ -240,7 +265,7 @@ async def get_ticker_historical(
 
 @router.post("/{strategy_name}/add")
 async def add_ticker_to_watchlist(strategy_name: str, body: TickerRequest = Body(...)):
-	"""Add a ticker to a watchlist."""
+	"""Add a ticker to a watchlist with enriched data."""
 	try:
 		ticker = body.ticker
 		manager = WatchlistManager(strategy_name)
@@ -248,15 +273,25 @@ async def add_ticker_to_watchlist(strategy_name: str, body: TickerRequest = Body
 		# Load current watchlist
 		df = manager.load()
 
-		# Create new row with just ticker
+		# Fetch enriched data for ticker
+		ticker_data = _get_ticker_data(ticker)
+		date = ticker_data.get('date', datetime.now().strftime('%Y-%m-%d'))
+		close_price = ticker_data.get('close')
+		name = ticker_data.get('name', '')
+
+		# Create new row with enriched data
 		if df is not None and not df.empty:
-			# If watchlist exists, check columns
+			# If watchlist exists, check columns and preserve structure
 			new_row = {col: None for col in df.columns}
 		else:
-			# Create minimal row with just ticker
-			new_row = {'ticker': ticker}
+			# Create row with standard columns: date, ticker, name, close
+			new_row = {'date': date, 'ticker': ticker, 'name': name, 'close': close_price}
 
+		# Ensure standard columns exist
+		new_row['date'] = date
 		new_row['ticker'] = ticker
+		new_row['name'] = name
+		new_row['close'] = close_price
 
 		# Add to watchlist
 		if df is None or df.empty:
