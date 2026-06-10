@@ -24,6 +24,7 @@ export default function WatchlistPage() {
   // Trading dialog state
   const [tradingDialogOpen, setTradingDialogOpen] = useState(false)
   const [tradingTicker, setTradingTicker] = useState<string | null>(null)
+  const [tradingPrice, setTradingPrice] = useState<number | null>(null)
 
   useEffect(() => {
     // Load global watchlist on mount
@@ -66,7 +67,12 @@ export default function WatchlistPage() {
   }
 
   const handleBuy = (ticker: string) => {
+    // Get latest close price from watchlist data
+    const tickerData = watchlistData.find((row) => row.ticker === ticker)
+    const closePrice = tickerData?.close ? parseFloat(tickerData.close) : null
+
     setTradingTicker(ticker)
+    setTradingPrice(closePrice)
     setTradingDialogOpen(true)
   }
 
@@ -122,9 +128,18 @@ export default function WatchlistPage() {
         isOpen={tradingDialogOpen}
         mode="buy"
         ticker={tradingTicker || ''}
+        currentPrice={tradingPrice || 0}
         onClose={() => {
           setTradingDialogOpen(false)
           setTradingTicker(null)
+          setTradingPrice(null)
+        }}
+        onConfirm={(quantity, price) => {
+          console.log(`[Watchlist] Buy order: ${quantity} shares of ${tradingTicker} at €${price || tradingPrice}`)
+          // Close dialog after confirmation
+          setTradingDialogOpen(false)
+          setTradingTicker(null)
+          setTradingPrice(null)
         }}
       />
     </div>
