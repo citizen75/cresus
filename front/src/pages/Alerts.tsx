@@ -338,6 +338,58 @@ export default function Alerts() {
 
   const currentAlert = paramName ? alerts.find((a) => a.name === paramName) : null
 
+  // Extract indicator names from alert formula
+  const getFormulaIndicators = (formula: string): Set<string> => {
+    const indicators = new Set<string>()
+    // Match patterns like: word_number, word_number_word, etc (indicator names)
+    // Exclude common keywords: and, or, not, ==, !=, >, <, >=, <=, true, false
+    const regex = /\b([a-z_]+(?:_\d+)?(?:_[a-z]+)*)\b/gi
+    let match
+    while ((match = regex.exec(formula)) !== null) {
+      const word = match[1].toLowerCase()
+      // Filter out operators and common keywords
+      if (![
+        'and', 'or', 'not', 'true', 'false',
+        'data', 'index', 'ticker', 'company', 'date', 'timestamp',
+        'open', 'high', 'low', 'close', 'volume', 'dividends', 'stock', 'splits'
+      ].includes(word) && !word.match(/^(==|!=|>|<|>=|<=)$/)) {
+        indicators.add(word)
+      }
+    }
+    return indicators
+  }
+
+  // Get columns to display (ticker, company_name, then formula indicators, then other columns)
+  const getDisplayColumns = (): string[] => {
+    if (!sortedResults.length || !sortedResults[0]) return []
+
+    const allKeys = Object.keys(sortedResults[0])
+    const formulaIndicators = currentAlert ? getFormulaIndicators(currentAlert.formula) : new Set()
+
+    // Build column order: ticker, company_name, then formula indicators, then others
+    const ordered: string[] = []
+
+    // Add ticker and company_name first
+    if (allKeys.includes('ticker')) ordered.push('ticker')
+    if (allKeys.includes('company_name')) ordered.push('company_name')
+
+    // Add formula indicators in order they appear
+    formulaIndicators.forEach(ind => {
+      if (allKeys.includes(ind) && !ordered.includes(ind)) {
+        ordered.push(ind)
+      }
+    })
+
+    // Add remaining columns (skip already added)
+    allKeys.forEach(key => {
+      if (!ordered.includes(key) && !['Index', 'Dividends', 'Stock Splits'].includes(key)) {
+        ordered.push(key)
+      }
+    })
+
+    return ordered
+  }
+
   return (
     <div className="h-full flex flex-col gap-4">
       {/* Header */}
@@ -759,36 +811,35 @@ export default function Alerts() {
                     </div>
                   </div>
 
-                  {/* Table View - Same as ScreenerDetail */}
+                  {/* Table View - Same as ScreenerDetail, with formula indicators */}
                   {resultViewMode === 'table' && (
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead className="bg-slate-800/50 border-b border-slate-800">
                           <tr>
-                            {sortedResults.length > 0 &&
-                              Object.keys(sortedResults[0]).map((key) => (
-                                <th
-                                  key={key}
-                                  onClick={() => {
-                                    if (resultSortColumn === key) {
-                                      setResultSortDirection(resultSortDirection === 'asc' ? 'desc' : 'asc')
-                                    } else {
-                                      setResultSortColumn(key)
-                                      setResultSortDirection('asc')
-                                    }
-                                  }}
-                                  className="px-6 py-3 text-left text-slate-300 font-medium cursor-pointer hover:bg-slate-700/50 transition"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    {key}
-                                    {resultSortColumn === key && (
-                                      <span className="text-xs text-slate-400">
-                                        {resultSortDirection === 'asc' ? '↑' : '↓'}
-                                      </span>
-                                    )}
-                                  </div>
-                                </th>
-                              ))}
+                            {getDisplayColumns().map((key) => (
+                              <th
+                                key={key}
+                                onClick={() => {
+                                  if (resultSortColumn === key) {
+                                    setResultSortDirection(resultSortDirection === 'asc' ? 'desc' : 'asc')
+                                  } else {
+                                    setResultSortColumn(key)
+                                    setResultSortDirection('asc')
+                                  }
+                                }}
+                                className="px-6 py-3 text-left text-slate-300 font-medium cursor-pointer hover:bg-slate-700/50 transition"
+                              >
+                                <div className="flex items-center gap-2">
+                                  {key}
+                                  {resultSortColumn === key && (
+                                    <span className="text-xs text-slate-400">
+                                      {resultSortDirection === 'asc' ? '↑' : '↓'}
+                                    </span>
+                                  )}
+                                </div>
+                              </th>
+                            ))}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800">
@@ -797,7 +848,8 @@ export default function Alerts() {
                               key={idx}
                               className="hover:bg-slate-800/50 cursor-pointer transition"
                             >
-                              {Object.entries(row).map(([key, value], colIdx) => {
+                              {getDisplayColumns().map((key) => {
+                                const value = row[key]
                                 let displayValue = String(value || '')
                                 const numValue = typeof value === 'number' ? value : parseFloat(String(value || 0))
 
@@ -806,12 +858,12 @@ export default function Alerts() {
                                   if (key.toLowerCase().includes('volume') || key.toLowerCase().includes('vol')) {
                                     displayValue = numValue.toFixed(0)
                                   } else {
-                                    // Format other numbers (prices) with 3 decimal places
+                                    // Format other numbers with 3 decimal places
                                     displayValue = numValue.toFixed(3)
                                   }
                                 }
                                 return (
-                                  <td key={colIdx} className="px-6 py-3 text-slate-300">
+                                  <td key={key} className="px-6 py-3 text-slate-300">
                                     {displayValue}
                                   </td>
                                 )
