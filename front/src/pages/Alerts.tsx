@@ -451,17 +451,19 @@ export default function Alerts() {
       // Create message with signal and tickers
       const messageContent = `${signalLine}\n${tickerLines}`
 
-      // Send message to conversation with results data and widget info
+      // Send message to conversation with clean results (only ticker & name)
+      const cleanResults = sortedResults.map(r => ({
+        ticker: r.ticker,
+        company_name: r.company_name,
+      }))
+
       await api.sendConversationMessage({
         text: messageContent,
         widget: 'results_widget',
         data: {
-          results: sortedResults,
+          results: cleanResults,
           alert_name: currentAlert.name,
           alert_formula: currentAlert.formula,
-          historicalData,
-          chartTimeframe,
-          columnInfo: getDisplayColumns(),
         },
       })
       // Show success message
