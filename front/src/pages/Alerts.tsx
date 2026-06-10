@@ -359,6 +359,36 @@ export default function Alerts() {
     return indicators
   }
 
+  // Filter chart data by selected timeframe
+  const filterDataByTimeframe = (data: any[], timeframe: '1W' | '1M' | '3M' | 'YTD' | 'ALL') => {
+    if (!data || data.length === 0) return []
+
+    const today = new Date()
+    let cutoffDate = new Date()
+
+    switch (timeframe) {
+      case '1W':
+        cutoffDate.setDate(today.getDate() - 7)
+        break
+      case '1M':
+        cutoffDate.setMonth(today.getMonth() - 1)
+        break
+      case '3M':
+        cutoffDate.setMonth(today.getMonth() - 3)
+        break
+      case 'YTD':
+        cutoffDate = new Date(today.getFullYear(), 0, 1)
+        break
+      case 'ALL':
+        return data // Return all data
+    }
+
+    return data.filter(point => {
+      const pointDate = new Date(point.date)
+      return pointDate >= cutoffDate
+    })
+  }
+
   // Get columns to display (ticker, company_name, then formula indicators, then other columns)
   const getDisplayColumns = (): string[] => {
     if (!sortedResults.length || !sortedResults[0]) return []
@@ -878,9 +908,11 @@ export default function Alerts() {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                           {sortedResults.map((match: any) => {
                             const ticker = match.ticker
-                            const chartData = historicalData[ticker] || []
+                            const allData = historicalData[ticker] || []
+                            // Filter data by selected timeframe
+                            const chartData = filterDataByTimeframe(allData, chartTimeframe)
 
-                            // Calculate change percentage
+                            // Calculate change percentage based on filtered data
                             let changePercent = 0
                             let isPositive = false
                             if (chartData.length > 1) {
