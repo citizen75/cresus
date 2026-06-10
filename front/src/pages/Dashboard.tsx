@@ -58,6 +58,7 @@ export default function Dashboard() {
         // Find the most recent alert message (with or without results_widget)
         for (let i = messages.length - 1; i >= 0; i--) {
           const msg = messages[i]
+          console.log(`[Dashboard] Checking message ${messages.length - 1 - i}: source=${msg.source}, id=${msg.id}, datetime=${msg.datetime}`)
           if (msg.source === 'alert') {
             // Auto-select any alert message (will show results if available)
             console.log(`[Dashboard] ✓ Auto-selecting alert message:`, { id: msg.id, datetime: msg.datetime, source: msg.source })
