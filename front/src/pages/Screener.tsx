@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '@/services/api'
-import ScreenerDetail from './ScreenerDetail'
 
 interface ScreenerItem {
   name: string
@@ -18,7 +17,6 @@ export default function Screener() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
-  const [selectedScreener, setSelectedScreener] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -167,21 +165,8 @@ export default function Screener() {
         </div>
       )}
 
-      {/* If screener selected, show detail view */}
-      {selectedScreener ? (
-        <div>
-          <button
-            onClick={() => setSelectedScreener(null)}
-            className="mb-4 text-slate-400 hover:text-slate-300 text-sm flex items-center gap-2"
-          >
-            ← Back to List
-          </button>
-          <ScreenerDetail screenerName={selectedScreener} />
-        </div>
-      ) : (
-        <>
-          {/* Screeners List - Compact Table */}
-          <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
+      {/* Screeners List - Compact Table */}
+      <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
             {loading ? (
               <div className="text-center py-12">
                 <div className="text-slate-500">Loading screeners...</div>
@@ -205,7 +190,7 @@ export default function Screener() {
                   {screeners.map((screener, idx) => (
                     <tr
                       key={`${screener.name}-${idx}`}
-                      onClick={() => setSelectedScreener(screener.name)}
+                      onClick={() => navigate(`/screener/${screener.name}`)}
                       className="hover:bg-slate-800 cursor-pointer transition"
                     >
                       <td className="px-6 py-3 text-sm font-medium text-white">{screener.name}</td>
@@ -228,9 +213,7 @@ export default function Screener() {
                 </tbody>
               </table>
             )}
-          </div>
-        </>
-      )}
+      </div>
     </div>
   )
 }
