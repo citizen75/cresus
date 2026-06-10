@@ -507,53 +507,17 @@ export default function ScreenerDetail() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <button
-            onClick={() => navigate('/screener')}
-            className="text-purple-400 hover:text-purple-300 text-sm mb-2"
-          >
-            ← Back to Screeners
-          </button>
-          <h1 className="text-3xl font-bold text-white">{screener.name}</h1>
-          {screener.description && (
-            <p className="text-sm text-slate-400 mt-1">{screener.description}</p>
-          )}
-        </div>
-        <div className="flex gap-2">
-          {editMode ? (
-            <>
-              <button
-                onClick={handleSave}
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition"
-              >
-                Save
-              </button>
-              <button
-                onClick={() => setEditMode(false)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-medium transition"
-              >
-                Cancel
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                onClick={handleRun}
-                disabled={running}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-medium transition"
-              >
-                {running ? 'Running...' : '▶ Run'}
-              </button>
-              <button
-                onClick={() => setEditMode(true)}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition"
-              >
-                Edit
-              </button>
-            </>
-          )}
-        </div>
+      <div>
+        <button
+          onClick={() => navigate('/screener')}
+          className="text-purple-400 hover:text-purple-300 text-sm mb-2"
+        >
+          ← Back to Screeners
+        </button>
+        <h1 className="text-3xl font-bold text-white">{screener.name}</h1>
+        {screener.description && (
+          <p className="text-sm text-slate-400 mt-1">{screener.description}</p>
+        )}
       </div>
 
       {/* Error Message */}
