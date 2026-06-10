@@ -1275,14 +1275,43 @@ export default function Alerts() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-400 mb-2">Source Value</label>
-                <input
-                  type="text"
-                  value={newAlertData.source_value}
-                  onChange={(e) => setNewAlertData({ ...newAlertData, source_value: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded focus:outline-none focus:border-purple-500"
-                  placeholder="e.g., cac40, AAPL"
-                />
+                <label className="block text-sm font-medium text-slate-400 mb-2">
+                  {newAlertData.source === 'universe' ? 'Universe' : 'Source Value'}
+                </label>
+                {newAlertData.source === 'universe' ? (
+                  <select
+                    value={newAlertData.source_value}
+                    onChange={(e) => setNewAlertData({ ...newAlertData, source_value: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="">Select universe...</option>
+                    <option value="cac40">CAC 40</option>
+                    <option value="srd">SRD</option>
+                    <option value="enx_large">Euronext Large</option>
+                    <option value="enx_mid">Euronext Mid</option>
+                    <option value="enx_small">Euronext Small</option>
+                    <option value="nasdaq_100">Nasdaq 100</option>
+                    <option value="nasdaq_tech">Nasdaq Tech</option>
+                    <option value="etf_pea">ETF PEA</option>
+                    <option value="etf_fr">ETF FR</option>
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    value={newAlertData.source_value}
+                    onChange={(e) => setNewAlertData({ ...newAlertData, source_value: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded focus:outline-none focus:border-purple-500"
+                    placeholder={
+                      newAlertData.source === 'ticker'
+                        ? 'e.g., AAPL, AF.PA'
+                        : newAlertData.source === 'tickers'
+                        ? 'e.g., AAPL,AF.PA,MSFT'
+                        : newAlertData.source === 'portfolio'
+                        ? 'e.g., my_portfolio'
+                        : 'Enter source value'
+                    }
+                  />
+                )}
               </div>
 
               <div>
