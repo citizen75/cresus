@@ -671,12 +671,12 @@ export default function Alerts() {
                         <h3 className="font-semibold text-white truncate">{alert.name}</h3>
                         <span
                           className={`text-xs px-2 py-1 rounded ${
-                            alert.enabled
+                            alert.enabled === 'true' || alert.enabled === true
                               ? 'bg-green-900/30 text-green-400'
                               : 'bg-slate-800 text-slate-400'
                           }`}
                         >
-                          {alert.enabled ? 'Enabled' : 'Disabled'}
+                          {alert.enabled === 'true' || alert.enabled === true ? 'Enabled' : 'Disabled'}
                         </span>
                       </div>
                       <p className="text-xs text-slate-400 mb-3 font-mono break-words">
@@ -821,7 +821,13 @@ export default function Alerts() {
                         <input
                           type="checkbox"
                           name="enabled"
-                          checked={formData.enabled !== undefined ? formData.enabled : currentAlert?.enabled}
+                          checked={
+                            formData.enabled !== undefined
+                              ? typeof formData.enabled === 'string'
+                                ? formData.enabled === 'true'
+                                : formData.enabled
+                              : currentAlert?.enabled === 'true' || currentAlert?.enabled === true
+                          }
                           onChange={handleFormChange}
                           className="rounded"
                         />
@@ -878,8 +884,8 @@ export default function Alerts() {
 
                       <div>
                         <div className="text-sm text-slate-500">Status</div>
-                        <div className={`text-white font-medium mt-1 ${currentAlert?.enabled ? 'text-green-400' : 'text-red-400'}`}>
-                          {currentAlert?.enabled ? '✓ Enabled' : '✗ Disabled'}
+                        <div className={`text-white font-medium mt-1 ${currentAlert?.enabled === 'true' || currentAlert?.enabled === true ? 'text-green-400' : 'text-red-400'}`}>
+                          {currentAlert?.enabled === 'true' || currentAlert?.enabled === true ? '✓ Enabled' : '✗ Disabled'}
                         </div>
                       </div>
 
