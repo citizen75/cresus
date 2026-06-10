@@ -39,7 +39,9 @@ class HeartbeatFlow(Flow):
 			Heartbeat result
 		"""
 		timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-		logger.info(f"Gateway heartbeat [{timestamp}] - Cron scheduler is running")
+		message = f"Gateway heartbeat [{timestamp}] - Cron scheduler is running"
+		logger.info(message)
+		self.logger.info(message)
 
 		return {
 			"status": "success",
