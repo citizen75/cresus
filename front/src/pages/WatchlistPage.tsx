@@ -28,6 +28,9 @@ export default function WatchlistPage() {
   useEffect(() => {
     if (selectedWatchlist) {
       loadWatchlistData(selectedWatchlist)
+    } else {
+      // Default to global if no selection
+      setSelectedWatchlist('global')
     }
   }, [selectedWatchlist])
 
@@ -36,16 +39,26 @@ export default function WatchlistPage() {
       setLoading(true)
       setError(null)
       const response = await api.listWatchlists()
-      const lists = response.watchlists || []
-      setWatchlists(lists)
-      // Set global as default if it exists
-      if (lists.some(w => w.name === 'global')) {
-        setSelectedWatchlist('global')
-      } else if (lists.length > 0) {
-        setSelectedWatchlist(lists[0].name)
+      let lists = response.watchlists || []
+
+      // Always include 'global' watchlist as default option
+      if (!lists.includes('global') && !lists.some((w: any) => (typeof w === 'string' ? w : w.name) === 'global')) {
+        lists = ['global', ...lists]
       }
+
+      // Convert to objects if needed
+      const watchlistObjects = lists.map((item: any) =>
+        typeof item === 'string' ? { name: item, tickers: [] } : item
+      )
+
+      setWatchlists(watchlistObjects)
+      // Always default to global
+      setSelectedWatchlist('global')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load watchlists')
+      // Show global even if fetch fails
+      setWatchlists([{ name: 'global', tickers: [] }])
+      setSelectedWatchlist('global')
     } finally {
       setLoading(false)
     }
