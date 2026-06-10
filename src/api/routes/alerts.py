@@ -264,11 +264,24 @@ async def get_alert_results(name: str, limit: int = 10):
         manager = AlertManager()
         results = manager.get_alert_results(name, limit=limit)
 
+        # Clean NaN/Inf values from results
+        cleaned_results = []
+        for result in results:
+            cleaned_result = {
+                "alert_name": result.get("alert_name"),
+                "matched": result.get("matched"),
+                "matches": clean_matches(result.get("matches", [])),
+                "error": result.get("error"),
+                "evaluated_at": result.get("evaluated_at"),
+                "tickers_checked": result.get("tickers_checked"),
+            }
+            cleaned_results.append(cleaned_result)
+
         return {
             "status": "success",
             "alert_name": name,
-            "results": results,
-            "total": len(results),
+            "results": cleaned_results,
+            "total": len(cleaned_results),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
