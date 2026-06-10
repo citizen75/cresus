@@ -666,8 +666,14 @@ export default function Alerts() {
                             const date = new Date(result.evaluated_at)
                             const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
                             const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                            // Use timestamp as result ID (YYYYMMDDHHMMSS format)
-                            const resultId = date.toISOString().replace(/[-:.]/g, '').slice(0, 14)
+                            // Generate result ID matching backend format: YYYYMMDD_HHMMSS
+                            const year = date.getFullYear()
+                            const month = String(date.getMonth() + 1).padStart(2, '0')
+                            const day = String(date.getDate()).padStart(2, '0')
+                            const hours = String(date.getHours()).padStart(2, '0')
+                            const minutes = String(date.getMinutes()).padStart(2, '0')
+                            const seconds = String(date.getSeconds()).padStart(2, '0')
+                            const resultId = `${year}${month}${day}_${hours}${minutes}${seconds}`
                             const isSelected = paramResultId === resultId
                             return (
                               <div
