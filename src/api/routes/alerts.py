@@ -191,7 +191,13 @@ async def delete_alert(name: str):
 @router.post("/alerts/{name}/run")
 async def run_alert(name: str):
     """Run alert evaluation and return matches."""
+    from tools.logger import get_task_logger
+    import time
+
     try:
+        task_logger = get_task_logger(f"alert.{name}")
+        task_logger.info(f"Starting alert evaluation for '{name}'")
+
         manager = AlertManager()
         evaluator = AlertEvaluator()
         notifier = AlertNotifier()
@@ -200,15 +206,30 @@ async def run_alert(name: str):
         if not alert:
             raise HTTPException(status_code=404, detail=f"Alert '{name}' not found")
 
+        task_logger.info(f"Alert found: source={alert.source.value}, formula={alert.formula[:100]}")
+
         # Evaluate the alert
+        start = time.time()
         result = evaluator.evaluate_alert(alert)
+        elapsed = time.time() - start
+        task_logger.info(f"Evaluation completed in {elapsed:.2f}s")
 
         # Update last_run timestamp
         manager.update_last_run(name)
+        task_logger.info(f"Last run timestamp updated")
 
         # Send notification if alert matched and is enabled
         if alert.enabled and result.matched:
+            task_logger.info(f"Alert matched! Found {len(result.matches)} matches, notifying")
             notifier.send_alert(alert, result)
+        elif result.matched:
+            task_logger.info(f"Alert matched but disabled, no notification sent")
+        else:
+            task_logger.info(f"Alert did not match (checked {result.tickers_checked} tickers)")
+
+        # Flush logs to disk
+        time.sleep(0.2)
+        task_logger.flush()
 
         return {
             "status": "success",
@@ -222,6 +243,9 @@ async def run_alert(name: str):
     except HTTPException:
         raise
     except Exception as e:
+        task_logger = get_task_logger(f"alert.{name}")
+        task_logger.error(f"Alert evaluation failed: {str(e)}")
+        task_logger.flush()
         raise HTTPException(status_code=500, detail=str(e))
 
 
