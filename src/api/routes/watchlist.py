@@ -1,6 +1,7 @@
 """Watchlist API endpoints."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Body
+from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import pandas as pd
 from datetime import datetime, timedelta
@@ -17,6 +18,11 @@ def _get_project_root() -> Path:
 
 
 router = APIRouter(prefix="/watchlists", tags=["watchlists"])
+
+
+class TickerRequest(BaseModel):
+	"""Request model for adding a ticker to watchlist."""
+	ticker: str
 
 
 @router.get("")
@@ -233,9 +239,10 @@ async def get_ticker_historical(
 
 
 @router.post("/{strategy_name}/add")
-async def add_ticker_to_watchlist(strategy_name: str, ticker: str):
+async def add_ticker_to_watchlist(strategy_name: str, request: TickerRequest):
 	"""Add a ticker to a watchlist."""
 	try:
+		ticker = request.ticker
 		manager = WatchlistManager(strategy_name)
 		# Load current watchlist
 		df = manager.load()
