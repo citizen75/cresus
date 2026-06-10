@@ -23,11 +23,11 @@ export function TradingDialog({
 }: TradingDialogProps) {
   const [ticker, setTicker] = useState(initialTicker || '')
   const [tickerName, setTickerName] = useState('')
-  const [price, setPrice] = useState<string>(initialPrice ? initialPrice.toString() : '')
+  const [price, setPrice] = useState<string>(String(initialPrice || ''))
   const [quantity, setQuantity] = useState<string>('')
   const [fees, setFees] = useState<string>('0')
-  const [stopLoss, setStopLoss] = useState<string>('7')
-  const [takeProfit, setTakeProfit] = useState<string>('2')
+  const [stopLoss, setStopLoss] = useState<string>('7') // Default 7%
+  const [takeProfit, setTakeProfit] = useState<string>('2') // Default 2%
   const [loadingTicker, setLoadingTicker] = useState(false)
 
   // Fetch ticker name when ticker changes
@@ -193,17 +193,24 @@ export function TradingDialog({
 
         {/* Stop Loss Input */}
         <div className="mb-4">
-          <label className="block text-sm text-slate-400 mb-2">Stop Loss (%)</label>
-          <input
-            type="number"
-            min="0"
-            step="0.1"
-            placeholder="7"
-            value={stopLoss}
-            onChange={(e) => setStopLoss(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded focus:outline-none focus:border-purple-600"
-          />
-          {stopLoss && priceVal > 0 && (
+          <label className="block text-sm text-slate-400 mb-2">Stop Loss (%) - Default 7%</label>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              min="0"
+              step="0.1"
+              value={stopLoss}
+              onChange={(e) => setStopLoss(e.target.value)}
+              className="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded focus:outline-none focus:border-purple-600"
+            />
+            <button
+              onClick={() => setStopLoss('7')}
+              className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-sm transition"
+            >
+              Reset
+            </button>
+          </div>
+          {priceVal > 0 && (
             <p className="text-xs text-slate-500 mt-1">
               Stop at: €{(priceVal * (1 - parseFloat(stopLoss) / 100)).toFixed(2)}
             </p>
@@ -212,17 +219,24 @@ export function TradingDialog({
 
         {/* Take Profit Input */}
         <div className="mb-4">
-          <label className="block text-sm text-slate-400 mb-2">Target Profit (%)</label>
-          <input
-            type="number"
-            min="0"
-            step="0.1"
-            placeholder="2"
-            value={takeProfit}
-            onChange={(e) => setTakeProfit(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded focus:outline-none focus:border-purple-600"
-          />
-          {takeProfit && priceVal > 0 && (
+          <label className="block text-sm text-slate-400 mb-2">Target Profit (%) - Default 2%</label>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              min="0"
+              step="0.1"
+              value={takeProfit}
+              onChange={(e) => setTakeProfit(e.target.value)}
+              className="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded focus:outline-none focus:border-purple-600"
+            />
+            <button
+              onClick={() => setTakeProfit('2')}
+              className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-sm transition"
+            >
+              Reset
+            </button>
+          </div>
+          {priceVal > 0 && (
             <p className="text-xs text-slate-500 mt-1">
               Target at: €{(priceVal * (1 + parseFloat(takeProfit) / 100)).toFixed(2)}
             </p>
