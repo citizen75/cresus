@@ -338,6 +338,12 @@ export default function Alerts() {
       // Set runResults to the latest result for chart display
       if (results.length > 0 && !runResults) {
         setRunResults(results[0])
+
+        // Auto-navigate to latest result URL if not already on a specific result
+        if (!paramResultId && results[0].evaluated_at) {
+          const resultId = results[0].evaluated_at.replace(/[:.]/g, '')
+          navigate(`/alerts/${encodeURIComponent(alertName)}/${resultId}`, { replace: true })
+        }
       }
     } catch (err) {
       console.error('Failed to load saved results:', err)
