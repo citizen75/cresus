@@ -466,7 +466,13 @@ class CresusAPI {
   }
 
   async getWatchlist(watchlistName: string, limit?: number) {
-    return (await this.client.get(`/watchlists/${watchlistName}`, { params: { limit } })).data
+    const response = (await this.client.get(`/watchlists/${watchlistName}`, { params: { limit } })).data
+    // Transform watchlist records to results format
+    return {
+      ...response,
+      results: response.watchlist || [],
+      tickers: response.watchlist?.map((item: any) => item.ticker) || [],
+    }
   }
 
   async addToWatchlist(watchlistName: string, ticker: string) {

@@ -56,13 +56,8 @@ export default function WatchlistPage() {
       setLoadingData(true)
       const response = await api.getWatchlist(watchlistName, 1000)
 
-      // Format tickers as results array with ticker and empty company_name
-      const results = (response.tickers || []).map((ticker: string) => ({
-        ticker,
-        company_name: '',
-      }))
-
-      setWatchlistData(results)
+      // Use watchlist data directly (includes signal_score, OHLCV data)
+      setWatchlistData(response.results || response.watchlist || [])
     } catch (err) {
       console.error('Failed to load watchlist data:', err)
       setError('Failed to load watchlist data')
