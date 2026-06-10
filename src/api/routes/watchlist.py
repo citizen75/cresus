@@ -244,23 +244,39 @@ async def add_ticker_to_watchlist(strategy_name: str, body: TickerRequest = Body
 	try:
 		ticker = body.ticker
 		manager = WatchlistManager(strategy_name)
+
 		# Load current watchlist
 		df = manager.load()
 
 		# Create new row with just ticker
-		new_row = {col: None for col in (df.columns if df is not None else ['ticker'])}
+		if df is not None and not df.empty:
+			# If watchlist exists, check columns
+			new_row = {col: None for col in df.columns}
+		else:
+			# Create minimal row with just ticker
+			new_row = {'ticker': ticker}
+
 		new_row['ticker'] = ticker
 
 		# Add to watchlist
 		if df is None or df.empty:
+			# Create new watchlist
 			df = pd.DataFrame([new_row])
 		else:
 			# Check if ticker already exists
 			if ticker not in df['ticker'].values:
+				# Add new row to existing watchlist
 				df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+			else:
+				# Ticker already exists
+				return {"success": False, "message": f"Ticker {ticker} already in {strategy_name} watchlist"}
 
-		# Save watchlist
-		manager.save(df)
+		# Save watchlist directly to CSV (bypass WatchlistManager.save which needs complex params)
+		watchlist_dir = _get_project_root() / "db" / "local" / "watchlist"
+		watchlist_dir.mkdir(parents=True, exist_ok=True)
+		filepath = watchlist_dir / f"{strategy_name}.csv"
+
+		df.to_csv(filepath, index=False)
 
 		return {"success": True, "message": f"Added {ticker} to {strategy_name} watchlist"}
 	except Exception as e:
@@ -277,11 +293,23 @@ async def remove_ticker_from_watchlist(strategy_name: str, ticker: str):
 		if df is None or df.empty:
 			raise HTTPException(404, f"Watchlist '{strategy_name}' not found")
 
+		# Check if ticker exists
+		if ticker not in df['ticker'].values:
+			raise HTTPException(404, f"Ticker '{ticker}' not found in watchlist '{strategy_name}'")
+
 		# Remove ticker
 		df = df[df['ticker'] != ticker]
 
-		# Save watchlist
-		manager.save(df)
+		# Save watchlist directly to CSV
+		watchlist_dir = _get_project_root() / "db" / "local" / "watchlist"
+		filepath = watchlist_dir / f"{strategy_name}.csv"
+
+		if df.empty:
+			# Delete watchlist file if no tickers left
+			if filepath.exists():
+				filepath.unlink()
+		else:
+			df.to_csv(filepath, index=False)
 
 		return {"success": True, "message": f"Removed {ticker} from {strategy_name} watchlist"}
 	except HTTPException:
