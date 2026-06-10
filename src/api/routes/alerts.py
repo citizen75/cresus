@@ -222,6 +222,10 @@ async def run_alert(name: str):
         manager.update_last_run(name)
         task_logger.info(f"Last run timestamp updated")
 
+        # Save result to disk
+        save_result = manager.save_alert_result(name, result)
+        task_logger.info(f"Result saved: {save_result['status']}")
+
         # Send notification if alert matched and is enabled
         if alert.enabled and result.matched:
             task_logger.info(f"Alert matched! Found {len(result.matches)} matches, notifying")
@@ -250,6 +254,23 @@ async def run_alert(name: str):
         task_logger = get_task_logger(f"alert.{name}")
         task_logger.error(f"Alert evaluation failed: {str(e)}")
         task_logger.flush()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/alerts/{name}/results")
+async def get_alert_results(name: str, limit: int = 10):
+    """Get saved alert results."""
+    try:
+        manager = AlertManager()
+        results = manager.get_alert_results(name, limit=limit)
+
+        return {
+            "status": "success",
+            "alert_name": name,
+            "results": results,
+            "total": len(results),
+        }
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 

@@ -38,6 +38,8 @@ export default function Alerts() {
   const [chartTimeframe, setChartTimeframe] = useState<'1W' | '1M' | '3M' | 'YTD' | 'ALL'>('1M')
   const [historicalData, setHistoricalData] = useState<{ [ticker: string]: any[] }>({})
   const [loadingCharts, setLoadingCharts] = useState(false)
+  const [savedResults, setSavedResults] = useState<any[]>([])
+  const [loadingSavedResults, setLoadingSavedResults] = useState(false)
   const [newAlertData, setNewAlertData] = useState({
     name: '',
     source: 'universe',
@@ -189,6 +191,18 @@ export default function Alerts() {
     if (hours < 24) return `${hours}h ago`
     if (days < 7) return `${days}d ago`
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
+
+  const loadSavedResults = async (alertName: string) => {
+    try {
+      setLoadingSavedResults(true)
+      const response = await api.getAlertResults(alertName, 10)
+      setSavedResults(response.results || [])
+    } catch (err) {
+      console.error('Failed to load saved results:', err)
+    } finally {
+      setLoadingSavedResults(false)
+    }
   }
 
   const getResultColumns = () => {
@@ -380,7 +394,10 @@ export default function Alerts() {
                   {alerts.map((alert) => (
                     <div
                       key={alert.name}
-                      onClick={() => setSelectedAlert(alert.name)}
+                      onClick={() => {
+                        setSelectedAlert(alert.name)
+                        loadSavedResults(alert.name)
+                      }}
                       className="bg-slate-900 border border-slate-800 rounded-lg p-4 cursor-pointer hover:border-purple-500 transition"
                     >
                       <div className="flex items-start justify-between mb-2">
@@ -551,41 +568,86 @@ export default function Alerts() {
                   )}
                 </div>
 
-                {/* Right: Last Result (1 column) */}
-                <div className="bg-slate-900 border border-slate-800 rounded-lg p-6 overflow-y-auto">
-                  <h2 className="text-lg font-semibold text-white mb-4">Last Result</h2>
+                {/* Right: Last Result & History (1 column) */}
+                <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden flex flex-col">
+                  <div className="p-6 border-b border-slate-700 flex-shrink-0">
+                    <h2 className="text-lg font-semibold text-white mb-4">Last Result</h2>
 
-                  {runResults && runResults.alert_name === currentAlert?.name ? (
-                    <div className="space-y-3 text-sm">
-                      <div>
-                        <div className="text-slate-400">Status</div>
-                        <div className={`font-bold mt-1 ${runResults.matched ? 'text-green-400' : 'text-slate-400'}`}>
-                          {runResults.matched ? '✓ Matched' : '✗ No Match'}
+                    {runResults && runResults.alert_name === currentAlert?.name ? (
+                      <div className="space-y-3 text-sm">
+                        <div>
+                          <div className="text-slate-400">Status</div>
+                          <div className={`font-bold mt-1 ${runResults.matched ? 'text-green-400' : 'text-slate-400'}`}>
+                            {runResults.matched ? '✓ Matched' : '✗ No Match'}
+                          </div>
                         </div>
-                      </div>
 
-                      <div>
-                        <div className="text-slate-400">Matches</div>
-                        <div className="text-white font-medium mt-1">{runResults.matches?.length || 0}</div>
-                      </div>
+                        <div>
+                          <div className="text-slate-400">Matches</div>
+                          <div className="text-white font-medium mt-1">{runResults.matches?.length || 0}</div>
+                        </div>
 
-                      <div>
-                        <div className="text-slate-400">Tickers Checked</div>
-                        <div className="text-white font-medium mt-1">{runResults.tickers_checked}</div>
-                      </div>
+                        <div>
+                          <div className="text-slate-400">Tickers Checked</div>
+                          <div className="text-white font-medium mt-1">{runResults.tickers_checked}</div>
+                        </div>
 
-                      {runResults.error && (
-                        <div className="bg-red-900/30 border border-red-700 rounded p-2 text-red-300 text-xs">
-                          {runResults.error}
+                        {runResults.error && (
+                          <div className="bg-red-900/30 border border-red-700 rounded p-2 text-red-300 text-xs">
+                            {runResults.error}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4 text-slate-500">
+                        <p className="text-sm">No recent run</p>
+                        <p className="text-xs mt-1">Run the alert to see results</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Results History */}
+                  <div className="flex-1 overflow-y-auto">
+                    <div className="p-4 border-t border-slate-700">
+                      <h3 className="text-sm font-semibold text-slate-400 mb-2">History</h3>
+                      {loadingSavedResults ? (
+                        <div className="text-center py-4 text-slate-500">
+                          <p className="text-xs">Loading history...</p>
+                        </div>
+                      ) : savedResults.length === 0 ? (
+                        <div className="text-center py-4 text-slate-500">
+                          <p className="text-xs">No results yet</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {savedResults.map((result, idx) => {
+                            const date = new Date(result.evaluated_at)
+                            const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+                            const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                            return (
+                              <div
+                                key={idx}
+                                className="p-2 rounded bg-slate-800/50 border border-slate-700 text-xs cursor-pointer hover:border-slate-600 transition"
+                                onClick={() => {
+                                  // Load this result as the current one
+                                  setRunResults(result)
+                                }}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className={result.matched ? 'text-green-400' : 'text-slate-400'}>
+                                    {result.matched ? '✓' : '✗'} {result.matches?.length || 0} matches
+                                  </span>
+                                </div>
+                                <div className="text-slate-500 text-xs mt-1">
+                                  {dateStr} {timeStr}
+                                </div>
+                              </div>
+                            )
+                          })}
                         </div>
                       )}
                     </div>
-                  ) : (
-                    <div className="text-center py-6 text-slate-500">
-                      <p>No recent run</p>
-                      <p className="text-xs mt-2">Run the alert to see results</p>
-                    </div>
-                  )}
+                  </div>
                 </div>
               </div>
 

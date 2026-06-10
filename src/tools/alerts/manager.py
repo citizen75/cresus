@@ -5,6 +5,8 @@ from typing import List, Dict, Optional, Any
 from datetime import datetime
 import yaml
 import logging
+import json
+from utils.env import get_db_root
 
 from .models import Alert, AlertSource, AlertNotifyTarget, AlertResult
 
@@ -202,3 +204,76 @@ class AlertManager:
         if alert:
             alert.last_run = datetime.now().isoformat()
             self._save_alert(alert)
+
+    def save_alert_result(self, alert_name: str, result: AlertResult) -> Dict[str, Any]:
+        """Save alert evaluation result to disk.
+
+        Args:
+            alert_name: Name of the alert
+            result: AlertResult object with matches and metadata
+
+        Returns:
+            Status dict
+        """
+        try:
+            # Create alert results directory: ~/.cresus/db/alerts/{alert_name}/
+            results_dir = get_db_root() / "alerts" / alert_name
+            results_dir.mkdir(parents=True, exist_ok=True)
+
+            # Save result with timestamp
+            timestamp = datetime.fromisoformat(result.evaluated_at).strftime("%Y%m%d_%H%M%S")
+            result_file = results_dir / f"result_{timestamp}.json"
+
+            # Convert result to dict with proper serialization
+            result_data = {
+                "alert_name": result.alert_name,
+                "matched": result.matched,
+                "matches": result.matches,
+                "error": result.error,
+                "evaluated_at": result.evaluated_at,
+                "tickers_checked": result.tickers_checked,
+            }
+
+            with open(result_file, 'w') as f:
+                json.dump(result_data, f, indent=2, default=str)
+
+            self.logger.info(f"Saved alert result for '{alert_name}' to {result_file}")
+            return {"status": "success", "path": str(result_file)}
+
+        except Exception as e:
+            self.logger.error(f"Error saving alert result for '{alert_name}': {e}")
+            return {"status": "error", "message": str(e)}
+
+    def get_alert_results(self, alert_name: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get saved alert results.
+
+        Args:
+            alert_name: Name of the alert
+            limit: Maximum number of results to return
+
+        Returns:
+            List of result dicts, sorted by most recent first
+        """
+        try:
+            results_dir = get_db_root() / "alerts" / alert_name
+            if not results_dir.exists():
+                return []
+
+            # Find all result files
+            result_files = sorted(results_dir.glob("result_*.json"), reverse=True)[:limit]
+            results = []
+
+            for result_file in result_files:
+                try:
+                    with open(result_file, 'r') as f:
+                        result_data = json.load(f)
+                        results.append(result_data)
+                except Exception as e:
+                    self.logger.error(f"Error loading result from {result_file}: {e}")
+                    continue
+
+            return results
+
+        except Exception as e:
+            self.logger.error(f"Error getting alert results for '{alert_name}': {e}")
+            return []

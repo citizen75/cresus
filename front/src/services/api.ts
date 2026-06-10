@@ -426,6 +426,10 @@ class CresusAPI {
     return (await this.client.get(`/alerts/${alertName}/logs?lines=${lines}`)).data
   }
 
+  async getAlertResults(alertName: string, limit: number = 10) {
+    return (await this.client.get(`/alerts/${alertName}/results?limit=${limit}`)).data
+  }
+
   async getConversationHistory(
     portfolioName: string,
     limit?: number,
