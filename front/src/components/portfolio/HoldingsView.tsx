@@ -495,6 +495,16 @@ export default function HoldingsView({ name }: HoldingsViewProps) {
                   const pos = positions.find((p: any) => p.ticker === ticker)
                   if (pos) setChartPosition(pos)
                 }}
+                onBuy={(ticker, position) => {
+                  setSelectedTicker(ticker)
+                  setSelectedPositionData(position)
+                  setPositionModalMode('buy')
+                }}
+                onSell={(ticker, position) => {
+                  setSelectedTicker(ticker)
+                  setSelectedPositionData(position)
+                  setPositionModalMode('sell')
+                }}
                 showSearch={false}
                 showActions={true}
                 externalSearchQuery={searchQuery}

@@ -8,6 +8,8 @@ interface PortfolioHoldingsTableProps {
   fundamentalData?: Record<string, any>
   selectedPosition?: string | null
   onSelectPosition?: (ticker: string, position: any) => void
+  onBuy?: (ticker: string, position: any) => void
+  onSell?: (ticker: string, position: any) => void
   showSearch?: boolean
   showActions?: boolean
   filterTickers?: string[] // Optional: filter positions to only these tickers
@@ -25,6 +27,8 @@ export function PortfolioHoldingsTable({
   fundamentalData = {},
   selectedPosition = null,
   onSelectPosition,
+  onBuy,
+  onSell,
   showSearch = true,
   showActions = true,
   filterTickers,
@@ -292,16 +296,38 @@ export function PortfolioHoldingsTable({
                     </td>
                     {showActions && (
                       <td className="px-4 py-3 text-center">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            onSelectPosition?.(pos.ticker, pos)
-                          }}
-                          className="text-slate-400 hover:text-slate-200 transition"
-                          title="View details"
-                        >
-                          📊
-                        </button>
+                        <div className="flex gap-2 justify-center">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onBuy?.(pos.ticker, pos)
+                            }}
+                            className="px-2 py-1 text-xs font-medium bg-green-600 hover:bg-green-700 text-white rounded transition"
+                            title="Buy"
+                          >
+                            Buy
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onSell?.(pos.ticker, pos)
+                            }}
+                            className="px-2 py-1 text-xs font-medium bg-red-600 hover:bg-red-700 text-white rounded transition"
+                            title="Sell"
+                          >
+                            Sell
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onSelectPosition?.(pos.ticker, pos)
+                            }}
+                            className="px-2 py-1 text-xs font-medium text-slate-400 hover:text-slate-200 transition"
+                            title="View details"
+                          >
+                            📊
+                          </button>
+                        </div>
                       </td>
                     )}
                   </tr>
