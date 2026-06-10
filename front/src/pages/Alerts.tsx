@@ -706,6 +706,14 @@ export default function Alerts() {
                         </button>
                         <button
                           type="button"
+                          onClick={() => handleNotifyConversation()}
+                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-medium transition"
+                          title="Send to conversation"
+                        >
+                          🔔 Notify
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => deleteAlert(currentAlert?.name!)}
                           className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded font-medium transition"
                         >
@@ -813,15 +821,6 @@ export default function Alerts() {
                         onChange={(e) => setResultSearchQuery(e.target.value)}
                         className="flex-1 px-4 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-slate-600"
                       />
-
-                      {/* Notify Button */}
-                      <button
-                        onClick={() => handleNotifyConversation()}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition text-sm"
-                        title="Send to conversation"
-                      >
-                        🔔 Notify
-                      </button>
 
                       {/* Timeframe Selector - shown only in charts view */}
                       {resultViewMode === 'charts' && (
