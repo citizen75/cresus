@@ -888,20 +888,23 @@ export default function Alerts() {
 
                             return (
                               <div key={ticker} className="bg-slate-800 rounded-lg overflow-hidden border border-slate-700 flex flex-col h-full">
-                                <div className="p-3 border-b border-slate-700 flex-shrink-0 bg-slate-900/50">
-                                  <div className="flex items-start justify-between gap-2">
+                                <div className="p-4 border-b border-slate-700 flex-shrink-0 bg-slate-900/50">
+                                  <div className="flex items-start justify-between gap-4">
+                                    {/* Left: Company name and ticker */}
                                     <div className="flex-1 min-w-0">
-                                      <h3 className="text-sm font-semibold text-white truncate">
+                                      <h3 className="text-lg font-bold text-white truncate">
                                         {match.company_name || ticker}
-                                        {match.company_name && match.company_name !== ticker && (
-                                          <span className="text-xs font-normal text-slate-400 ml-1">({ticker})</span>
-                                        )}
                                       </h3>
-                                      <div className={`text-xs font-bold mt-1 ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
+                                      <p className="text-sm text-slate-400 mt-1">{ticker}</p>
+                                    </div>
+
+                                    {/* Right: Change % and timeframe */}
+                                    <div className="flex flex-col items-end flex-shrink-0">
+                                      <div className={`text-lg font-bold ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
                                         {isPositive ? '+' : ''}{changePercent.toFixed(1)}%
                                       </div>
+                                      <div className="text-xs text-slate-400 mt-1">{chartTimeframe} Change</div>
                                     </div>
-                                    <div className="text-xs text-slate-400 whitespace-nowrap flex-shrink-0">{chartTimeframe} Change</div>
                                   </div>
                                 </div>
                                 <div className="flex-1 p-4 bg-slate-900/50 flex flex-col justify-center min-h-0">
