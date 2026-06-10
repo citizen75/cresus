@@ -229,7 +229,8 @@ export default function Alerts() {
   ]
 
   const notifyOptions = [
-    { value: 'conversation', label: 'Conversation' },
+    { value: 'conversation', label: 'Conversation (per portfolio)' },
+    { value: 'global', label: 'Global (all matches)' },
     { value: 'email', label: 'Email' },
     { value: 'webhook', label: 'Webhook' },
   ]

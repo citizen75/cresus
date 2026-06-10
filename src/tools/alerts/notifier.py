@@ -31,6 +31,8 @@ class AlertNotifier:
 
         if alert.notify == AlertNotifyTarget.CONVERSATION:
             self._send_conversation_alert(alert, result)
+        elif alert.notify == AlertNotifyTarget.GLOBAL:
+            self._send_global_alert(alert, result)
         elif alert.notify == AlertNotifyTarget.EMAIL:
             self._send_email_alert(alert, result)
         elif alert.notify == AlertNotifyTarget.WEBHOOK:
@@ -116,6 +118,30 @@ class AlertNotifier:
 
         except Exception as e:
             self.logger.error(f"Error in conversation alert notification: {e}")
+
+    def _send_global_alert(self, alert: Alert, result: AlertResult) -> None:
+        """Send alert to global conversation (not portfolio-specific).
+
+        Args:
+            alert: Alert configuration
+            result: Alert evaluation result
+        """
+        try:
+            if not result.matches:
+                return
+
+            manager = ConversationManager("_temp")
+
+            # Format alert message with all matches
+            message = self._format_alert_message(alert, result, result.matches)
+            manager.add_message("alert", message, portfolio=None)  # None = global
+
+            self.logger.info(
+                f"Sent global alert '{alert.name}': {len(result.matches)} match(es)"
+            )
+
+        except Exception as e:
+            self.logger.error(f"Error in global alert notification: {e}")
 
     def _send_email_alert(self, alert: Alert, result: AlertResult) -> None:
         """Send alert via email. (Not yet implemented)

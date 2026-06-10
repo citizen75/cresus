@@ -18,6 +18,7 @@ class AlertSource(Enum):
 class AlertNotifyTarget(Enum):
     """Alert notification target."""
     CONVERSATION = "conversation"
+    GLOBAL = "global"
     EMAIL = "email"
     WEBHOOK = "webhook"
 
