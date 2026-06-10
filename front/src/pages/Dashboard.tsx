@@ -351,6 +351,7 @@ export default function Dashboard() {
             subtitle="All portfolios & alerts"
             maxHeight="h-full"
             showResultsPanel={false}
+            selectedMessageId={selectedAlertMessage?.id}
             onNewMessage={(msg) => {
               // Update recent alerts when new message arrives
               if (msg.source === 'alert') {

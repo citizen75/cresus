@@ -64,6 +64,7 @@ interface ConversationWidgetProps {
   onNewMessage?: (message: ConversationMessage) => void
   autoSelectLatestAlert?: boolean // Auto-select latest alert in right panel
   showResultsPanel?: boolean // Show results panel for results_widget messages (default: true)
+  selectedMessageId?: string // ID of selected message for highlighting
 }
 
 // Dynamic widget loader
@@ -143,7 +144,8 @@ export function ConversationWidget({
   onPortfolioClick,
   onNewMessage,
   autoSelectLatestAlert = false,
-  showResultsPanel = true
+  showResultsPanel = true,
+  selectedMessageId
 }: ConversationWidgetProps) {
   const { messages: allMessages, connected: allConnected, loading: allLoading, error: allError, subscribeToConversation, unsubscribeFromConversation, deleteMessage } = useConversation()
   const [inputValue, setInputValue] = useState('')
@@ -296,10 +298,16 @@ export function ConversationWidget({
             }
           }
 
+          const isSelected = selectedMessageId === msg.id
+
           return (
             <div
               key={`${msg.datetime}-${idx}`}
-              className="rounded-lg p-3 bg-slate-800/50 border border-slate-700/50 space-y-2 cursor-pointer hover:bg-slate-700/50 transition group"
+              className={`rounded-lg p-3 space-y-2 cursor-pointer transition group ${
+                isSelected
+                  ? 'bg-indigo-600/30 border border-indigo-500/50'
+                  : 'bg-slate-800/50 border border-slate-700/50 hover:bg-slate-700/50'
+              }`}
               onClick={handleMessageClick}
             >
               {/* Header: Icon + Portfolio + Signal + Time + Delete */}
