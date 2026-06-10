@@ -29,7 +29,7 @@ class TickerRequest(BaseModel):
 async def list_watchlists():
 	"""List all saved watchlists."""
 	project_root = _get_watchlist_root()
-	watchlist_dir = project_root / "db" / "local" / "watchlist"
+	watchlist_dir = project_root / "db" / "watchlist"
 
 	if not watchlist_dir.exists():
 		return {"watchlists": [], "count": 0}
@@ -272,7 +272,7 @@ async def add_ticker_to_watchlist(strategy_name: str, body: TickerRequest = Body
 				return {"success": False, "message": f"Ticker {ticker} already in {strategy_name} watchlist"}
 
 		# Save watchlist directly to CSV (bypass WatchlistManager.save which needs complex params)
-		watchlist_dir = _get_watchlist_root() / "db" / "local" / "watchlist"
+		watchlist_dir = _get_watchlist_root() / "db" / "watchlist"
 		print(f"[Watchlist] Project root: {_get_watchlist_root()}")
 		print(f"[Watchlist] Watchlist dir: {watchlist_dir}")
 		print(f"[Watchlist] Creating directory...")
@@ -309,7 +309,7 @@ async def remove_ticker_from_watchlist(strategy_name: str, ticker: str):
 		df = df[df['ticker'] != ticker]
 
 		# Save watchlist directly to CSV
-		watchlist_dir = _get_watchlist_root() / "db" / "local" / "watchlist"
+		watchlist_dir = _get_watchlist_root() / "db" / "watchlist"
 		filepath = watchlist_dir / f"{strategy_name}.csv"
 
 		if df.empty:
