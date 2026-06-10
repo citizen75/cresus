@@ -338,6 +338,18 @@ export default function Alerts() {
     }
   }, [resultViewMode, sortedResults.length])
 
+  // Handle ESC key to close chart modal
+  useEffect(() => {
+    const handleEscKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedTickerForChart) {
+        setSelectedTickerForChart(null)
+      }
+    }
+
+    window.addEventListener('keydown', handleEscKey)
+    return () => window.removeEventListener('keydown', handleEscKey)
+  }, [selectedTickerForChart])
+
   const currentAlert = paramName ? alerts.find((a) => a.name === paramName) : null
 
   // Extract indicator names from alert formula
