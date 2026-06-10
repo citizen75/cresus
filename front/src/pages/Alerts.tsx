@@ -85,11 +85,25 @@ export default function Alerts() {
 
   // Set edit mode based on URL
   useEffect(() => {
-    if (isEditMode && paramName) {
+    if (isEditMode && paramName && alerts.length > 0) {
       const alert = alerts.find(a => a.name === paramName)
       if (alert) {
-        startEdit(alert)
+        setEditingAlert(alert)
+        setFormData({
+          formula: alert.formula,
+          description: alert.description,
+          notify: alert.notify,
+          enabled: alert.enabled,
+          name: alert.name,
+          source: alert.source,
+          source_value: alert.source_value,
+        })
+        setEditMode(true)
       }
+    } else if (!isEditMode) {
+      setEditMode(false)
+      setEditingAlert(null)
+      setFormData({})
     }
   }, [isEditMode, paramName, alerts])
 
