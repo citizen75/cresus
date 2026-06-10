@@ -63,6 +63,7 @@ interface ConversationWidgetProps {
   onPortfolioClick?: (portfolioName: string, tickers: string[], widget?: MessageWidget) => void
   onNewMessage?: (message: ConversationMessage) => void
   autoSelectLatestAlert?: boolean // Auto-select latest alert in right panel
+  showResultsPanel?: boolean // Show results panel for results_widget messages (default: true)
 }
 
 // Dynamic widget loader
@@ -141,7 +142,8 @@ export function ConversationWidget({
   onSendMessage,
   onPortfolioClick,
   onNewMessage,
-  autoSelectLatestAlert = false
+  autoSelectLatestAlert = false,
+  showResultsPanel = true
 }: ConversationWidgetProps) {
   const { messages: allMessages, connected: allConnected, loading: allLoading, error: allError, subscribeToConversation, unsubscribeFromConversation, deleteMessage } = useConversation()
   const [inputValue, setInputValue] = useState('')
@@ -349,7 +351,7 @@ export function ConversationWidget({
         </div>
 
         {/* Results Widget Panel */}
-        {selectedMessage && selectedMessage.widget === 'results_widget' && selectedMessage.data?.results && (
+        {showResultsPanel && selectedMessage && selectedMessage.widget === 'results_widget' && selectedMessage.data?.results && (
           <div className="flex-1 border-l border-slate-800 overflow-hidden flex flex-col bg-slate-900/30">
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 flex-shrink-0">
               <h3 className="text-sm font-semibold text-white">Alert Results</h3>
