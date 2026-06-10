@@ -86,18 +86,28 @@ def disable_verbose_mode():
 
 
 class AgentLogger:
-	"""Logger for agents to log messages."""
+	"""Logger for agents to log messages (console + file)."""
 
 	def __init__(self, agent_name: str):
 		"""Initialize logger with agent name.
+
+		Logs to both:
+		1. Console via loguru (for real-time monitoring)
+		2. File via TaskLogger in ~/.cresus/db/logs/{agent_name}.log (for auditing)
 
 		Args:
 			agent_name: Name of the agent using this logger
 		"""
 		self.agent_name = agent_name
+		# Initialize file-based logger for this agent
+		try:
+			from tools.logger import get_task_logger
+			self.file_logger = get_task_logger(f"agent.{agent_name}")
+		except Exception:
+			self.file_logger = None
 
 	def log(self, message: str):
-		"""Log a message.
+		"""Log a message to console and file.
 
 		Args:
 			message: The message to log
@@ -107,43 +117,55 @@ class AgentLogger:
 			loguru_logger.info(formatted_msg)
 		else:
 			print(formatted_msg)
+		if self.file_logger:
+			self.file_logger.info(message)
 
 	def info(self, message: str):
-		"""Log an info level message."""
+		"""Log an info level message to console and file."""
 		formatted_msg = f"[{self.agent_name}]  {message}"
 		if HAS_LOGURU:
 			loguru_logger.info(formatted_msg)
 		else:
 			print(f"INFO: {formatted_msg}")
+		if self.file_logger:
+			self.file_logger.info(message)
 
 	def error(self, message: str):
-		"""Log an error level message."""
+		"""Log an error level message to console and file."""
 		formatted_msg = f"[{self.agent_name}]  {message}"
 		if HAS_LOGURU:
 			loguru_logger.error(formatted_msg)
 		else:
 			print(f"ERROR: {formatted_msg}")
+		if self.file_logger:
+			self.file_logger.error(message)
 
 	def debug(self, message: str):
-		"""Log a debug level message."""
+		"""Log a debug level message to console and file."""
 		formatted_msg = f"[{self.agent_name}]  {message}"
 		if HAS_LOGURU:
 			loguru_logger.debug(formatted_msg)
 		else:
 			print(f"DEBUG: {formatted_msg}")
+		if self.file_logger:
+			self.file_logger.debug(message)
 
 	def warning(self, message: str):
-		"""Log a warning level message."""
+		"""Log a warning level message to console and file."""
 		formatted_msg = f"[{self.agent_name}]  {message}"
 		if HAS_LOGURU:
 			loguru_logger.warning(formatted_msg)
 		else:
 			print(f"WARNING: {formatted_msg}")
+		if self.file_logger:
+			self.file_logger.warning(message)
 
 	def exception(self, message: str):
-		"""Log an exception level message."""
+		"""Log an exception level message to console and file."""
 		formatted_msg = f"[{self.agent_name}]  {message}"
 		if HAS_LOGURU:
 			loguru_logger.exception(formatted_msg)
 		else:
 			print(f"EXCEPTION: {formatted_msg}")
+		if self.file_logger:
+			self.file_logger.error(message)
