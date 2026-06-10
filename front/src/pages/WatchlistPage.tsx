@@ -133,6 +133,7 @@ export default function WatchlistPage() {
             loadingCharts={loadingData}
             chartTimeframe={chartTimeframe}
             onChartTimeframeChange={setChartTimeframe}
+            onLoadCharts={loadHistoricalData}
             onDeleteRow={handleDeleteTicker}
             watchlistName="global"
           />
