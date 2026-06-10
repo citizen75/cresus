@@ -185,7 +185,34 @@ export default function Alerts() {
 
   const saveAlert = async (name: string) => {
     try {
-      await api.updateAlert(name, formData)
+      // Handle name change (rename)
+      if (formData.name && formData.name !== name) {
+        // Delete old alert and create new one with renamed name
+        const newName = formData.name
+        const updateData = { ...formData }
+        delete updateData.name // Remove name from update data
+
+        // Create new alert with new name
+        await api.createAlert({
+          name: newName,
+          source: formData.source || currentAlert?.source,
+          source_value: currentAlert?.source_value,
+          formula: formData.formula || currentAlert?.formula,
+          notify: formData.notify || currentAlert?.notify,
+          description: formData.description || currentAlert?.description,
+          tags: currentAlert?.tags
+        })
+
+        // Delete old alert
+        await api.deleteAlert(name)
+
+        // Navigate to new alert
+        navigate(`/alerts/${encodeURIComponent(newName)}`)
+      } else {
+        // Regular update without rename
+        await api.updateAlert(name, formData)
+      }
+
       cancelEdit()
       await fetchAlerts()
     } catch (err) {
@@ -633,6 +660,35 @@ export default function Alerts() {
                   {editMode ? (
                     <form className="space-y-4">
                       <div>
+                        <label className="block text-sm text-slate-400 mb-2">Name</label>
+                        <input
+                          type="text"
+                          name="name"
+                          value={formData.name || currentAlert?.name || ''}
+                          onChange={handleFormChange}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
+                          placeholder="Alert name"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm text-slate-400 mb-2">Source</label>
+                        <select
+                          name="source"
+                          value={formData.source || currentAlert?.source || ''}
+                          onChange={handleFormChange}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
+                        >
+                          <option value="">Select source...</option>
+                          <option value="screener">Screener</option>
+                          <option value="backtest">Backtest</option>
+                          <option value="signal">Signal</option>
+                          <option value="performance">Performance</option>
+                          <option value="custom">Custom</option>
+                        </select>
+                      </div>
+
+                      <div>
                         <label className="block text-sm text-slate-400 mb-2">Formula</label>
                         <textarea
                           name="formula"
@@ -699,6 +755,11 @@ export default function Alerts() {
                     </form>
                   ) : (
                     <div className="space-y-4">
+                      <div>
+                        <div className="text-sm text-slate-500">Name</div>
+                        <div className="text-white font-medium mt-1">{currentAlert?.name}</div>
+                      </div>
+
                       <div>
                         <div className="text-sm text-slate-500">Source</div>
                         <div className="text-white font-medium mt-1">{currentAlert?.source}</div>
