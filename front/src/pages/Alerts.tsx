@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../services/api'
 import CardChart from '@/components/CardChart'
+import Chart from './Chart'
 
 interface Alert {
   name: string
@@ -41,6 +42,7 @@ export default function Alerts() {
   const [chartTimeframe, setChartTimeframe] = useState<'1W' | '1M' | '3M' | 'YTD' | 'ALL'>('1M')
   const [historicalData, setHistoricalData] = useState<{ [ticker: string]: any[] }>({})
   const [loadingCharts, setLoadingCharts] = useState(false)
+  const [selectedTickerForChart, setSelectedTickerForChart] = useState<string | null>(null)
   const [savedResults, setSavedResults] = useState<any[]>([])
   const [loadingSavedResults, setLoadingSavedResults] = useState(false)
   const [newAlertData, setNewAlertData] = useState({
@@ -864,7 +866,7 @@ export default function Alerts() {
                           {sortedResults.map((row, idx) => (
                             <tr
                               key={idx}
-                              onClick={() => navigate(`/chart/${row.ticker}`)}
+                              onClick={() => setSelectedTickerForChart(row.ticker)}
                               className="hover:bg-slate-800/50 cursor-pointer transition"
                             >
                               {getDisplayColumns().map((key) => {
@@ -1175,6 +1177,32 @@ export default function Alerts() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Trading Chart Modal */}
+      {selectedTickerForChart && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-slate-800 sticky top-0 bg-slate-900">
+              <div>
+                <h2 className="text-2xl font-bold text-white">{selectedTickerForChart}</h2>
+                <p className="text-slate-400 text-sm mt-1">Trading Chart</p>
+              </div>
+              <button
+                onClick={() => setSelectedTickerForChart(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-medium transition"
+              >
+                Close
+              </button>
+            </div>
+
+            {/* Chart Widget */}
+            <div className="p-6">
+              <Chart ticker={selectedTickerForChart} />
+            </div>
           </div>
         </div>
       )}
