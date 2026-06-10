@@ -15,24 +15,24 @@ import os
 def _get_ticker_metadata(ticker: str) -> Dict[str, Any]:
 	"""Get metadata for a ticker - date, name, close."""
 	date = datetime.now().strftime('%Y-%m-%d')
-
-	# Try to get company name from local sources
-	name = ''
 	close_price = None
+	name = ''
 
 	try:
-		# Try loading from cached data
-		from pathlib import Path
-		import json
-
-		# Check for cached fundamental data
-		cache_dir = Path.home() / '.cache' / 'ticker_info'
-		if cache_dir.exists():
-			ticker_file = cache_dir / f"{ticker}.json"
-			if ticker_file.exists():
-				with open(ticker_file) as f:
-					data = json.load(f)
-					name = data.get('longName') or data.get('name', '')
+		# Try to get company name from yfinance
+		import yfinance as yf
+		try:
+			ticker_info = yf.Ticker(ticker)
+			info = ticker_info.info
+			name = info.get('longName') or info.get('shortName') or ''
+		except:
+			# Fallback: try from history
+			try:
+				data = yf.download(ticker, period="1d", progress=False)
+				if not data.empty:
+					close_price = float(data['Close'].iloc[-1])
+			except:
+				pass
 	except:
 		pass
 
