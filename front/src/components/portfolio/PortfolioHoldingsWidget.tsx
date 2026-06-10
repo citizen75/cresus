@@ -210,11 +210,6 @@ export default function PortfolioHoldingsWidget({
             ))}
         </select>
 
-        {/* Settings */}
-        <button className="px-3 py-1.5 bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded hover:bg-slate-700 transition flex-shrink-0">
-          ⚙️
-        </button>
-
         {/* Table/Charts Toggle */}
         <div className="flex gap-1 bg-slate-800 border border-slate-700 rounded p-1 flex-shrink-0">
           <button
