@@ -10,7 +10,8 @@ export interface ConversationMessage {
   portfolio?: string
   signal?: string
   tickers?: string[]
-  widget?: any
+  widget?: string
+  data?: any
 }
 
 interface WebSocketConnection {

@@ -336,8 +336,8 @@ export function ConversationWidget({
         </div>
 
         {/* Results Widget Panel */}
-        {selectedMessage && selectedMessage.widget === 'results_widget' && (
-          <div className="flex-1 border-l border-slate-800 overflow-hidden flex flex-col">
+        {selectedMessage && selectedMessage.widget === 'results_widget' && selectedMessage.data?.results && (
+          <div className="flex-1 border-l border-slate-800 overflow-hidden flex flex-col bg-slate-900/30">
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 flex-shrink-0">
               <h3 className="text-sm font-semibold text-white">Alert Results</h3>
               <button
@@ -347,25 +347,28 @@ export function ConversationWidget({
                 ✕
               </button>
             </div>
-            <div className="flex-1 overflow-hidden">
-              {selectedMessage.data?.results && (
-                <div className="h-full overflow-auto">
-                  {/* Render results table/data here */}
-                  <div className="p-4 text-xs text-slate-300">
-                    <div className="mb-2 font-semibold">{selectedMessage.data.alert_name}</div>
-                    <div className="space-y-1">
-                      {selectedMessage.data.results.map((result: any, idx: number) => (
-                        <div key={idx} className="flex justify-between">
-                          <span>{result.ticker}</span>
-                          {result.company_name && result.company_name !== result.ticker && (
-                            <span className="text-slate-500">{result.company_name}</span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="space-y-4">
+                {/* Alert Header */}
+                <div className="border-b border-slate-700 pb-3">
+                  <div className="text-sm font-semibold text-white mb-1">⚠️ {selectedMessage.data.alert_name}</div>
+                  <div className="text-xs text-slate-400">
+                    {selectedMessage.data.results.length} matches found
                   </div>
                 </div>
-              )}
+
+                {/* Results List */}
+                <div className="space-y-2">
+                  {selectedMessage.data.results.map((result: any, idx: number) => (
+                    <div key={idx} className="bg-slate-800/50 rounded p-2 border border-slate-700">
+                      <div className="text-sm font-medium text-white">{result.ticker}</div>
+                      {result.company_name && result.company_name !== result.ticker && (
+                        <div className="text-xs text-slate-400 mt-1">{result.company_name}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         )}
