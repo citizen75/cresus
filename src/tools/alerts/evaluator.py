@@ -191,15 +191,13 @@ class AlertEvaluator:
                 for indicator_name, indicator_series in indicator_results.items():
                     history_df[indicator_name.lower()] = indicator_series
 
-            # Evaluate formula using vectorized evaluation (supports shift notation like [-1])
+            # Evaluate formula on the latest row with full historical context for shift notation
             if len(history_df) > 0:
                 try:
-                    from tools.formula.dsl_parser import evaluate_dsl_vectorized
-                    # Vectorized evaluation returns a Series of boolean results
-                    results = evaluate_dsl_vectorized(formula, history_df)
-
-                    # Check if the latest row matches
-                    if results.iloc[-1]:
+                    from tools.formula.dsl_parser import evaluate_dsl
+                    # Pass full history_df to evaluate_dsl to support shift notation like [-1]
+                    # evaluate_dsl will use the latest row as the evaluation point
+                    if evaluate_dsl(formula, history_df):
                         latest_row = history_df.iloc[-1]
                         latest_dict = latest_row.to_dict()
                         latest_dict['ticker'] = ticker
