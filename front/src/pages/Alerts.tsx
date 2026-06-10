@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../services/api'
 import CardChart from '@/components/CardChart'
-import AlertResultsTable from '@/components/alerts/AlertResultsTable'
+import ResultTable from '@/components/ResultTable'
 
 interface Alert {
   name: string
@@ -776,8 +776,8 @@ export default function Alerts() {
                   {/* Table View */}
                   {resultViewMode === 'table' && (
                     <div className="flex-1 overflow-auto p-6">
-                      <AlertResultsTable
-                        matches={sortedResults}
+                      <ResultTable
+                        data={sortedResults}
                         searchQuery={resultSearchQuery}
                         onSearchChange={setResultSearchQuery}
                         sortColumn={resultSortColumn}
