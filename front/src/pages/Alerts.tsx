@@ -18,7 +18,7 @@ interface Alert {
 }
 
 export default function Alerts() {
-  const { name: paramName } = useParams<{ name?: string }>()
+  const { name: paramName, view: viewParam } = useParams<{ name?: string; view?: string }>()
   const navigate = useNavigate()
 
   const [alerts, setAlerts] = useState<Alert[]>([])
@@ -34,7 +34,7 @@ export default function Alerts() {
   const [logsLoading, setLogsLoading] = useState(false)
   const [editMode, setEditMode] = useState(false)
   const [formData, setFormData] = useState<Partial<Alert>>({})
-  const [resultViewMode, setResultViewMode] = useState<'table' | 'charts'>('table')
+  const [resultViewMode, setResultViewMode] = useState<'table' | 'charts'>(viewParam === 'charts' ? 'charts' : 'table')
   const [resultSearchQuery, setResultSearchQuery] = useState('')
   const [resultSortColumn, setResultSortColumn] = useState<string | null>('ticker')
   const [resultSortDirection, setResultSortDirection] = useState<'asc' | 'desc'>('asc')
@@ -279,9 +279,13 @@ export default function Alerts() {
   }
 
   const loadChartsData = async () => {
-    if (!sortedResults || sortedResults.length === 0) return
+    if (!sortedResults || sortedResults.length === 0) {
+      console.log('No results to load charts for')
+      return
+    }
 
     setLoadingCharts(true)
+    setHistoricalData({}) // Clear previous data
     const data: { [ticker: string]: any[] } = {}
 
     for (const match of sortedResults) {
@@ -289,36 +293,39 @@ export default function Alerts() {
       if (!ticker) continue
 
       try {
+        console.log(`Loading chart data for ${ticker}...`)
         const response = await api.getHistoricalData(ticker, getDaysForTimeframe(chartTimeframe))
-        if (response && Array.isArray(response)) {
-          data[ticker] = response
+
+        let historyArray: any[] = []
+        if (Array.isArray(response)) {
+          historyArray = response
         } else if (response && response.history && Array.isArray(response.history)) {
-          data[ticker] = response.history
+          historyArray = response.history
         } else if (response && response.data && Array.isArray(response.data)) {
-          data[ticker] = response.data
+          historyArray = response.data
+        }
+
+        if (historyArray.length > 0) {
+          data[ticker] = historyArray
+          console.log(`Loaded ${historyArray.length} rows for ${ticker}`)
         }
       } catch (err) {
         console.error(`Failed to load data for ${ticker}:`, err)
       }
     }
 
+    console.log('Chart data loaded:', Object.keys(data).length, 'tickers')
     setHistoricalData(data)
     setLoadingCharts(false)
   }
 
-  // Load charts when switching to charts view
+  // Load charts when switching to charts view or when results change
   useEffect(() => {
-    if (resultViewMode === 'charts' && sortedResults.length > 0 && Object.keys(historicalData).length === 0) {
+    if (resultViewMode === 'charts' && sortedResults.length > 0) {
+      console.log('Loading charts for', sortedResults.length, 'results')
       loadChartsData()
     }
-  }, [resultViewMode, sortedResults.length])
-
-  // Reload charts when timeframe changes
-  useEffect(() => {
-    if (resultViewMode === 'charts') {
-      loadChartsData()
-    }
-  }, [chartTimeframe])
+  }, [resultViewMode, sortedResults.length, chartTimeframe])
 
   const currentAlert = paramName ? alerts.find((a) => a.name === paramName) : null
 
@@ -678,7 +685,10 @@ export default function Alerts() {
                     />
                     <div className="flex gap-2 flex-shrink-0">
                       <button
-                        onClick={() => setResultViewMode('table')}
+                        onClick={() => {
+                          setResultViewMode('table')
+                          navigate(`/alerts/${paramName}`)
+                        }}
                         className={`px-3 py-2 rounded text-sm font-medium transition ${
                           resultViewMode === 'table'
                             ? 'bg-purple-600 text-white'
@@ -688,7 +698,10 @@ export default function Alerts() {
                         📊 Table
                       </button>
                       <button
-                        onClick={() => setResultViewMode('charts')}
+                        onClick={() => {
+                          setResultViewMode('charts')
+                          navigate(`/alerts/${paramName}/charts`)
+                        }}
                         className={`px-3 py-2 rounded text-sm font-medium transition ${
                           resultViewMode === 'charts'
                             ? 'bg-purple-600 text-white'
@@ -797,22 +810,25 @@ export default function Alerts() {
                             const ticker = match.ticker
                             const chartData = historicalData[ticker] || []
                             return (
-                              <div key={ticker} className="bg-slate-800 rounded-lg overflow-hidden border border-slate-700">
-                                <div className="p-4 border-b border-slate-700">
+                              <div key={ticker} className="bg-slate-800 rounded-lg overflow-hidden border border-slate-700 flex flex-col h-full">
+                                <div className="p-4 border-b border-slate-700 flex-shrink-0">
                                   <h3 className="font-semibold text-white">{ticker}</h3>
                                   <p className="text-xs text-slate-400">{match.company_name || '—'}</p>
                                 </div>
-                                <div className="p-4 h-64">
+                                <div className="flex-1 p-4 min-h-[240px] flex items-center justify-center bg-slate-900/50">
                                   {chartData && chartData.length > 0 ? (
-                                    <CardChart
-                                      ticker={ticker}
-                                      data={chartData}
-                                      height={240}
-                                      showLegend={false}
-                                    />
+                                    <div style={{ width: '100%', height: '100%' }}>
+                                      <CardChart
+                                        ticker={ticker}
+                                        data={chartData}
+                                        height={200}
+                                        showLegend={false}
+                                      />
+                                    </div>
                                   ) : (
-                                    <div className="flex items-center justify-center h-full text-slate-500">
+                                    <div className="text-center text-slate-500">
                                       <p className="text-xs">No data available</p>
+                                      <p className="text-xs mt-2 text-slate-600">{historicalData[ticker] ? 'Loading...' : 'Waiting for data'}</p>
                                     </div>
                                   )}
                                 </div>
