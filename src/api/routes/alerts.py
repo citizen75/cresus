@@ -14,7 +14,7 @@ router = APIRouter(tags=["alerts"])
 
 
 def enrich_with_company_names(matches: List[dict]) -> List[dict]:
-    """Add company_name to matches if not already present."""
+    """Add company_name to matches if not already present (only during save, not load)."""
     if not matches:
         return matches
 
@@ -46,14 +46,20 @@ def enrich_with_company_names(matches: List[dict]) -> List[dict]:
     return enriched
 
 
-def clean_matches(matches: List[dict]) -> List[dict]:
-    """Convert NaN and Inf values to None for JSON serialization, and add company names."""
-    # First enrich with company names
-    enriched = enrich_with_company_names(matches)
+def clean_matches(matches: List[dict], enrich: bool = False) -> List[dict]:
+    """Convert NaN and Inf values to None for JSON serialization.
 
-    # Then clean NaN/Inf values
+    Args:
+        matches: List of match dicts
+        enrich: If True, also add company names (only during save, not load)
+    """
+    # Optionally enrich with company names (only when saving, not when loading)
+    if enrich:
+        matches = enrich_with_company_names(matches)
+
+    # Clean NaN/Inf values
     cleaned = []
-    for match in enriched:
+    for match in matches:
         clean_match = {}
         for key, value in match.items():
             if isinstance(value, float):
@@ -280,7 +286,7 @@ async def run_alert(name: str):
             "status": "success",
             "alert_name": result.alert_name,
             "matched": result.matched,
-            "matches": clean_matches(result.matches),
+            "matches": clean_matches(result.matches, enrich=True),
             "tickers_checked": result.tickers_checked,
             "error": result.error,
             "evaluated_at": result.evaluated_at,
@@ -301,13 +307,13 @@ async def get_alert_results(name: str, limit: int = 10):
         manager = AlertManager()
         results = manager.get_alert_results(name, limit=limit)
 
-        # Clean NaN/Inf values from results
+        # Clean NaN/Inf values from results (don't re-enrich, already enriched when saved)
         cleaned_results = []
         for result in results:
             cleaned_result = {
                 "alert_name": result.get("alert_name"),
                 "matched": result.get("matched"),
-                "matches": clean_matches(result.get("matches", [])),
+                "matches": clean_matches(result.get("matches", []), enrich=False),
                 "error": result.get("error"),
                 "evaluated_at": result.get("evaluated_at"),
                 "tickers_checked": result.get("tickers_checked"),
