@@ -414,6 +414,8 @@ export default function Dashboard() {
               }
             }}
             onPortfolioClick={(portfolio, tickers, widget, messageData) => {
+              console.log(`[Dashboard] onPortfolioClick called:`, { portfolio, widget, messageDataWidget: messageData?.widget })
+
               // For results_widget messages: show results in right panel
               if (messageData && messageData.widget === 'results_widget') {
                 console.log(`[Dashboard] Results message clicked:`, { id: messageData.id, widget: messageData.widget })
@@ -426,6 +428,13 @@ export default function Dashboard() {
                 console.log(`[Dashboard] Portfolio message clicked:`, { id: messageData.id, portfolio: messageData.portfolio })
                 setSelectedAlertMessage(null)  // Clear results widget
                 setSelectedPortfolioWidget(messageData.portfolio)
+                setRightPanelOpen(true)
+              }
+              // For old alert messages without widget field: show holdings if portfolio exists
+              else if (portfolio && portfolio !== 'global') {
+                console.log(`[Dashboard] Old portfolio message clicked:`, { portfolio })
+                setSelectedAlertMessage(null)  // Clear results widget
+                setSelectedPortfolioWidget(portfolio)
                 setRightPanelOpen(true)
               }
 
