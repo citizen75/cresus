@@ -29,6 +29,8 @@ export default function PortfolioHoldingsWidget({
   const [viewMode, setViewMode] = useState<'table' | 'charts' | 'history'>('table')
   const [transactions, setTransactions] = useState<any[]>([])
   const [loadingTransactions, setLoadingTransactions] = useState(false)
+  const [sortColumn, setSortColumn] = useState<string>('date')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [timeframe, setTimeframe] = useState<'1W' | '1M' | '3M' | 'YTD' | 'ALL'>('1M')
   const [tradingDialogOpen, setTradingDialogOpen] = useState(false)
   const [tradingMode, setTradingMode] = useState<'buy' | 'sell'>('buy')
@@ -180,6 +182,55 @@ export default function PortfolioHoldingsWidget({
       setLoadingTransactions(false)
     }
   }
+
+  const handleSortColumn = (column: string) => {
+    if (sortColumn === column) {
+      // Toggle direction if same column clicked
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      // New column, default to ascending
+      setSortColumn(column)
+      setSortDirection('asc')
+    }
+  }
+
+  const getSortedTransactions = () => {
+    const sorted = [...transactions].sort((a, b) => {
+      let aVal = a[sortColumn] || ''
+      let bVal = b[sortColumn] || ''
+
+      // Handle numeric columns
+      if (['quantity', 'price', 'fees', 'stop_loss', 'target_profit'].includes(sortColumn)) {
+        aVal = parseFloat(aVal) || 0
+        bVal = parseFloat(bVal) || 0
+      }
+
+      // Handle date columns
+      if (['date', 'timestamp'].includes(sortColumn)) {
+        aVal = new Date(aVal).getTime() || 0
+        bVal = new Date(bVal).getTime() || 0
+      }
+
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1
+      return 0
+    })
+    return sorted
+  }
+
+  const SortHeader = ({ label, column }: { label: string; column: string }) => (
+    <th
+      onClick={() => handleSortColumn(column)}
+      className="px-3 py-2 text-left text-slate-300 cursor-pointer hover:text-white transition"
+    >
+      <div className="flex items-center gap-1">
+        {label}
+        {sortColumn === column && (
+          <span className="text-xs">{sortDirection === 'asc' ? '▲' : '▼'}</span>
+        )}
+      </div>
+    </th>
+  )
 
   return (
     <div className="flex flex-col h-full space-y-4">
@@ -397,20 +448,20 @@ export default function PortfolioHoldingsWidget({
               <table className="w-full text-xs">
                 <thead className="bg-slate-800/50 sticky top-0">
                   <tr>
-                    <th className="px-3 py-2 text-left text-slate-300">Date</th>
-                    <th className="px-3 py-2 text-left text-slate-300">Ticker</th>
-                    <th className="px-3 py-2 text-left text-slate-300">Name</th>
+                    <SortHeader label="Date" column="date" />
+                    <SortHeader label="Ticker" column="ticker" />
+                    <SortHeader label="Name" column="name" />
                     <th className="px-3 py-2 text-center text-slate-300">Type</th>
-                    <th className="px-3 py-2 text-right text-slate-300">Qty</th>
-                    <th className="px-3 py-2 text-right text-slate-300">Price</th>
-                    <th className="px-3 py-2 text-right text-slate-300">Fees</th>
-                    <th className="px-3 py-2 text-right text-slate-300">Stop Loss</th>
-                    <th className="px-3 py-2 text-right text-slate-300">Target</th>
-                    <th className="px-3 py-2 text-right text-slate-300">Total</th>
+                    <SortHeader label="Qty" column="quantity" />
+                    <SortHeader label="Price" column="price" />
+                    <SortHeader label="Fees" column="fees" />
+                    <SortHeader label="Stop Loss" column="stop_loss" />
+                    <SortHeader label="Target" column="target_profit" />
+                    <SortHeader label="Total" column="price" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800">
-                  {transactions.map((tx: any, idx: number) => {
+                  {getSortedTransactions().map((tx: any, idx: number) => {
                     // Parse date - try different field names
                     let dateStr = '—'
                     try {
