@@ -307,6 +307,50 @@ class CronScheduler:
 			logger.error(f"Failed to reload job '{job_name}': {e}", exc_info=True)
 			return False
 
+	def reload_all_jobs(self) -> None:
+		"""Reload all jobs from config after external config file changes.
+
+		Useful when config.yml is modified externally to sync scheduler with config.
+		"""
+		try:
+			logger.info("Reloading all cron jobs from config...")
+			# Reload config from disk
+			self.config.reload()
+
+			# Get all currently scheduled jobs
+			current_jobs = {job.id for job in self.scheduler.get_jobs()}
+
+			# Get all jobs from updated config
+			enabled_config_jobs = self.config.get_enabled_jobs()
+			config_job_names = {job.name for job in enabled_config_jobs}
+
+			# Remove jobs that are no longer enabled
+			for job_id in current_jobs:
+				if job_id not in config_job_names:
+					try:
+						self.scheduler.remove_job(job_id)
+						logger.info(f"Removed job '{job_id}' (no longer enabled)")
+					except Exception:
+						pass
+
+			# Update or add jobs from config
+			for job_config in enabled_config_jobs:
+				try:
+					# Remove old job if it exists
+					try:
+						self.scheduler.remove_job(job_config.name)
+					except Exception:
+						pass
+					# Add updated job
+					self._add_job(job_config)
+				except Exception as e:
+					logger.error(f"Failed to reload job '{job_config.name}': {e}")
+
+			logger.info(f"All cron jobs reloaded: {len(enabled_config_jobs)} enabled jobs")
+
+		except Exception as e:
+			logger.error(f"Failed to reload all jobs: {e}", exc_info=True)
+
 	def add_job_to_scheduler(self, job_name: str) -> bool:
 		"""Add a job to the running scheduler.
 

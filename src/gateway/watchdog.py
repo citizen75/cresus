@@ -24,6 +24,7 @@ class CodeChangeHandler(FileSystemEventHandler):
 		on_api_change: Optional[Callable] = None,
 		on_mcp_change: Optional[Callable] = None,
 		on_gateway_change: Optional[Callable] = None,
+		on_config_change: Optional[Callable] = None,
 		debounce_seconds: float = 2.0,
 	):
 		"""Initialize handler.
@@ -32,12 +33,14 @@ class CodeChangeHandler(FileSystemEventHandler):
 			on_api_change: Callback for API changes
 			on_mcp_change: Callback for MCP changes
 			on_gateway_change: Callback for gateway changes
+			on_config_change: Callback for config file changes
 			debounce_seconds: Debounce period to avoid multiple triggers
 		"""
 		super().__init__()
 		self.on_api_change = on_api_change
 		self.on_mcp_change = on_mcp_change
 		self.on_gateway_change = on_gateway_change
+		self.on_config_change = on_config_change
 		self.debounce_seconds = debounce_seconds
 		self.last_trigger_time = 0
 		self.pending_changes = set()
@@ -45,7 +48,21 @@ class CodeChangeHandler(FileSystemEventHandler):
 
 	def on_modified(self, event):
 		"""Handle file modification events."""
-		if event.is_directory or not self._should_watch(event.src_path):
+		if event.is_directory:
+			return
+
+		# Check for config file changes
+		if event.src_path.endswith("cron.yml"):
+			with self.lock:
+				self.pending_changes.add("config")
+				current_time = time.time()
+				if current_time - self.last_trigger_time >= self.debounce_seconds:
+					self._trigger_callbacks()
+					self.last_trigger_time = current_time
+			return
+
+		# Check for code changes
+		if not self._should_watch(event.src_path):
 			return
 
 		with self.lock:
@@ -87,6 +104,9 @@ class CodeChangeHandler(FileSystemEventHandler):
 			elif module == "gateway" and self.on_gateway_change:
 				logger.info(f"Detected changes in gateway module")
 				self.on_gateway_change()
+			elif module == "config" and self.on_config_change:
+				logger.info(f"Detected changes in config files")
+				self.on_config_change()
 
 
 class FileWatcher:
@@ -98,6 +118,7 @@ class FileWatcher:
 		on_api_change: Optional[Callable] = None,
 		on_mcp_change: Optional[Callable] = None,
 		on_gateway_change: Optional[Callable] = None,
+		on_config_change: Optional[Callable] = None,
 		debounce_seconds: float = 2.0,
 	):
 		"""Initialize file watcher.
@@ -107,6 +128,7 @@ class FileWatcher:
 			on_api_change: Callback when API code changes
 			on_mcp_change: Callback when MCP code changes
 			on_gateway_change: Callback when gateway code changes
+			on_config_change: Callback when config files change
 			debounce_seconds: Debounce period for file changes
 		"""
 		self.project_root = Path(project_root)
@@ -123,6 +145,7 @@ class FileWatcher:
 			on_api_change=on_api_change,
 			on_mcp_change=on_mcp_change,
 			on_gateway_change=on_gateway_change,
+			on_config_change=on_config_change,
 			debounce_seconds=debounce_seconds,
 		)
 
@@ -155,6 +178,16 @@ class FileWatcher:
 			if gateway_path.exists():
 				self.observer.schedule(self.handler, gateway_path, recursive=True)
 				logger.info(f"Watching gateway directory: {gateway_path}")
+
+			# Watch config directory for cron.yml changes
+			from utils.env import get_config_root
+			try:
+				config_path = get_config_root()
+				if config_path.exists():
+					self.observer.schedule(self.handler, config_path, recursive=False)
+					logger.info(f"Watching config directory: {config_path}")
+			except Exception as e:
+				logger.warning(f"Could not watch config directory: {e}")
 
 			# Start observer
 			self.observer.start()

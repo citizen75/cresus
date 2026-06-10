@@ -70,6 +70,7 @@ class GatewayServer:
 				on_api_change=self._on_api_change,
 				on_mcp_change=self._on_mcp_change,
 				on_gateway_change=self._on_gateway_change,
+				on_config_change=self._on_config_change,
 			)
 		else:
 			self.file_watcher = None
@@ -127,6 +128,20 @@ class GatewayServer:
 
 		except Exception as e:
 			logger.error(f"Error restarting cron scheduler: {e}", exc_info=True)
+
+	def _on_config_change(self) -> None:
+		"""Handle config file changes - reload cron scheduler."""
+		logger.info("Detected config file changes, reloading cron scheduler...")
+		try:
+			if self.cron_scheduler and self.cron_scheduler.is_running():
+				# Reload the scheduler to pick up config changes
+				self.cron_scheduler.reload_all_jobs()
+				logger.info("Cron scheduler reloaded with updated config")
+			else:
+				logger.warning("Cron scheduler not running, cannot reload")
+
+		except Exception as e:
+			logger.error(f"Error reloading cron scheduler: {e}", exc_info=True)
 
 	def _start_api(self) -> None:
 		"""Start the API server in a separate thread.
