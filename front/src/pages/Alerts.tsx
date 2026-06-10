@@ -107,6 +107,15 @@ export default function Alerts() {
     }
   }, [isEditMode, paramName, alerts])
 
+  // Auto-load logs for currently viewed alert
+  useEffect(() => {
+    if (paramName && !paramResultId && !isEditMode) {
+      // Auto-select and load logs for the current alert
+      setSelectedAlertForLogs(paramName)
+      loadAlertLogs(paramName)
+    }
+  }, [paramName, paramResultId, isEditMode])
+
   const fetchAlerts = async () => {
     try {
       setLoading(true)
