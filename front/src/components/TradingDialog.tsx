@@ -221,11 +221,30 @@ export function TradingDialog({
         </div>
 
         {/* Calculations */}
-        {priceVal > 0 && (
+        {priceVal > 0 && quantity && (
           <div className="bg-slate-800/30 rounded p-2 mb-3 text-xs space-y-1">
-            {stopLoss && <p className="text-slate-400">Stop: <span className="text-white">€{(priceVal * (1 - parseFloat(stopLoss) / 100)).toFixed(2)}</span></p>}
-            {takeProfit && <p className="text-slate-400">Target: <span className="text-white">€{(priceVal * (1 + parseFloat(takeProfit) / 100)).toFixed(2)}</span></p>}
-            {quantity && <p className="text-slate-400">Total: <span className={totalAmount > 0 ? 'text-green-400' : 'text-slate-400'}>€{totalAmount.toFixed(2)}</span></p>}
+            <p className="text-slate-400">Total: <span className={totalAmount > 0 ? 'text-white font-bold' : 'text-slate-400'}>€{totalAmount.toFixed(2)}</span></p>
+            {mode === 'sell' && position?.avg_entry_price && (
+              <>
+                {(() => {
+                  const entryPrice = parseFloat(position.avg_entry_price)
+                  const profit = (priceVal - entryPrice) * qtyVal - feesVal
+                  const gainPct = ((priceVal - entryPrice) / entryPrice) * 100
+                  return (
+                    <>
+                      <p className="text-slate-400">Profit: <span className={profit >= 0 ? 'text-green-400 font-medium' : 'text-red-400 font-medium'}>€{profit.toFixed(2)}</span></p>
+                      <p className="text-slate-400">Gain %: <span className={gainPct >= 0 ? 'text-green-400 font-medium' : 'text-red-400 font-medium'}>{gainPct.toFixed(2)}%</span></p>
+                    </>
+                  )
+                })()}
+              </>
+            )}
+            {mode === 'buy' && (
+              <>
+                {stopLoss && <p className="text-slate-400">Stop: <span className="text-white">€{(priceVal * (1 - parseFloat(stopLoss) / 100)).toFixed(2)}</span></p>}
+                {takeProfit && <p className="text-slate-400">Target: <span className="text-white">€{(priceVal * (1 + parseFloat(takeProfit) / 100)).toFixed(2)}</span></p>}
+              </>
+            )}
           </div>
         )}
 
