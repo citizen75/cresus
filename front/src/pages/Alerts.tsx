@@ -57,12 +57,12 @@ export default function Alerts() {
     fetchAlerts()
   }, [])
 
-  // Auto-refresh alerts periodically (skip while alert is running)
-  useEffect(() => {
-    if (runningAlert) return
-    const interval = setInterval(fetchAlerts, 5000)
-    return () => clearInterval(interval)
-  }, [runningAlert])
+  // Don't auto-refresh - only refresh when explicitly needed
+  // useEffect(() => {
+  //   if (runningAlert) return
+  //   const interval = setInterval(fetchAlerts, 5000)
+  //   return () => clearInterval(interval)
+  // }, [runningAlert])
 
   // Refresh alerts list when results arrive
   useEffect(() => {
