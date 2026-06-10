@@ -959,7 +959,11 @@ export default function Alerts() {
                             }
 
                             return (
-                              <div key={ticker} className="bg-slate-800 rounded-lg overflow-hidden border border-slate-700 flex flex-col h-full">
+                              <div
+                                key={ticker}
+                                onClick={() => setSelectedTickerForChart(ticker)}
+                                className="bg-slate-800 rounded-lg overflow-hidden border border-slate-700 flex flex-col h-full cursor-pointer hover:border-slate-600 transition"
+                              >
                                 <div className="p-4 border-b border-slate-700 flex-shrink-0 bg-slate-900/50">
                                   <div className="flex items-start justify-between gap-4">
                                     {/* Left: Company name and ticker */}
