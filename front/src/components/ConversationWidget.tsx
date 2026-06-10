@@ -299,6 +299,9 @@ export function ConversationWidget({
           }
 
           const isSelected = selectedMessageId === msg.id
+          if (msg.id && idx === messages.length - 1) {
+            console.log(`[ConversationWidget] Last message:`, { msgId: msg.id, selectedId: selectedMessageId, isSelected })
+          }
 
           return (
             <div
