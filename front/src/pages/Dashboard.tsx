@@ -25,6 +25,7 @@ export default function Dashboard() {
   const [alertGridView, setAlertGridView] = useState<AlertInfo | null>(null)
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null)
   const [selectedAlertMessage, setSelectedAlertMessage] = useState<any>(null)
+  const [selectedPortfolioWidget, setSelectedPortfolioWidget] = useState<string | null>(null)
   const [selectedTableTicker, setSelectedTableTicker] = useState<string | null>(null)
   const [historicalData, setHistoricalData] = useState<Record<string, any[]>>({})
   const [tickerInfo, setTickerInfo] = useState<Record<string, any>>({})
@@ -417,12 +418,14 @@ export default function Dashboard() {
               if (messageData && messageData.widget === 'results_widget') {
                 console.log(`[Dashboard] Results message clicked:`, { id: messageData.id, widget: messageData.widget })
                 setSelectedAlertMessage(messageData)
+                setSelectedPortfolioWidget(null)
                 setRightPanelOpen(true)
               }
-              // For portfolio messages: show holdings
+              // For portfolio_holdings_widget messages: show PortfolioHoldingsWidget
               else if (messageData && messageData.widget === 'portfolio_holdings_widget') {
                 console.log(`[Dashboard] Portfolio message clicked:`, { id: messageData.id, portfolio: messageData.portfolio })
                 setSelectedAlertMessage(null)  // Clear results widget
+                setSelectedPortfolioWidget(messageData.portfolio)
                 setRightPanelOpen(true)
               }
 
@@ -539,6 +542,13 @@ export default function Dashboard() {
               viewMode={viewMode}
               onViewModeChange={setViewMode}
             />
+          ) : selectedPortfolioWidget ? (
+            <div className="p-4">
+              <PortfolioHoldingsWidget
+                portfolioName={selectedPortfolioWidget}
+                onClose={() => setRightPanelOpen(false)}
+              />
+            </div>
           ) : alertGridView?.portfolio ? (
             <div className="p-4">
               <PortfolioHoldingsWidget
