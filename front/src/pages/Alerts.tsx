@@ -1017,79 +1017,50 @@ export default function Alerts() {
               </div>
 
               {/* Results Table (Bottom) */}
-              {currentAlert && runResults && (
-                <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden flex flex-col flex-1 min-h-0">
-                  {/* Results Header - Same as ScreenerDetail */}
-                  <div className="px-6 py-4 border-b border-slate-800">
-                    <div className="flex items-center justify-between gap-4">
-                      {/* Results Title */}
-                      <h2 className="text-lg font-semibold text-white whitespace-nowrap">
-                        Results ({sortedResults.length} of {runResults?.matches?.length || 0} matches)
-                      </h2>
+              {currentAlert && runResults && sortedResults && (
+                <ResultsWidget
+                  data={sortedResults}
+                  searchQuery={resultSearchQuery}
+                  onSearchChange={setResultSearchQuery}
+                  sortColumn={resultSortColumn}
+                  onSortChange={setResultSortColumn}
+                  sortDirection={resultSortDirection}
+                  onSortDirectionChange={setResultSortDirection}
+                  historicalData={historicalData}
+                  onSetHistoricalData={setHistoricalData}
+                  loadingCharts={loadingCharts}
+                  chartTimeframe={chartTimeframe}
+                  onChartTimeframeChange={setChartTimeframe}
+                  viewMode={resultViewMode}
+                  onViewModeChange={setResultViewMode}
+                  onGetHistoricalData={(ticker: string, days: number) => api.getHistoricalData(ticker, days)}
+                />
+              )}
 
-                      {/* Search Input */}
-                      <input
-                        type="text"
-                        placeholder="Search results..."
-                        value={resultSearchQuery}
-                        onChange={(e) => setResultSearchQuery(e.target.value)}
-                        className="flex-1 px-4 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-slate-600"
-                      />
-
-                      {/* Timeframe Selector - shown only in charts view */}
-                      {resultViewMode === 'charts' && (
-                        <select
-                          value={chartTimeframe}
-                          onChange={(e) => setChartTimeframe(e.target.value as '1W' | '1M' | '3M' | 'YTD' | 'ALL')}
-                          className="px-4 py-1.5 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:border-slate-600 transition font-medium text-sm"
-                        >
-                          <option value="1W">1W</option>
-                          <option value="1M">1M</option>
-                          <option value="3M">3M</option>
-                          <option value="YTD">YTD</option>
-                          <option value="ALL">ALL</option>
-                        </select>
-                      )}
-
-                      {/* Table/Charts Toggle - Same as ScreenerDetail */}
-                      <div className="flex gap-2 bg-slate-800 border border-slate-700 rounded-lg p-1">
-                        <button
-                          onClick={() => {
-                            setResultViewMode('table')
-                            if (paramResultId) {
-                              navigate(`/alerts/${paramName}/${paramResultId}`)
-                            } else {
-                              navigate(`/alerts/${paramName}`)
-                            }
-                          }}
-                          className={`px-4 py-1.5 rounded transition font-medium text-sm whitespace-nowrap ${
-                            resultViewMode === 'table'
-                              ? 'bg-purple-600 text-white'
-                              : 'text-slate-400 hover:text-slate-300'
-                          }`}
-                        >
-                          📊 Table
-                        </button>
-                        <button
-                          onClick={() => {
-                            setResultViewMode('charts')
-                            if (paramResultId) {
-                              navigate(`/alerts/${paramName}/${paramResultId}/charts`)
-                            } else {
-                              navigate(`/alerts/${paramName}/charts`)
-                            }
-                          }}
-                          className={`px-4 py-1.5 rounded transition font-medium text-sm whitespace-nowrap ${
-                            resultViewMode === 'charts'
-                              ? 'bg-purple-600 text-white'
-                              : 'text-slate-400 hover:text-slate-300'
-                          }`}
-                        >
-                          📈 Charts
-                        </button>
+              {currentAlert && runResults && !sortedResults && (
+                <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden flex flex-col flex-1 min-h-0 p-6">
+                  {runResults?.error ? (
+                    <div className="flex items-center justify-center flex-1 text-center">
+                      <div>
+                        <p className="text-red-400 font-medium mb-2 text-lg">❌ Evaluation Error</p>
+                        <p className="text-slate-400 mb-1">{runResults.error}</p>
+                        <p className="text-xs text-slate-500">Checked {runResults.tickers_checked || 0} tickers</p>
                       </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="flex items-center justify-center flex-1 text-center">
+                      <div>
+                        <p className="text-slate-400 font-medium mb-1">No matches found</p>
+                        <p className="text-xs text-slate-500">Checked {runResults.tickers_checked || 0} tickers</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {currentAlert && runResults && sortedResults && (
+                <div style={{ display: 'none' }}>
+                  {/* Hidden section - kept for compatibility */}
 
                   {/* Table View - Same as ScreenerDetail, with formula indicators */}
                   {resultViewMode === 'table' && (
