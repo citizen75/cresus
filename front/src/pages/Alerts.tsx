@@ -306,19 +306,28 @@ export default function Alerts() {
     const data: { [ticker: string]: any[] } = {}
     let loadedCount = 0
 
-    // Limit to first 9 tickers to avoid too many requests
-    const tickersToLoad = sortedResults.slice(0, 9)
+    // Limit to first 6 tickers to avoid browser resource exhaustion
+    const tickersToLoad = sortedResults.slice(0, 6)
+    console.log(`Loading chart data for ${tickersToLoad.length} tickers...`)
 
-    for (const match of tickersToLoad) {
+    // Load sequentially with delays to avoid browser overload
+    for (let i = 0; i < tickersToLoad.length; i++) {
+      const match = tickersToLoad[i]
       const ticker = match.ticker
       if (!ticker) continue
 
       try {
-        console.log(`Loading chart data for ${ticker}...`)
+        console.log(`[${i + 1}/${tickersToLoad.length}] Loading chart data for ${ticker}...`)
+
+        // Add delay between requests to avoid resource exhaustion
+        if (i > 0) {
+          await new Promise(resolve => setTimeout(resolve, 200))
+        }
+
         const response = await Promise.race([
           api.getHistoricalData(ticker, getDaysForTimeframe(chartTimeframe)),
           new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Timeout')), 10000) // 10 second timeout per ticker
+            setTimeout(() => reject(new Error('Timeout')), 8000) // 8 second timeout per ticker
           )
         ])
 
@@ -334,15 +343,15 @@ export default function Alerts() {
         if (historyArray.length > 0) {
           data[ticker] = historyArray
           loadedCount++
-          console.log(`Loaded ${historyArray.length} rows for ${ticker}`)
+          console.log(`✓ Loaded ${historyArray.length} rows for ${ticker}`)
         }
       } catch (err) {
-        console.error(`Failed to load data for ${ticker}:`, err)
+        console.error(`✗ Failed to load data for ${ticker}:`, err instanceof Error ? err.message : err)
         // Continue with next ticker instead of blocking
       }
     }
 
-    console.log('Chart data loaded:', loadedCount, 'tickers')
+    console.log('Chart data loaded:', loadedCount, `of ${tickersToLoad.length} tickers`)
     setHistoricalData(data)
     setLoadingCharts(false)
   }
