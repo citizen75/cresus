@@ -239,10 +239,10 @@ async def get_ticker_historical(
 
 
 @router.post("/{strategy_name}/add")
-async def add_ticker_to_watchlist(strategy_name: str, request: TickerRequest):
+async def add_ticker_to_watchlist(strategy_name: str, body: TickerRequest = Body(...)):
 	"""Add a ticker to a watchlist."""
 	try:
-		ticker = request.ticker
+		ticker = body.ticker
 		manager = WatchlistManager(strategy_name)
 		# Load current watchlist
 		df = manager.load()
