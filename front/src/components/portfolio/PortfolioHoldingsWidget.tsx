@@ -3,6 +3,7 @@ import { useEnrichedPositions } from '@/hooks/useEnrichedPositions'
 import { PortfolioHoldingsTable } from './PortfolioHoldingsTable'
 import CardChart from '@/components/CardChart'
 import { ChartModal } from '@/components/ChartModal'
+import { TradingDialog } from '@/components/TradingDialog'
 import { getApiBaseUrl } from '@/services/api'
 
 interface PortfolioHoldingsWidgetProps {
@@ -25,6 +26,10 @@ export default function PortfolioHoldingsWidget({
   const [chartModalTicker, setChartModalTicker] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'table' | 'charts'>('table')
   const [timeframe, setTimeframe] = useState<'1W' | '1M' | '3M' | 'YTD' | 'ALL'>('1M')
+  const [tradingDialogOpen, setTradingDialogOpen] = useState(false)
+  const [tradingMode, setTradingMode] = useState<'buy' | 'sell'>('buy')
+  const [tradingTicker, setTradingTicker] = useState<string | null>(null)
+  const [tradingPosition, setTradingPosition] = useState<any>(null)
 
   // Load raw positions from API
   useEffect(() => {
@@ -130,6 +135,26 @@ export default function PortfolioHoldingsWidget({
     const sector = pos.sector || 'Unknown'
     sectorMap.set(sector, (sectorMap.get(sector) || 0) + pos.position_value)
   })
+
+  const handleBuy = (ticker: string, position: any) => {
+    setTradingTicker(ticker)
+    setTradingPosition(position)
+    setTradingMode('buy')
+    setTradingDialogOpen(true)
+  }
+
+  const handleSell = (ticker: string, position: any) => {
+    setTradingTicker(ticker)
+    setTradingPosition(position)
+    setTradingMode('sell')
+    setTradingDialogOpen(true)
+  }
+
+  const handleTradingConfirm = (quantity: number, price?: number) => {
+    console.log(`${tradingMode.toUpperCase()} ${quantity} shares of ${tradingTicker} at ${price || 'market'} price`)
+    alert(`${tradingMode === 'buy' ? 'Buy' : 'Sell'} order created:\n${quantity} shares of ${tradingTicker}`)
+    setTradingDialogOpen(false)
+  }
 
   return (
     <div className="flex flex-col h-full space-y-4">
@@ -256,6 +281,8 @@ export default function PortfolioHoldingsWidget({
               setSelectedPosition(ticker)
               setChartModalTicker(ticker)
             }}
+            onBuy={handleBuy}
+            onSell={handleSell}
             showSearch={false}
             showActions={true}
             externalSearchQuery={searchQuery}
@@ -327,6 +354,17 @@ export default function PortfolioHoldingsWidget({
           onClose={() => setChartModalTicker(null)}
         />
       )}
+
+      {/* Trading Dialog */}
+      <TradingDialog
+        isOpen={tradingDialogOpen}
+        mode={tradingMode}
+        ticker={tradingTicker || ''}
+        position={tradingPosition}
+        currentPrice={tradingPosition?.current_price || 0}
+        onClose={() => setTradingDialogOpen(false)}
+        onConfirm={handleTradingConfirm}
+      />
     </div>
   )
 }
