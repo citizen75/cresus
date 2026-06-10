@@ -232,6 +232,57 @@ async def get_ticker_historical(
 		raise HTTPException(500, f"Error loading historical data: {str(e)}")
 
 
+@router.post("/{strategy_name}/add")
+async def add_ticker_to_watchlist(strategy_name: str, ticker: str):
+	"""Add a ticker to a watchlist."""
+	try:
+		manager = WatchlistManager(strategy_name)
+		# Load current watchlist
+		df = manager.load()
+
+		# Create new row with just ticker
+		new_row = {col: None for col in (df.columns if df is not None else ['ticker'])}
+		new_row['ticker'] = ticker
+
+		# Add to watchlist
+		if df is None or df.empty:
+			df = pd.DataFrame([new_row])
+		else:
+			# Check if ticker already exists
+			if ticker not in df['ticker'].values:
+				df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+
+		# Save watchlist
+		manager.save(df)
+
+		return {"success": True, "message": f"Added {ticker} to {strategy_name} watchlist"}
+	except Exception as e:
+		raise HTTPException(500, f"Error adding ticker to watchlist: {str(e)}")
+
+
+@router.delete("/{strategy_name}/{ticker}")
+async def remove_ticker_from_watchlist(strategy_name: str, ticker: str):
+	"""Remove a ticker from a watchlist."""
+	try:
+		manager = WatchlistManager(strategy_name)
+		df = manager.load()
+
+		if df is None or df.empty:
+			raise HTTPException(404, f"Watchlist '{strategy_name}' not found")
+
+		# Remove ticker
+		df = df[df['ticker'] != ticker]
+
+		# Save watchlist
+		manager.save(df)
+
+		return {"success": True, "message": f"Removed {ticker} from {strategy_name} watchlist"}
+	except HTTPException:
+		raise
+	except Exception as e:
+		raise HTTPException(500, f"Error removing ticker from watchlist: {str(e)}")
+
+
 def _get_ytd_days() -> int:
 	"""Calculate days from start of year to today."""
 	today = datetime.now().date()
