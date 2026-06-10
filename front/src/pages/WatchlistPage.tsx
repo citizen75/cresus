@@ -90,12 +90,8 @@ export default function WatchlistPage() {
 
   const handleViewModeChange = (mode: 'table' | 'charts') => {
     setViewMode(mode)
-    // Update URL based on view mode
-    if (mode === 'charts') {
-      navigate('/watchlist/charts')
-    } else {
-      navigate('/watchlist')
-    }
+    // Don't navigate - just change view mode
+    // URL will update based on view mode if needed elsewhere
   }
 
   return (
