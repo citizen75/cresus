@@ -285,91 +285,56 @@ export default function Alerts() {
     }
 
     setLoadingCharts(true)
-    setHistoricalData({}) // Clear previous data
+    setHistoricalData({})
     const data: { [ticker: string]: any[] } = {}
-    let loadedCount = 0
 
-    // Limit to first 6 tickers to avoid browser resource exhaustion
-    const tickersToLoad = sortedResults.slice(0, 6)
-    console.log(`Loading chart data for ${tickersToLoad.length} tickers...`)
+    // Load full historical data like ScreenerDetail does (5 years for timeframe filtering)
+    for (const row of sortedResults) {
+      const ticker = row.ticker
+      if (!data[ticker]) {
+        try {
+          console.log(`Loading chart data for ${ticker}...`)
+          const response = await api.getHistoricalData(ticker, 1825) // ~5 years
 
-    // Load sequentially with delays to avoid browser overload
-    for (let i = 0; i < tickersToLoad.length; i++) {
-      const match = tickersToLoad[i]
-      const ticker = match.ticker
-      if (!ticker) continue
-
-      try {
-        console.log(`[${i + 1}/${tickersToLoad.length}] Loading chart data for ${ticker}...`)
-
-        // Add delay between requests to avoid resource exhaustion
-        if (i > 0) {
-          await new Promise(resolve => setTimeout(resolve, 200))
+          if (response && response.data) {
+            // Map and sort by date (oldest to newest) - same as ScreenerDetail
+            data[ticker] = response.data
+              .map((item: any) => ({
+                date: item.date || item.timestamp,
+                close: parseFloat(item.close),
+                open: parseFloat(item.open),
+                high: parseFloat(item.high),
+                low: parseFloat(item.low),
+                volume: parseFloat(item.volume),
+              }))
+              .sort((a: any, b: any) => {
+                const dateA = new Date(a.date)
+                const dateB = new Date(b.date)
+                return dateA.getTime() - dateB.getTime()
+              })
+            console.log(`✓ Loaded ${data[ticker].length} rows for ${ticker}`)
+          } else {
+            data[ticker] = []
+          }
+        } catch (err) {
+          console.error(`✗ Failed to load data for ${ticker}:`, err instanceof Error ? err.message : err)
+          data[ticker] = []
         }
-
-        const response = await Promise.race([
-          api.getHistoricalData(ticker, getDaysForTimeframe(chartTimeframe)),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Timeout')), 8000) // 8 second timeout per ticker
-          )
-        ])
-
-        let historyArray: any[] = []
-        if (Array.isArray(response)) {
-          historyArray = response
-        } else if (response && response.history && Array.isArray(response.history)) {
-          historyArray = response.history
-        } else if (response && response.data && Array.isArray(response.data)) {
-          historyArray = response.data
-        }
-
-        if (historyArray.length > 0) {
-          data[ticker] = historyArray
-          loadedCount++
-          console.log(`✓ Loaded ${historyArray.length} rows for ${ticker}`)
-        }
-      } catch (err) {
-        console.error(`✗ Failed to load data for ${ticker}:`, err instanceof Error ? err.message : err)
-        // Continue with next ticker instead of blocking
       }
     }
 
-    console.log('Chart data loaded:', loadedCount, `of ${tickersToLoad.length} tickers`)
+    console.log('Chart data loaded for', Object.keys(data).length, 'tickers')
     setHistoricalData(data)
     setLoadingCharts(false)
   }
 
-  // Track if charts have been loaded to prevent infinite loops
-  const chartsLoadedRef = useRef(false)
-
-  // Reset charts loaded flag when switching results or exiting charts view
+  // Load chart data when switching to charts view (same as ScreenerDetail)
   useEffect(() => {
-    if (resultViewMode !== 'charts') {
-      chartsLoadedRef.current = false
-    }
-  }, [paramResultId, resultViewMode])
-
-  // Load charts only once when entering charts view
-  useEffect(() => {
-    if (
-      resultViewMode === 'charts' &&
-      sortedResults &&
-      sortedResults.length > 0 &&
-      !chartsLoadedRef.current
-    ) {
-      console.log('Loading charts for', sortedResults.length, 'results')
-      chartsLoadedRef.current = true
+    if (resultViewMode === 'charts' && sortedResults && sortedResults.length > 0 && Object.keys(historicalData).length === 0) {
+      console.log('Loading chart data for', sortedResults.length, 'results')
       loadChartsData()
     }
-  }, [resultViewMode])
-
-  // Reload charts when timeframe changes
-  useEffect(() => {
-    if (resultViewMode === 'charts' && Object.keys(historicalData).length > 0) {
-      console.log('Reloading charts for timeframe:', chartTimeframe)
-      loadChartsData()
-    }
-  }, [chartTimeframe])
+  }, [resultViewMode, sortedResults.length])
 
   const currentAlert = paramName ? alerts.find((a) => a.name === paramName) : null
 
