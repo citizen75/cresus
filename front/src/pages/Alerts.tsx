@@ -891,20 +891,22 @@ export default function Alerts() {
                                   <h3 className="font-semibold text-white">{ticker}</h3>
                                   <p className="text-xs text-slate-400">{match.company_name || '—'}</p>
                                 </div>
-                                <div className="flex-1 p-4 min-h-[240px] flex items-center justify-center bg-slate-900/50">
+                                <div className="flex-1 p-4 bg-slate-900/50 flex flex-col">
                                   {chartData && chartData.length > 0 ? (
-                                    <div style={{ width: '100%', height: '100%' }}>
+                                    <div style={{ width: '100%', height: '240px', minWidth: 0 }}>
                                       <CardChart
                                         ticker={ticker}
                                         data={chartData}
-                                        height={200}
+                                        height={240}
                                         showLegend={false}
                                       />
                                     </div>
                                   ) : (
-                                    <div className="text-center text-slate-500">
-                                      <p className="text-xs">No data available</p>
-                                      <p className="text-xs mt-2 text-slate-600">{historicalData[ticker] ? 'Loading...' : 'Waiting for data'}</p>
+                                    <div className="flex items-center justify-center h-60 text-center text-slate-500">
+                                      <div>
+                                        <p className="text-xs">No data available</p>
+                                        <p className="text-xs mt-2 text-slate-600">{historicalData[ticker] ? 'Loading...' : 'Waiting for data'}</p>
+                                      </div>
                                     </div>
                                   )}
                                 </div>
