@@ -508,6 +508,16 @@ export default function Dashboard() {
         {/* Main Content Area - Results or Holdings */}
         <div className="flex-1 overflow-auto flex flex-col">
           {/* Display ResultsWidget if alert message with results is selected */}
+          {(() => {
+            console.log(`[Dashboard] Right panel check:`, {
+              hasSelectedMsg: !!selectedAlertMessage,
+              hasData: !!selectedAlertMessage?.data,
+              hasResults: !!selectedAlertMessage?.data?.results,
+              resultsCount: selectedAlertMessage?.data?.results?.length || 0,
+              selectedMsg: selectedAlertMessage ? { id: selectedAlertMessage.id, source: selectedAlertMessage.source, datetime: selectedAlertMessage.datetime, widget: selectedAlertMessage.widget } : null
+            })
+            return null
+          })()}
           {selectedAlertMessage?.data?.results ? (
             <ResultsWidget
               data={selectedAlertMessage.data.results}
