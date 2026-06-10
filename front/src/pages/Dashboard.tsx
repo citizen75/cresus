@@ -348,6 +348,11 @@ export default function Dashboard() {
             onNewMessage={(msg) => {
               // Update recent alerts when new message arrives
               if (msg.source === 'alert') {
+                // Auto-select the alert message on right panel if it has results
+                if (msg.widget === 'results_widget' && msg.data?.results) {
+                  setSelectedAlertMessage(msg)
+                }
+
                 // Parse alert content
                 const lines = msg.content?.split('\n') || []
                 const alertInfo: AlertInfo = {
