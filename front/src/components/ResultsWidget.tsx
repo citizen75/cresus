@@ -3,6 +3,9 @@ import CardChart from './CardChart'
 import TradingChartWidget from './TradingChartWidget'
 import { api } from '@/services/api'
 
+// Days to load for each timeframe
+const DAYS_FOR_TIMEFRAME = 1825 // ~5 years for all timeframes
+
 interface ResultsWidgetProps {
   data: any[] // Array of result objects
   searchQuery: string
@@ -49,6 +52,13 @@ export default function ResultsWidget({
       setViewMode(externalViewMode)
     }
   }, [externalViewMode])
+
+  // Auto-load historical data when switching to charts view
+  useEffect(() => {
+    if (viewMode === 'charts' && data.length > 0 && Object.keys(historicalData).length === 0) {
+      loadHistoricalDataForCharts()
+    }
+  }, [viewMode, data.length, historicalData])
 
   // Handle ESC key to close chart modal
   useEffect(() => {
@@ -101,6 +111,33 @@ export default function ResultsWidget({
     } catch (err) {
       console.error('Failed to delete ticker:', err)
       setDeletingTicker(null)
+    }
+  }
+
+  // Load historical data for charts
+  const loadHistoricalDataForCharts = async () => {
+    try {
+      const loaded: { [ticker: string]: any[] } = {}
+
+      // Extract tickers from data
+      const tickers = Array.from(new Set(data.map((row: any) => row.ticker).filter(Boolean)))
+      console.log(`[ResultsWidget] Loading historical data for ${tickers.length} tickers`)
+
+      for (const ticker of tickers) {
+        try {
+          const response = await api.getHistoricalData(ticker, DAYS_FOR_TIMEFRAME)
+          if (response && response.data) {
+            loaded[ticker] = response.data
+          }
+        } catch (err) {
+          console.error(`[ResultsWidget] Failed to load data for ${ticker}:`, err)
+        }
+      }
+
+      setHistoricalData(loaded)
+      console.log(`[ResultsWidget] Loaded data for ${Object.keys(loaded).length} tickers`)
+    } catch (err) {
+      console.error('[ResultsWidget] Failed to load historical data:', err)
     }
   }
 
