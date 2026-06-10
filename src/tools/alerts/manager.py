@@ -6,7 +6,6 @@ from datetime import datetime
 import yaml
 import logging
 import json
-from utils.env import get_db_root
 
 from .models import Alert, AlertSource, AlertNotifyTarget, AlertResult
 
@@ -217,7 +216,7 @@ class AlertManager:
         """
         try:
             # Create alert results directory: ~/.cresus/db/alerts/{alert_name}/
-            results_dir = get_db_root() / "alerts" / alert_name
+            results_dir = self.alerts_dir / alert_name / "results"
             results_dir.mkdir(parents=True, exist_ok=True)
 
             # Save result with timestamp
@@ -255,7 +254,7 @@ class AlertManager:
             List of result dicts, sorted by most recent first
         """
         try:
-            results_dir = get_db_root() / "alerts" / alert_name
+            results_dir = self.alerts_dir / alert_name / "results"
             if not results_dir.exists():
                 return []
 
