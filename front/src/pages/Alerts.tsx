@@ -708,23 +708,41 @@ export default function Alerts() {
                             return (
                               <div
                                 key={idx}
-                                className={`p-2 rounded border text-xs cursor-pointer transition ${
+                                className={`p-2 rounded border text-xs transition ${
                                   isSelected
                                     ? 'bg-purple-900/30 border-purple-600'
                                     : 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
                                 }`}
-                                onClick={() => {
-                                  navigate(`/alerts/${paramName}/${resultId}`)
-                                  setRunResults(result)
-                                }}
                               >
-                                <div className="flex items-center justify-between">
-                                  <span className={result.matched ? 'text-green-400' : 'text-slate-400'}>
-                                    {result.matched ? '✓' : '✗'} {result.matches?.length || 0} matches
-                                  </span>
-                                </div>
-                                <div className="text-slate-500 text-xs mt-1">
-                                  {dateStr} {timeStr}
+                                <div className="flex items-center justify-between gap-2">
+                                  <div
+                                    className="flex-1 cursor-pointer"
+                                    onClick={() => {
+                                      navigate(`/alerts/${paramName}/${resultId}`)
+                                      setRunResults(result)
+                                    }}
+                                  >
+                                    <div className={result.matched ? 'text-green-400' : 'text-slate-400'}>
+                                      {result.matched ? '✓' : '✗'} {result.matches?.length || 0} matches
+                                    </div>
+                                    <div className="text-slate-500 text-xs mt-1">
+                                      {dateStr} {timeStr}
+                                    </div>
+                                  </div>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      if (confirm('Delete this result?')) {
+                                        api.deleteAlertResult(paramName!, resultId).then(() => {
+                                          loadSavedResults(paramName!)
+                                        }).catch(err => console.error('Failed to delete result:', err))
+                                      }
+                                    }}
+                                    className="text-slate-500 hover:text-red-400 transition flex-shrink-0"
+                                    title="Delete this result"
+                                  >
+                                    ✕
+                                  </button>
                                 </div>
                               </div>
                             )

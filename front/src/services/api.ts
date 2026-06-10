@@ -430,6 +430,10 @@ class CresusAPI {
     return (await this.client.get(`/alerts/${alertName}/results?limit=${limit}`)).data
   }
 
+  async deleteAlertResult(alertName: string, resultId: string) {
+    return (await this.client.delete(`/alerts/${alertName}/results/${resultId}`)).data
+  }
+
   async getConversationHistory(
     portfolioName: string,
     limit?: number,

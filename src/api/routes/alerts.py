@@ -330,6 +330,23 @@ async def get_alert_results(name: str, limit: int = 10):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.delete("/alerts/{name}/results/{result_id}")
+async def delete_alert_result(name: str, result_id: str):
+    """Delete a specific alert result."""
+    try:
+        manager = AlertManager()
+        result = manager.delete_alert_result(name, result_id)
+
+        if result["status"] == "error":
+            raise HTTPException(status_code=404, detail=result["message"])
+
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/alerts/{name}/logs")
 async def get_alert_logs(name: str, lines: int = 100):
     """Get logs for an alert."""

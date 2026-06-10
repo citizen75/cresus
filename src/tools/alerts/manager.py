@@ -276,3 +276,28 @@ class AlertManager:
         except Exception as e:
             self.logger.error(f"Error getting alert results for '{alert_name}': {e}")
             return []
+
+    def delete_alert_result(self, alert_name: str, result_id: str) -> Dict[str, Any]:
+        """Delete a specific alert result.
+
+        Args:
+            alert_name: Name of the alert
+            result_id: Result ID (timestamp format: YYYYmmdd_HHMMSS)
+
+        Returns:
+            Status dict
+        """
+        try:
+            results_dir = self.alerts_dir / alert_name / "results"
+            result_file = results_dir / f"result_{result_id}.json"
+
+            if not result_file.exists():
+                return {"status": "error", "message": f"Result not found: {result_id}"}
+
+            result_file.unlink()
+            self.logger.info(f"Deleted alert result: {alert_name}/{result_id}")
+            return {"status": "success", "message": f"Deleted result {result_id}"}
+
+        except Exception as e:
+            self.logger.error(f"Error deleting alert result '{alert_name}/{result_id}': {e}")
+            return {"status": "error", "message": str(e)}
