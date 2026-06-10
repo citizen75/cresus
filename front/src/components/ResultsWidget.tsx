@@ -474,10 +474,10 @@ export default function ResultsWidget({
         </div>
       )}
 
-      {/* Trading Chart Widget Modal */}
+      {/* Trading Chart Widget Modal - Click on chart to open */}
       {selectedTickerForChart && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-950 border border-slate-800 rounded-lg w-full h-[90vh] max-w-7xl flex flex-col">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedTickerForChart(null)}>
+          <div className="bg-slate-950 border border-slate-800 rounded-lg w-full h-[90vh] max-w-7xl flex flex-col" onClick={(e) => e.stopPropagation()}>
             {/* Header with Close Button */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 flex-shrink-0">
               <h2 className="text-2xl font-bold text-white">{selectedTickerForChart}</h2>
