@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import CardChart from './CardChart'
 import TradingChartWidget from './TradingChartWidget'
+import { api } from '@/services/api'
 
 interface ResultsWidgetProps {
   data: any[] // Array of result objects
@@ -35,6 +36,7 @@ export default function ResultsWidget({
 }: ResultsWidgetProps) {
   const [viewMode, setViewMode] = useState<'table' | 'charts'>(externalViewMode || 'table')
   const [selectedTickerForChart, setSelectedTickerForChart] = useState<string | null>(null)
+  const [addingToWatchlist, setAddingToWatchlist] = useState<Set<string>>(new Set())
 
   // Update internal viewMode when external viewMode changes
   useEffect(() => {
@@ -59,6 +61,29 @@ export default function ResultsWidget({
   const handleViewModeChange = (newMode: 'table' | 'charts') => {
     setViewMode(newMode)
     onViewModeChange?.(newMode)
+  }
+
+  // Add ticker to global watchlist
+  const handleAddToWatchlist = async (ticker: string) => {
+    try {
+      setAddingToWatchlist(prev => new Set([...prev, ticker]))
+      await api.addToWatchlist('global', ticker)
+      // Keep the loading state briefly for visual feedback
+      setTimeout(() => {
+        setAddingToWatchlist(prev => {
+          const next = new Set(prev)
+          next.delete(ticker)
+          return next
+        })
+      }, 500)
+    } catch (err) {
+      console.error('Failed to add to watchlist:', err)
+      setAddingToWatchlist(prev => {
+        const next = new Set(prev)
+        next.delete(ticker)
+        return next
+      })
+    }
   }
 
   // Filter data based on search query
@@ -286,6 +311,23 @@ export default function ResultsWidget({
                       </td>
                     )
                   })}
+                  {/* Watchlist Button */}
+                  <td className="px-6 py-3 text-right">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleAddToWatchlist(row.ticker)
+                      }}
+                      disabled={addingToWatchlist.has(row.ticker)}
+                      className={`px-3 py-1 rounded text-xs font-medium transition ${
+                        addingToWatchlist.has(row.ticker)
+                          ? 'bg-green-600/50 text-green-200'
+                          : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                      }`}
+                    >
+                      {addingToWatchlist.has(row.ticker) ? '✓ Added' : '⭐ Watchlist'}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -370,6 +412,24 @@ export default function ResultsWidget({
                           </div>
                         </div>
                       )}
+                    </div>
+
+                    {/* Watchlist Button Footer */}
+                    <div className="px-4 py-3 border-t border-slate-700 bg-slate-900/50 flex-shrink-0">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleAddToWatchlist(ticker)
+                        }}
+                        disabled={addingToWatchlist.has(ticker)}
+                        className={`w-full px-3 py-2 rounded text-sm font-medium transition ${
+                          addingToWatchlist.has(ticker)
+                            ? 'bg-green-600/50 text-green-200'
+                            : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                        }`}
+                      >
+                        {addingToWatchlist.has(ticker) ? '✓ Added to Watchlist' : '⭐ Add to Watchlist'}
+                      </button>
                     </div>
                   </div>
                 )
