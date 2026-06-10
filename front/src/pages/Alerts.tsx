@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../services/api'
 import CardChart from '@/components/CardChart'
-import ResultTable from '@/components/ResultTable'
 
 interface Alert {
   name: string
@@ -723,100 +722,152 @@ export default function Alerts() {
               {/* Results Table (Bottom) */}
               {currentAlert && runResults && runResults.matches && runResults.matches.length > 0 && (
                 <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden flex flex-col flex-1 min-h-0">
-                  {/* Results Header with Search */}
-                  <div className="bg-slate-800 px-6 py-4 border-b border-slate-700 flex items-center justify-between gap-4 flex-shrink-0">
-                    <h3 className="font-semibold text-white whitespace-nowrap">
-                      Results ({filteredResults.length} of {runResults.matches.length} matches)
-                    </h3>
-                    <input
-                      type="text"
-                      placeholder="Search results..."
-                      value={resultSearchQuery}
-                      onChange={(e) => setResultSearchQuery(e.target.value)}
-                      className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 text-white rounded text-sm placeholder-slate-400 focus:outline-none focus:border-purple-500"
-                    />
-                    <div className="flex gap-2 flex-shrink-0">
-                      <button
-                        onClick={() => {
-                          setResultViewMode('table')
-                          if (paramResultId) {
-                            navigate(`/alerts/${paramName}/${paramResultId}`)
-                          } else {
-                            navigate(`/alerts/${paramName}`)
-                          }
-                        }}
-                        className={`px-3 py-2 rounded text-sm font-medium transition ${
-                          resultViewMode === 'table'
-                            ? 'bg-purple-600 text-white'
-                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                        }`}
-                      >
-                        📊 Table
-                      </button>
-                      <button
-                        onClick={() => {
-                          setResultViewMode('charts')
-                          if (paramResultId) {
-                            navigate(`/alerts/${paramName}/${paramResultId}/charts`)
-                          } else {
-                            navigate(`/alerts/${paramName}/charts`)
-                          }
-                        }}
-                        className={`px-3 py-2 rounded text-sm font-medium transition ${
-                          resultViewMode === 'charts'
-                            ? 'bg-purple-600 text-white'
-                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                        }`}
-                      >
-                        📈 Charts
-                      </button>
+                  {/* Results Header - Same as ScreenerDetail */}
+                  <div className="px-6 py-4 border-b border-slate-800">
+                    <div className="flex items-center justify-between gap-4">
+                      {/* Results Title */}
+                      <h2 className="text-lg font-semibold text-white whitespace-nowrap">
+                        Results ({sortedResults.length} of {runResults?.matches?.length || 0} matches)
+                      </h2>
+
+                      {/* Search Input */}
+                      <input
+                        type="text"
+                        placeholder="Search results..."
+                        value={resultSearchQuery}
+                        onChange={(e) => setResultSearchQuery(e.target.value)}
+                        className="flex-1 px-4 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-slate-600"
+                      />
+
+                      {/* Timeframe Selector - shown only in charts view */}
+                      {resultViewMode === 'charts' && (
+                        <select
+                          value={chartTimeframe}
+                          onChange={(e) => setChartTimeframe(e.target.value as '1W' | '1M' | '3M' | 'YTD' | 'ALL')}
+                          className="px-4 py-1.5 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:border-slate-600 transition font-medium text-sm"
+                        >
+                          <option value="1W">1W</option>
+                          <option value="1M">1M</option>
+                          <option value="3M">3M</option>
+                          <option value="YTD">YTD</option>
+                          <option value="ALL">ALL</option>
+                        </select>
+                      )}
+
+                      {/* Table/Charts Toggle - Same as ScreenerDetail */}
+                      <div className="flex gap-2 bg-slate-800 border border-slate-700 rounded-lg p-1">
+                        <button
+                          onClick={() => {
+                            setResultViewMode('table')
+                            if (paramResultId) {
+                              navigate(`/alerts/${paramName}/${paramResultId}`)
+                            } else {
+                              navigate(`/alerts/${paramName}`)
+                            }
+                          }}
+                          className={`px-4 py-1.5 rounded transition font-medium text-sm whitespace-nowrap ${
+                            resultViewMode === 'table'
+                              ? 'bg-purple-600 text-white'
+                              : 'text-slate-400 hover:text-slate-300'
+                          }`}
+                        >
+                          📊 Table
+                        </button>
+                        <button
+                          onClick={() => {
+                            setResultViewMode('charts')
+                            if (paramResultId) {
+                              navigate(`/alerts/${paramName}/${paramResultId}/charts`)
+                            } else {
+                              navigate(`/alerts/${paramName}/charts`)
+                            }
+                          }}
+                          className={`px-4 py-1.5 rounded transition font-medium text-sm whitespace-nowrap ${
+                            resultViewMode === 'charts'
+                              ? 'bg-purple-600 text-white'
+                              : 'text-slate-400 hover:text-slate-300'
+                          }`}
+                        >
+                          📈 Charts
+                        </button>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Table View */}
+                  {/* Table View - Same as ScreenerDetail */}
                   {resultViewMode === 'table' && (
-                    <div className="flex-1 overflow-auto p-6">
-                      <ResultTable
-                        data={sortedResults}
-                        searchQuery={resultSearchQuery}
-                        onSearchChange={setResultSearchQuery}
-                        sortColumn={resultSortColumn}
-                        onSortChange={(col) => {
-                          if (resultSortColumn === col) {
-                            setResultSortDirection(resultSortDirection === 'asc' ? 'desc' : 'asc')
-                          } else {
-                            setResultSortColumn(col)
-                            setResultSortDirection('asc')
-                          }
-                        }}
-                        sortDirection={resultSortDirection}
-                      />
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-slate-800/50 border-b border-slate-800">
+                          <tr>
+                            {sortedResults.length > 0 &&
+                              Object.keys(sortedResults[0]).map((key) => (
+                                <th
+                                  key={key}
+                                  onClick={() => {
+                                    if (resultSortColumn === key) {
+                                      setResultSortDirection(resultSortDirection === 'asc' ? 'desc' : 'asc')
+                                    } else {
+                                      setResultSortColumn(key)
+                                      setResultSortDirection('asc')
+                                    }
+                                  }}
+                                  className="px-6 py-3 text-left text-slate-300 font-medium cursor-pointer hover:bg-slate-700/50 transition"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    {key}
+                                    {resultSortColumn === key && (
+                                      <span className="text-xs text-slate-400">
+                                        {resultSortDirection === 'asc' ? '↑' : '↓'}
+                                      </span>
+                                    )}
+                                  </div>
+                                </th>
+                              ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800">
+                          {sortedResults.map((row, idx) => (
+                            <tr
+                              key={idx}
+                              className="hover:bg-slate-800/50 cursor-pointer transition"
+                            >
+                              {Object.entries(row).map(([key, value], colIdx) => {
+                                let displayValue = String(value || '')
+                                const numValue = typeof value === 'number' ? value : parseFloat(String(value || 0))
+
+                                if (!isNaN(numValue)) {
+                                  // Format volume with 0 decimal places
+                                  if (key.toLowerCase().includes('volume') || key.toLowerCase().includes('vol')) {
+                                    displayValue = numValue.toFixed(0)
+                                  } else {
+                                    // Format other numbers (prices) with 3 decimal places
+                                    displayValue = numValue.toFixed(3)
+                                  }
+                                }
+                                return (
+                                  <td key={colIdx} className="px-6 py-3 text-slate-300">
+                                    {displayValue}
+                                  </td>
+                                )
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   )}
 
-                  {/* Charts View */}
+                  {/* Charts View - Same as ScreenerDetail */}
                   {resultViewMode === 'charts' && (
-                    <div className="flex-1 overflow-auto p-6">
-                      {/* Timeframe Toggle */}
-                      <div className="flex gap-2 mb-6 flex-shrink-0">
-                        {(['1W', '1M', '3M', 'YTD', 'ALL'] as const).map((tf) => (
-                          <button
-                            key={tf}
-                            onClick={() => setChartTimeframe(tf)}
-                            className={`px-3 py-2 rounded text-sm font-medium transition ${
-                              chartTimeframe === tf
-                                ? 'bg-purple-600 text-white'
-                                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                            }`}
-                          >
-                            {tf}
-                          </button>
-                        ))}
-                      </div>
-
-                      {loadingCharts ? (
-                        <div className="flex items-center justify-center h-96">
-                          <div className="text-slate-400">Loading charts...</div>
+                    <div className="p-6">
+                      {sortedResults.length === 0 ? (
+                        <div className="text-center py-12 text-slate-400">
+                          No matches in this result
+                        </div>
+                      ) : loadingCharts ? (
+                        <div className="text-center py-12 text-slate-400">
+                          Loading price history for {sortedResults.length} tickers...
                         </div>
                       ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
