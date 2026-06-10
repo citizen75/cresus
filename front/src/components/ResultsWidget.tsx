@@ -19,6 +19,7 @@ interface ResultsWidgetProps {
   viewMode?: 'table' | 'charts'
   onViewModeChange?: (mode: 'table' | 'charts') => void
   onGetHistoricalData?: (ticker: string, days: number) => Promise<any> // API method to fetch data
+  onBuy?: (ticker: string) => void // Buy button callback
   onDeleteRow?: (ticker: string) => Promise<void>
   watchlistName?: string
 }
@@ -39,6 +40,7 @@ export default function ResultsWidget({
   viewMode: externalViewMode,
   onViewModeChange,
   onGetHistoricalData,
+  onBuy,
   onDeleteRow,
   watchlistName,
 }: ResultsWidgetProps) {
@@ -369,6 +371,17 @@ export default function ResultsWidget({
                   })}
                   {/* Action Buttons */}
                   <td className="px-6 py-3 text-right space-x-2 flex justify-end">
+                    {onBuy && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onBuy(row.ticker)
+                        }}
+                        className="px-3 py-1 rounded text-xs font-medium transition bg-green-900/30 hover:bg-green-900/50 text-green-300"
+                      >
+                        💰 Buy
+                      </button>
+                    )}
                     {onDeleteRow ? (
                       <button
                         onClick={(e) => {

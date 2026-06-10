@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { api } from '@/services/api'
 import ResultsWidget from '@/components/ResultsWidget'
+import { TradingDialog } from '@/components/TradingDialog'
 
 export default function WatchlistPage() {
   const location = useLocation()
@@ -19,6 +20,10 @@ export default function WatchlistPage() {
   const isChartsView = location.pathname.includes('/charts')
   const [viewMode, setViewMode] = useState<'table' | 'charts'>(isChartsView ? 'charts' : 'table')
   const [chartTimeframe, setChartTimeframe] = useState<'1W' | '1M' | '3M' | 'YTD' | 'ALL'>('1M')
+
+  // Trading dialog state
+  const [tradingDialogOpen, setTradingDialogOpen] = useState(false)
+  const [tradingTicker, setTradingTicker] = useState<string | null>(null)
 
   useEffect(() => {
     // Load global watchlist on mount
@@ -58,6 +63,11 @@ export default function WatchlistPage() {
     setViewMode(mode)
     // Don't navigate - just change view mode
     // URL will update based on view mode if needed elsewhere
+  }
+
+  const handleBuy = (ticker: string) => {
+    setTradingTicker(ticker)
+    setTradingDialogOpen(true)
   }
 
   return (
@@ -100,11 +110,23 @@ export default function WatchlistPage() {
             chartTimeframe={chartTimeframe}
             onChartTimeframeChange={setChartTimeframe}
             onGetHistoricalData={api.getHistoricalData.bind(api)}
+            onBuy={handleBuy}
             onDeleteRow={handleDeleteTicker}
             watchlistName="global"
           />
         </div>
       )}
+
+      {/* Trading Dialog */}
+      <TradingDialog
+        isOpen={tradingDialogOpen}
+        mode="buy"
+        ticker={tradingTicker || ''}
+        onClose={() => {
+          setTradingDialogOpen(false)
+          setTradingTicker(null)
+        }}
+      />
     </div>
   )
 }
