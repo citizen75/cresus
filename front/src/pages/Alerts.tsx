@@ -873,11 +873,30 @@ export default function Alerts() {
                           {sortedResults.map((match: any) => {
                             const ticker = match.ticker
                             const chartData = historicalData[ticker] || []
+
+                            // Calculate change percentage
+                            let changePercent = 0
+                            let isPositive = false
+                            if (chartData.length > 1) {
+                              const oldPrice = chartData[0]?.close || 0
+                              const newPrice = chartData[chartData.length - 1]?.close || 0
+                              if (oldPrice) {
+                                changePercent = ((newPrice - oldPrice) / oldPrice) * 100
+                                isPositive = changePercent >= 0
+                              }
+                            }
+
                             return (
                               <div key={ticker} className="bg-slate-800 rounded-lg overflow-hidden border border-slate-700 flex flex-col h-full">
-                                <div className="p-4 border-b border-slate-700 flex-shrink-0">
-                                  <h3 className="font-semibold text-white">{ticker}</h3>
-                                  <p className="text-xs text-slate-400">{match.company_name || '—'}</p>
+                                <div className="p-4 border-b border-slate-700 flex-shrink-0 bg-slate-900/50">
+                                  <h3 className="text-sm font-medium text-slate-300">{match.company_name || ticker}</h3>
+                                  <p className="text-lg font-bold text-white mt-1">{ticker}</p>
+                                  <div className="flex items-center justify-between mt-2">
+                                    <div className={`text-sm font-bold ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
+                                      {isPositive ? '+' : ''}{changePercent.toFixed(1)}%
+                                    </div>
+                                    <div className="text-xs text-slate-400">{chartTimeframe} Change</div>
+                                  </div>
                                 </div>
                                 <div className="flex-1 p-4 bg-slate-900/50 flex flex-col justify-center min-h-0">
                                   {chartData && chartData.length > 0 ? (
