@@ -4,26 +4,14 @@ import { api } from '@/services/api'
 
 interface TradingWidgetProps {
   onOrderPlaced?: (order: any) => void
-  defaultMode?: 'buy' | 'sell'
-  position?: any
-  currentPrice?: number
 }
 
-export function TradingWidget({
-  onOrderPlaced,
-  defaultMode = 'buy',
-  position,
-  currentPrice,
-}: TradingWidgetProps) {
-  const [mode, setMode] = useState<'buy' | 'sell'>(defaultMode)
-  const [ticker, setTicker] = useState(position?.ticker || '')
-  const [tickerName, setTickerName] = useState(position?.company_name || '')
-  const [price, setPrice] = useState<string>(
-    defaultMode === 'sell' && currentPrice ? String(currentPrice) : ''
-  )
-  const [quantity, setQuantity] = useState<string>(
-    defaultMode === 'sell' && position?.quantity ? String(position.quantity) : ''
-  )
+export function TradingWidget({ onOrderPlaced }: TradingWidgetProps) {
+  const [mode, setMode] = useState<'buy' | 'sell'>('buy')
+  const [ticker, setTicker] = useState('')
+  const [tickerName, setTickerName] = useState('')
+  const [price, setPrice] = useState<string>('')
+  const [quantity, setQuantity] = useState<string>('')
   const [fees, setFees] = useState<string>('0')
   const [stopLoss, setStopLoss] = useState<string>('7')
   const [takeProfit, setTakeProfit] = useState<string>('2')
@@ -158,8 +146,7 @@ export function TradingWidget({
             placeholder="e.g., AAPL"
             value={ticker}
             onChange={(e) => setTicker(e.target.value.toUpperCase())}
-            disabled={position ? true : false}
-            className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white text-sm rounded focus:outline-none focus:border-purple-600 disabled:opacity-50"
+            className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white text-sm rounded focus:outline-none focus:border-purple-600"
           />
           {tickerName && <p className="text-xs text-slate-400 mt-1">📊 {tickerName}</p>}
           {loadingTicker && <p className="text-xs text-slate-500 mt-1">Loading...</p>}
@@ -192,7 +179,7 @@ export function TradingWidget({
         </div>
 
         {/* Fees & Risk Row */}
-        <div className={`grid gap-2 ${mode === 'sell' ? 'grid-cols-1' : 'grid-cols-3'}`}>
+        <div className="grid grid-cols-3 gap-2">
           <div>
             <label className="block text-xs text-slate-400 mb-1">Fees</label>
             <input
@@ -204,32 +191,28 @@ export function TradingWidget({
               className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white text-sm rounded focus:outline-none focus:border-purple-600"
             />
           </div>
-          {mode === 'buy' && (
-            <>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Stop %</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  placeholder="7"
-                  value={stopLoss}
-                  onChange={(e) => setStopLoss(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white text-sm rounded focus:outline-none focus:border-purple-600"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Target %</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  placeholder="2"
-                  value={takeProfit}
-                  onChange={(e) => setTakeProfit(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white text-sm rounded focus:outline-none focus:border-purple-600"
-                />
-              </div>
-            </>
-          )}
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">Stop %</label>
+            <input
+              type="number"
+              step="0.1"
+              placeholder="7"
+              value={stopLoss}
+              onChange={(e) => setStopLoss(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white text-sm rounded focus:outline-none focus:border-purple-600"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">Target %</label>
+            <input
+              type="number"
+              step="0.1"
+              placeholder="2"
+              value={takeProfit}
+              onChange={(e) => setTakeProfit(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white text-sm rounded focus:outline-none focus:border-purple-600"
+            />
+          </div>
         </div>
 
         {/* Calculations */}

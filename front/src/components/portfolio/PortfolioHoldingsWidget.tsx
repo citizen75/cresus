@@ -5,7 +5,6 @@ import { PortfolioHoldingsTable } from './PortfolioHoldingsTable'
 import CardChart from '@/components/CardChart'
 import { ChartModal } from '@/components/ChartModal'
 import { TradingDialog } from '@/components/TradingDialog'
-import { TradingWidget } from '@/components/TradingWidget'
 import { getApiBaseUrl, api } from '@/services/api'
 
 interface PortfolioHoldingsWidgetProps {
@@ -37,8 +36,6 @@ export default function PortfolioHoldingsWidget({
   const [tradingMode, setTradingMode] = useState<'buy' | 'sell'>('buy')
   const [tradingTicker, setTradingTicker] = useState<string | null>(null)
   const [tradingPosition, setTradingPosition] = useState<any>(null)
-  const [tradingWidgetPosition, setTradingWidgetPosition] = useState<any>(null)
-  const [showTradingWidget, setShowTradingWidget] = useState(false)
 
   // Use centralized data loader
   const { historicalData, loadData, setHistoricalData } = useHistoricalDataLoader()
@@ -148,9 +145,10 @@ export default function PortfolioHoldingsWidget({
   }
 
   const handleSell = (ticker: string, position: any) => {
-    // Open trading widget for sell with position details pre-filled
-    setTradingWidgetPosition(position)
-    setShowTradingWidget(true)
+    setTradingTicker(ticker)
+    setTradingPosition(position)
+    setTradingMode('sell')
+    setTradingDialogOpen(true)
   }
 
   const handleTradingConfirm = (quantity: number, price?: number) => {
@@ -235,34 +233,19 @@ export default function PortfolioHoldingsWidget({
   )
 
   return (
-    <div className="flex flex-col h-full gap-4">
+    <div className="flex flex-col h-full space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-white">Portfolio Holdings</h3>
-        <div className="flex items-center gap-2">
-          {showTradingWidget && (
-            <button
-              onClick={() => setShowTradingWidget(false)}
-              className="px-2 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition"
-            >
-              Hide Trading
-            </button>
-          )}
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="text-slate-400 hover:text-white transition text-lg"
-            >
-              ✕
-            </button>
-          )}
-        </div>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-white transition text-lg"
+          >
+            ✕
+          </button>
+        )}
       </div>
-
-      {/* Main Content - Holdings + Trading Widget */}
-      <div className="flex-1 flex gap-4 min-h-0 overflow-hidden">
-        {/* Left - Holdings */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden space-y-4">
 
       {/* Filters - All on one line */}
       <div className="flex gap-2 items-center flex-wrap">
@@ -529,23 +512,6 @@ export default function PortfolioHoldingsWidget({
                 </tbody>
               </table>
             )}
-          </div>
-        )}
-      </div>
-        </div>
-
-        {/* Right - Trading Widget */}
-        {showTradingWidget && (
-          <div className="w-80 flex-shrink-0 overflow-hidden">
-            <TradingWidget
-              defaultMode="sell"
-              position={tradingWidgetPosition}
-              currentPrice={tradingWidgetPosition?.current_price}
-              onOrderPlaced={(order) => {
-                console.log('[PortfolioHoldings] Order placed:', order)
-                // Optionally refresh positions or show confirmation
-              }}
-            />
           </div>
         )}
       </div>
