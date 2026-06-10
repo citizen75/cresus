@@ -18,16 +18,30 @@ function parseAlertContent(content: string): { portfolio?: string; signal?: stri
     if (line.startsWith('**Portfolio:**')) {
       result.portfolio = line.replace('**Portfolio:**', '').trim()
     }
-    // Extract signal from line with emoji: ⚠️ **sha_red**
-    if ((line.includes('🚨') || line.includes('⚠️')) && line.includes('**')) {
-      const match = line.match(/\*\*([^*]+)\*\*/)
+    // Extract signal from line with emoji: ⚠️ **sha_red** OR ⚠️ sha_red
+    if ((line.includes('🚨') || line.includes('⚠️'))) {
+      // Try bold markdown format first: ⚠️ **signal**
+      let match = line.match(/\*\*([^*]+)\*\*/)
       if (match) {
         result.signal = match[1]
+      } else {
+        // Try plain format: ⚠️ signal_name
+        match = line.match(/(⚠️|🚨)\s+(.+)$/)
+        if (match) {
+          result.signal = match[2].trim()
+        }
       }
     }
     // Extract tickers from bullet points: • AAPL: xxx
     if (line.trim().startsWith('•')) {
-      const match = line.match(/•\s+([A-Z0-9.-]+):/)
+      const match = line.match(/•\s+([A-Z0-9.-]+)/)
+      if (match) {
+        result.tickers.push(match[1])
+      }
+    }
+    // Extract tickers from arrows: ◀ AAPL
+    if (line.trim().startsWith('◀')) {
+      const match = line.match(/◀\s+([A-Z0-9.-]+)/)
       if (match) {
         result.tickers.push(match[1])
       }

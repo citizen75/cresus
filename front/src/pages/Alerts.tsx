@@ -439,13 +439,13 @@ export default function Alerts() {
     if (!currentAlert || !sortedResults.length) return
 
     try {
-      // Format message to match ConversationWidget's parseAlertContent expectations
-      // Signal (alert name) with emoji and bold
-      const signalLine = `⚠️ **${currentAlert.name}**`
+      // Format message with alert name and tickers
+      // Signal: ⚠️ alert_name
+      const signalLine = `⚠️ ${currentAlert.name}`
 
-      // Format tickers as bullet points (matching ConversationWidget parser format)
+      // Format tickers with arrow: ◀ TICKER
       const tickerLines = sortedResults
-        .map(r => `• ${r.ticker}:`)
+        .map(r => `◀ ${r.ticker}`)
         .join('\n')
 
       // Create message with signal and tickers
