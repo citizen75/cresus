@@ -1017,7 +1017,7 @@ export default function Alerts() {
               </div>
 
               {/* Results Table (Bottom) */}
-              {currentAlert && runResults && runResults.matches && runResults.matches.length > 0 && (
+              {currentAlert && runResults && (
                 <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden flex flex-col flex-1 min-h-0">
                   {/* Results Header - Same as ScreenerDetail */}
                   <div className="px-6 py-4 border-b border-slate-800">
@@ -1093,12 +1093,28 @@ export default function Alerts() {
 
                   {/* Table View - Same as ScreenerDetail, with formula indicators */}
                   {resultViewMode === 'table' && (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead className="bg-slate-800/50 border-b border-slate-800">
-                          <tr>
-                            {getDisplayColumns().map((key) => (
-                              <th
+                    <div className="overflow-x-auto flex flex-col flex-1">
+                      {sortedResults.length === 0 ? (
+                        <div className="flex items-center justify-center flex-1 text-slate-400 py-12">
+                          {runResults?.error ? (
+                            <div className="text-center">
+                              <p className="text-red-400 font-medium mb-2">❌ Evaluation Error</p>
+                              <p className="text-sm text-slate-500">{runResults.error}</p>
+                              <p className="text-xs text-slate-500 mt-2">Checked {runResults.tickers_checked || 0} tickers</p>
+                            </div>
+                          ) : (
+                            <div className="text-center">
+                              <p className="font-medium mb-1">No matches found</p>
+                              <p className="text-sm text-slate-500">Checked {runResults.tickers_checked || 0} tickers</p>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <table className="w-full text-sm">
+                          <thead className="bg-slate-800/50 border-b border-slate-800">
+                            <tr>
+                              {getDisplayColumns().map((key) => (
+                                <th
                                 key={key}
                                 onClick={() => {
                                   if (resultSortColumn === key) {
@@ -1170,7 +1186,8 @@ export default function Alerts() {
                             </tr>
                           ))}
                         </tbody>
-                      </table>
+                        </table>
+                      )}
                     </div>
                   )}
 
