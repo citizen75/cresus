@@ -81,6 +81,26 @@ export default function PortfolioHoldingsWidget({
     }
   }, [viewMode, filteredPositions, historicalData, onGetHistoricalData, loadData, setHistoricalData])
 
+  // Transform raw API data to chart format
+  const transformHistoricalData = (rawData: any[]): any[] => {
+    if (!rawData || rawData.length === 0) return []
+
+    return rawData
+      .map((item: any) => ({
+        date: item.date || item.timestamp || item.Date,
+        close: parseFloat(item.close || item.Close || 0),
+        open: parseFloat(item.open || item.Open || 0),
+        high: parseFloat(item.high || item.High || 0),
+        low: parseFloat(item.low || item.Low || 0),
+        volume: parseFloat(item.volume || item.Volume || 0),
+      }))
+      .sort((a: any, b: any) => {
+        const dateA = new Date(a.date)
+        const dateB = new Date(b.date)
+        return dateA.getTime() - dateB.getTime()
+      })
+  }
+
   const getDaysForTimeframe = (tf: string) => {
     switch (tf) {
       case '1W': return 7
@@ -292,17 +312,23 @@ export default function PortfolioHoldingsWidget({
                   </div>
 
                   {/* Chart */}
-                  {historicalData[pos.ticker] && historicalData[pos.ticker].length > 0 ? (
-                    <CardChart
-                      data={filterDataByTimeframe(historicalData[pos.ticker], timeframe)}
-                      ticker={pos.ticker}
-                      showVariation={false}
-                    />
-                  ) : (
-                    <div className="p-4 h-32 bg-slate-700/20 flex items-center justify-center gap-2">
-                      <p className="text-slate-500 text-xs">Loading chart...</p>
-                    </div>
-                  )}
+                  {(() => {
+                    const rawData = historicalData[pos.ticker] || []
+                    const transformedData = transformHistoricalData(rawData)
+                    const chartData = filterDataByTimeframe(transformedData, timeframe)
+                    return chartData && chartData.length > 0 ? (
+                      <CardChart
+                        data={chartData}
+                        ticker={pos.ticker}
+                        showVariation={false}
+                      />
+                    ) : (
+                      <div className="p-4 h-32 bg-slate-700/20 flex items-center justify-center gap-2">
+                        <p className="text-slate-500 text-xs">No chart data</p>
+                      </div>
+                    )
+                  })()}
+                  }
 
                   {/* Card Footer */}
                   <div className="border-t border-slate-700 p-3 space-y-2 bg-slate-800/30 text-xs">
