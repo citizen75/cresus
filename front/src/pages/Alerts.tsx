@@ -341,7 +341,16 @@ export default function Alerts() {
 
         // Auto-navigate to latest result URL if not already on a specific result
         if (!paramResultId && results[0].evaluated_at) {
-          const resultId = results[0].evaluated_at.replace(/[:.]/g, '')
+          // Convert ISO timestamp to YYYYMMDD_HHMMSS format
+          const date = new Date(results[0].evaluated_at)
+          const year = date.getUTCFullYear()
+          const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+          const day = String(date.getUTCDate()).padStart(2, '0')
+          const hours = String(date.getUTCHours()).padStart(2, '0')
+          const minutes = String(date.getUTCMinutes()).padStart(2, '0')
+          const seconds = String(date.getUTCSeconds()).padStart(2, '0')
+          const resultId = `${year}${month}${day}_${hours}${minutes}${seconds}`
+
           navigate(`/alerts/${encodeURIComponent(alertName)}/${resultId}`, { replace: true })
         }
       }
