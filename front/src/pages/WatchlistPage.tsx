@@ -54,13 +54,15 @@ export default function WatchlistPage() {
   const loadWatchlistData = async (watchlistName: string) => {
     try {
       setLoadingData(true)
+      setError(null)
       const response = await api.getWatchlist(watchlistName, 1000)
 
       // Use watchlist data directly (includes signal_score, OHLCV data)
       setWatchlistData(response.results || response.watchlist || [])
     } catch (err) {
       console.error('Failed to load watchlist data:', err)
-      setError('Failed to load watchlist data')
+      // Don't show error for empty watchlists, just show empty state
+      setError(null)
       setWatchlistData([])
     } finally {
       setLoadingData(false)

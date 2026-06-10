@@ -43,8 +43,14 @@ async def get_watchlist(strategy_name: str, limit: Optional[int] = None):
 		manager = WatchlistManager(strategy_name)
 		df = manager.load()
 
+		# Return empty watchlist if not found instead of error
 		if df is None or df.empty:
-			raise HTTPException(404, f"Watchlist '{strategy_name}' not found")
+			return {
+				"strategy": strategy_name,
+				"watchlist": [],
+				"count": 0,
+				"total_score": 0,
+			}
 
 		# Sort by signal_score descending
 		df = df.sort_values('signal_score', ascending=False)
@@ -69,6 +75,8 @@ async def get_watchlist(strategy_name: str, limit: Optional[int] = None):
 			"total_score": float(df['signal_score'].sum()) if not df.empty else 0,
 		}
 
+	except HTTPException:
+		raise
 	except Exception as e:
 		raise HTTPException(500, f"Error loading watchlist: {str(e)}")
 
