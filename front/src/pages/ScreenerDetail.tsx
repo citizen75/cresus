@@ -568,64 +568,7 @@ export default function ScreenerDetail() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Configuration (Left - 3 columns / 75%) */}
         <div className="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-lg p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold text-white">Configuration</h2>
-            <div className="flex gap-2">
-              {!editMode && (
-                <>
-                  <button
-                    type="button"
-                    onClick={handleRun}
-                    disabled={loadingResults}
-                    className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded font-medium transition text-sm"
-                    title="Run screener"
-                  >
-                    {loadingResults ? '⟳ Running...' : '▶ Run'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditMode(true)}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition text-sm"
-                    title="Edit screener"
-                  >
-                    ✎ Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (confirm(`Delete screener "${paramName}"?`)) {
-                        deleteScreener(paramName!)
-                      }
-                    }}
-                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded font-medium transition text-sm"
-                    title="Delete screener"
-                  >
-                    🗑 Delete
-                  </button>
-                </>
-              )}
-              {editMode && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setEditMode(false)}
-                    className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded font-medium transition text-sm"
-                    title="Cancel editing"
-                  >
-                    ✕ Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    form="screener-form"
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded font-medium transition text-sm"
-                    title="Save changes"
-                  >
-                    ✓ Save
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
+          <h2 className="text-lg font-semibold text-white mb-6">Configuration</h2>
 
           <form id="screener-form" onSubmit={handleSave} className="space-y-4">
             <div>
@@ -709,6 +652,62 @@ export default function ScreenerDetail() {
                 </button>
               </div>
             )}
+
+            {/* Action Buttons - Bottom of Form */}
+            <div className="flex gap-3 pt-6 border-t border-slate-700">
+              {!editMode && (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleRun}
+                    disabled={loadingResults}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded font-medium transition text-sm flex-1"
+                    title="Run screener"
+                  >
+                    {loadingResults ? '⟳ Running...' : '▶ Run'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditMode(true)}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition text-sm flex-1"
+                    title="Edit screener"
+                  >
+                    ✎ Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirm(`Delete screener "${paramName}"?`)) {
+                        deleteScreener(paramName!)
+                      }
+                    }}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded font-medium transition text-sm flex-1"
+                    title="Delete screener"
+                  >
+                    🗑 Delete
+                  </button>
+                </>
+              )}
+              {editMode && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setEditMode(false)}
+                    className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded font-medium transition text-sm flex-1"
+                    title="Cancel editing"
+                  >
+                    ✕ Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded font-medium transition text-sm flex-1"
+                    title="Save changes"
+                  >
+                    ✓ Save
+                  </button>
+                </>
+              )}
+            </div>
           </form>
         </div>
 
