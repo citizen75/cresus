@@ -422,6 +422,10 @@ class CresusAPI {
     return (await this.longTimeoutClient.post(`/alerts/${name}/run`)).data
   }
 
+  async getAlertLogs(alertName: string, lines: number = 200) {
+    return (await this.client.get(`/alerts/${alertName}/logs?lines=${lines}`)).data
+  }
+
   async getConversationHistory(
     portfolioName: string,
     limit?: number,

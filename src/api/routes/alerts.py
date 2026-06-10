@@ -223,3 +223,22 @@ async def run_alert(name: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/alerts/{name}/logs")
+async def get_alert_logs(name: str, lines: int = 100):
+    """Get logs for an alert."""
+    try:
+        from tools.logger import get_task_logger
+
+        task_logger = get_task_logger(f"alert.{name}")
+        logs = task_logger.get_logs(lines=lines)
+
+        return {
+            "status": "success",
+            "alert_name": name,
+            "logs": [line.rstrip('\n') for line in logs],
+            "total_lines": len(logs),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

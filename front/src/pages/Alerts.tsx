@@ -28,6 +28,10 @@ export default function Alerts() {
   const [runningAlert, setRunningAlert] = useState<string | null>(null)
   const [runResults, setRunResults] = useState<any>(null)
   const [showRunResults, setShowRunResults] = useState(false)
+  const [activeTab, setActiveTab] = useState<'alerts' | 'logs'>('alerts')
+  const [selectedAlertForLogs, setSelectedAlertForLogs] = useState<string | null>(null)
+  const [logs, setLogs] = useState<string[]>([])
+  const [logsLoading, setLogsLoading] = useState(false)
 
   // Portfolio selector for conversation widget
   const [selectedPortfolio, setSelectedPortfolio] = useState<string>('')
@@ -98,6 +102,20 @@ export default function Alerts() {
       setError(errorMsg)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadAlertLogs = async (alertName: string) => {
+    try {
+      setLogsLoading(true)
+      const response = await api.getAlertLogs(alertName, 200)
+      setLogs(response.logs || [])
+      setError(null)
+    } catch (err) {
+      setError('Failed to load alert logs')
+      console.error(err)
+    } finally {
+      setLogsLoading(false)
     }
   }
 
@@ -271,7 +289,32 @@ export default function Alerts() {
         </div>
       </div>
 
-      {/* Split Layout */}
+      {/* Tabs */}
+      <div className="flex gap-4 border-b border-slate-800 px-4">
+        <button
+          onClick={() => setActiveTab('alerts')}
+          className={`px-4 py-2 font-medium transition ${
+            activeTab === 'alerts'
+              ? 'text-white border-b-2 border-purple-500'
+              : 'text-slate-400 hover:text-slate-300'
+          }`}
+        >
+          Alerts
+        </button>
+        <button
+          onClick={() => setActiveTab('logs')}
+          className={`px-4 py-2 font-medium transition ${
+            activeTab === 'logs'
+              ? 'text-white border-b-2 border-purple-500'
+              : 'text-slate-400 hover:text-slate-300'
+          }`}
+        >
+          Logs
+        </button>
+      </div>
+
+      {/* Split Layout (Alerts Tab) */}
+      {activeTab === 'alerts' && (
       <div className="flex-1 flex gap-4 px-4 min-h-0 overflow-hidden">
         {/* Left: Alerts Management */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -418,6 +461,80 @@ export default function Alerts() {
           />
         </div>
       </div>
+      )}
+
+      {/* Logs Tab */}
+      {activeTab === 'logs' && (
+      <div className="flex-1 flex flex-col gap-4 px-4 min-h-0 overflow-hidden">
+        {/* Alert Selector */}
+        <div className="flex gap-2">
+          <select
+            value={selectedAlertForLogs || ''}
+            onChange={(e) => {
+              const alertName = e.target.value
+              setSelectedAlertForLogs(alertName)
+              if (alertName) loadAlertLogs(alertName)
+            }}
+            className="px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-purple-500"
+          >
+            <option value="">Select an alert to view logs...</option>
+            {alerts.map((alert) => (
+              <option key={alert.name} value={alert.name}>
+                {alert.name}
+              </option>
+            ))}
+          </select>
+          {selectedAlertForLogs && (
+            <button
+              onClick={() => selectedAlertForLogs && loadAlertLogs(selectedAlertForLogs)}
+              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm transition"
+              title="Refresh logs"
+            >
+              🔄 Refresh
+            </button>
+          )}
+        </div>
+
+        {/* Logs Display */}
+        {selectedAlertForLogs ? (
+          <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden flex flex-col flex-1 min-h-0">
+            <div className="bg-slate-800 px-4 py-3 border-b border-slate-700">
+              <h3 className="font-semibold text-white">Logs for: {selectedAlertForLogs}</h3>
+            </div>
+            <div className="p-4 max-h-full overflow-y-auto flex-1">
+              {logsLoading ? (
+                <div className="text-center text-slate-500">Loading logs...</div>
+              ) : logs.length === 0 ? (
+                <div className="text-center text-slate-500 text-sm">No logs yet</div>
+              ) : (
+                <div className="font-mono text-xs space-y-0">
+                  {logs.map((line, idx) => (
+                    <div
+                      key={idx}
+                      className={`py-1 px-2 ${
+                        line.includes('ERROR')
+                          ? 'text-red-400 bg-red-900/10'
+                          : line.includes('WARNING')
+                            ? 'text-yellow-400 bg-yellow-900/10'
+                            : line.includes('INFO')
+                              ? 'text-blue-400'
+                              : 'text-slate-400'
+                      }`}
+                    >
+                      {line}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-12 bg-slate-900 border border-slate-800 rounded-lg flex-1 flex items-center justify-center">
+            <div className="text-slate-500">Select an alert to view its logs</div>
+          </div>
+        )}
+      </div>
+      )}
 
       {/* Create/Edit Modal */}
       {showCreateModal && (
