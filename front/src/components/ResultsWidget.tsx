@@ -47,6 +47,9 @@ export default function ResultsWidget({
   const [addingToWatchlist, setAddingToWatchlist] = useState<Set<string>>(new Set())
   const [deletingTicker, setDeletingTicker] = useState<string | null>(null)
 
+  // Use centralized data loader hook
+  const { loadData } = useHistoricalDataLoader()
+
   // Update internal viewMode when external viewMode changes
   useEffect(() => {
     if (externalViewMode) {
@@ -54,41 +57,16 @@ export default function ResultsWidget({
     }
   }, [externalViewMode])
 
-  // Load historical data for charts
-  const loadChartsData = async () => {
-    if (!onGetHistoricalData || !onSetHistoricalData || data.length === 0) return
-
-    try {
-      const loaded: { [ticker: string]: any[] } = {}
-      const tickers = Array.from(new Set(data.map((row: any) => row.ticker).filter(Boolean)))
-
-      console.log(`[ResultsWidget] Loading historical data for ${tickers.length} tickers`)
-
-      for (const ticker of tickers) {
-        try {
-          const response = await onGetHistoricalData(ticker, 1825)
-          if (response && response.data) {
-            loaded[ticker] = response.data
-          }
-        } catch (err) {
-          console.error(`[ResultsWidget] Failed to load data for ${ticker}:`, err)
-        }
-      }
-
-      onSetHistoricalData(loaded)
-      console.log(`[ResultsWidget] Loaded data for ${Object.keys(loaded).length} tickers`)
-    } catch (err) {
-      console.error('[ResultsWidget] Failed to load chart data:', err)
-    }
-  }
-
-  // Auto-load historical data when switching to charts view
+  // Auto-load historical data when switching to charts view (uses hook)
   useEffect(() => {
-    if (viewMode === 'charts' && data.length > 0 && Object.keys(historicalData).length === 0) {
-      console.log('[ResultsWidget] Loading charts data')
-      loadChartsData()
+    if (viewMode === 'charts' && data.length > 0 && Object.keys(historicalData).length === 0 && onGetHistoricalData && onSetHistoricalData) {
+      const tickers = Array.from(new Set(data.map((row: any) => row.ticker).filter(Boolean)))
+      console.log(`[ResultsWidget] Loading data for ${tickers.length} tickers`)
+      loadData(tickers, onGetHistoricalData).then(loaded => {
+        if (loaded) onSetHistoricalData(loaded)
+      })
     }
-  }, [viewMode, data.length, historicalData, loadChartsData])
+  }, [viewMode, data.length, historicalData, onGetHistoricalData, onSetHistoricalData, loadData])
 
   // Handle ESC key to close chart modal
   useEffect(() => {

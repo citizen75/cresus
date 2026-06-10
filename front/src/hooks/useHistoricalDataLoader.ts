@@ -14,8 +14,8 @@ export function useHistoricalDataLoader() {
       tickers: string[],
       fetchFn: (ticker: string, days: number) => Promise<any>,
       days: number = 1825
-    ) => {
-      if (!tickers.length || !fetchFn) return
+    ): Promise<{ [ticker: string]: any[] } | null> => {
+      if (!tickers.length || !fetchFn) return null
 
       try {
         setIsLoading(true)
@@ -34,10 +34,12 @@ export function useHistoricalDataLoader() {
         }
 
         setHistoricalData(loaded)
+        return loaded
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to load data'
         setError(message)
         console.error('Error loading historical data:', err)
+        return null
       } finally {
         setIsLoading(false)
       }
