@@ -35,6 +35,17 @@ export default function WatchlistPage() {
     }
   }
 
+  const handleDeleteTicker = async (ticker: string) => {
+    try {
+      await api.removeFromWatchlist('global', ticker)
+      // Refresh watchlist after deletion
+      await loadWatchlistData('global')
+    } catch (err) {
+      console.error('Failed to delete ticker from watchlist:', err)
+      throw err
+    }
+  }
+
   return (
     <div className="h-full flex flex-col gap-4">
       {/* Header */}
@@ -69,6 +80,8 @@ export default function WatchlistPage() {
             onSortDirectionChange={setSortDirection}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
+            onDeleteRow={handleDeleteTicker}
+            watchlistName="global"
           />
         </div>
       )}

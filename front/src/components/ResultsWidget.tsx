@@ -17,6 +17,8 @@ interface ResultsWidgetProps {
   onChartTimeframeChange?: (timeframe: '1W' | '1M' | '3M' | 'YTD' | 'ALL') => void
   viewMode?: 'table' | 'charts'
   onViewModeChange?: (mode: 'table' | 'charts') => void
+  onDeleteRow?: (ticker: string) => Promise<void>
+  watchlistName?: string
 }
 
 export default function ResultsWidget({
@@ -33,10 +35,13 @@ export default function ResultsWidget({
   onChartTimeframeChange,
   viewMode: externalViewMode,
   onViewModeChange,
+  onDeleteRow,
+  watchlistName,
 }: ResultsWidgetProps) {
   const [viewMode, setViewMode] = useState<'table' | 'charts'>(externalViewMode || 'table')
   const [selectedTickerForChart, setSelectedTickerForChart] = useState<string | null>(null)
   const [addingToWatchlist, setAddingToWatchlist] = useState<Set<string>>(new Set())
+  const [deletingTicker, setDeletingTicker] = useState<string | null>(null)
 
   // Update internal viewMode when external viewMode changes
   useEffect(() => {
@@ -83,6 +88,19 @@ export default function ResultsWidget({
         next.delete(ticker)
         return next
       })
+    }
+  }
+
+  // Delete ticker from watchlist
+  const handleDeleteTicker = async (ticker: string) => {
+    if (!onDeleteRow) return
+    try {
+      setDeletingTicker(ticker)
+      await onDeleteRow(ticker)
+      setDeletingTicker(null)
+    } catch (err) {
+      console.error('Failed to delete ticker:', err)
+      setDeletingTicker(null)
     }
   }
 
@@ -311,22 +329,39 @@ export default function ResultsWidget({
                       </td>
                     )
                   })}
-                  {/* Watchlist Button */}
-                  <td className="px-6 py-3 text-right">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleAddToWatchlist(row.ticker)
-                      }}
-                      disabled={addingToWatchlist.has(row.ticker)}
-                      className={`px-3 py-1 rounded text-xs font-medium transition ${
-                        addingToWatchlist.has(row.ticker)
-                          ? 'bg-green-600/50 text-green-200'
-                          : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                      }`}
-                    >
-                      {addingToWatchlist.has(row.ticker) ? '✓ Added' : '⭐ Watchlist'}
-                    </button>
+                  {/* Action Buttons */}
+                  <td className="px-6 py-3 text-right space-x-2 flex justify-end">
+                    {onDeleteRow ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDeleteTicker(row.ticker)
+                        }}
+                        disabled={deletingTicker === row.ticker}
+                        className={`px-3 py-1 rounded text-xs font-medium transition ${
+                          deletingTicker === row.ticker
+                            ? 'bg-red-600/50 text-red-200'
+                            : 'bg-red-900/30 hover:bg-red-900/50 text-red-300'
+                        }`}
+                      >
+                        {deletingTicker === row.ticker ? '⏳ Deleting...' : '🗑️ Delete'}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleAddToWatchlist(row.ticker)
+                        }}
+                        disabled={addingToWatchlist.has(row.ticker)}
+                        className={`px-3 py-1 rounded text-xs font-medium transition ${
+                          addingToWatchlist.has(row.ticker)
+                            ? 'bg-green-600/50 text-green-200'
+                            : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                        }`}
+                      >
+                        {addingToWatchlist.has(row.ticker) ? '✓ Added' : '⭐ Watchlist'}
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
