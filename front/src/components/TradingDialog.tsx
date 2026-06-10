@@ -32,20 +32,19 @@ export function TradingDialog({
 
   // Fetch ticker name when ticker changes
   useEffect(() => {
-    if (ticker && ticker !== initialTicker) {
-      fetchTickerName(ticker)
-    } else if (ticker === initialTicker && initialTicker) {
-      setTickerName(position?.company_name || '')
-    }
-  }, [ticker])
+    if (!ticker) return
 
-  // Set initial ticker if provided
-  useEffect(() => {
-    if (initialTicker && !ticker) {
-      setTicker(initialTicker)
-      setTickerName(position?.company_name || '')
+    // Try to get from position first
+    if (position?.company_name) {
+      setTickerName(position.company_name)
+      return
     }
-  }, [initialTicker])
+
+    // Otherwise fetch from API
+    if (ticker) {
+      fetchTickerName(ticker)
+    }
+  }, [ticker, position?.company_name])
 
   const fetchTickerName = async (tickerSymbol: string) => {
     try {
@@ -53,6 +52,9 @@ export function TradingDialog({
       const response = await api.getTickerInfo?.(tickerSymbol)
       if (response?.name) {
         setTickerName(response.name)
+      } else {
+        // If API doesn't return name, try searching in watchlist
+        console.log(`[TradingDialog] No name found for ${tickerSymbol}`)
       }
     } catch (err) {
       console.error('Failed to fetch ticker info:', err)
@@ -60,6 +62,13 @@ export function TradingDialog({
       setLoadingTicker(false)
     }
   }
+
+  // Initialize ticker on dialog open
+  useEffect(() => {
+    if (isOpen && initialTicker && !ticker) {
+      setTicker(initialTicker)
+    }
+  }, [isOpen, initialTicker])
 
   const handleConfirm = () => {
     if (!ticker) {
