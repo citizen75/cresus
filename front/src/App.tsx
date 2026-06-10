@@ -56,6 +56,7 @@ export default function App() {
           <Route path="/chart" element={<Layout><Chart /></Layout>} />
           <Route path="/chart/:ticker" element={<Layout><Chart /></Layout>} />
           <Route path="/alerts" element={<Layout><Alerts /></Layout>} />
+          <Route path="/alerts/:name/edit" element={<Layout><Alerts /></Layout>} />
           <Route path="/alerts/:name" element={<Layout><Alerts /></Layout>} />
           <Route path="/alerts/:name/:resultId" element={<Layout><Alerts /></Layout>} />
           <Route path="/alerts/:name/:resultId/:view" element={<Layout><Alerts /></Layout>} />

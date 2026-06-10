@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { api } from '../services/api'
 import CardChart from '@/components/CardChart'
 import TradingChartWidget from '@/components/TradingChartWidget'
@@ -22,6 +22,8 @@ interface Alert {
 export default function Alerts() {
   const { name: paramName, resultId: paramResultId, view: viewParam } = useParams<{ name?: string; resultId?: string; view?: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
+  const isEditMode = location.pathname.includes('/edit')
 
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [loading, setLoading] = useState(true)
@@ -80,6 +82,16 @@ export default function Alerts() {
       loadSavedResults(paramName)
     }
   }, [paramName])
+
+  // Set edit mode based on URL
+  useEffect(() => {
+    if (isEditMode && paramName) {
+      const alert = alerts.find(a => a.name === paramName)
+      if (alert) {
+        startEdit(alert)
+      }
+    }
+  }, [isEditMode, paramName, alerts])
 
   const fetchAlerts = async () => {
     try {
@@ -165,14 +177,22 @@ export default function Alerts() {
       description: alert.description,
       notify: alert.notify,
       enabled: alert.enabled,
+      name: alert.name,
+      source: alert.source,
+      source_value: alert.source_value,
     })
-    setEditMode(true)
+    navigate(`/alerts/${encodeURIComponent(alert.name)}/edit`)
   }
 
   const cancelEdit = () => {
     setEditMode(false)
     setEditingAlert(null)
     setFormData({})
+    if (paramName) {
+      navigate(`/alerts/${encodeURIComponent(paramName)}`)
+    } else {
+      navigate('/alerts')
+    }
   }
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
