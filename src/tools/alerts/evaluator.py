@@ -17,9 +17,21 @@ logger = logging.getLogger(__name__)
 class AlertEvaluator:
     """Evaluate alerts using DSL formulas against data."""
 
-    def __init__(self):
-        """Initialize evaluator."""
+    def __init__(self, alert_name: Optional[str] = None):
+        """Initialize evaluator.
+
+        Args:
+            alert_name: Optional alert name for file logging
+        """
         self.logger = logger
+        self.alert_name = alert_name
+        self.task_logger = None
+        if alert_name:
+            try:
+                from tools.logger import get_task_logger
+                self.task_logger = get_task_logger(f"alert.{alert_name}")
+            except Exception:
+                pass
 
     def evaluate_alert(self, alert: Alert, target_date: Optional[date] = None) -> AlertResult:
         """Evaluate an alert and return matches.
@@ -36,10 +48,14 @@ class AlertEvaluator:
             tickers = self._get_tickers(alert)
 
             if not tickers:
+                error_msg = f"No tickers found for source: {alert.source.value}"
+                self.logger.error(error_msg)
+                if self.task_logger:
+                    self.task_logger.error(error_msg)
                 return AlertResult(
                     alert_name=alert.name,
                     matched=False,
-                    error=f"No tickers found for source: {alert.source.value}",
+                    error=error_msg,
                 )
 
             # Extract indicators from formula
@@ -47,14 +63,23 @@ class AlertEvaluator:
 
             # Evaluate against each ticker
             matches = []
+            error_count = 0
             for ticker in tickers:
                 try:
                     result = self._evaluate_ticker(ticker, alert.formula, indicators, target_date)
                     if result:
                         matches.extend(result)
                 except Exception as e:
-                    self.logger.debug(f"Error evaluating {ticker}: {e}")
+                    error_msg = f"Error evaluating formula for {ticker}: {e}"
+                    self.logger.debug(error_msg)
+                    if self.task_logger:
+                        self.task_logger.debug(error_msg)
+                    error_count += 1
                     continue
+
+            if error_count > 0:
+                if self.task_logger:
+                    self.task_logger.info(f"Evaluation complete: {len(matches)} matches, {error_count} errors")
 
             return AlertResult(
                 alert_name=alert.name,
@@ -64,7 +89,10 @@ class AlertEvaluator:
             )
 
         except Exception as e:
-            self.logger.error(f"Error evaluating alert {alert.name}: {e}")
+            error_msg = f"Error evaluating alert {alert.name}: {e}"
+            self.logger.error(error_msg)
+            if self.task_logger:
+                self.task_logger.error(error_msg)
             return AlertResult(
                 alert_name=alert.name,
                 matched=False,

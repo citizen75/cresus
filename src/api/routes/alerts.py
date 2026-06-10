@@ -199,7 +199,7 @@ async def run_alert(name: str):
         task_logger.info(f"Starting alert evaluation for '{name}'")
 
         manager = AlertManager()
-        evaluator = AlertEvaluator()
+        evaluator = AlertEvaluator(alert_name=name)
         notifier = AlertNotifier()
 
         alert = manager.get_alert(name)
@@ -213,6 +213,10 @@ async def run_alert(name: str):
         result = evaluator.evaluate_alert(alert)
         elapsed = time.time() - start
         task_logger.info(f"Evaluation completed in {elapsed:.2f}s")
+
+        # Check for evaluation errors
+        if result.error:
+            task_logger.error(f"Evaluation error: {result.error}")
 
         # Update last_run timestamp
         manager.update_last_run(name)
