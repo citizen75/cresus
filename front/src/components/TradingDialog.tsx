@@ -8,7 +8,7 @@ interface TradingDialogProps {
   position?: any
   currentPrice?: number
   onClose: () => void
-  onConfirm: (quantity: number, price?: number) => void
+  onConfirm: (quantity: number, price?: number, fees?: number, stopLoss?: number, takeProfit?: number) => void
 }
 
 export function TradingDialog({
@@ -22,6 +22,9 @@ export function TradingDialog({
 }: TradingDialogProps) {
   const [quantity, setQuantity] = useState<string>('')
   const [priceOverride, setPriceOverride] = useState<string>('')
+  const [fees, setFees] = useState<string>('0')
+  const [stopLoss, setStopLoss] = useState<string>('')
+  const [takeProfit, setTakeProfit] = useState<string>('')
 
   const handleConfirm = () => {
     const qty = parseFloat(quantity)
@@ -36,9 +39,26 @@ export function TradingDialog({
       return
     }
 
-    onConfirm(qty, price)
+    const feesAmount = parseFloat(fees || '0')
+    const sl = stopLoss ? parseFloat(stopLoss) : undefined
+    const tp = takeProfit ? parseFloat(takeProfit) : undefined
+
+    if (sl !== undefined && isNaN(sl)) {
+      alert('Please enter a valid stop loss')
+      return
+    }
+
+    if (tp !== undefined && isNaN(tp)) {
+      alert('Please enter a valid take profit')
+      return
+    }
+
+    onConfirm(qty, price, feesAmount, sl, tp)
     setQuantity('')
     setPriceOverride('')
+    setFees('0')
+    setStopLoss('')
+    setTakeProfit('')
   }
 
   if (!isOpen) return null
