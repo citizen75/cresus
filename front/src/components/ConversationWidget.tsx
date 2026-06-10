@@ -249,7 +249,7 @@ export function ConversationWidget({
       {/* Main Content - Messages + Results Panel */}
       <div className="flex-1 flex overflow-hidden">
         {/* Messages */}
-        <div className={`${selectedMessage ? 'flex-0 w-1/3' : 'flex-1'} overflow-y-auto p-4 space-y-3 transition-all ${maxHeight}`}>
+        <div className={`${showResultsPanel && selectedMessage ? 'flex-0 w-1/3' : 'flex-1'} overflow-y-auto p-4 space-y-3 transition-all ${maxHeight}`}>
         {loading && (
           <p className="text-xs text-slate-500 text-center py-4">Loading conversation...</p>
         )}
