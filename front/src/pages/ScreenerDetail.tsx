@@ -169,13 +169,6 @@ export default function ScreenerDetail() {
     }
   }, [selectedRow])
 
-  // Load chart data when switching to charts view
-  useEffect(() => {
-    if (resultViewMode === 'charts' && selectedResult.length > 0 && Object.keys(historicalData).length === 0) {
-      loadHistoricalDataForCharts()
-    }
-  }, [resultViewMode, selectedResult])
-
   // Formula validation
   useEffect(() => {
     if (!editMode || !formData.formula) {
