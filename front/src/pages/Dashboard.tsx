@@ -413,9 +413,11 @@ export default function Dashboard() {
               }
             }}
             onPortfolioClick={(portfolio, tickers, widget, messageData) => {
-              // If this is a results_widget message, store the full message data
-              if (messageData && messageData.widget === 'results_widget') {
+              // Update selected alert message when clicking any message with data
+              if (messageData) {
+                console.log(`[Dashboard] Message clicked:`, { id: messageData.id, source: messageData.source, widget: messageData.widget })
                 setSelectedAlertMessage(messageData)
+                setRightPanelOpen(true)
               }
 
               // Create alert info object and display holdings filtered by tickers
@@ -442,11 +444,6 @@ export default function Dashboard() {
               }
 
               setAlertGridView(alertInfo)
-              setRightPanelOpen(true)
-              // Widget data is available if message has widget field
-              if (widget) {
-                console.log('Message widget:', widget)
-              }
             }}
             onSendMessage={async (message) => {
               const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
