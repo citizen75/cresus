@@ -65,6 +65,7 @@ interface ConversationWidgetProps {
   autoSelectLatestAlert?: boolean // Auto-select latest alert in right panel
   showResultsPanel?: boolean // Show results panel for results_widget messages (default: true)
   selectedMessageId?: string // ID of selected message for highlighting
+  selectedMessageDateTime?: string // Datetime of selected message (used when id is not available)
 }
 
 // Dynamic widget loader
@@ -145,7 +146,8 @@ export function ConversationWidget({
   onNewMessage,
   autoSelectLatestAlert = false,
   showResultsPanel = true,
-  selectedMessageId
+  selectedMessageId,
+  selectedMessageDateTime
 }: ConversationWidgetProps) {
   const { messages: allMessages, connected: allConnected, loading: allLoading, error: allError, subscribeToConversation, unsubscribeFromConversation, deleteMessage } = useConversation()
   const [inputValue, setInputValue] = useState('')
@@ -298,9 +300,10 @@ export function ConversationWidget({
             }
           }
 
-          const isSelected = selectedMessageId === msg.id
-          if (msg.id && idx === messages.length - 1) {
-            console.log(`[ConversationWidget] Last message:`, { msgId: msg.id, selectedId: selectedMessageId, isSelected })
+          // Match by id or datetime (datetime is used when id is not available)
+          const isSelected = (selectedMessageId && selectedMessageId === msg.id) || (selectedMessageDateTime && selectedMessageDateTime === msg.datetime)
+          if (idx === messages.length - 1) {
+            console.log(`[ConversationWidget] Last message:`, { msgId: msg.id, datetime: msg.datetime, selectedId: selectedMessageId, selectedDateTime: selectedMessageDateTime, isSelected })
           }
 
           return (
