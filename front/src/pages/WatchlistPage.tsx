@@ -26,8 +26,9 @@ export default function WatchlistPage() {
   }, [])
 
   useEffect(() => {
-    // Load historical data when view mode changes to charts
-    if (viewMode === 'charts' && watchlistData.length > 0) {
+    // Load historical data when watchlist data is loaded and we're in charts view
+    if (watchlistData.length > 0 && viewMode === 'charts' && Object.keys(historicalData).length === 0) {
+      console.log('[WatchlistPage] Loading historical data for charts view')
       loadHistoricalData()
     }
   }, [viewMode, watchlistData.length])
