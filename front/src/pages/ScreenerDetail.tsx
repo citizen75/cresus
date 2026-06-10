@@ -386,9 +386,7 @@ export default function ScreenerDetail() {
     if (paramName) {
       navigate(`/screener/${paramName}${mode === 'charts' ? '/charts' : ''}`)
     }
-    if (mode === 'charts' && selectedResult.length > 0) {
-      loadHistoricalDataForCharts()
-    }
+    // ResultsWidget handles data loading via hook when mode changes
   }
 
   const getDaysForTimeframe = (tf: string) => {
@@ -425,51 +423,6 @@ export default function ScreenerDetail() {
         const dateB = new Date(b.date || b.timestamp)
         return dateA.getTime() - dateB.getTime()
       })
-  }
-
-  const loadHistoricalDataForCharts = async () => {
-    if (selectedResult.length === 0) return
-
-    try {
-      setLoadingCharts(true)
-      const data: { [ticker: string]: any[] } = {}
-
-      // Load full historical data for each ticker (5 years for timeframe filtering)
-      for (const row of selectedResult) {
-        const ticker = row.ticker
-        if (!data[ticker]) {
-          try {
-            const response = await api.getHistoricalData(ticker, 1825) // ~5 years
-            if (response.data) {
-              // Map and sort by date (oldest to newest)
-              data[ticker] = response.data
-                .map((item: any) => ({
-                  date: item.date || item.timestamp,
-                  close: parseFloat(item.close),
-                  open: parseFloat(item.open),
-                  high: parseFloat(item.high),
-                  low: parseFloat(item.low),
-                  volume: parseFloat(item.volume),
-                }))
-                .sort((a: any, b: any) => {
-                  const dateA = new Date(a.date)
-                  const dateB = new Date(b.date)
-                  return dateA.getTime() - dateB.getTime()
-                })
-            } else {
-              data[ticker] = []
-            }
-          } catch (err) {
-            console.error(`Failed to load history for ${ticker}:`, err)
-            data[ticker] = []
-          }
-        }
-      }
-
-      setHistoricalData(data)
-    } finally {
-      setLoadingCharts(false)
-    }
   }
 
   if (!paramName) {
