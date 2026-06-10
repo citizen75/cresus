@@ -273,10 +273,18 @@ async def add_ticker_to_watchlist(strategy_name: str, body: TickerRequest = Body
 
 		# Save watchlist directly to CSV (bypass WatchlistManager.save which needs complex params)
 		watchlist_dir = _get_project_root() / "db" / "local" / "watchlist"
+		print(f"[Watchlist] Project root: {_get_project_root()}")
+		print(f"[Watchlist] Watchlist dir: {watchlist_dir}")
+		print(f"[Watchlist] Creating directory...")
 		watchlist_dir.mkdir(parents=True, exist_ok=True)
+		print(f"[Watchlist] Directory created")
 		filepath = watchlist_dir / f"{strategy_name}.csv"
-
+		print(f"[Watchlist] File path: {filepath}")
+		print(f"[Watchlist] DataFrame shape: {df.shape}")
+		print(f"[Watchlist] Saving CSV...")
 		df.to_csv(filepath, index=False)
+		print(f"[Watchlist] CSV saved successfully")
+		print(f"[Watchlist] File exists: {filepath.exists()}")
 
 		return {"success": True, "message": f"Added {ticker} to {strategy_name} watchlist"}
 	except Exception as e:
