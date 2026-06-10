@@ -82,11 +82,27 @@ export default function Alerts() {
     try {
       setLoading(true)
       setError(null)
+      console.log('Fetching alerts from API...')
       const response = await api.listAlerts()
-      setAlerts(response.alerts || [])
+      console.log('Alerts response:', response)
+      if (Array.isArray(response)) {
+        setAlerts(response)
+      } else if (response && response.alerts && Array.isArray(response.alerts)) {
+        setAlerts(response.alerts)
+      } else {
+        console.warn('Unexpected response format:', response)
+        setAlerts([])
+      }
     } catch (err) {
-      const errorMsg = `Failed to load alerts: ${err instanceof Error ? err.message : 'Unknown error'}`
-      console.error(errorMsg, err)
+      let errorMsg = 'Failed to load alerts: '
+      if (err instanceof Error) {
+        errorMsg += err.message
+      } else if (err && typeof err === 'object') {
+        errorMsg += JSON.stringify(err)
+      } else {
+        errorMsg += 'Unknown error'
+      }
+      console.error('Alert fetch error:', err)
       setError(errorMsg)
     } finally {
       setLoading(false)
