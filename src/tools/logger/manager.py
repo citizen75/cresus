@@ -1,16 +1,18 @@
-"""Task logger with per-job logging and automatic file rotation."""
+"""Task logger with per-job logging and automatic file rotation (async/fire-and-forget)."""
 
 import os
 from pathlib import Path
 from datetime import datetime
 import logging
-from logging.handlers import RotatingFileHandler
+from logging.handlers import RotatingFileHandler, QueueHandler, QueueListener
+import queue
 from typing import Optional
 from threading import Lock
 from utils.env import get_db_root
 
-# Global loggers cache and lock for thread safety
+# Global loggers cache, queue listeners, and lock for thread safety
 _loggers = {}
+_listeners = {}  # QueueListener instances for async logging
 _loggers_lock = Lock()
 
 
@@ -18,7 +20,7 @@ class TaskLogger:
 	"""Logger for scheduled tasks with automatic file rotation."""
 
 	def __init__(self, task_name: str, log_dir: Optional[Path] = None, max_bytes: int = 10 * 1024 * 1024, backup_count: int = 5):
-		"""Initialize task logger.
+		"""Initialize task logger with async/fire-and-forget logging.
 
 		Args:
 			task_name: Name of the task (e.g., 'alert_sha_red')
@@ -43,20 +45,34 @@ class TaskLogger:
 		# Remove existing handlers to avoid duplicates
 		self.logger.handlers.clear()
 
+		# Create queue for async logging (fire-and-forget)
+		log_queue = queue.Queue(-1)  # Unlimited queue
+
 		# Create formatter
 		formatter = logging.Formatter(
 			"%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
 			datefmt="%Y-%m-%d %H:%M:%S"
 		)
 
-		# Add rotating file handler (thread-safe)
-		handler = RotatingFileHandler(
+		# Create rotating file handler for the listener
+		file_handler = RotatingFileHandler(
 			str(self.log_file),
 			maxBytes=self.max_bytes,
 			backupCount=self.backup_count
 		)
-		handler.setFormatter(formatter)
-		self.logger.addHandler(handler)
+		file_handler.setFormatter(formatter)
+
+		# Set up queue listener with file handler (runs in separate thread)
+		listener = QueueListener(log_queue, file_handler, respect_handler_level=True)
+		listener.start()
+
+		# Store listener for cleanup
+		_listeners[task_name] = listener
+
+		# Add queue handler to logger (non-blocking, fire-and-forget)
+		queue_handler = QueueHandler(log_queue)
+		queue_handler.setLevel(logging.DEBUG)
+		self.logger.addHandler(queue_handler)
 
 
 	def info(self, msg: str) -> None:
@@ -112,6 +128,15 @@ class TaskLogger:
 				return f.readlines()
 		except Exception as e:
 			return [f"Error reading logs: {e}"]
+
+	def stop(self) -> None:
+		"""Stop the queue listener and clean up resources."""
+		if self.task_name in _listeners:
+			try:
+				_listeners[self.task_name].stop()
+				del _listeners[self.task_name]
+			except Exception:
+				pass
 
 
 def get_task_logger(task_name: str) -> TaskLogger:
