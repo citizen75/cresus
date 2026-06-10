@@ -10,10 +10,9 @@ interface ChartDataPoint {
 interface CardChartProps {
   data: ChartDataPoint[]
   ticker: string
-  showVariation?: boolean
 }
 
-export default function CardChart({ data, ticker, showVariation = true }: CardChartProps) {
+export default function CardChart({ data, ticker }: CardChartProps) {
   if (!data || data.length === 0) {
     return (
       <div className="p-4 h-48 bg-slate-800/20 flex items-center justify-center">
@@ -24,29 +23,10 @@ export default function CardChart({ data, ticker, showVariation = true }: CardCh
 
   const firstPrice = data[0]?.close || 0
   const lastPrice = data[data.length - 1]?.close || 0
-  const variation = firstPrice !== 0 ? ((lastPrice - firstPrice) / firstPrice) * 100 : 0
-  const isPositive = variation >= 0
+  const isPositive = lastPrice >= firstPrice
 
   return (
     <div className="relative p-4 bg-slate-800/20 w-full overflow-hidden">
-      {/* Variation Badge */}
-      {showVariation && (
-        <div className="absolute top-4 right-4 z-10">
-          <div className={`px-3 py-1 rounded-lg backdrop-blur-sm flex items-center gap-1 ${
-            isPositive
-              ? 'bg-green-900/40 border border-green-700/50'
-              : 'bg-red-900/40 border border-red-700/50'
-          }`}>
-            <span className={`text-xs font-bold ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
-              {isPositive ? '↗' : '↘'}
-            </span>
-            <span className={`text-sm font-bold ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
-              {isPositive ? '+' : ''}{variation.toFixed(2)}%
-            </span>
-          </div>
-        </div>
-      )}
-
       {/* Chart */}
       <div style={{ width: '100%', height: '12rem' }}>
         <ResponsiveContainer width="100%" height="100%">
