@@ -713,18 +713,7 @@ export default function ScreenerDetail() {
 
         {/* Recent Results (Right - 1 column / 25%) */}
         <div className="bg-slate-900 border border-slate-800 rounded-lg p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-white">Recent Results</h2>
-            {results.length > 0 && (
-              <button
-                onClick={handleClearResults}
-                className="px-2 py-1 text-xs font-medium text-red-400 hover:text-red-300 rounded transition"
-                title="Clear all results"
-              >
-                Clear All
-              </button>
-            )}
-          </div>
+          <h2 className="text-lg font-semibold text-white mb-4">Recent Results</h2>
 
           {results.length === 0 ? (
             <div className="text-center py-6">
