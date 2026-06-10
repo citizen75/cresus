@@ -276,15 +276,16 @@ export function ConversationWidget({
           const tickers = msg.tickers || parsedAlert?.tickers || []
 
           const handleMessageClick = () => {
-            // If message has results_widget, show ResultsWidget on right panel (regardless of portfolio)
-            if (msg.widget === 'results_widget') {
-              setSelectedMessage(msg)
-              // Also notify parent with full message data
-              if (onPortfolioClick) {
+            // Always pass full message data to parent
+            if (onPortfolioClick) {
+              // For results_widget: show results on right panel
+              if (msg.widget === 'results_widget') {
                 onPortfolioClick('global', tickers, msg.widget, msg)
               }
-            } else if (portfolio && portfolio !== 'global' && onPortfolioClick) {
-              onPortfolioClick(portfolio, tickers, msg.widget)
+              // For portfolio_holdings_widget or other portfolio messages: show holdings
+              else if (portfolio && portfolio !== 'global') {
+                onPortfolioClick(portfolio, tickers, msg.widget, msg)
+              }
             }
           }
 

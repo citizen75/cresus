@@ -413,10 +413,16 @@ export default function Dashboard() {
               }
             }}
             onPortfolioClick={(portfolio, tickers, widget, messageData) => {
-              // Update selected alert message when clicking any message with data
-              if (messageData) {
-                console.log(`[Dashboard] Message clicked:`, { id: messageData.id, source: messageData.source, widget: messageData.widget })
+              // For results_widget messages: show results in right panel
+              if (messageData && messageData.widget === 'results_widget') {
+                console.log(`[Dashboard] Results message clicked:`, { id: messageData.id, widget: messageData.widget })
                 setSelectedAlertMessage(messageData)
+                setRightPanelOpen(true)
+              }
+              // For portfolio messages: show holdings
+              else if (messageData && messageData.widget === 'portfolio_holdings_widget') {
+                console.log(`[Dashboard] Portfolio message clicked:`, { id: messageData.id, portfolio: messageData.portfolio })
+                setSelectedAlertMessage(null)  // Clear results widget
                 setRightPanelOpen(true)
               }
 
