@@ -46,15 +46,12 @@ export default function Dashboard() {
         const data = await response.json()
         const messages = data.history || []
 
-        // Find the most recent alert message with results_widget
+        // Find the most recent alert message (with or without results_widget)
         for (let i = messages.length - 1; i >= 0; i--) {
           const msg = messages[i]
           if (msg.source === 'alert') {
-            // If message has results_widget, auto-select it for right panel
-            if (msg.widget === 'results_widget' && msg.data?.results) {
-              setSelectedAlertMessage(msg)
-              break
-            }
+            // Auto-select any alert message (will show results if available)
+            setSelectedAlertMessage(msg)
 
             // Parse alert content for legacy support
             const lines = msg.content.split('\n')
@@ -493,7 +490,7 @@ export default function Dashboard() {
         )}
 
         {/* Main Content Area - Results or Holdings */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto flex flex-col">
           {/* Display ResultsWidget if alert message with results is selected */}
           {selectedAlertMessage?.data?.results ? (
             <ResultsWidget
