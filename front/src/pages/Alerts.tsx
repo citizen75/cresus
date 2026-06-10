@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../services/api'
 import CardChart from '@/components/CardChart'
@@ -356,13 +356,37 @@ export default function Alerts() {
     setLoadingCharts(false)
   }
 
-  // Load charts when switching to charts view or when results change
+  // Track if charts have been loaded to prevent infinite loops
+  const chartsLoadedRef = useRef(false)
+
+  // Reset charts loaded flag when switching results or exiting charts view
   useEffect(() => {
-    if (resultViewMode === 'charts' && sortedResults && sortedResults.length > 0) {
+    if (resultViewMode !== 'charts') {
+      chartsLoadedRef.current = false
+    }
+  }, [paramResultId, resultViewMode])
+
+  // Load charts only once when entering charts view
+  useEffect(() => {
+    if (
+      resultViewMode === 'charts' &&
+      sortedResults &&
+      sortedResults.length > 0 &&
+      !chartsLoadedRef.current
+    ) {
       console.log('Loading charts for', sortedResults.length, 'results')
+      chartsLoadedRef.current = true
       loadChartsData()
     }
-  }, [resultViewMode, sortedResults, chartTimeframe])
+  }, [resultViewMode])
+
+  // Reload charts when timeframe changes
+  useEffect(() => {
+    if (resultViewMode === 'charts' && Object.keys(historicalData).length > 0) {
+      console.log('Reloading charts for timeframe:', chartTimeframe)
+      loadChartsData()
+    }
+  }, [chartTimeframe])
 
   const currentAlert = paramName ? alerts.find((a) => a.name === paramName) : null
 
