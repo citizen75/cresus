@@ -1,7 +1,6 @@
-import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { PortfolioProvider, usePortfolioContext } from '@/context/PortfolioContext'
-import HoldingsView from '@/components/portfolio/HoldingsView'
+import { PortfolioProvider } from '@/context/PortfolioContext'
+import PortfolioHoldingsWidget from '@/components/portfolio/PortfolioHoldingsWidget'
 
 const MAIN_TABS = [
   { id: 'overview', label: 'Overview' },
@@ -14,17 +13,6 @@ const MAIN_TABS = [
 
 function HoldingsPageContent() {
   const { name = 'main' } = useParams()
-  const { refetch } = usePortfolioContext()
-  const [isRefreshing, setIsRefreshing] = useState(false)
-
-  const handleRefresh = async () => {
-    setIsRefreshing(true)
-    try {
-      await refetch()
-    } finally {
-      setIsRefreshing(false)
-    }
-  }
 
   return (
     <div className="space-y-6">
@@ -53,17 +41,7 @@ function HoldingsPageContent() {
               <span className="text-lg">🚀</span>
             </div>
             <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <h1 className="text-3xl font-bold text-white capitalize">{name} Portfolio</h1>
-                <button
-                  onClick={handleRefresh}
-                  disabled={isRefreshing}
-                  className="p-2 text-slate-400 hover:text-white transition disabled:opacity-50"
-                  title="Refresh portfolio data"
-                >
-                  <span className={`text-xl ${isRefreshing ? 'animate-spin' : ''}`}>🔄</span>
-                </button>
-              </div>
+              <h1 className="text-3xl font-bold text-white capitalize">{name} Portfolio</h1>
               <p className="text-slate-400 text-sm">High growth companies and AI innovators.</p>
             </div>
           </div>
@@ -101,8 +79,10 @@ function HoldingsPageContent() {
         </div>
       </div>
 
-      {/* Holdings Content */}
-      <HoldingsView name={name} />
+      {/* Holdings Widget */}
+      <div className="h-[calc(100vh-300px)]">
+        <PortfolioHoldingsWidget portfolioName={name} />
+      </div>
     </div>
   )
 }
