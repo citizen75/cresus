@@ -114,6 +114,16 @@ const WidgetRenderer = ({ widget }: { widget: MessageWidget }) => {
         </div>
       )
 
+    case 'results_widget':
+      return (
+        <div className="mt-2 bg-slate-700/30 rounded p-2 border border-slate-600">
+          <div className="text-xs font-semibold text-slate-300 mb-2">Alert Results:</div>
+          <div className="text-xs text-slate-400">
+            <p>Click message to view full results</p>
+          </div>
+        </div>
+      )
+
     default:
       return null
   }
@@ -134,6 +144,7 @@ export function ConversationWidget({
   const { messages: allMessages, connected: allConnected, loading: allLoading, error: allError, subscribeToConversation, unsubscribeFromConversation, deleteMessage } = useConversation()
   const [inputValue, setInputValue] = useState('')
   const [sending, setSending] = useState(false)
+  const [selectedMessage, setSelectedMessage] = useState<any>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const conversationKeyRef = useRef<string>('')
 
@@ -220,8 +231,10 @@ export function ConversationWidget({
         </div>
       </div>
 
-      {/* Messages */}
-      <div className={`flex-1 overflow-y-auto p-4 space-y-3 ${maxHeight}`}>
+      {/* Main Content - Messages + Results Panel */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Messages */}
+        <div className={`${selectedMessage ? 'flex-0 w-1/3' : 'flex-1'} overflow-y-auto p-4 space-y-3 transition-all ${maxHeight}`}>
         {loading && (
           <p className="text-xs text-slate-500 text-center py-4">Loading conversation...</p>
         )}
@@ -244,7 +257,10 @@ export function ConversationWidget({
           const tickers = msg.tickers || parsedAlert?.tickers || []
 
           const handleMessageClick = () => {
-            if (portfolio && onPortfolioClick) {
+            // If message has results_widget and no portfolio, show ResultsWidget on right panel
+            if (msg.widget === 'results_widget' && !portfolio) {
+              setSelectedMessage(msg)
+            } else if (portfolio && onPortfolioClick) {
               onPortfolioClick(portfolio, tickers, msg.widget)
             }
           }
@@ -317,6 +333,42 @@ export function ConversationWidget({
         })}
 
         <div ref={messagesEndRef} />
+        </div>
+
+        {/* Results Widget Panel */}
+        {selectedMessage && selectedMessage.widget === 'results_widget' && (
+          <div className="flex-1 border-l border-slate-800 overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 flex-shrink-0">
+              <h3 className="text-sm font-semibold text-white">Alert Results</h3>
+              <button
+                onClick={() => setSelectedMessage(null)}
+                className="text-slate-400 hover:text-white transition"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              {selectedMessage.data?.results && (
+                <div className="h-full overflow-auto">
+                  {/* Render results table/data here */}
+                  <div className="p-4 text-xs text-slate-300">
+                    <div className="mb-2 font-semibold">{selectedMessage.data.alert_name}</div>
+                    <div className="space-y-1">
+                      {selectedMessage.data.results.map((result: any, idx: number) => (
+                        <div key={idx} className="flex justify-between">
+                          <span>{result.ticker}</span>
+                          {result.company_name && result.company_name !== result.ticker && (
+                            <span className="text-slate-500">{result.company_name}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Input Area */}

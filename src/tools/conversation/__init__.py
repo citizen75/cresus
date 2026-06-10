@@ -31,7 +31,9 @@ class ConversationMessage:
 		content: str,
 		portfolio: Optional[str] = None,
 		timestamp: Optional[datetime] = None,
-		message_id: Optional[str] = None
+		message_id: Optional[str] = None,
+		widget: Optional[str] = None,
+		data: Optional[dict] = None
 	):
 		"""Initialize a conversation message.
 
@@ -41,22 +43,31 @@ class ConversationMessage:
 			portfolio: Target portfolio (None = global)
 			timestamp: Message timestamp (defaults to now)
 			message_id: Unique message ID (defaults to UUID)
+			widget: Widget type to display (e.g., 'results_widget')
+			data: Additional data for the widget
 		"""
 		self.id = message_id or str(uuid.uuid4())
 		self.source = source
 		self.content = content
 		self.portfolio = portfolio
 		self.timestamp = timestamp or datetime.utcnow()
+		self.widget = widget
+		self.data = data
 
 	def to_dict(self) -> Dict[str, Any]:
 		"""Convert message to dictionary."""
-		return {
+		result = {
 			"id": self.id,
 			"source": self.source,
 			"content": self.content,
 			"portfolio": self.portfolio,
 			"datetime": self.timestamp.isoformat()
 		}
+		if self.widget:
+			result["widget"] = self.widget
+		if self.data:
+			result["data"] = self.data
+		return result
 
 	@classmethod
 	def from_dict(cls, data: Dict[str, Any]) -> "ConversationMessage":
@@ -67,7 +78,9 @@ class ConversationMessage:
 			content=data["content"],
 			portfolio=data.get("portfolio"),
 			timestamp=timestamp,
-			message_id=data.get("id")
+			message_id=data.get("id"),
+			widget=data.get("widget"),
+			data=data.get("data")
 		)
 
 
@@ -139,7 +152,9 @@ class ConversationManager:
 		source: ConversationSource,
 		content: str,
 		portfolio: Optional[str] = None,
-		timestamp: Optional[datetime] = None
+		timestamp: Optional[datetime] = None,
+		widget: Optional[str] = None,
+		data: Optional[dict] = None
 	) -> None:
 		"""Add a message to conversation history.
 
@@ -148,9 +163,11 @@ class ConversationManager:
 			content: Message content
 			portfolio: Target portfolio (None = global)
 			timestamp: Message timestamp (defaults to now)
+			widget: Widget type to display (e.g., 'results_widget')
+			data: Additional data for the widget
 		"""
 		with ConversationManager._lock:
-			message = ConversationMessage(source, content, portfolio, timestamp)
+			message = ConversationMessage(source, content, portfolio, timestamp, widget=widget, data=data)
 			ConversationManager._global_history.append(message)
 			self._save_history()
 

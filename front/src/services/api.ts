@@ -451,10 +451,12 @@ class CresusAPI {
     data?: any
   }) {
     // Send to global conversation (portfolio_name = "global")
-    // Format: { source, content }
+    // Format: { source, content, widget, data }
     const message = {
       source: 'alert',
       content: data.text,
+      widget: data.widget,
+      data: data.data,
     }
     return (await this.client.post('/conversations/global/message', message)).data
   }

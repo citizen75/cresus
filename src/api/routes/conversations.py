@@ -13,6 +13,8 @@ router = APIRouter(prefix="/conversations", tags=["conversations"])
 class ConversationMessage(BaseModel):
     source: Literal["user", "chatbot", "alert", "notification"]
     content: str
+    widget: Optional[str] = None
+    data: Optional[dict] = None
 
 
 class BulkAddMessagesRequest(BaseModel):
@@ -24,6 +26,8 @@ class MessageResponse(BaseModel):
     content: str
     datetime: str
     portfolio: Optional[str] = None
+    widget: Optional[str] = None
+    data: Optional[dict] = None
 
 
 class ConversationHistoryResponse(BaseModel):
@@ -214,7 +218,9 @@ async def add_message(portfolio_name: str, message: ConversationMessage):
         manager.add_message(
             source=message.source,
             content=message.content,
-            portfolio=portfolio_name
+            portfolio=portfolio_name,
+            widget=message.widget,
+            data=message.data
         )
 
         # Return updated history for this portfolio
