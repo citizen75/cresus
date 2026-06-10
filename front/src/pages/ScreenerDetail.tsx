@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '@/services/api'
 import TradingChart from '@/components/TradingChart'
 import CardChart from '@/components/CardChart'
+import ResultsWidget from '@/components/ResultsWidget'
 
 interface ScreenerConfig {
   name: string
@@ -712,239 +713,29 @@ export default function ScreenerDetail() {
         </div>
       )}
 
-      {/* Results Table */}
+      {/* Results Widget */}
       {!loadingResults && results.length > 0 && selectedResult !== null && (
-        <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-800">
-            <div className="flex items-center justify-between gap-4">
-              {/* Results Title */}
-              <h2 className="text-lg font-semibold text-white whitespace-nowrap">Results ({filteredAndSortedResults.length} of {selectedResult.length} matches)</h2>
-
-              {/* Search Input */}
-              <input
-                type="text"
-                placeholder="Search results..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="flex-1 px-4 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-slate-600"
-              />
-
-              {/* Timeframe Selector - shown only in charts view */}
-              {resultViewMode === 'charts' && (
-                <select
-                  value={chartTimeframe}
-                  onChange={(e) => setChartTimeframe(e.target.value as '1W' | '1M' | '3M' | 'YTD' | 'ALL')}
-                  className="px-4 py-1.5 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:border-slate-600 transition font-medium text-sm"
-                >
-                  <option value="1W">1W</option>
-                  <option value="1M">1M</option>
-                  <option value="3M">3M</option>
-                  <option value="YTD">YTD</option>
-                  <option value="ALL">ALL</option>
-                </select>
-              )}
-
-              {/* Table/Charts Toggle */}
-              <div className="flex gap-2 bg-slate-800 border border-slate-700 rounded-lg p-1">
-                <button
-                  onClick={() => handleViewModeChange('table')}
-                  className={`px-4 py-1.5 rounded transition font-medium text-sm whitespace-nowrap ${
-                    resultViewMode === 'table'
-                      ? 'bg-purple-600 text-white'
-                      : 'text-slate-400 hover:text-slate-300'
-                  }`}
-                >
-                  📊 Table
-                </button>
-                <button
-                  onClick={() => handleViewModeChange('charts')}
-                  className={`px-4 py-1.5 rounded transition font-medium text-sm whitespace-nowrap ${
-                    resultViewMode === 'charts'
-                      ? 'bg-purple-600 text-white'
-                      : 'text-slate-400 hover:text-slate-300'
-                  }`}
-                >
-                  📈 Charts
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Table View */}
-          {resultViewMode === 'table' && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-800/50 border-b border-slate-800">
-                <tr>
-                  {selectedResult.length > 0 &&
-                    Object.keys(selectedResult[0]).map((key) => (
-                      <th
-                        key={key}
-                        onClick={() => handleColumnSort(key)}
-                        className="px-6 py-3 text-left text-slate-300 font-medium cursor-pointer hover:bg-slate-700/50 transition"
-                      >
-                        <div className="flex items-center gap-2">
-                          {key}
-                          {sortColumn === key && (
-                            <span className="text-xs text-slate-400">
-                              {sortDirection === 'asc' ? '↑' : '↓'}
-                            </span>
-                          )}
-                        </div>
-                      </th>
-                    ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800">
-                {filteredAndSortedResults.map((row, idx) => (
-                  <tr
-                    key={idx}
-                    className="hover:bg-slate-800/50 cursor-pointer transition"
-                    onClick={() => {
-                      console.log('Row clicked:', row)
-                      setSelectedRow(row)
-                    }}
-                  >
-                    {Object.entries(row).map(([key, value], colIdx) => {
-                      let displayValue = String(value || '')
-                      const numValue = typeof value === 'number' ? value : parseFloat(String(value || 0))
-
-                      if (!isNaN(numValue)) {
-                        // Format volume with 0 decimal places
-                        if (key.toLowerCase().includes('volume') || key.toLowerCase().includes('vol')) {
-                          displayValue = numValue.toFixed(0)
-                        } else {
-                          // Format other numbers (prices) with 3 decimal places
-                          displayValue = numValue.toFixed(3)
-                        }
-                      }
-                      return (
-                        <td key={colIdx} className="px-6 py-3 text-slate-300">
-                          {displayValue}
-                        </td>
-                      )
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          )}
-
-          {/* Charts View */}
-          {resultViewMode === 'charts' && (
-            <div className="p-6">
-            {selectedResult.length === 0 ? (
-              <div className="text-center py-12 text-slate-400">
-                No matches in this result
-              </div>
-            ) : loadingCharts ? (
-              <div className="text-center py-12 text-slate-400">
-                Loading price history for {selectedResult.length} tickers...
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredAndSortedResults.map((row) => {
-                  const tickerHistory = historicalData[row.ticker] || []
-                  const filteredHistory = tickerHistory.length > 0 ? filterDataByTimeframe(tickerHistory, chartTimeframe) : []
-                  const chartData = filteredHistory.length > 0 ? filteredHistory : [
-                    {
-                      date: row.date,
-                      close: parseFloat(row.close),
-                      open: parseFloat(row.open),
-                      high: parseFloat(row.high),
-                      low: parseFloat(row.low),
-                      volume: parseFloat(row.volume),
-                    },
-                  ]
-
-                  // Calculate price change for timeframe
-                  let priceChange = 0
-                  if (filteredHistory.length > 1) {
-                    const firstPrice = filteredHistory[0]?.close || 0
-                    const lastPrice = filteredHistory[filteredHistory.length - 1]?.close || 0
-                    priceChange = firstPrice ? ((lastPrice - firstPrice) / firstPrice) * 100 : 0
-                  }
-
-                  return (
-                    <div key={row.ticker} className="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden hover:border-purple-600/50 transition">
-                      {/* Card Header */}
-                      <div className="bg-slate-800/50 border-b border-slate-800 p-4">
-                        <div className="flex items-start justify-between mb-3">
-                          <div>
-                            <p className="text-white font-bold text-lg">{row.name || row.ticker}</p>
-                            <p className="text-slate-400 text-xs">{row.ticker}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className={`text-2xl font-bold ${priceChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                              {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(1)}%
-                            </p>
-                            <p className="text-slate-400 text-xs">{chartTimeframe} Change</p>
-                          </div>
-                        </div>
-                        <div className="text-slate-400 text-xs">
-                          {row.name ? `${row.ticker} • ${row.name}` : row.ticker}
-                        </div>
-                      </div>
-
-                      {/* Chart */}
-                      {historicalData[row.ticker] && historicalData[row.ticker].length > 0 ? (
-                        <CardChart
-                          data={chartData}
-                          ticker={row.ticker}
-                          showVariation={false}
-                        />
-                      ) : (
-                        <div className="p-4 h-48 bg-slate-800/20 flex flex-col items-center justify-center gap-2">
-                          <p className="text-slate-500 text-sm">No historical data</p>
-                        </div>
-                      )}
-
-                      {/* Price Range Row */}
-                      {filteredHistory.length > 0 && (() => {
-                        const lowPrice = Math.min(...filteredHistory.map((d: any) => d.low || d.close))
-                        const highPrice = Math.max(...filteredHistory.map((d: any) => d.high || d.close))
-                        const currentPrice = parseFloat(row.close)
-                        return (
-                          <div className="border-t border-slate-800 px-4 py-3 bg-slate-800/30">
-                            <div className="flex justify-between items-center text-xs">
-                              <div className="flex flex-col items-center flex-1">
-                                <p className="text-slate-500 text-xs mb-1">{chartTimeframe} Low</p>
-                                <p className="text-white font-medium">{lowPrice.toFixed(2)}</p>
-                              </div>
-                              <div className="flex flex-col items-center flex-1">
-                                <p className="text-slate-500 text-xs mb-1">Current</p>
-                                <p className="text-white font-medium">{currentPrice.toFixed(2)}</p>
-                              </div>
-                              <div className="flex flex-col items-center flex-1">
-                                <p className="text-slate-500 text-xs mb-1">{chartTimeframe} High</p>
-                                <p className="text-white font-medium">{highPrice.toFixed(2)}</p>
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      })()}
-
-                      {/* Card Footer */}
-                      <div className="border-t border-slate-800 p-4 space-y-2">
-                        <div className="flex justify-between text-xs">
-                          <span className="text-slate-400">Volume</span>
-                          <span className="text-white font-medium">{(parseFloat(row.volume) / 1000000).toFixed(2)}M</span>
-                        </div>
-                        <button
-                          onClick={() => setSelectedRow(row)}
-                          className="w-full mt-3 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-medium transition"
-                        >
-                          View Full Chart
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-            </div>
-          )}
+        <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden flex flex-col">
+          <ResultsWidget
+            data={filteredAndSortedResults}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            sortColumn={sortColumn}
+            onSortChange={(col) => {
+              if (sortColumn === col) {
+                setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+              } else {
+                setSortColumn(col)
+                setSortDirection('asc')
+              }
+            }}
+            sortDirection={sortDirection}
+            onSortDirectionChange={setSortDirection}
+            historicalData={historicalData}
+            loadingCharts={loadingCharts}
+            chartTimeframe={chartTimeframe}
+            onChartTimeframeChange={setChartTimeframe}
+          />
         </div>
       )}
 
