@@ -24,7 +24,9 @@ export function TradingDialog({
   const [ticker, setTicker] = useState(initialTicker || '')
   const [tickerName, setTickerName] = useState('')
   const [price, setPrice] = useState<string>(String(initialPrice || ''))
-  const [quantity, setQuantity] = useState<string>('')
+  const [quantity, setQuantity] = useState<string>(
+    mode === 'sell' && position?.quantity ? String(position.quantity) : ''
+  )
   const [fees, setFees] = useState<string>('0')
   const [stopLoss, setStopLoss] = useState<string>('7') // Default 7%
   const [takeProfit, setTakeProfit] = useState<string>('2') // Default 2%
@@ -180,7 +182,7 @@ export function TradingDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className={`grid gap-2 ${mode === 'sell' ? 'grid-cols-1' : 'grid-cols-3'}`}>
             <div>
               <label className="text-xs text-slate-400">Fees</label>
               <input
@@ -191,26 +193,30 @@ export function TradingDialog({
                 className="w-full px-2 py-1 bg-slate-800 border border-slate-700 text-white text-sm rounded focus:outline-none focus:border-purple-600"
               />
             </div>
-            <div>
-              <label className="text-xs text-slate-400">Stop %</label>
-              <input
-                type="number"
-                step="0.1"
-                value={stopLoss}
-                onChange={(e) => setStopLoss(e.target.value)}
-                className="w-full px-2 py-1 bg-slate-800 border border-slate-700 text-white text-sm rounded focus:outline-none focus:border-purple-600"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-slate-400">Target %</label>
-              <input
-                type="number"
-                step="0.1"
-                value={takeProfit}
-                onChange={(e) => setTakeProfit(e.target.value)}
-                className="w-full px-2 py-1 bg-slate-800 border border-slate-700 text-white text-sm rounded focus:outline-none focus:border-purple-600"
-              />
-            </div>
+            {mode === 'buy' && (
+              <>
+                <div>
+                  <label className="text-xs text-slate-400">Stop %</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={stopLoss}
+                    onChange={(e) => setStopLoss(e.target.value)}
+                    className="w-full px-2 py-1 bg-slate-800 border border-slate-700 text-white text-sm rounded focus:outline-none focus:border-purple-600"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400">Target %</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={takeProfit}
+                    onChange={(e) => setTakeProfit(e.target.value)}
+                    className="w-full px-2 py-1 bg-slate-800 border border-slate-700 text-white text-sm rounded focus:outline-none focus:border-purple-600"
+                  />
+                </div>
+              </>
+            )}
           </div>
         </div>
 
