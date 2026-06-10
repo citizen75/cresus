@@ -51,7 +51,8 @@ export default function Dashboard() {
         console.log(`[Dashboard] Loaded ${messages.length} messages, looking for alert...`)
 
         if (messages.length > 0) {
-          console.log(`[Dashboard] Last 3 messages:`, messages.slice(-3).map((m: any) => ({ id: m.id, source: m.source, datetime: m.datetime })))
+          console.log(`[Dashboard] Last message full structure:`, messages[messages.length - 1])
+          console.log(`[Dashboard] Last 3 messages:`, messages.slice(-3).map((m: any) => ({ id: m.id, source: m.source, datetime: m.datetime, keys: Object.keys(m) })))
         }
 
         // Find the most recent alert message (with or without results_widget)
