@@ -300,10 +300,10 @@ export function ConversationWidget({
             }
           }
 
-          // Match by id or datetime (datetime is used when id is not available)
+          // Match by id (datetime fallback if id not available)
           const isSelected = (selectedMessageId && selectedMessageId === msg.id) || (selectedMessageDateTime && selectedMessageDateTime === msg.datetime)
           if (idx === messages.length - 1) {
-            console.log(`[ConversationWidget] Last message:`, { msgId: msg.id, datetime: msg.datetime, selectedId: selectedMessageId, selectedDateTime: selectedMessageDateTime, isSelected })
+            console.log(`[ConversationWidget] Last message:`, { msgId: msg.id, selectedId: selectedMessageId, isSelected })
           }
 
           return (

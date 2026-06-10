@@ -60,8 +60,7 @@ export default function Dashboard() {
           const msg = messages[i]
           if (msg.source === 'alert') {
             // Auto-select any alert message (will show results if available)
-            // Use datetime as ID since API messages don't have id field
-            console.log(`[Dashboard] ✓ Auto-selecting alert message:`, { datetime: msg.datetime, source: msg.source })
+            console.log(`[Dashboard] ✓ Auto-selecting alert message:`, { id: msg.id, datetime: msg.datetime, source: msg.source })
             setSelectedAlertMessage(msg)
 
             // Parse alert content for legacy support

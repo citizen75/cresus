@@ -22,6 +22,7 @@ class BulkAddMessagesRequest(BaseModel):
 
 
 class MessageResponse(BaseModel):
+    id: str
     source: str
     content: str
     datetime: str
