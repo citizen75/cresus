@@ -62,6 +62,7 @@ interface ConversationWidgetProps {
   onSendMessage?: (message: string) => Promise<void>
   onPortfolioClick?: (portfolioName: string, tickers: string[], widget?: MessageWidget) => void
   onNewMessage?: (message: ConversationMessage) => void
+  autoSelectLatestAlert?: boolean // Auto-select latest alert in right panel
 }
 
 // Dynamic widget loader
@@ -139,7 +140,8 @@ export function ConversationWidget({
   maxHeight = 'h-96',
   onSendMessage,
   onPortfolioClick,
-  onNewMessage
+  onNewMessage,
+  autoSelectLatestAlert = false
 }: ConversationWidgetProps) {
   const { messages: allMessages, connected: allConnected, loading: allLoading, error: allError, subscribeToConversation, unsubscribeFromConversation, deleteMessage } = useConversation()
   const [inputValue, setInputValue] = useState('')
@@ -175,6 +177,17 @@ export function ConversationWidget({
       console.log(`[ConversationWidget] Component unmounting: ${key} (connection stays open)`)
     }
   }, [portfolioName, sourceFilter, subscribeToConversation, onNewMessage])
+
+  // Auto-select latest alert message if enabled
+  useEffect(() => {
+    if (autoSelectLatestAlert && messages.length > 0) {
+      // Find the most recent alert message with results_widget
+      const latestAlert = [...messages].reverse().find(msg => msg.widget === 'results_widget' && msg.data?.results)
+      if (latestAlert) {
+        setSelectedMessage(latestAlert)
+      }
+    }
+  }, [autoSelectLatestAlert, messages])
 
   const formatMessageDate = (dateString: string) => {
     const date = new Date(dateString)
