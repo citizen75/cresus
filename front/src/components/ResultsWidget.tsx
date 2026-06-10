@@ -405,7 +405,12 @@ export default function ResultsWidget({
                 return (
                   <div
                     key={ticker}
-                    onClick={() => setSelectedTickerForChart(ticker)}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      console.log(`[ResultsWidget] Chart clicked: ${ticker}`)
+                      setSelectedTickerForChart(ticker)
+                    }}
                     className="bg-slate-800 rounded-lg overflow-hidden border border-slate-700 flex flex-col h-full cursor-pointer hover:border-slate-600 transition"
                   >
                     <div className="p-4 border-b border-slate-700 flex-shrink-0 bg-slate-900/50">
