@@ -89,8 +89,9 @@ async def get_watchlist(strategy_name: str, limit: Optional[int] = None):
 				"total_score": 0,
 			}
 
-		# Sort by signal_score descending
-		df = df.sort_values('signal_score', ascending=False)
+		# Sort by signal_score if it exists, otherwise keep order
+		if 'signal_score' in df.columns:
+			df = df.sort_values('signal_score', ascending=False)
 
 		# Apply limit if specified
 		if limit and limit > 0:
@@ -109,7 +110,7 @@ async def get_watchlist(strategy_name: str, limit: Optional[int] = None):
 			"strategy": strategy_name,
 			"watchlist": records,
 			"count": len(records),
-			"total_score": float(df['signal_score'].sum()) if not df.empty else 0,
+			"total_score": float(df['signal_score'].sum()) if 'signal_score' in df.columns and not df.empty else 0,
 		}
 
 	except HTTPException:
