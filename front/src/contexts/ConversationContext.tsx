@@ -98,10 +98,18 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
             }
             setLoading((prev) => ({ ...prev, [key]: false }))
           } else if (message.type === 'message') {
-            setMessages((prev) => ({
-              ...prev,
-              [key]: [...(prev[key] || []), message.data],
-            }))
+            setMessages((prev) => {
+              const existingMessages = prev[key] || []
+              // Check if message already exists by ID to avoid duplicates
+              const messageExists = existingMessages.some((m) => m.id === message.data.id)
+              if (messageExists) {
+                return prev // Message already exists, don't add duplicate
+              }
+              return {
+                ...prev,
+                [key]: [...existingMessages, message.data],
+              }
+            })
             // Notify all listeners
             const conn = connectionsRef.current.get(key)
             if (conn) {
