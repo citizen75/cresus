@@ -19,17 +19,21 @@ def _get_ticker_metadata(ticker: str) -> Dict[str, Any]:
 	name = ''
 
 	try:
-		# Try to get company name from yfinance
+		# Try to get company name and price from yfinance
 		import yfinance as yf
 		try:
 			ticker_info = yf.Ticker(ticker)
 			info = ticker_info.info
 			name = info.get('longName') or info.get('shortName') or ''
+			close_price = info.get('currentPrice') or info.get('regularMarketPrice')
 		except:
-			# Fallback: try from history
+			pass
+
+		# If price not in info, try downloading
+		if close_price is None:
 			try:
 				data = yf.download(ticker, period="1d", progress=False)
-				if not data.empty:
+				if not data.empty and 'Close' in data.columns:
 					close_price = float(data['Close'].iloc[-1])
 			except:
 				pass
