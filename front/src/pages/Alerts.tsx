@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../services/api'
 import CardChart from '@/components/CardChart'
 
@@ -17,11 +18,13 @@ interface Alert {
 }
 
 export default function Alerts() {
+  const { name: paramName } = useParams<{ name?: string }>()
+  const navigate = useNavigate()
+
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [selectedAlert, setSelectedAlert] = useState<string | null>(null)
   const [editingAlert, setEditingAlert] = useState<Alert | null>(null)
   const [runningAlert, setRunningAlert] = useState<string | null>(null)
   const [runResults, setRunResults] = useState<any>(null)
@@ -67,6 +70,13 @@ export default function Alerts() {
       fetchAlerts()
     }
   }, [runResults])
+
+  // Load saved results when alert name changes from URL
+  useEffect(() => {
+    if (paramName) {
+      loadSavedResults(paramName)
+    }
+  }, [paramName])
 
   const fetchAlerts = async () => {
     try {
@@ -168,8 +178,8 @@ export default function Alerts() {
     if (!confirm(`Delete alert "${name}"?`)) return
     try {
       await api.deleteAlert(name)
-      if (selectedAlert === name) {
-        setSelectedAlert(null)
+      if (paramName === name) {
+        navigate('/alerts')
         setEditingAlert(null)
       }
       await fetchAlerts()
@@ -310,7 +320,7 @@ export default function Alerts() {
     }
   }, [chartTimeframe])
 
-  const currentAlert = selectedAlert ? alerts.find((a) => a.name === selectedAlert) : null
+  const currentAlert = paramName ? alerts.find((a) => a.name === paramName) : null
 
   return (
     <div className="h-full flex flex-col gap-4">
@@ -395,7 +405,7 @@ export default function Alerts() {
                     <div
                       key={alert.name}
                       onClick={() => {
-                        setSelectedAlert(alert.name)
+                        navigate(`/alerts/${alert.name}`)
                         loadSavedResults(alert.name)
                       }}
                       className="bg-slate-900 border border-slate-800 rounded-lg p-4 cursor-pointer hover:border-purple-500 transition"
@@ -433,7 +443,7 @@ export default function Alerts() {
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg font-semibold text-white">Configuration</h2>
                     <button
-                      onClick={() => setSelectedAlert(null)}
+                      onClick={() => navigate('/alerts')}
                       className="text-slate-400 hover:text-slate-200"
                     >
                       ✕
