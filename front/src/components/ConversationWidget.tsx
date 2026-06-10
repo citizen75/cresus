@@ -249,7 +249,7 @@ export function ConversationWidget({
 
           return (
             <div
-              key={msg.id || idx}
+              key={`${msg.datetime}-${idx}`}
               className="rounded-lg p-3 bg-slate-800/50 border border-slate-700/50 space-y-2 cursor-pointer hover:bg-slate-700/50 transition group"
               onClick={handleMessageClick}
             >
