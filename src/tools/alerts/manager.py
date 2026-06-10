@@ -144,7 +144,7 @@ class AlertManager:
 
         try:
             # Update allowed fields
-            for key in ['formula', 'enabled', 'description', 'tags', 'notify']:
+            for key in ['formula', 'enabled', 'description', 'tags', 'notify', 'source', 'source_value']:
                 if key in kwargs:
                     if key == 'notify' and isinstance(kwargs[key], str):
                         setattr(alert, key, AlertNotifyTarget(kwargs[key]))
