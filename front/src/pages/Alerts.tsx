@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../services/api'
+import CardChart from '@/components/CardChart'
 
 interface Alert {
   name: string
@@ -34,6 +35,9 @@ export default function Alerts() {
   const [resultSearchQuery, setResultSearchQuery] = useState('')
   const [resultSortColumn, setResultSortColumn] = useState<string | null>('ticker')
   const [resultSortDirection, setResultSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [chartTimeframe, setChartTimeframe] = useState<'1W' | '1M' | '3M' | 'YTD' | 'ALL'>('1M')
+  const [historicalData, setHistoricalData] = useState<{ [ticker: string]: any[] }>({})
+  const [loadingCharts, setLoadingCharts] = useState(false)
   const [newAlertData, setNewAlertData] = useState({
     name: '',
     source: 'universe',
@@ -232,6 +236,65 @@ export default function Alerts() {
       return bStr.localeCompare(aStr)
     }
   })
+
+  const getDaysForTimeframe = (tf: '1W' | '1M' | '3M' | 'YTD' | 'ALL') => {
+    switch (tf) {
+      case '1W':
+        return 7
+      case '1M':
+        return 30
+      case '3M':
+        return 90
+      case 'YTD':
+        return 365
+      case 'ALL':
+        return 1825
+      default:
+        return 30
+    }
+  }
+
+  const loadChartsData = async () => {
+    if (!sortedResults || sortedResults.length === 0) return
+
+    setLoadingCharts(true)
+    const data: { [ticker: string]: any[] } = {}
+
+    for (const match of sortedResults) {
+      const ticker = match.ticker
+      if (!ticker) continue
+
+      try {
+        const response = await api.getHistoricalData(ticker, getDaysForTimeframe(chartTimeframe))
+        if (response && Array.isArray(response)) {
+          data[ticker] = response
+        } else if (response && response.history && Array.isArray(response.history)) {
+          data[ticker] = response.history
+        } else if (response && response.data && Array.isArray(response.data)) {
+          data[ticker] = response.data
+        }
+      } catch (err) {
+        console.error(`Failed to load data for ${ticker}:`, err)
+      }
+    }
+
+    setHistoricalData(data)
+    setLoadingCharts(false)
+  }
+
+  // Load charts when switching to charts view
+  useEffect(() => {
+    if (resultViewMode === 'charts' && sortedResults.length > 0 && Object.keys(historicalData).length === 0) {
+      loadChartsData()
+    }
+  }, [resultViewMode, sortedResults.length])
+
+  // Reload charts when timeframe changes
+  useEffect(() => {
+    if (resultViewMode === 'charts') {
+      loadChartsData()
+    }
+  }, [chartTimeframe])
 
   const currentAlert = selectedAlert ? alerts.find((a) => a.name === selectedAlert) : null
 
@@ -634,11 +697,58 @@ export default function Alerts() {
 
                   {/* Charts View */}
                   {resultViewMode === 'charts' && (
-                    <div className="flex-1 overflow-auto p-6 flex items-center justify-center">
-                      <div className="text-center text-slate-500">
-                        <p className="text-lg mb-2">📈 Charts View</p>
-                        <p className="text-sm">Chart visualization coming soon</p>
+                    <div className="flex-1 overflow-auto p-6">
+                      {/* Timeframe Toggle */}
+                      <div className="flex gap-2 mb-6 flex-shrink-0">
+                        {(['1W', '1M', '3M', 'YTD', 'ALL'] as const).map((tf) => (
+                          <button
+                            key={tf}
+                            onClick={() => setChartTimeframe(tf)}
+                            className={`px-3 py-2 rounded text-sm font-medium transition ${
+                              chartTimeframe === tf
+                                ? 'bg-purple-600 text-white'
+                                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                            }`}
+                          >
+                            {tf}
+                          </button>
+                        ))}
                       </div>
+
+                      {loadingCharts ? (
+                        <div className="flex items-center justify-center h-96">
+                          <div className="text-slate-400">Loading charts...</div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {sortedResults.map((match: any) => {
+                            const ticker = match.ticker
+                            const chartData = historicalData[ticker] || []
+                            return (
+                              <div key={ticker} className="bg-slate-800 rounded-lg overflow-hidden border border-slate-700">
+                                <div className="p-4 border-b border-slate-700">
+                                  <h3 className="font-semibold text-white">{ticker}</h3>
+                                  <p className="text-xs text-slate-400">{match.company_name || '—'}</p>
+                                </div>
+                                <div className="p-4 h-64">
+                                  {chartData && chartData.length > 0 ? (
+                                    <CardChart
+                                      ticker={ticker}
+                                      data={chartData}
+                                      height={240}
+                                      showLegend={false}
+                                    />
+                                  ) : (
+                                    <div className="flex items-center justify-center h-full text-slate-500">
+                                      <p className="text-xs">No data available</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
