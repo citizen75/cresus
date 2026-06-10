@@ -30,6 +30,10 @@ export default function Alerts() {
   const [logsLoading, setLogsLoading] = useState(false)
   const [editMode, setEditMode] = useState(false)
   const [formData, setFormData] = useState<Partial<Alert>>({})
+  const [resultViewMode, setResultViewMode] = useState<'table' | 'charts'>('table')
+  const [resultSearchQuery, setResultSearchQuery] = useState('')
+  const [resultSortColumn, setResultSortColumn] = useState<string | null>('ticker')
+  const [resultSortDirection, setResultSortDirection] = useState<'asc' | 'desc'>('asc')
   const [newAlertData, setNewAlertData] = useState({
     name: '',
     source: 'universe',
@@ -182,6 +186,40 @@ export default function Alerts() {
     if (days < 7) return `${days}d ago`
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   }
+
+  const getResultColumns = () => {
+    if (!runResults?.matches || runResults.matches.length === 0) return []
+    const firstMatch = runResults.matches[0]
+    return Object.keys(firstMatch).filter((key) => key !== 'Index')
+  }
+
+  const filteredResults = runResults?.matches
+    ? runResults.matches.filter((match: any) => {
+        if (!resultSearchQuery.trim()) return true
+        const query = resultSearchQuery.toLowerCase()
+        return Object.values(match).some((val) =>
+          String(val).toLowerCase().includes(query)
+        )
+      })
+    : []
+
+  const sortedResults = [...filteredResults].sort((a: any, b: any) => {
+    if (!resultSortColumn) return 0
+    const aVal = a[resultSortColumn]
+    const bVal = b[resultSortColumn]
+
+    if (typeof aVal === 'number' && typeof bVal === 'number') {
+      return resultSortDirection === 'asc' ? aVal - bVal : bVal - aVal
+    }
+
+    const aStr = String(aVal).toLowerCase()
+    const bStr = String(bVal).toLowerCase()
+    if (resultSortDirection === 'asc') {
+      return aStr.localeCompare(bStr)
+    } else {
+      return bStr.localeCompare(aStr)
+    }
+  })
 
   const currentAlert = selectedAlert ? alerts.find((a) => a.name === selectedAlert) : null
 
@@ -478,28 +516,107 @@ export default function Alerts() {
 
               {/* Results Table (Bottom) */}
               {currentAlert && runResults && runResults.matches && runResults.matches.length > 0 && (
-                <div className="bg-slate-900 border border-slate-800 rounded-lg p-6 max-h-64 overflow-auto">
-                  <h3 className="text-lg font-semibold text-white mb-4">Matches ({runResults.matches.length})</h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="border-b border-slate-700">
-                          <th className="px-4 py-2 text-left text-slate-400">Ticker</th>
-                          <th className="px-4 py-2 text-right text-slate-400">Price</th>
-                          <th className="px-4 py-2 text-right text-slate-400">Volume</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-800">
-                        {runResults.matches.map((match: any, idx: number) => (
-                          <tr key={idx} className="hover:bg-slate-800/50">
-                            <td className="px-4 py-2 text-white font-medium">{match.ticker}</td>
-                            <td className="px-4 py-2 text-right text-slate-300">{match.close?.toFixed(2)}</td>
-                            <td className="px-4 py-2 text-right text-slate-300">{match.volume?.toLocaleString() || '—'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden flex flex-col flex-1 min-h-0">
+                  {/* Results Header */}
+                  <div className="bg-slate-800 px-6 py-4 border-b border-slate-700 flex items-center justify-between flex-shrink-0">
+                    <h3 className="font-semibold text-white">
+                      Results ({filteredResults.length} of {runResults.matches.length} matches)
+                    </h3>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setResultViewMode('table')}
+                        className={`px-3 py-1 rounded text-sm font-medium transition ${
+                          resultViewMode === 'table'
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
+                      >
+                        📊 Table
+                      </button>
+                      <button
+                        onClick={() => setResultViewMode('charts')}
+                        className={`px-3 py-1 rounded text-sm font-medium transition ${
+                          resultViewMode === 'charts'
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
+                      >
+                        📈 Charts
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Search Bar */}
+                  <div className="px-6 py-3 border-b border-slate-700 flex-shrink-0">
+                    <input
+                      type="text"
+                      placeholder="Search results..."
+                      value={resultSearchQuery}
+                      onChange={(e) => setResultSearchQuery(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+
+                  {/* Table View */}
+                  {resultViewMode === 'table' && (
+                    <div className="flex-1 overflow-auto">
+                      <table className="w-full text-xs">
+                        <thead className="sticky top-0 bg-slate-800 border-b border-slate-700">
+                          <tr>
+                            {getResultColumns().map((col) => (
+                              <th
+                                key={col}
+                                onClick={() => {
+                                  if (resultSortColumn === col) {
+                                    setResultSortDirection(
+                                      resultSortDirection === 'asc' ? 'desc' : 'asc'
+                                    )
+                                  } else {
+                                    setResultSortColumn(col)
+                                    setResultSortDirection('asc')
+                                  }
+                                }}
+                                className="px-4 py-3 text-left text-slate-400 font-medium cursor-pointer hover:text-slate-300 transition whitespace-nowrap"
+                              >
+                                {col}
+                                {resultSortColumn === col && (
+                                  <span className="ml-1">
+                                    {resultSortDirection === 'asc' ? '↑' : '↓'}
+                                  </span>
+                                )}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800">
+                          {sortedResults.map((match: any, idx: number) => (
+                            <tr key={idx} className="hover:bg-slate-800/50 transition">
+                              {getResultColumns().map((col) => (
+                                <td
+                                  key={`${idx}-${col}`}
+                                  className="px-4 py-3 text-slate-300 whitespace-nowrap"
+                                >
+                                  {typeof match[col] === 'number'
+                                    ? match[col].toFixed(3)
+                                    : match[col]}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* Charts View */}
+                  {resultViewMode === 'charts' && (
+                    <div className="flex-1 overflow-auto p-6 flex items-center justify-center">
+                      <div className="text-center text-slate-500">
+                        <p className="text-lg mb-2">📈 Charts View</p>
+                        <p className="text-sm">Chart visualization coming soon</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </>
