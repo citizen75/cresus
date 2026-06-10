@@ -1,8 +1,5 @@
 import { useState, useEffect } from 'react'
 import { api } from '../services/api'
-import TradingChart from '@/components/TradingChart'
-import { AlertMessageRenderer } from '@/components/AlertMessageRenderer'
-import { ConversationWidget } from '@/components/ConversationWidget'
 
 interface Alert {
   name: string
@@ -18,38 +15,29 @@ interface Alert {
   tags?: string[]
 }
 
-
 export default function Alerts() {
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [selectedAlert, setSelectedAlert] = useState<string | null>(null)
   const [editingAlert, setEditingAlert] = useState<Alert | null>(null)
   const [runningAlert, setRunningAlert] = useState<string | null>(null)
   const [runResults, setRunResults] = useState<any>(null)
-  const [showRunResults, setShowRunResults] = useState(false)
   const [activeTab, setActiveTab] = useState<'alerts' | 'logs'>('alerts')
   const [selectedAlertForLogs, setSelectedAlertForLogs] = useState<string | null>(null)
   const [logs, setLogs] = useState<string[]>([])
   const [logsLoading, setLogsLoading] = useState(false)
-
-  // Portfolio selector for conversation widget
-  const [selectedPortfolio, setSelectedPortfolio] = useState<string>('')
-  const [portfolios, setPortfolios] = useState<string[]>([])
-
-  const [formData, setFormData] = useState({
+  const [editMode, setEditMode] = useState(false)
+  const [formData, setFormData] = useState<Partial<Alert>>({})
+  const [newAlertData, setNewAlertData] = useState({
     name: '',
-    source: 'ticker',
-    source_value: '',
+    source: 'universe',
+    source_value: 'cac40',
     formula: '',
     notify: 'conversation',
     description: '',
   })
-
-  // Chart view state
-  const [showChartModal, setShowChartModal] = useState(false)
-  const [chartTicker, setChartTicker] = useState<string>('')
-  const [chartTimeframe, setChartTimeframe] = useState('1D')
 
   // Fetch alerts on mount
   useEffect(() => {
@@ -58,11 +46,10 @@ export default function Alerts() {
 
   // Auto-refresh alerts periodically (skip while alert is running)
   useEffect(() => {
-    if (runningAlert) return // Skip auto-refresh while running
-    const interval = setInterval(fetchAlerts, 5000) // Refresh every 5 seconds
+    if (runningAlert) return
+    const interval = setInterval(fetchAlerts, 5000)
     return () => clearInterval(interval)
   }, [runningAlert])
-
 
   // Refresh alerts list when results arrive
   useEffect(() => {
@@ -71,30 +58,11 @@ export default function Alerts() {
     }
   }, [runResults])
 
-  // Fetch portfolios on mount
-  useEffect(() => {
-    const fetchPortfolios = async () => {
-      try {
-        const response = await api.listPortfolios()
-        const portfolioList = response.portfolios || []
-        const realPortfolios = portfolioList.filter((p: any) => p.type === 'real')
-        setPortfolios(realPortfolios.map((p: any) => p.name))
-        if (realPortfolios.length > 0) {
-          setSelectedPortfolio(realPortfolios[0].name)
-        }
-      } catch (err) {
-        console.error('Error fetching portfolios:', err)
-      }
-    }
-    fetchPortfolios()
-  }, [])
-
   const fetchAlerts = async () => {
     try {
       setLoading(true)
       setError(null)
       const response = await api.listAlerts()
-      console.log('Alerts response:', response)
       setAlerts(response.alerts || [])
     } catch (err) {
       const errorMsg = `Failed to load alerts: ${err instanceof Error ? err.message : 'Unknown error'}`
@@ -119,131 +87,85 @@ export default function Alerts() {
     }
   }
 
-
-  const handleCreateAlert = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const runAlert = async (name: string) => {
+    setRunningAlert(name)
     try {
-      setError(null)
-      await api.createAlert(formData)
-      closeModals()
-      await fetchAlerts()
-    } catch (err) {
-      setError(`Failed to create alert: ${err instanceof Error ? err.message : 'Unknown error'}`)
-    }
-  }
-
-  const handleUpdateAlert = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!editingAlert) return
-
-    try {
-      setError(null)
-      await api.updateAlert(editingAlert.name, {
-        formula: formData.formula,
-        notify: formData.notify,
-        description: formData.description,
-        enabled: editingAlert.enabled,
-      })
-      closeModals()
-      await fetchAlerts()
-    } catch (err) {
-      setError(`Failed to update alert: ${err instanceof Error ? err.message : 'Unknown error'}`)
-    }
-  }
-
-  const handleDeleteAlert = async (name: string) => {
-    if (!confirm(`Delete alert "${name}"?`)) return
-
-    try {
-      setError(null)
-      await api.deleteAlert(name)
-      await fetchAlerts()
-    } catch (err) {
-      setError(`Failed to delete alert: ${err instanceof Error ? err.message : 'Unknown error'}`)
-    }
-  }
-
-  const handleToggleEnabled = async (alert: Alert) => {
-    try {
-      setError(null)
-      await api.updateAlert(alert.name, {
-        enabled: !alert.enabled,
-      })
-      await fetchAlerts()
-    } catch (err) {
-      setError(`Failed to update alert: ${err instanceof Error ? err.message : 'Unknown error'}`)
-    }
-  }
-
-  const handleRunAlert = async (name: string) => {
-    try {
-      setError(null)
-      setRunningAlert(name)
       const response = await api.runAlert(name)
       setRunResults(response)
-      setShowRunResults(true)
+      setError(null)
     } catch (err) {
-      setError(`Failed to run alert: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      setError(err instanceof Error ? err.message : 'Failed to run alert')
     } finally {
       setRunningAlert(null)
     }
   }
 
-  const openEditModal = (alert: Alert) => {
+  const createAlert = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      await api.createAlert(newAlertData)
+      setNewAlertData({
+        name: '',
+        source: 'universe',
+        source_value: 'cac40',
+        formula: '',
+        notify: 'conversation',
+        description: '',
+      })
+      setShowCreateModal(false)
+      await fetchAlerts()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create alert')
+    }
+  }
+
+  const startEdit = (alert: Alert) => {
     setEditingAlert(alert)
     setFormData({
-      name: alert.name,
-      source: alert.source,
-      source_value: alert.source_value || '',
       formula: alert.formula,
+      description: alert.description,
       notify: alert.notify,
-      description: alert.description || '',
+      enabled: alert.enabled,
     })
-    setShowCreateModal(true)
+    setEditMode(true)
   }
 
-  const openChart = (ticker: string) => {
-    setChartTicker(ticker)
-    setShowChartModal(true)
-  }
-
-  const closeModals = () => {
-    setShowCreateModal(false)
+  const cancelEdit = () => {
+    setEditMode(false)
     setEditingAlert(null)
+    setFormData({})
+  }
+
+  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.currentTarget as HTMLInputElement
     setFormData({
-      name: '',
-      source: 'ticker',
-      source_value: '',
-      formula: '',
-      notify: 'conversation',
-      description: '',
+      ...formData,
+      [name]: type === 'checkbox' ? (e.currentTarget as HTMLInputElement).checked : value,
     })
   }
 
-  const sourceOptions = [
-    { value: 'ticker', label: 'Single Ticker' },
-    { value: 'tickers', label: 'Multiple Tickers (comma-separated)' },
-    { value: 'universe', label: 'Universe' },
-    { value: 'portfolio', label: 'Portfolio' },
-    { value: 'all_portfolios', label: 'All Real Portfolios' },
-  ]
+  const saveAlert = async (name: string) => {
+    try {
+      await api.updateAlert(name, formData)
+      cancelEdit()
+      await fetchAlerts()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update alert')
+    }
+  }
 
-  const notifyOptions = [
-    { value: 'conversation', label: 'Conversation (per portfolio)' },
-    { value: 'global', label: 'Global (all matches)' },
-    { value: 'email', label: 'Email' },
-    { value: 'webhook', label: 'Webhook' },
-  ]
-
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return 'Never'
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
+  const deleteAlert = async (name: string) => {
+    if (!confirm(`Delete alert "${name}"?`)) return
+    try {
+      await api.deleteAlert(name)
+      if (selectedAlert === name) {
+        setSelectedAlert(null)
+        setEditingAlert(null)
+      }
+      await fetchAlerts()
+    } catch (err) {
+      setError('Failed to delete alert')
+    }
   }
 
   const formatMessageDate = (dateString: string) => {
@@ -260,6 +182,8 @@ export default function Alerts() {
     if (days < 7) return `${days}d ago`
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   }
+
+  const currentAlert = selectedAlert ? alerts.find((a) => a.name === selectedAlert) : null
 
   return (
     <div className="h-full flex flex-col gap-4">
@@ -279,10 +203,7 @@ export default function Alerts() {
             ⟳
           </button>
           <button
-            onClick={() => {
-              setEditingAlert(null)
-              setShowCreateModal(true)
-            }}
+            onClick={() => setShowCreateModal(true)}
             className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition"
           >
             + Create Alert
@@ -314,504 +235,452 @@ export default function Alerts() {
         </button>
       </div>
 
-      {/* Split Layout (Alerts Tab) */}
+      {/* Alert Editor (Like Screener Detail) */}
       {activeTab === 'alerts' && (
-      <div className="flex-1 flex gap-4 px-4 min-h-0 overflow-hidden">
-        {/* Left: Alerts Management */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          {/* Error Message */}
+        <div className="flex-1 flex flex-col gap-4 px-4 min-h-0 overflow-hidden">
           {error && (
-            <div className="bg-red-900/50 border border-red-700 rounded-lg p-4 text-red-300 flex items-start justify-between gap-4 mb-4">
+            <div className="bg-red-900/50 border border-red-700 rounded-lg p-4 text-red-300 flex items-start justify-between gap-4">
               <div>
                 <p className="font-bold mb-1">Error</p>
                 <p className="text-sm">{error}</p>
               </div>
-              <button
-                onClick={() => setError(null)}
-                className="text-red-300 hover:text-red-100 flex-shrink-0"
-              >
+              <button onClick={() => setError(null)} className="text-red-300 hover:text-red-100">
                 ✕
               </button>
             </div>
           )}
 
-          {/* Alerts List */}
-          <div className="flex-1 overflow-y-auto">
-            {loading ? (
-              <div className="bg-slate-900/50 rounded-lg p-12 border border-slate-800 text-center">
-                <p className="text-slate-400">Loading alerts...</p>
-              </div>
-            ) : alerts.length === 0 ? (
-              <div className="bg-slate-900/50 rounded-lg p-8 border border-slate-800 text-center">
-                <p className="text-slate-400 text-lg mb-2">No alerts configured</p>
-                <p className="text-slate-500 text-sm">Create your first alert to monitor screener formulas</p>
-              </div>
-            ) : (
-              <div className="space-y-1.5">
-                {alerts.map((alert) => {
-                  const tickerFromSource = alert.source === 'ticker' ? alert.source_value : null
-
-                  return (
-                  <div
-                    key={alert.name}
-                    className="bg-slate-900/30 border border-slate-800 rounded p-2.5 hover:border-slate-700 hover:bg-slate-900/50 transition cursor-pointer group"
-                    onClick={() => {
-                      if (tickerFromSource) {
-                        openChart(tickerFromSource)
-                      }
-                    }}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      {/* Alert Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className={`text-sm font-bold ${tickerFromSource ? 'text-purple-400 group-hover:text-purple-300 cursor-pointer' : 'text-white'}`}>
-                            {alert.name}
-                            {tickerFromSource && <span className="text-xs text-slate-500 ml-1">(view chart)</span>}
-                          </h3>
-                          <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${
-                            alert.enabled
-                              ? 'bg-green-900/30 border border-green-800 text-green-400'
-                              : 'bg-slate-800 text-slate-400'
-                          }`}>
-                            {alert.enabled ? '✓' : '○'}
-                          </span>
-                          <span className="text-xs text-slate-500">
-                            {alert.source}
-                            {alert.source_value && ` (${alert.source_value})`}
-                          </span>
-                        </div>
-                        <div className="text-xs text-slate-500 mt-1 flex gap-3 overflow-hidden">
-                          <code className="text-slate-400 overflow-hidden text-ellipsis">
-                            {alert.formula.substring(0, 40)}{alert.formula.length > 40 ? '...' : ''}
-                          </code>
-                          <span>Last: {formatDate(alert.last_run)}</span>
-                        </div>
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        <button
-                          onClick={() => handleRunAlert(alert.name)}
-                          disabled={runningAlert === alert.name}
-                          className="px-2 py-1 text-xs bg-blue-900/30 hover:bg-blue-900/50 border border-blue-800 text-blue-400 rounded transition disabled:opacity-50"
-                          title="Run alert"
-                        >
-                          {runningAlert === alert.name ? '⟳' : '▶'}
-                        </button>
-                        <button
-                          onClick={() => handleToggleEnabled(alert)}
-                          className={`px-2 py-1 text-xs rounded transition border ${
-                            alert.enabled
-                              ? 'bg-green-900/30 hover:bg-green-900/50 border-green-800 text-green-400'
-                              : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-400'
-                          }`}
-                          title={alert.enabled ? 'Disable' : 'Enable'}
-                        >
-                          {alert.enabled ? '✓' : '○'}
-                        </button>
-                        <button
-                          onClick={() => openEditModal(alert)}
-                          className="px-2 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition"
-                          title="Edit"
-                        >
-                          ✎
-                        </button>
-                        <button
-                          onClick={() => handleDeleteAlert(alert.name)}
-                          className="px-2 py-1 text-xs bg-slate-800 hover:bg-red-900/20 text-slate-300 hover:text-red-400 rounded transition"
-                          title="Delete"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right: Conversation Alerts Widget */}
-        <div className="w-96 flex flex-col gap-3">
-          {/* Portfolio Selector */}
-          {portfolios.length > 0 && (
-            <div className="bg-slate-900/30 border border-slate-800 rounded-lg p-3">
-              <label className="text-xs text-slate-400 mb-2 block">Portfolio</label>
-              <select
-                value={selectedPortfolio}
-                onChange={(e) => setSelectedPortfolio(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-purple-600"
-              >
-                {portfolios.map((p) => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Conversation Widget - show global alerts by default */}
-          <ConversationWidget
-            portfolioName="_global"
-            sourceFilter="alert"
-            title="Alert Activity"
-            subtitle="Latest alerts (all portfolios)"
-            maxHeight="flex-1"
-          />
-        </div>
-      </div>
-      )}
-
-      {/* Logs Tab */}
-      {activeTab === 'logs' && (
-      <div className="flex-1 flex flex-col gap-4 px-4 min-h-0 overflow-hidden">
-        {/* Alert Selector */}
-        <div className="flex gap-2">
-          <select
-            value={selectedAlertForLogs || ''}
-            onChange={(e) => {
-              const alertName = e.target.value
-              setSelectedAlertForLogs(alertName)
-              if (alertName) loadAlertLogs(alertName)
-            }}
-            className="px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-purple-500"
-          >
-            <option value="">Select an alert to view logs...</option>
-            {alerts.map((alert) => (
-              <option key={alert.name} value={alert.name}>
-                {alert.name}
-              </option>
-            ))}
-          </select>
-          {selectedAlertForLogs && (
-            <button
-              onClick={() => selectedAlertForLogs && loadAlertLogs(selectedAlertForLogs)}
-              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm transition"
-              title="Refresh logs"
-            >
-              🔄 Refresh
-            </button>
-          )}
-        </div>
-
-        {/* Logs Display */}
-        {selectedAlertForLogs ? (
-          <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden flex flex-col flex-1 min-h-0">
-            <div className="bg-slate-800 px-4 py-3 border-b border-slate-700">
-              <h3 className="font-semibold text-white">Logs for: {selectedAlertForLogs}</h3>
-            </div>
-            <div className="p-4 max-h-full overflow-y-auto flex-1">
-              {logsLoading ? (
-                <div className="text-center text-slate-500">Loading logs...</div>
-              ) : logs.length === 0 ? (
-                <div className="text-center text-slate-500 text-sm">No logs yet</div>
+          {!currentAlert ? (
+            // Alert List
+            <div className="flex-1 overflow-auto">
+              {loading ? (
+                <div className="bg-slate-900/50 rounded-lg p-12 border border-slate-800 text-center">
+                  <p className="text-slate-400">Loading alerts...</p>
+                </div>
+              ) : alerts.length === 0 ? (
+                <div className="bg-slate-900/50 rounded-lg p-8 border border-slate-800 text-center">
+                  <p className="text-slate-400 text-lg mb-2">No alerts configured</p>
+                  <p className="text-slate-500 text-sm">Create your first alert to monitor market conditions</p>
+                </div>
               ) : (
-                <div className="font-mono text-xs space-y-0">
-                  {logs.map((line, idx) => (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {alerts.map((alert) => (
                     <div
-                      key={idx}
-                      className={`py-1 px-2 ${
-                        line.includes('ERROR')
-                          ? 'text-red-400 bg-red-900/10'
-                          : line.includes('WARNING')
-                            ? 'text-yellow-400 bg-yellow-900/10'
-                            : line.includes('INFO')
-                              ? 'text-blue-400'
-                              : 'text-slate-400'
-                      }`}
+                      key={alert.name}
+                      onClick={() => setSelectedAlert(alert.name)}
+                      className="bg-slate-900 border border-slate-800 rounded-lg p-4 cursor-pointer hover:border-purple-500 transition"
                     >
-                      {line}
+                      <div className="flex items-start justify-between mb-2">
+                        <h3 className="font-semibold text-white truncate">{alert.name}</h3>
+                        <span
+                          className={`text-xs px-2 py-1 rounded ${
+                            alert.enabled
+                              ? 'bg-green-900/30 text-green-400'
+                              : 'bg-slate-800 text-slate-400'
+                          }`}
+                        >
+                          {alert.enabled ? 'Enabled' : 'Disabled'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 mb-3 font-mono break-words">
+                        {alert.formula}
+                      </p>
+                      <p className="text-xs text-slate-500">Source: {alert.source}</p>
+                      {alert.last_run && (
+                        <p className="text-xs text-slate-500 mt-1">Last run: {formatMessageDate(alert.last_run)}</p>
+                      )}
                     </div>
                   ))}
                 </div>
               )}
             </div>
-          </div>
-        ) : (
-          <div className="text-center py-12 bg-slate-900 border border-slate-800 rounded-lg flex-1 flex items-center justify-center">
-            <div className="text-slate-500">Select an alert to view its logs</div>
-          </div>
-        )}
-      </div>
+          ) : (
+            // Alert Editor (Grid Layout - Form Left, Last Result Right, Results Bottom)
+            <>
+              <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-6 min-h-0 overflow-hidden">
+                {/* Left: Configuration Form (3 columns) */}
+                <div className="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-lg p-6 overflow-y-auto">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold text-white">Configuration</h2>
+                    <button
+                      onClick={() => setSelectedAlert(null)}
+                      className="text-slate-400 hover:text-slate-200"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {editMode ? (
+                    <form className="space-y-4">
+                      <div>
+                        <label className="block text-sm text-slate-400 mb-2">Formula</label>
+                        <textarea
+                          name="formula"
+                          value={formData.formula || ''}
+                          onChange={handleFormChange}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500 font-mono"
+                          rows={3}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm text-slate-400 mb-2">Notify</label>
+                        <select
+                          name="notify"
+                          value={formData.notify || currentAlert?.notify || ''}
+                          onChange={handleFormChange}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
+                        >
+                          <option value="conversation">Conversation (per portfolio)</option>
+                          <option value="global">Global (all matches)</option>
+                          <option value="email">Email</option>
+                          <option value="webhook">Webhook</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm text-slate-400 mb-2">Description</label>
+                        <input
+                          type="text"
+                          name="description"
+                          value={formData.description || ''}
+                          onChange={handleFormChange}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
+                        />
+                      </div>
+
+                      <label className="flex items-center gap-2 text-sm text-slate-400">
+                        <input
+                          type="checkbox"
+                          name="enabled"
+                          checked={formData.enabled !== undefined ? formData.enabled : currentAlert?.enabled}
+                          onChange={handleFormChange}
+                          className="rounded"
+                        />
+                        Enabled
+                      </label>
+
+                      <div className="flex gap-3 pt-4 border-t border-slate-700">
+                        <button
+                          type="button"
+                          onClick={() => saveAlert(currentAlert?.name!)}
+                          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded font-medium transition"
+                        >
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelEdit}
+                          className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-medium transition"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="space-y-4">
+                      <div>
+                        <div className="text-sm text-slate-500">Source</div>
+                        <div className="text-white font-medium mt-1">{currentAlert?.source}</div>
+                      </div>
+
+                      <div>
+                        <div className="text-sm text-slate-500">Formula</div>
+                        <div className="text-white font-mono text-xs mt-1 break-words bg-slate-800 p-3 rounded">
+                          {currentAlert?.formula}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-sm text-slate-500">Notify</div>
+                        <div className="text-white font-medium mt-1">{currentAlert?.notify}</div>
+                      </div>
+
+                      {currentAlert?.description && (
+                        <div>
+                          <div className="text-sm text-slate-500">Description</div>
+                          <div className="text-white mt-1">{currentAlert?.description}</div>
+                        </div>
+                      )}
+
+                      <div>
+                        <div className="text-sm text-slate-500">Status</div>
+                        <div className={`text-white font-medium mt-1 ${currentAlert?.enabled ? 'text-green-400' : 'text-red-400'}`}>
+                          {currentAlert?.enabled ? '✓ Enabled' : '✗ Disabled'}
+                        </div>
+                      </div>
+
+                      <div className="flex gap-3 pt-4 border-t border-slate-700">
+                        <button
+                          type="button"
+                          onClick={() => startEdit(currentAlert!)}
+                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition"
+                        >
+                          ✏️ Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => runAlert(currentAlert?.name!)}
+                          disabled={runningAlert === currentAlert?.name}
+                          className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded font-medium transition"
+                        >
+                          {runningAlert === currentAlert?.name ? '⏳ Running...' : '▶ Run Now'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteAlert(currentAlert?.name!)}
+                          className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded font-medium transition"
+                        >
+                          🗑 Delete
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right: Last Result (1 column) */}
+                <div className="bg-slate-900 border border-slate-800 rounded-lg p-6 overflow-y-auto">
+                  <h2 className="text-lg font-semibold text-white mb-4">Last Result</h2>
+
+                  {runResults && runResults.alert_name === currentAlert?.name ? (
+                    <div className="space-y-3 text-sm">
+                      <div>
+                        <div className="text-slate-400">Status</div>
+                        <div className={`font-bold mt-1 ${runResults.matched ? 'text-green-400' : 'text-slate-400'}`}>
+                          {runResults.matched ? '✓ Matched' : '✗ No Match'}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-slate-400">Matches</div>
+                        <div className="text-white font-medium mt-1">{runResults.matches?.length || 0}</div>
+                      </div>
+
+                      <div>
+                        <div className="text-slate-400">Tickers Checked</div>
+                        <div className="text-white font-medium mt-1">{runResults.tickers_checked}</div>
+                      </div>
+
+                      {runResults.error && (
+                        <div className="bg-red-900/30 border border-red-700 rounded p-2 text-red-300 text-xs">
+                          {runResults.error}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-6 text-slate-500">
+                      <p>No recent run</p>
+                      <p className="text-xs mt-2">Run the alert to see results</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Results Table (Bottom) */}
+              {currentAlert && runResults && runResults.matches && runResults.matches.length > 0 && (
+                <div className="bg-slate-900 border border-slate-800 rounded-lg p-6 max-h-64 overflow-auto">
+                  <h3 className="text-lg font-semibold text-white mb-4">Matches ({runResults.matches.length})</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-700">
+                          <th className="px-4 py-2 text-left text-slate-400">Ticker</th>
+                          <th className="px-4 py-2 text-right text-slate-400">Price</th>
+                          <th className="px-4 py-2 text-right text-slate-400">Volume</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800">
+                        {runResults.matches.map((match: any, idx: number) => (
+                          <tr key={idx} className="hover:bg-slate-800/50">
+                            <td className="px-4 py-2 text-white font-medium">{match.ticker}</td>
+                            <td className="px-4 py-2 text-right text-slate-300">{match.close?.toFixed(2)}</td>
+                            <td className="px-4 py-2 text-right text-slate-300">{match.volume?.toLocaleString() || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       )}
 
-      {/* Create/Edit Modal */}
+      {/* Logs Tab */}
+      {activeTab === 'logs' && (
+        <div className="flex-1 flex flex-col gap-4 px-4 min-h-0 overflow-hidden">
+          <div className="flex gap-2">
+            <select
+              value={selectedAlertForLogs || ''}
+              onChange={(e) => {
+                const alertName = e.target.value
+                setSelectedAlertForLogs(alertName)
+                if (alertName) loadAlertLogs(alertName)
+              }}
+              className="px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-purple-500"
+            >
+              <option value="">Select an alert to view logs...</option>
+              {alerts.map((alert) => (
+                <option key={alert.name} value={alert.name}>
+                  {alert.name}
+                </option>
+              ))}
+            </select>
+            {selectedAlertForLogs && (
+              <button
+                onClick={() => selectedAlertForLogs && loadAlertLogs(selectedAlertForLogs)}
+                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm transition"
+              >
+                🔄 Refresh
+              </button>
+            )}
+          </div>
+
+          {selectedAlertForLogs ? (
+            <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden flex flex-col flex-1 min-h-0">
+              <div className="bg-slate-800 px-4 py-3 border-b border-slate-700">
+                <h3 className="font-semibold text-white">Logs for: {selectedAlertForLogs}</h3>
+              </div>
+              <div className="p-4 max-h-full overflow-y-auto flex-1">
+                {logsLoading ? (
+                  <div className="text-center text-slate-500">Loading logs...</div>
+                ) : logs.length === 0 ? (
+                  <div className="text-center text-slate-500 text-sm">No logs yet</div>
+                ) : (
+                  <div className="font-mono text-xs space-y-0">
+                    {logs.map((line, idx) => (
+                      <div
+                        key={idx}
+                        className={`py-1 px-2 ${
+                          line.includes('ERROR')
+                            ? 'text-red-400 bg-red-900/10'
+                            : line.includes('WARNING')
+                              ? 'text-yellow-400 bg-yellow-900/10'
+                              : line.includes('INFO')
+                                ? 'text-blue-400'
+                                : 'text-slate-400'
+                        }`}
+                      >
+                        {line}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-12 bg-slate-900 border border-slate-800 rounded-lg flex-1 flex items-center justify-center">
+              <div className="text-slate-500">Select an alert to view its logs</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Create Alert Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-slate-900 border-b border-slate-800 p-6 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-white">
-                {editingAlert ? 'Edit Alert' : 'Create New Alert'}
-              </h2>
+              <h2 className="text-2xl font-bold text-white">Create New Alert</h2>
               <button
-                onClick={closeModals}
+                onClick={() => setShowCreateModal(false)}
                 className="text-slate-400 hover:text-white transition"
               >
                 ✕
               </button>
             </div>
 
-            <form
-              onSubmit={editingAlert ? handleUpdateAlert : handleCreateAlert}
-              className="p-6 space-y-4"
-            >
-              {!editingAlert && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Alert Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="e.g., rsi_oversold"
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-purple-600"
-                    required
-                  />
-                </div>
-              )}
-
+            <form onSubmit={createAlert} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Source *
-                </label>
-                {editingAlert ? (
-                  <div className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2 text-slate-300 text-sm">
-                    {formData.source}
-                    {formData.source_value && ` (${formData.source_value})`}
-                  </div>
-                ) : (
-                  <select
-                    value={formData.source}
-                    onChange={(e) => setFormData({ ...formData, source: e.target.value })}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-600"
-                  >
-                    {sourceOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-
-              {!editingAlert && formData.source !== 'all_portfolios' && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    {formData.source === 'ticker' ? 'Ticker' : 'Value'} {formData.source !== 'ticker' && formData.source !== 'tickers' && '*'}
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.source_value}
-                    onChange={(e) => setFormData({ ...formData, source_value: e.target.value })}
-                    placeholder={
-                      formData.source === 'tickers'
-                        ? 'AAPL,MSFT,GOOGL'
-                        : formData.source === 'universe'
-                        ? 'cac40'
-                        : 'Portfolio name'
-                    }
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-purple-600"
-                    required={formData.source !== 'ticker' && formData.source !== 'tickers'}
-                  />
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  DSL Formula *
-                </label>
-                <textarea
-                  value={formData.formula}
-                  onChange={(e) => setFormData({ ...formData, formula: e.target.value })}
-                  placeholder="e.g., rsi_14[0] > 50 && ema_20[0] > close[0]"
-                  rows={4}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-purple-600 font-mono text-sm"
+                <label className="block text-sm font-medium text-slate-400 mb-2">Alert Name</label>
+                <input
+                  type="text"
+                  value={newAlertData.name}
+                  onChange={(e) => setNewAlertData({ ...newAlertData, name: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded focus:outline-none focus:border-purple-500"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Notify Target
-                </label>
+                <label className="block text-sm font-medium text-slate-400 mb-2">Source</label>
                 <select
-                  value={formData.notify}
-                  onChange={(e) => setFormData({ ...formData, notify: e.target.value })}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-600"
+                  value={newAlertData.source}
+                  onChange={(e) => setNewAlertData({ ...newAlertData, source: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded focus:outline-none focus:border-purple-500"
                 >
-                  {notifyOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
+                  <option value="universe">Universe</option>
+                  <option value="ticker">Ticker</option>
+                  <option value="tickers">Tickers</option>
+                  <option value="portfolio">Portfolio</option>
+                  <option value="all_portfolios">All Portfolios</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Description
-                </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Optional description"
-                  rows={2}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-purple-600"
+                <label className="block text-sm font-medium text-slate-400 mb-2">Source Value</label>
+                <input
+                  type="text"
+                  value={newAlertData.source_value}
+                  onChange={(e) => setNewAlertData({ ...newAlertData, source_value: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded focus:outline-none focus:border-purple-500"
+                  placeholder="e.g., cac40, AAPL"
                 />
               </div>
 
-              <div className="flex items-center gap-3 pt-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-400 mb-2">Formula</label>
+                <textarea
+                  value={newAlertData.formula}
+                  onChange={(e) => setNewAlertData({ ...newAlertData, formula: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded focus:outline-none focus:border-purple-500 font-mono text-sm"
+                  rows={3}
+                  placeholder="e.g., sha_10_green[-1]==1 && sha_10_up[0]==1"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-400 mb-2">Notify</label>
+                <select
+                  value={newAlertData.notify}
+                  onChange={(e) => setNewAlertData({ ...newAlertData, notify: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded focus:outline-none focus:border-purple-500"
+                >
+                  <option value="conversation">Conversation (per portfolio)</option>
+                  <option value="global">Global (all matches)</option>
+                  <option value="email">Email</option>
+                  <option value="webhook">Webhook</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-400 mb-2">Description (optional)</label>
+                <input
+                  type="text"
+                  value={newAlertData.description}
+                  onChange={(e) => setNewAlertData({ ...newAlertData, description: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4 border-t border-slate-700">
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition"
+                  className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded font-medium transition"
                 >
-                  {editingAlert ? 'Update Alert' : 'Create Alert'}
+                  Create Alert
                 </button>
                 <button
                   type="button"
-                  onClick={closeModals}
-                  className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-medium transition"
+                  onClick={() => setShowCreateModal(false)}
+                  className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-medium transition"
                 >
                   Cancel
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* Run Results Modal */}
-      {showRunResults && runResults && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-slate-900 border-b border-slate-800 p-6 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-white">
-                Alert Results: {runResults.alert_name}
-              </h2>
-              <button
-                onClick={() => setShowRunResults(false)}
-                className="text-slate-400 hover:text-white transition"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              {runResults.error ? (
-                <div className="bg-red-900/30 border border-red-800 rounded-lg p-4 text-red-400">
-                  <p className="font-medium mb-1">Error</p>
-                  <p className="text-sm">{runResults.error}</p>
-                </div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-                      <p className="text-slate-400 text-sm mb-1">Status</p>
-                      <p className={`text-lg font-bold ${runResults.matched ? 'text-green-400' : 'text-slate-400'}`}>
-                        {runResults.matched ? '✓ Matched' : '○ No matches'}
-                      </p>
-                    </div>
-                    <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-                      <p className="text-slate-400 text-sm mb-1">Tickers Checked</p>
-                      <p className="text-lg font-bold text-white">{runResults.tickers_checked}</p>
-                    </div>
-                    <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-                      <p className="text-slate-400 text-sm mb-1">Matches Found</p>
-                      <p className="text-lg font-bold text-white">{runResults.matches?.length || 0}</p>
-                    </div>
-                  </div>
-
-                  {runResults.matches && runResults.matches.length > 0 && (
-                    <div>
-                      <p className="text-sm font-medium text-slate-300 mb-2">Top Matches (max 50)</p>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead className="bg-slate-800/50 border-b border-slate-700">
-                            <tr>
-                              <th className="px-3 py-2 text-left text-slate-400">Date</th>
-                              <th className="px-3 py-2 text-left text-slate-400">Ticker</th>
-                              <th className="px-3 py-2 text-right text-slate-400">Close</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-800">
-                            {runResults.matches.slice(0, 50).map((match: any, idx: number) => (
-                              <tr key={idx} className="hover:bg-slate-800/30">
-                                <td className="px-3 py-2 text-slate-300">
-                                  {match.timestamp || match.date || '—'}
-                                </td>
-                                <td className="px-3 py-2 text-white font-medium">{match.ticker}</td>
-                                <td className="px-3 py-2 text-right text-slate-300">
-                                  {typeof match.close === 'number' ? match.close.toFixed(2) : '—'}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                      {runResults.matches.length > 50 && (
-                        <p className="text-xs text-slate-500 mt-2">
-                          Showing 50 of {runResults.matches.length} matches
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  <p className="text-xs text-slate-500">
-                    Evaluated at: {new Date(runResults.evaluated_at).toLocaleString()}
-                  </p>
-                </>
-              )}
-
-              <button
-                onClick={() => setShowRunResults(false)}
-                className="w-full px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-medium transition"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Chart Modal */}
-      {showChartModal && chartTicker && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-lg w-full h-[90vh] max-w-7xl flex flex-col">
-            {/* Header */}
-            <div className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex items-center justify-between flex-shrink-0">
-              <div>
-                <h2 className="text-2xl font-bold text-white">{chartTicker}</h2>
-                <p className="text-sm text-slate-400">Chart View</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <select
-                  value={chartTimeframe}
-                  onChange={(e) => setChartTimeframe(e.target.value)}
-                  className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-600"
-                >
-                  <option>1M</option>
-                  <option>5M</option>
-                  <option>15M</option>
-                  <option>1H</option>
-                  <option selected>1D</option>
-                  <option>1W</option>
-                </select>
-                <button
-                  onClick={() => setShowChartModal(false)}
-                  className="text-slate-400 hover:text-white transition text-2xl"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-
-            {/* Chart Container */}
-            <div className="flex-1 overflow-hidden bg-slate-900/50 w-full">
-              <TradingChart ticker={chartTicker} interval={chartTimeframe} />
-            </div>
           </div>
         </div>
       )}
