@@ -6,7 +6,7 @@ from typing import Optional, List, Dict, Any
 import pandas as pd
 from datetime import datetime, timedelta
 
-from tools.watchlist import WatchlistManager
+from tools.watchlist.watchlist_manager import WatchlistManager
 from tools.strategy import StrategyManager
 from pathlib import Path
 import os
