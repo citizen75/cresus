@@ -62,6 +62,7 @@ export default function Dashboard() {
           if (msg.source === 'alert') {
             // Auto-select any alert message (will show results if available)
             console.log(`[Dashboard] ✓ Auto-selecting alert message:`, { id: msg.id, datetime: msg.datetime, source: msg.source })
+            console.log(`[Dashboard] Full selected message structure:`, msg)
             setSelectedAlertMessage(msg)
 
             // IMPORTANT: Break here to select the FIRST (most recent) alert only!
