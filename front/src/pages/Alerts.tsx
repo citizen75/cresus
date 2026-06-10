@@ -321,11 +321,11 @@ export default function Alerts() {
 
   // Load charts when switching to charts view or when results change
   useEffect(() => {
-    if (resultViewMode === 'charts' && sortedResults.length > 0) {
+    if (resultViewMode === 'charts' && sortedResults && sortedResults.length > 0) {
       console.log('Loading charts for', sortedResults.length, 'results')
       loadChartsData()
     }
-  }, [resultViewMode, sortedResults.length, chartTimeframe])
+  }, [resultViewMode, sortedResults, chartTimeframe])
 
   const currentAlert = paramName ? alerts.find((a) => a.name === paramName) : null
 
@@ -641,8 +641,8 @@ export default function Alerts() {
                             const date = new Date(result.evaluated_at)
                             const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
                             const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                            // Use timestamp as result ID (formatted as result_YYYYMMDD_HHMMSS)
-                            const resultId = date.toISOString().replace(/[-:T]/g, '').slice(0, 15)
+                            // Use timestamp as result ID (YYYYMMDDHHMMSS format)
+                            const resultId = date.toISOString().replace(/[-:.]/g, '').slice(0, 14)
                             const isSelected = paramResultId === resultId
                             return (
                               <div
