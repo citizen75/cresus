@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import CardChart from './CardChart'
+import TradingChartWidget from './TradingChartWidget'
 
 interface ResultsWidgetProps {
   data: any[] // Array of result objects
@@ -33,6 +34,7 @@ export default function ResultsWidget({
   onViewModeChange,
 }: ResultsWidgetProps) {
   const [viewMode, setViewMode] = useState<'table' | 'charts'>(externalViewMode || 'table')
+  const [selectedTickerForChart, setSelectedTickerForChart] = useState<string | null>(null)
 
   // Update internal viewMode when external viewMode changes
   useEffect(() => {
@@ -40,6 +42,18 @@ export default function ResultsWidget({
       setViewMode(externalViewMode)
     }
   }, [externalViewMode])
+
+  // Handle ESC key to close chart modal
+  useEffect(() => {
+    const handleEscKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedTickerForChart) {
+        setSelectedTickerForChart(null)
+      }
+    }
+
+    window.addEventListener('keydown', handleEscKey)
+    return () => window.removeEventListener('keydown', handleEscKey)
+  }, [selectedTickerForChart])
 
   // Notify parent when viewMode changes
   const handleViewModeChange = (newMode: 'table' | 'charts') => {
@@ -211,7 +225,11 @@ export default function ResultsWidget({
             </thead>
             <tbody className="divide-y divide-slate-800">
               {sortedData.map((row, idx) => (
-                <tr key={idx} className="hover:bg-slate-800/50 cursor-pointer transition">
+                <tr
+                  key={idx}
+                  onClick={() => setSelectedTickerForChart(row.ticker)}
+                  className="hover:bg-slate-800/50 cursor-pointer transition"
+                >
                   {columns.map((col) => {
                     const value = row[col]
                     let displayValue = String(value || '')
@@ -336,6 +354,32 @@ export default function ResultsWidget({
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Trading Chart Widget Modal */}
+      {selectedTickerForChart && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-950 border border-slate-800 rounded-lg w-full h-[90vh] max-w-7xl flex flex-col">
+            {/* Header with Close Button */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 flex-shrink-0">
+              <h2 className="text-2xl font-bold text-white">{selectedTickerForChart}</h2>
+              <button
+                onClick={() => setSelectedTickerForChart(null)}
+                className="text-slate-400 hover:text-white transition text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Chart Widget with Controls */}
+            <div className="flex-1 overflow-hidden">
+              <TradingChartWidget
+                ticker={selectedTickerForChart}
+                showControls={true}
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>
