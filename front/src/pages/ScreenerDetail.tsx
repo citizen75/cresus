@@ -604,21 +604,35 @@ export default function ScreenerDetail() {
               </div>
             )}
 
-            {editMode && (
-              <div className="flex gap-3 pt-4 border-t border-slate-700">
-                <button
-                  type="button"
-                  onClick={handleTestFormula}
-                  disabled={previewLoading || !formData.formula || !formData.source}
-                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded font-medium transition"
-                >
-                  {previewLoading ? 'Testing...' : '🧪 Test Formula'}
-                </button>
-              </div>
-            )}
-
             {/* Action Buttons - Bottom of Form */}
             <div className="flex gap-3 pt-6 border-t border-slate-700">
+              {editMode && (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleTestFormula}
+                    disabled={previewLoading || !formData.formula || !formData.source}
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded font-medium transition"
+                  >
+                    {previewLoading ? 'Testing...' : '🧪 Test Formula'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditMode(false)}
+                    className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded font-medium transition text-sm"
+                    title="Cancel editing"
+                  >
+                    ✕ Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded font-medium transition text-sm"
+                    title="Save changes"
+                  >
+                    ✓ Save
+                  </button>
+                </>
+              )}
               {!editMode && (
                 <>
                   <button
@@ -649,25 +663,6 @@ export default function ScreenerDetail() {
                     title="Delete screener"
                   >
                     🗑 Delete
-                  </button>
-                </>
-              )}
-              {editMode && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setEditMode(false)}
-                    className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded font-medium transition text-sm"
-                    title="Cancel editing"
-                  >
-                    ✕ Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded font-medium transition text-sm"
-                    title="Save changes"
-                  >
-                    ✓ Save
                   </button>
                 </>
               )}
