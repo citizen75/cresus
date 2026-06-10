@@ -11,30 +11,36 @@ from tools.strategy import StrategyManager
 from pathlib import Path
 import os
 
-# For fetching price data
-def _get_ticker_data(ticker: str) -> Dict[str, Any]:
-	"""Fetch current price and name for a ticker."""
+# For enriching watchlist with metadata
+def _get_ticker_metadata(ticker: str) -> Dict[str, Any]:
+	"""Get metadata for a ticker - date, name, close."""
+	date = datetime.now().strftime('%Y-%m-%d')
+
+	# Try to get company name from local sources
+	name = ''
+	close_price = None
+
 	try:
-		import yfinance as yf
-		data = yf.download(ticker, period="1d", progress=False)
+		# Try loading from cached data
+		from pathlib import Path
+		import json
 
-		if data.empty:
-			return {}
-
-		close_price = float(data['Close'].iloc[-1]) if 'Close' in data.columns else None
-		date = str(data.index[-1].date())
-
-		# Get company name
-		info = yf.Ticker(ticker).info
-		name = info.get('longName', info.get('shortName', ''))
-
-		return {
-			'date': date,
-			'close': close_price,
-			'name': name
-		}
+		# Check for cached fundamental data
+		cache_dir = Path.home() / '.cache' / 'ticker_info'
+		if cache_dir.exists():
+			ticker_file = cache_dir / f"{ticker}.json"
+			if ticker_file.exists():
+				with open(ticker_file) as f:
+					data = json.load(f)
+					name = data.get('longName') or data.get('name', '')
 	except:
-		return {}
+		pass
+
+	return {
+		'date': date,
+		'close': close_price,
+		'name': name
+	}
 
 
 def _get_watchlist_root() -> Path:
@@ -273,11 +279,11 @@ async def add_ticker_to_watchlist(strategy_name: str, body: TickerRequest = Body
 		# Load current watchlist
 		df = manager.load()
 
-		# Fetch enriched data for ticker
-		ticker_data = _get_ticker_data(ticker)
-		date = ticker_data.get('date', datetime.now().strftime('%Y-%m-%d'))
-		close_price = ticker_data.get('close')
-		name = ticker_data.get('name', '')
+		# Fetch metadata for ticker
+		ticker_meta = _get_ticker_metadata(ticker)
+		date = ticker_meta.get('date')
+		close_price = ticker_meta.get('close')
+		name = ticker_meta.get('name', '')
 
 		# Create new row with enriched data
 		if df is not None and not df.empty:
