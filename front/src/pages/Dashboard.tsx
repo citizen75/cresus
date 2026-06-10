@@ -46,11 +46,17 @@ export default function Dashboard() {
         const data = await response.json()
         const messages = data.history || []
 
-        // Find the most recent alert message
+        // Find the most recent alert message with results_widget
         for (let i = messages.length - 1; i >= 0; i--) {
           const msg = messages[i]
           if (msg.source === 'alert') {
-            // Parse alert content
+            // If message has results_widget, auto-select it for right panel
+            if (msg.widget === 'results_widget' && msg.data?.results) {
+              setSelectedAlertMessage(msg)
+              break
+            }
+
+            // Parse alert content for legacy support
             const lines = msg.content.split('\n')
             const alertInfo: AlertInfo = {
               title: '',
