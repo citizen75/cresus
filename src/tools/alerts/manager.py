@@ -148,6 +148,8 @@ class AlertManager:
                 if key in kwargs:
                     if key == 'notify' and isinstance(kwargs[key], str):
                         setattr(alert, key, AlertNotifyTarget(kwargs[key]))
+                    elif key == 'source' and isinstance(kwargs[key], str):
+                        setattr(alert, key, AlertSource(kwargs[key]))
                     else:
                         setattr(alert, key, kwargs[key])
 
