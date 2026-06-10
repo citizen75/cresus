@@ -23,6 +23,7 @@ import Insights from '@/pages/Insights'
 import Scheduler from '@/pages/Scheduler'
 import Screener from '@/pages/Screener'
 import ScreenerDetail from '@/pages/ScreenerDetail'
+import WatchlistPage from '@/pages/WatchlistPage'
 
 export default function App() {
   useEffect(() => {
@@ -62,6 +63,7 @@ export default function App() {
           <Route path="/scheduler" element={<Layout><Scheduler /></Layout>} />
           <Route path="/screener" element={<Layout><Screener /></Layout>} />
           <Route path="/screener/:name/:view?" element={<Layout><ScreenerDetail /></Layout>} />
+          <Route path="/watchlist" element={<Layout><WatchlistPage /></Layout>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         </BrowserRouter>

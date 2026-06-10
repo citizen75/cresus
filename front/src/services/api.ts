@@ -460,6 +460,26 @@ class CresusAPI {
     }
     return (await this.client.post('/conversations/global/message', message)).data
   }
+
+  async listWatchlists() {
+    return (await this.client.get('/watchlists')).data
+  }
+
+  async getWatchlist(watchlistName: string, limit?: number) {
+    return (await this.client.get(`/watchlists/${watchlistName}`, { params: { limit } })).data
+  }
+
+  async addToWatchlist(watchlistName: string, ticker: string) {
+    return (await this.client.post(`/watchlists/${watchlistName}/add`, { ticker })).data
+  }
+
+  async removeFromWatchlist(watchlistName: string, ticker: string) {
+    return (await this.client.delete(`/watchlists/${watchlistName}/${ticker}`)).data
+  }
+
+  async getWatchlistTickers(watchlistName: string) {
+    return (await this.client.get(`/watchlists/${watchlistName}/tickers`)).data
+  }
 }
 
 export const api = new CresusAPI()
