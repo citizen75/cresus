@@ -41,17 +41,25 @@ export default function Dashboard() {
       try {
         const baseUrl = getApiBaseUrl()
         const response = await fetch(`${baseUrl}/api/v1/conversations/_global`)
-        if (!response.ok) return
+        if (!response.ok) {
+          console.log(`[Dashboard] Failed to fetch conversations: ${response.status}`)
+          return
+        }
 
         const data = await response.json()
         const messages = data.history || []
+        console.log(`[Dashboard] Loaded ${messages.length} messages, looking for alert...`)
+
+        if (messages.length > 0) {
+          console.log(`[Dashboard] Last 3 messages:`, messages.slice(-3).map((m: any) => ({ id: m.id, source: m.source, datetime: m.datetime })))
+        }
 
         // Find the most recent alert message (with or without results_widget)
         for (let i = messages.length - 1; i >= 0; i--) {
           const msg = messages[i]
           if (msg.source === 'alert') {
             // Auto-select any alert message (will show results if available)
-            console.log(`[Dashboard] Auto-selecting alert message:`, { id: msg.id, datetime: msg.datetime, source: msg.source })
+            console.log(`[Dashboard] ✓ Auto-selecting alert message:`, { id: msg.id, datetime: msg.datetime, source: msg.source })
             setSelectedAlertMessage(msg)
 
             // Parse alert content for legacy support
@@ -95,8 +103,10 @@ export default function Dashboard() {
             }
           }
         }
+
+        console.log(`[Dashboard] No alert message found to auto-select`)
       } catch (err) {
-        console.error('Failed to load most recent alert:', err)
+        console.error(`[Dashboard] Failed to load most recent alert:`, err)
       }
     }
 
