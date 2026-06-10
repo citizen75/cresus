@@ -190,7 +190,19 @@ export default function Alerts() {
   const getResultColumns = () => {
     if (!runResults?.matches || runResults.matches.length === 0) return []
     const firstMatch = runResults.matches[0]
-    return Object.keys(firstMatch).filter((key) => key !== 'Index')
+    const allKeys = Object.keys(firstMatch).filter((key) => key !== 'Index')
+
+    // Ensure ticker is first, company_name is second, rest follow
+    const orderedKeys = []
+    if (allKeys.includes('ticker')) orderedKeys.push('ticker')
+    if (allKeys.includes('company_name')) orderedKeys.push('company_name')
+
+    // Add remaining keys
+    allKeys.forEach((key) => {
+      if (!orderedKeys.includes(key)) orderedKeys.push(key)
+    })
+
+    return orderedKeys
   }
 
   const filteredResults = runResults?.matches
@@ -559,44 +571,60 @@ export default function Alerts() {
                       <table className="w-full text-xs">
                         <thead className="sticky top-0 bg-slate-800 border-b border-slate-700">
                           <tr>
-                            {getResultColumns().map((col) => (
-                              <th
-                                key={col}
-                                onClick={() => {
-                                  if (resultSortColumn === col) {
-                                    setResultSortDirection(
-                                      resultSortDirection === 'asc' ? 'desc' : 'asc'
-                                    )
-                                  } else {
-                                    setResultSortColumn(col)
-                                    setResultSortDirection('asc')
-                                  }
-                                }}
-                                className="px-4 py-3 text-left text-slate-400 font-medium cursor-pointer hover:text-slate-300 transition whitespace-nowrap"
-                              >
-                                {col}
-                                {resultSortColumn === col && (
-                                  <span className="ml-1">
-                                    {resultSortDirection === 'asc' ? '↑' : '↓'}
-                                  </span>
-                                )}
-                              </th>
-                            ))}
+                            {getResultColumns().map((col, idx) => {
+                              const isSticky = idx < 2 // First two columns (ticker, company_name)
+                              return (
+                                <th
+                                  key={col}
+                                  onClick={() => {
+                                    if (resultSortColumn === col) {
+                                      setResultSortDirection(
+                                        resultSortDirection === 'asc' ? 'desc' : 'asc'
+                                      )
+                                    } else {
+                                      setResultSortColumn(col)
+                                      setResultSortDirection('asc')
+                                    }
+                                  }}
+                                  className={`px-4 py-3 text-left text-slate-400 font-medium cursor-pointer hover:text-slate-300 transition whitespace-nowrap ${
+                                    isSticky
+                                      ? 'sticky bg-slate-800 z-10'
+                                      : ''
+                                  }`}
+                                  style={isSticky ? { left: `${idx * 150}px` } : {}}
+                                >
+                                  {col}
+                                  {resultSortColumn === col && (
+                                    <span className="ml-1">
+                                      {resultSortDirection === 'asc' ? '↑' : '↓'}
+                                    </span>
+                                  )}
+                                </th>
+                              )
+                            })}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800">
                           {sortedResults.map((match: any, idx: number) => (
                             <tr key={idx} className="hover:bg-slate-800/50 transition">
-                              {getResultColumns().map((col) => (
-                                <td
-                                  key={`${idx}-${col}`}
-                                  className="px-4 py-3 text-slate-300 whitespace-nowrap"
-                                >
-                                  {typeof match[col] === 'number'
-                                    ? match[col].toFixed(3)
-                                    : match[col]}
-                                </td>
-                              ))}
+                              {getResultColumns().map((col, colIdx) => {
+                                const isSticky = colIdx < 2
+                                return (
+                                  <td
+                                    key={`${idx}-${col}`}
+                                    className={`px-4 py-3 text-slate-300 whitespace-nowrap ${
+                                      isSticky
+                                        ? 'sticky bg-slate-900 z-[9]'
+                                        : ''
+                                    }`}
+                                    style={isSticky ? { left: `${colIdx * 150}px` } : {}}
+                                  >
+                                    {typeof match[col] === 'number'
+                                      ? match[col].toFixed(3)
+                                      : match[col]}
+                                  </td>
+                                )
+                              })}
                             </tr>
                           ))}
                         </tbody>
