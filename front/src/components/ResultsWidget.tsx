@@ -404,13 +404,14 @@ export default function ResultsWidget({
                           handleAddToWatchlist(row.ticker)
                         }}
                         disabled={addingToWatchlist.has(row.ticker)}
-                        className={`px-3 py-1 rounded text-xs font-medium transition ${
+                        title={addingToWatchlist.has(row.ticker) ? 'Added to watchlist' : 'Add to watchlist'}
+                        className={`px-2 py-1 rounded text-sm transition ${
                           addingToWatchlist.has(row.ticker)
                             ? 'bg-green-600/50 text-green-200'
                             : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
                         }`}
                       >
-                        {addingToWatchlist.has(row.ticker) ? '✓ Added' : '⭐ Watchlist'}
+                        {addingToWatchlist.has(row.ticker) ? '✓' : '⭐'}
                       </button>
                     )}
                   </td>
