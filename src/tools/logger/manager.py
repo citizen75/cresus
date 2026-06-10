@@ -4,27 +4,32 @@ import os
 from pathlib import Path
 from datetime import datetime
 import logging
+from logging.handlers import RotatingFileHandler
 from typing import Optional
+from threading import Lock
 from utils.env import get_db_root
 
-# Global loggers cache
+# Global loggers cache and lock for thread safety
 _loggers = {}
+_loggers_lock = Lock()
 
 
 class TaskLogger:
 	"""Logger for scheduled tasks with automatic file rotation."""
 
-	def __init__(self, task_name: str, log_dir: Optional[Path] = None, max_bytes: int = 10 * 1024 * 1024):
+	def __init__(self, task_name: str, log_dir: Optional[Path] = None, max_bytes: int = 10 * 1024 * 1024, backup_count: int = 5):
 		"""Initialize task logger.
 
 		Args:
 			task_name: Name of the task (e.g., 'alert_sha_red')
 			log_dir: Directory to store logs (default: get_db_root()/logs)
 			max_bytes: Maximum file size before rotation (default: 10MB)
+			backup_count: Number of backup files to keep (default: 5)
 		"""
 		self.task_name = task_name
 		self.log_dir = log_dir or (get_db_root() / "logs")
 		self.max_bytes = max_bytes
+		self.backup_count = backup_count
 		self.log_file = self.log_dir / f"{task_name}.log"
 
 		# Create logs directory if it doesn't exist
@@ -33,6 +38,7 @@ class TaskLogger:
 		# Set up logger
 		self.logger = logging.getLogger(f"task.{task_name}")
 		self.logger.setLevel(logging.DEBUG)
+		self.logger.propagate = False  # Don't propagate to parent loggers
 
 		# Remove existing handlers to avoid duplicates
 		self.logger.handlers.clear()
@@ -43,34 +49,15 @@ class TaskLogger:
 			datefmt="%Y-%m-%d %H:%M:%S"
 		)
 
-		# Add file handler with rotation
-		handler = self._get_rotating_handler(formatter)
+		# Add rotating file handler (thread-safe)
+		handler = RotatingFileHandler(
+			str(self.log_file),
+			maxBytes=self.max_bytes,
+			backupCount=self.backup_count
+		)
+		handler.setFormatter(formatter)
 		self.logger.addHandler(handler)
 
-	def _get_rotating_handler(self, formatter: logging.Formatter) -> logging.FileHandler:
-		"""Create a file handler with rotation logic."""
-		# Check if rotation is needed
-		if self.log_file.exists() and self.log_file.stat().st_size >= self.max_bytes:
-			self._rotate_logs()
-
-		handler = logging.FileHandler(self.log_file, mode='a', encoding='utf-8')
-		handler.setFormatter(formatter)
-		return handler
-
-	def _rotate_logs(self) -> None:
-		"""Rotate log file when size exceeds threshold."""
-		if not self.log_file.exists():
-			return
-
-		# Create backup filename with timestamp
-		timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-		backup_file = self.log_dir / f"{self.task_name}.{timestamp}.log"
-
-		try:
-			self.log_file.rename(backup_file)
-			self.logger.info(f"Log rotated: {backup_file.name}")
-		except Exception as e:
-			self.logger.error(f"Failed to rotate log: {e}")
 
 	def info(self, msg: str) -> None:
 		"""Log info level message."""
@@ -136,9 +123,10 @@ def get_task_logger(task_name: str) -> TaskLogger:
 	Returns:
 		TaskLogger instance
 	"""
-	if task_name not in _loggers:
-		_loggers[task_name] = TaskLogger(task_name)
-	return _loggers[task_name]
+	with _loggers_lock:
+		if task_name not in _loggers:
+			_loggers[task_name] = TaskLogger(task_name)
+		return _loggers[task_name]
 
 
 def list_task_logs(log_dir: Optional[Path] = None) -> dict[str, dict]:
