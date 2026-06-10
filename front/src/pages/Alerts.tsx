@@ -18,7 +18,7 @@ interface Alert {
 }
 
 export default function Alerts() {
-  const { name: paramName, view: viewParam } = useParams<{ name?: string; view?: string }>()
+  const { name: paramName, resultId: paramResultId, view: viewParam } = useParams<{ name?: string; resultId?: string; view?: string }>()
   const navigate = useNavigate()
 
   const [alerts, setAlerts] = useState<Alert[]>([])
@@ -641,12 +641,19 @@ export default function Alerts() {
                             const date = new Date(result.evaluated_at)
                             const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
                             const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                            // Use timestamp as result ID (formatted as result_YYYYMMDD_HHMMSS)
+                            const resultId = date.toISOString().replace(/[-:T]/g, '').slice(0, 15)
+                            const isSelected = paramResultId === resultId
                             return (
                               <div
                                 key={idx}
-                                className="p-2 rounded bg-slate-800/50 border border-slate-700 text-xs cursor-pointer hover:border-slate-600 transition"
+                                className={`p-2 rounded border text-xs cursor-pointer transition ${
+                                  isSelected
+                                    ? 'bg-purple-900/30 border-purple-600'
+                                    : 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
+                                }`}
                                 onClick={() => {
-                                  // Load this result as the current one
+                                  navigate(`/alerts/${paramName}/${resultId}`)
                                   setRunResults(result)
                                 }}
                               >
@@ -687,7 +694,11 @@ export default function Alerts() {
                       <button
                         onClick={() => {
                           setResultViewMode('table')
-                          navigate(`/alerts/${paramName}`)
+                          if (paramResultId) {
+                            navigate(`/alerts/${paramName}/${paramResultId}`)
+                          } else {
+                            navigate(`/alerts/${paramName}`)
+                          }
                         }}
                         className={`px-3 py-2 rounded text-sm font-medium transition ${
                           resultViewMode === 'table'
@@ -700,7 +711,11 @@ export default function Alerts() {
                       <button
                         onClick={() => {
                           setResultViewMode('charts')
-                          navigate(`/alerts/${paramName}/charts`)
+                          if (paramResultId) {
+                            navigate(`/alerts/${paramName}/${paramResultId}/charts`)
+                          } else {
+                            navigate(`/alerts/${paramName}/charts`)
+                          }
                         }}
                         className={`px-3 py-2 rounded text-sm font-medium transition ${
                           resultViewMode === 'charts'
