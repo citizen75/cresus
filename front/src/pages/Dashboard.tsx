@@ -35,6 +35,8 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [portfolioPositions, setPortfolioPositions] = useState<any[]>([])
   const [fundamentalCache, setFundamentalCache] = useState<Record<string, any>>({})
+  const [sortColumn, setSortColumn] = useState<string | null>(null)
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
   // Fetch and auto-select most recent alert on mount
   useEffect(() => {
@@ -538,10 +540,10 @@ export default function Dashboard() {
               data={selectedAlertMessage.data.results}
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
-              sortColumn={null}
-              onSortChange={() => {}}
-              sortDirection="asc"
-              onSortDirectionChange={() => {}}
+              sortColumn={sortColumn}
+              onSortChange={setSortColumn}
+              sortDirection={sortDirection}
+              onSortDirectionChange={setSortDirection}
               historicalData={historicalData}
               onSetHistoricalData={setHistoricalData}
               loadingCharts={false}
