@@ -556,6 +556,7 @@ export default function Dashboard() {
               <PortfolioHoldingsWidget
                 portfolioName={selectedPortfolioWidget}
                 onClose={() => setRightPanelOpen(false)}
+                onGetHistoricalData={api.getHistoricalData.bind(api)}
               />
             </div>
           ) : alertGridView?.portfolio ? (
@@ -564,6 +565,7 @@ export default function Dashboard() {
                 portfolioName={alertGridView.portfolio}
                 onClose={() => setRightPanelOpen(false)}
                 filterTickers={alertGridView?.tickers}
+                onGetHistoricalData={api.getHistoricalData.bind(api)}
               />
             </div>
           ) : null}

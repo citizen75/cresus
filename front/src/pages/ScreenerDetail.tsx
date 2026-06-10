@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '@/services/api'
+import { useHistoricalDataLoader } from '@/hooks/useHistoricalDataLoader'
 import TradingChart from '@/components/TradingChart'
 import CardChart from '@/components/CardChart'
 import ResultsWidget from '@/components/ResultsWidget'
@@ -49,6 +50,9 @@ export default function ScreenerDetail() {
   const [historicalData, setHistoricalData] = useState<{ [ticker: string]: any[] }>({})
   const [loadingCharts, setLoadingCharts] = useState(false)
   const [chartTimeframe, setChartTimeframe] = useState<'1W' | '1M' | '3M' | 'YTD' | 'ALL'>('1M')
+
+  // Use centralized data loader
+  const { loadData } = useHistoricalDataLoader()
 
   const [universes] = useState([
     'cac40',
@@ -746,11 +750,13 @@ export default function ScreenerDetail() {
             sortDirection={sortDirection}
             onSortDirectionChange={setSortDirection}
             historicalData={historicalData}
+            onSetHistoricalData={setHistoricalData}
             loadingCharts={loadingCharts}
             chartTimeframe={chartTimeframe}
             onChartTimeframeChange={setChartTimeframe}
             viewMode={resultViewMode}
             onViewModeChange={setResultViewMode}
+            onGetHistoricalData={api.getHistoricalData.bind(api)}
           />
         </div>
       )}

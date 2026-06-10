@@ -1,24 +1,26 @@
 import { useState, useEffect } from 'react'
 import { useEnrichedPositions } from '@/hooks/useEnrichedPositions'
+import { useHistoricalDataLoader } from '@/hooks/useHistoricalDataLoader'
 import { PortfolioHoldingsTable } from './PortfolioHoldingsTable'
 import CardChart from '@/components/CardChart'
 import { ChartModal } from '@/components/ChartModal'
 import { TradingDialog } from '@/components/TradingDialog'
-import { getApiBaseUrl } from '@/services/api'
+import { getApiBaseUrl, api } from '@/services/api'
 
 interface PortfolioHoldingsWidgetProps {
   portfolioName: string
   onClose?: () => void
   filterTickers?: string[] // Only show these tickers
+  onGetHistoricalData?: (ticker: string, days: number) => Promise<any>
 }
 
 export default function PortfolioHoldingsWidget({
   portfolioName,
   onClose,
   filterTickers,
+  onGetHistoricalData,
 }: PortfolioHoldingsWidgetProps) {
   const [rawPositions, setRawPositions] = useState<any[]>([])
-  const [historicalData, setHistoricalData] = useState<Record<string, any>>({})
   const [isLoadingPositions, setIsLoadingPositions] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [sectorFilter, setSectorFilter] = useState('All sectors')
@@ -30,6 +32,9 @@ export default function PortfolioHoldingsWidget({
   const [tradingMode, setTradingMode] = useState<'buy' | 'sell'>('buy')
   const [tradingTicker, setTradingTicker] = useState<string | null>(null)
   const [tradingPosition, setTradingPosition] = useState<any>(null)
+
+  // Use centralized data loader
+  const { historicalData, loadData, setHistoricalData } = useHistoricalDataLoader()
 
   // Load raw positions from API
   useEffect(() => {
@@ -64,45 +69,17 @@ export default function PortfolioHoldingsWidget({
     ? enrichedPositions.filter((pos: any) => filterTickers.includes(pos.ticker))
     : enrichedPositions
 
-  // Load historical data for charts
+  // Load historical data for charts (use centralized hook)
   useEffect(() => {
-    const loadHistoricalData = async () => {
-      if (!filteredPositions || filteredPositions.length === 0) return
-
-      const data: Record<string, any[]> = {}
-      for (const pos of filteredPositions) {
-        try {
-          const baseUrl = getApiBaseUrl()
-          const response = await fetch(`${baseUrl}/api/v1/data/history/${pos.ticker}?days=1825`)
-          if (response.ok) {
-            const result = await response.json()
-            let historyArray = []
-            if (Array.isArray(result)) {
-              historyArray = result
-            } else if (result && result.history && Array.isArray(result.history)) {
-              historyArray = result.history
-            } else if (result && result.data && Array.isArray(result.data)) {
-              historyArray = result.data
-            }
-
-            if (historyArray.length > 0) {
-              data[pos.ticker] = historyArray.map((item: any) => ({
-                date: item.date || item.timestamp || item.Date,
-                close: parseFloat(item.close || item.Close),
-              }))
-            }
-          }
-        } catch (error) {
-          console.error(`Failed to load historical data for ${pos.ticker}:`, error)
-        }
-      }
-      setHistoricalData(data)
+    if (viewMode === 'charts' && filteredPositions && filteredPositions.length > 0 && Object.keys(historicalData).length === 0) {
+      const tickers = filteredPositions.map((pos: any) => pos.ticker)
+      const fetchFn = onGetHistoricalData || api.getHistoricalData.bind(api)
+      console.log(`[PortfolioHoldingsWidget] Loading data for ${tickers.length} positions`)
+      loadData(tickers, fetchFn).then(loaded => {
+        if (loaded) setHistoricalData(loaded)
+      })
     }
-
-    if (viewMode === 'charts') {
-      loadHistoricalData()
-    }
-  }, [filteredPositions, viewMode])
+  }, [viewMode, filteredPositions, historicalData, onGetHistoricalData, loadData, setHistoricalData])
 
   const getDaysForTimeframe = (tf: string) => {
     switch (tf) {
