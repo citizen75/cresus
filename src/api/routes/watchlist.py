@@ -12,9 +12,9 @@ from pathlib import Path
 import os
 
 
-def _get_project_root() -> Path:
-	"""Get project root from environment, same as strategies."""
-	return Path(os.environ.get("CRESUS_PROJECT_ROOT", "."))
+def _get_watchlist_root() -> Path:
+	"""Get watchlist root - always use ~/.cresus for user data."""
+	return Path.home() / ".cresus"
 
 
 router = APIRouter(prefix="/watchlists", tags=["watchlists"])
@@ -28,7 +28,7 @@ class TickerRequest(BaseModel):
 @router.get("")
 async def list_watchlists():
 	"""List all saved watchlists."""
-	project_root = _get_project_root()
+	project_root = _get_watchlist_root()
 	watchlist_dir = project_root / "db" / "local" / "watchlist"
 
 	if not watchlist_dir.exists():
@@ -272,8 +272,8 @@ async def add_ticker_to_watchlist(strategy_name: str, body: TickerRequest = Body
 				return {"success": False, "message": f"Ticker {ticker} already in {strategy_name} watchlist"}
 
 		# Save watchlist directly to CSV (bypass WatchlistManager.save which needs complex params)
-		watchlist_dir = _get_project_root() / "db" / "local" / "watchlist"
-		print(f"[Watchlist] Project root: {_get_project_root()}")
+		watchlist_dir = _get_watchlist_root() / "db" / "local" / "watchlist"
+		print(f"[Watchlist] Project root: {_get_watchlist_root()}")
 		print(f"[Watchlist] Watchlist dir: {watchlist_dir}")
 		print(f"[Watchlist] Creating directory...")
 		watchlist_dir.mkdir(parents=True, exist_ok=True)
@@ -309,7 +309,7 @@ async def remove_ticker_from_watchlist(strategy_name: str, ticker: str):
 		df = df[df['ticker'] != ticker]
 
 		# Save watchlist directly to CSV
-		watchlist_dir = _get_project_root() / "db" / "local" / "watchlist"
+		watchlist_dir = _get_watchlist_root() / "db" / "local" / "watchlist"
 		filepath = watchlist_dir / f"{strategy_name}.csv"
 
 		if df.empty:
