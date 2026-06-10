@@ -335,24 +335,27 @@ export default function Alerts() {
       const results = response.results || []
       setSavedResults(results)
 
-      // Set runResults to the latest result for chart display
-      if (results.length > 0 && !runResults) {
+      console.log('[Alerts] Loaded results:', results.length, 'paramResultId:', paramResultId)
+
+      // Auto-navigate to latest result URL if not already on a specific result
+      if (results.length > 0 && !paramResultId && results[0].evaluated_at) {
+        // Convert ISO timestamp to YYYYMMDD_HHMMSS format
+        const date = new Date(results[0].evaluated_at)
+        const year = date.getUTCFullYear()
+        const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+        const day = String(date.getUTCDate()).padStart(2, '0')
+        const hours = String(date.getUTCHours()).padStart(2, '0')
+        const minutes = String(date.getUTCMinutes()).padStart(2, '0')
+        const seconds = String(date.getUTCSeconds()).padStart(2, '0')
+        const resultId = `${year}${month}${day}_${hours}${minutes}${seconds}`
+
+        console.log('[Alerts] Auto-redirecting to:', `/alerts/${alertName}/${resultId}`)
+        navigate(`/alerts/${encodeURIComponent(alertName)}/${resultId}`)
+      }
+
+      // Set runResults to the latest result for display
+      if (results.length > 0) {
         setRunResults(results[0])
-
-        // Auto-navigate to latest result URL if not already on a specific result
-        if (!paramResultId && results[0].evaluated_at) {
-          // Convert ISO timestamp to YYYYMMDD_HHMMSS format
-          const date = new Date(results[0].evaluated_at)
-          const year = date.getUTCFullYear()
-          const month = String(date.getUTCMonth() + 1).padStart(2, '0')
-          const day = String(date.getUTCDate()).padStart(2, '0')
-          const hours = String(date.getUTCHours()).padStart(2, '0')
-          const minutes = String(date.getUTCMinutes()).padStart(2, '0')
-          const seconds = String(date.getUTCSeconds()).padStart(2, '0')
-          const resultId = `${year}${month}${day}_${hours}${minutes}${seconds}`
-
-          navigate(`/alerts/${encodeURIComponent(alertName)}/${resultId}`, { replace: true })
-        }
       }
     } catch (err) {
       console.error('Failed to load saved results:', err)
