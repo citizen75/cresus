@@ -72,9 +72,14 @@ class CronScheduler:
 		Returns:
 			Callable job function
 		"""
+		from tools.logger import get_task_logger
 
 		def job_func():
+			# Get per-task logger
+			task_logger = get_task_logger(job_config.name)
+
 			try:
+				task_logger.info(f"Starting execution ({job_config.type}: {job_config.target})")
 				logger.info(f"Executing cron job '{job_config.name}' ({job_config.type}: {job_config.target})")
 
 				if job_config.type == "http":
@@ -88,9 +93,11 @@ class CronScheduler:
 				else:
 					raise ValueError(f"Unknown job type: {job_config.type}")
 
+				task_logger.info(f"Execution completed successfully")
 				logger.info(f"Cron job '{job_config.name}' completed successfully")
 
 			except Exception as e:
+				task_logger.error(f"Execution failed: {e}")
 				logger.error(f"Cron job '{job_config.name}' failed: {e}", exc_info=True)
 
 		return job_func

@@ -28,6 +28,10 @@ export default function Scheduler() {
   const [error, setError] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingJob, setEditingJob] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'jobs' | 'logs'>('jobs')
+  const [selectedJobForLogs, setSelectedJobForLogs] = useState<string | null>(null)
+  const [logs, setLogs] = useState<string[]>([])
+  const [logsLoading, setLogsLoading] = useState(false)
   const [formData, setFormData] = useState<FormState>({
     name: '',
     schedule: '',
@@ -54,6 +58,23 @@ export default function Scheduler() {
       console.error(err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadJobLogs = async (jobName: string) => {
+    try {
+      setLogsLoading(true)
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || 'http://192.168.0.130:6501'}/api/v1/scheduler/jobs/${jobName}/logs?lines=200`
+      )
+      const data = await response.json()
+      setLogs(data.logs || [])
+      setError(null)
+    } catch (err) {
+      setError('Failed to load job logs')
+      console.error(err)
+    } finally {
+      setLogsLoading(false)
     }
   }
 
@@ -204,6 +225,30 @@ export default function Scheduler() {
         </button>
       </div>
 
+      {/* Tabs */}
+      <div className="flex gap-4 border-b border-slate-800">
+        <button
+          onClick={() => setActiveTab('jobs')}
+          className={`px-4 py-2 font-medium transition ${
+            activeTab === 'jobs'
+              ? 'text-white border-b-2 border-purple-500'
+              : 'text-slate-400 hover:text-slate-300'
+          }`}
+        >
+          Jobs
+        </button>
+        <button
+          onClick={() => setActiveTab('logs')}
+          className={`px-4 py-2 font-medium transition ${
+            activeTab === 'logs'
+              ? 'text-white border-b-2 border-purple-500'
+              : 'text-slate-400 hover:text-slate-300'
+          }`}
+        >
+          Logs
+        </button>
+      </div>
+
       {/* Error Message */}
       {error && (
         <div className="p-4 bg-red-900/20 border border-red-700 text-red-400 rounded-lg text-sm">
@@ -224,7 +269,8 @@ export default function Scheduler() {
         initialData={editingJob ? formData : undefined}
       />
 
-      {/* Jobs List */}
+      {/* Jobs List / Logs View */}
+      {activeTab === 'jobs' ? (
       <div className="space-y-3">
         {loading ? (
           <div className="text-center py-12">
@@ -271,6 +317,17 @@ export default function Scheduler() {
                 {/* Actions */}
                 <div className="flex gap-2 ml-4">
                   <button
+                    onClick={() => {
+                      setSelectedJobForLogs(job.name)
+                      loadJobLogs(job.name)
+                      setActiveTab('logs')
+                    }}
+                    className="px-3 py-2 text-xs font-medium text-amber-400 hover:text-amber-300 rounded transition"
+                    title="View logs"
+                  >
+                    Logs
+                  </button>
+                  <button
                     onClick={() => handleRun(job.name)}
                     className="px-3 py-2 text-xs font-medium text-blue-400 hover:text-blue-300 rounded transition"
                     title="Run job immediately"
@@ -313,6 +370,78 @@ export default function Scheduler() {
           ))
         )}
       </div>
+      ) : (
+      /* Logs Tab */
+      <div className="space-y-4">
+        {/* Job Selector */}
+        <div className="flex gap-2">
+          <select
+            value={selectedJobForLogs || ''}
+            onChange={(e) => {
+              const jobName = e.target.value
+              setSelectedJobForLogs(jobName)
+              if (jobName) loadJobLogs(jobName)
+            }}
+            className="px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-purple-500"
+          >
+            <option value="">Select a job to view logs...</option>
+            {jobs.map((job) => (
+              <option key={job.name} value={job.name}>
+                {job.name}
+              </option>
+            ))}
+          </select>
+          {selectedJobForLogs && (
+            <button
+              onClick={() => loadJobLogs(selectedJobForLogs)}
+              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm transition"
+              title="Refresh logs"
+            >
+              🔄 Refresh
+            </button>
+          )}
+        </div>
+
+        {/* Logs Display */}
+        {selectedJobForLogs ? (
+          <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
+            <div className="bg-slate-800 px-4 py-3 border-b border-slate-700">
+              <h3 className="font-semibold text-white">Logs for: {selectedJobForLogs}</h3>
+            </div>
+            <div className="p-4 max-h-96 overflow-y-auto">
+              {logsLoading ? (
+                <div className="text-center text-slate-500">Loading logs...</div>
+              ) : logs.length === 0 ? (
+                <div className="text-center text-slate-500 text-sm">No logs yet</div>
+              ) : (
+                <div className="font-mono text-xs space-y-0">
+                  {logs.map((line, idx) => (
+                    <div
+                      key={idx}
+                      className={`py-1 px-2 ${
+                        line.includes('ERROR')
+                          ? 'text-red-400 bg-red-900/10'
+                          : line.includes('WARNING')
+                            ? 'text-yellow-400 bg-yellow-900/10'
+                            : line.includes('INFO')
+                              ? 'text-blue-400'
+                              : 'text-slate-400'
+                      }`}
+                    >
+                      {line}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-12 bg-slate-900 border border-slate-800 rounded-lg">
+            <div className="text-slate-500">Select a job to view its logs</div>
+          </div>
+        )}
+      </div>
+      )}
     </div>
   )
 }
