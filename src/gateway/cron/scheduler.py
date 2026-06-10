@@ -73,6 +73,7 @@ class CronScheduler:
 			Callable job function
 		"""
 		from tools.logger import get_task_logger
+		import time
 
 		def job_func():
 			# Get per-task logger
@@ -99,6 +100,10 @@ class CronScheduler:
 			except Exception as e:
 				task_logger.error(f"Execution failed: {e}")
 				logger.error(f"Cron job '{job_config.name}' failed: {e}", exc_info=True)
+			finally:
+				# Ensure logs are flushed to disk
+				time.sleep(0.2)  # Give queue time to process
+				task_logger.flush()
 
 		return job_func
 

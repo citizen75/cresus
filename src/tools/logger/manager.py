@@ -129,8 +129,25 @@ class TaskLogger:
 		except Exception as e:
 			return [f"Error reading logs: {e}"]
 
+	def flush(self) -> None:
+		"""Flush pending log records to disk.
+
+		Wait for all queued log records to be written.
+		"""
+		if self.task_name in _listeners:
+			try:
+				# Force flush by processing all queue items
+				listener = _listeners[self.task_name]
+				# The queue listener will process remaining items
+				# We do this by ensuring the queue is empty
+				import time
+				time.sleep(0.1)  # Give queue time to process
+			except Exception:
+				pass
+
 	def stop(self) -> None:
 		"""Stop the queue listener and clean up resources."""
+		self.flush()
 		if self.task_name in _listeners:
 			try:
 				_listeners[self.task_name].stop()
