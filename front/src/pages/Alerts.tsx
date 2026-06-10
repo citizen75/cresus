@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../services/api'
 import CardChart from '@/components/CardChart'
-import TradingChart from '@/components/TradingChart'
+import TradingChartWidget from '@/components/TradingChartWidget'
 
 interface Alert {
   name: string
@@ -1181,30 +1181,26 @@ export default function Alerts() {
         </div>
       )}
 
-      {/* Trading Chart Modal */}
+      {/* Trading Chart Widget Modal */}
       {selectedTickerForChart && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-lg w-full h-[90vh] max-w-6xl flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-slate-800 flex-shrink-0">
-              <div>
-                <h2 className="text-2xl font-bold text-white">{selectedTickerForChart}</h2>
-                <p className="text-slate-400 text-sm mt-1">Trading Chart</p>
-              </div>
+          <div className="bg-slate-950 border border-slate-800 rounded-lg w-full h-[90vh] max-w-7xl flex flex-col">
+            {/* Header with Close Button */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 flex-shrink-0">
+              <h2 className="text-2xl font-bold text-white">{selectedTickerForChart}</h2>
               <button
                 onClick={() => setSelectedTickerForChart(null)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-medium transition"
+                className="text-slate-400 hover:text-white transition text-2xl"
               >
-                Close
+                ✕
               </button>
             </div>
 
-            {/* Chart Widget - Full Height */}
+            {/* Chart Widget with Controls */}
             <div className="flex-1 overflow-hidden">
-              <TradingChart
-                timeframe="1Y"
+              <TradingChartWidget
                 ticker={selectedTickerForChart}
-                visibleWindow="1Y"
+                showControls={true}
               />
             </div>
           </div>
