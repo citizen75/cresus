@@ -52,13 +52,18 @@ class CodeChangeHandler(FileSystemEventHandler):
 			return
 
 		# Check for config file changes
-		if event.src_path.endswith("cron.yml"):
+		if "cron.yml" in event.src_path:
+			logger.debug(f"Config file change detected: {event.src_path}")
 			with self.lock:
 				self.pending_changes.add("config")
 				current_time = time.time()
-				if current_time - self.last_trigger_time >= self.debounce_seconds:
+				time_since_last = current_time - self.last_trigger_time
+				if time_since_last >= self.debounce_seconds:
+					logger.debug(f"Triggering config change callback (debounce OK: {time_since_last:.1f}s >= {self.debounce_seconds}s)")
 					self._trigger_callbacks()
 					self.last_trigger_time = current_time
+				else:
+					logger.debug(f"Skipping trigger due to debounce ({time_since_last:.1f}s < {self.debounce_seconds}s)")
 			return
 
 		# Check for code changes
@@ -184,8 +189,10 @@ class FileWatcher:
 			try:
 				config_path = get_config_root()
 				if config_path.exists():
-					self.observer.schedule(self.handler, config_path, recursive=False)
-					logger.info(f"Watching config directory: {config_path}")
+					# Resolve symlinks to watch the actual directory
+					resolved_path = config_path.resolve()
+					self.observer.schedule(self.handler, str(resolved_path), recursive=False)
+					logger.info(f"Watching config directory: {resolved_path}")
 			except Exception as e:
 				logger.warning(f"Could not watch config directory: {e}")
 
