@@ -257,10 +257,10 @@ export function ConversationWidget({
           const tickers = msg.tickers || parsedAlert?.tickers || []
 
           const handleMessageClick = () => {
-            // If message has results_widget and no portfolio, show ResultsWidget on right panel
-            if (msg.widget === 'results_widget' && !portfolio) {
+            // If message has results_widget, show ResultsWidget on right panel (regardless of portfolio)
+            if (msg.widget === 'results_widget') {
               setSelectedMessage(msg)
-            } else if (portfolio && onPortfolioClick) {
+            } else if (portfolio && portfolio !== 'global' && onPortfolioClick) {
               onPortfolioClick(portfolio, tickers, msg.widget)
             }
           }
