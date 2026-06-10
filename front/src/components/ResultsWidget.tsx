@@ -438,18 +438,21 @@ export default function ResultsWidget({
                       <div className="flex items-start justify-between gap-2">
                         {/* Left: Company name and ticker */}
                         <div className="flex-1 min-w-0">
-                          {row.company_name && row.company_name !== ticker ? (
-                            <>
+                          {(() => {
+                            const companyName = row.company_name || row.name || row.Company || ''
+                            return companyName && companyName !== ticker ? (
+                              <>
+                                <h3 className="text-lg font-bold text-white truncate">
+                                  {companyName}
+                                </h3>
+                                <p className="text-sm text-slate-400 mt-1">{ticker}</p>
+                              </>
+                            ) : (
                               <h3 className="text-lg font-bold text-white truncate">
-                                {row.company_name}
+                                {ticker}
                               </h3>
-                              <p className="text-sm text-slate-400 mt-1">{ticker}</p>
-                            </>
-                          ) : (
-                            <h3 className="text-lg font-bold text-white truncate">
-                              {ticker}
-                            </h3>
-                          )}
+                            )
+                          })()}
                         </div>
 
                         {/* Right: Change % and timeframe */}
