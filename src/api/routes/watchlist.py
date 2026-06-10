@@ -13,12 +13,8 @@ import os
 
 
 def _get_project_root() -> Path:
-	"""Get project root from environment, defaults to ~/.cresus"""
-	project_root = os.environ.get("CRESUS_PROJECT_ROOT")
-	if project_root:
-		return Path(project_root)
-	# Default to ~/.cresus if CRESUS_PROJECT_ROOT not set
-	return Path.home() / ".cresus"
+	"""Get project root from environment, same as strategies."""
+	return Path(os.environ.get("CRESUS_PROJECT_ROOT", "."))
 
 
 router = APIRouter(prefix="/watchlists", tags=["watchlists"])
