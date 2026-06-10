@@ -661,7 +661,7 @@ export default function ScreenerDetail() {
                     type="button"
                     onClick={handleRun}
                     disabled={loadingResults}
-                    className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded font-medium transition text-sm flex-1"
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded font-medium transition text-sm"
                     title="Run screener"
                   >
                     {loadingResults ? '⟳ Running...' : '▶ Run'}
@@ -669,7 +669,7 @@ export default function ScreenerDetail() {
                   <button
                     type="button"
                     onClick={() => setEditMode(true)}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition text-sm flex-1"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition text-sm"
                     title="Edit screener"
                   >
                     ✎ Edit
@@ -681,7 +681,7 @@ export default function ScreenerDetail() {
                         deleteScreener(paramName!)
                       }
                     }}
-                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded font-medium transition text-sm flex-1"
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded font-medium transition text-sm"
                     title="Delete screener"
                   >
                     🗑 Delete
@@ -693,14 +693,14 @@ export default function ScreenerDetail() {
                   <button
                     type="button"
                     onClick={() => setEditMode(false)}
-                    className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded font-medium transition text-sm flex-1"
+                    className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded font-medium transition text-sm"
                     title="Cancel editing"
                   >
                     ✕ Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded font-medium transition text-sm flex-1"
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded font-medium transition text-sm"
                     title="Save changes"
                   >
                     ✓ Save
