@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import CardChart from './CardChart'
 import TradingChartWidget from './TradingChartWidget'
+import { useHistoricalDataLoader } from '@/hooks/useHistoricalDataLoader'
 
 interface ResultsWidgetProps {
   data: any[] // Array of result objects
