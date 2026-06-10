@@ -4,6 +4,7 @@ import TradingChart from '@/components/TradingChart'
 import CardChart from '@/components/CardChart'
 import { PortfolioHoldingsTable } from '@/components/portfolio/PortfolioHoldingsTable'
 import PortfolioHoldingsWidget from '@/components/portfolio/PortfolioHoldingsWidget'
+import ResultsWidget from '@/components/ResultsWidget'
 import { ChartModal } from '@/components/ChartModal'
 import { api, getApiBaseUrl } from '@/services/api'
 
@@ -23,6 +24,7 @@ export default function Dashboard() {
   const [alertHistory, setAlertHistory] = useState<{ id: string; info: AlertInfo }[]>([])
   const [alertGridView, setAlertGridView] = useState<AlertInfo | null>(null)
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null)
+  const [selectedAlertMessage, setSelectedAlertMessage] = useState<any>(null)
   const [selectedTableTicker, setSelectedTableTicker] = useState<string | null>(null)
   const [historicalData, setHistoricalData] = useState<Record<string, any[]>>({})
   const [tickerInfo, setTickerInfo] = useState<Record<string, any>>({})
@@ -382,7 +384,12 @@ export default function Dashboard() {
                 }
               }
             }}
-            onPortfolioClick={(portfolio, tickers, widget) => {
+            onPortfolioClick={(portfolio, tickers, widget, messageData) => {
+              // If this is a results_widget message, store the full message data
+              if (messageData && messageData.widget === 'results_widget') {
+                setSelectedAlertMessage(messageData)
+              }
+
               // Create alert info object and display holdings filtered by tickers
               const alertInfo: AlertInfo = {
                 title: '',
@@ -472,15 +479,34 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Portfolio Holdings Widget */}
-        <div className="flex-1 overflow-auto p-4">
-          {alertGridView?.portfolio && (
-            <PortfolioHoldingsWidget
-              portfolioName={alertGridView.portfolio}
-              onClose={() => setRightPanelOpen(false)}
-              filterTickers={alertGridView?.tickers}
+        {/* Main Content Area - Results or Holdings */}
+        <div className="flex-1 overflow-auto">
+          {/* Display ResultsWidget if alert message with results is selected */}
+          {selectedAlertMessage?.data?.results ? (
+            <ResultsWidget
+              data={selectedAlertMessage.data.results}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              sortColumn={null}
+              onSortChange={() => {}}
+              sortDirection="asc"
+              onSortDirectionChange={() => {}}
+              historicalData={historicalData}
+              loadingCharts={false}
+              chartTimeframe={timeframe}
+              onChartTimeframeChange={setTimeframe}
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
             />
-          )}
+          ) : alertGridView?.portfolio ? (
+            <div className="p-4">
+              <PortfolioHoldingsWidget
+                portfolioName={alertGridView.portfolio}
+                onClose={() => setRightPanelOpen(false)}
+                filterTickers={alertGridView?.tickers}
+              />
+            </div>
+          ) : null}
         </div>
       </div>
       )}

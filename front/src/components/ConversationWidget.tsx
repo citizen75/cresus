@@ -60,7 +60,7 @@ interface ConversationWidgetProps {
   onRefresh?: () => void
   maxHeight?: string
   onSendMessage?: (message: string) => Promise<void>
-  onPortfolioClick?: (portfolioName: string, tickers: string[], widget?: MessageWidget) => void
+  onPortfolioClick?: (portfolioName: string, tickers: string[], widget?: MessageWidget, messageData?: any) => void
   onNewMessage?: (message: ConversationMessage) => void
   autoSelectLatestAlert?: boolean // Auto-select latest alert in right panel
   showResultsPanel?: boolean // Show results panel for results_widget messages (default: true)
@@ -275,6 +275,10 @@ export function ConversationWidget({
             // If message has results_widget, show ResultsWidget on right panel (regardless of portfolio)
             if (msg.widget === 'results_widget') {
               setSelectedMessage(msg)
+              // Also notify parent with full message data
+              if (onPortfolioClick) {
+                onPortfolioClick('global', tickers, msg.widget, msg)
+              }
             } else if (portfolio && portfolio !== 'global' && onPortfolioClick) {
               onPortfolioClick(portfolio, tickers, msg.widget)
             }
