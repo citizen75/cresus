@@ -646,44 +646,8 @@ export default function Alerts() {
                   )}
                 </div>
 
-                {/* Right: Last Result & History (1 column) */}
+                {/* Right: Results History (1 column) */}
                 <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden flex flex-col">
-                  <div className="p-6 border-b border-slate-700 flex-shrink-0">
-                    <h2 className="text-lg font-semibold text-white mb-4">Last Result</h2>
-
-                    {runResults && runResults.alert_name === currentAlert?.name ? (
-                      <div className="space-y-3 text-sm">
-                        <div>
-                          <div className="text-slate-400">Status</div>
-                          <div className={`font-bold mt-1 ${runResults.matched ? 'text-green-400' : 'text-slate-400'}`}>
-                            {runResults.matched ? '✓ Matched' : '✗ No Match'}
-                          </div>
-                        </div>
-
-                        <div>
-                          <div className="text-slate-400">Matches</div>
-                          <div className="text-white font-medium mt-1">{runResults.matches?.length || 0}</div>
-                        </div>
-
-                        <div>
-                          <div className="text-slate-400">Tickers Checked</div>
-                          <div className="text-white font-medium mt-1">{runResults.tickers_checked}</div>
-                        </div>
-
-                        {runResults.error && (
-                          <div className="bg-red-900/30 border border-red-700 rounded p-2 text-red-300 text-xs">
-                            {runResults.error}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="text-center py-4 text-slate-500">
-                        <p className="text-sm">No recent run</p>
-                        <p className="text-xs mt-1">Run the alert to see results</p>
-                      </div>
-                    )}
-                  </div>
-
                   {/* Results History */}
                   <div className="flex-1 overflow-y-auto">
                     <div className="p-4 border-t border-slate-700">
