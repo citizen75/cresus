@@ -207,6 +207,35 @@ export default function Alerts() {
     }
   }
 
+  const duplicateAlert = async (name: string) => {
+    try {
+      const alert = alerts.find(a => a.name === name)
+      if (!alert) {
+        setError('Alert not found')
+        return
+      }
+
+      // Create a new alert with "Copy of" prefix
+      const newName = `Copy of ${name}`
+
+      // Call API to create the duplicate
+      await api.createAlert({
+        name: newName,
+        source: alert.source,
+        source_value: alert.source_value,
+        formula: alert.formula,
+        notify: alert.notify,
+        description: alert.description,
+        tags: alert.tags
+      })
+
+      await fetchAlerts()
+    } catch (err) {
+      console.error('Failed to duplicate alert:', err)
+      setError('Failed to duplicate alert')
+    }
+  }
+
   const formatMessageDate = (dateString: string) => {
     const date = new Date(dateString)
     const now = new Date()
@@ -724,6 +753,13 @@ export default function Alerts() {
                           title="Send to conversation"
                         >
                           🔔 Notify
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => duplicateAlert(currentAlert?.name!)}
+                          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded font-medium transition"
+                        >
+                          📋 Duplicate
                         </button>
                         <button
                           type="button"
