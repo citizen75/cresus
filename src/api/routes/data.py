@@ -151,19 +151,24 @@ async def get_universe_tickers(
         if not universe.exists():
             return {"error": f"Universe '{universe_id}' not found"}, 404
 
-        tickers = universe.get_tickers_with_metadata()
+        # Load only ticker symbols (not metadata)
+        symbols = universe.get_tickers()
         if limit:
-            tickers = tickers[:limit]
+            symbols = symbols[:limit]
 
-        # Optionally enrich with fundamentals
-        if enrich:
+        # Convert symbols to basic ticker dict
+        tickers = [{"symbol": symbol} for symbol in symbols]
+
+        # Enrich with fundamentals on-the-fly
+        if enrich and tickers:
+            # Primary enrichment via TickerIntelligence
             try:
                 tickers = TickerIntelligence.batch_enrich_flat(tickers, asset_type=asset_type)
             except Exception as e:
-                # If enrichment fails, continue with basic data
+                # If enrichment fails, continue with basic symbols
                 pass
 
-            # Fallback: Add country/exchange/currency directly from FinanceDatabase if missing
+            # Secondary enrichment from FinanceDatabase
             try:
                 import financedatabase as fd
 
@@ -183,7 +188,7 @@ async def get_universe_tickers(
                     if symbol in all_data.index:
                         row = all_data.loc[symbol]
 
-                        # Add missing fields
+                        # Fill missing fields from FinanceDatabase
                         if not ticker.get("name") and "name" in all_data.columns and pd.notna(row["name"]):
                             ticker["name"] = str(row["name"])
                         if not ticker.get("country") and "country" in all_data.columns and pd.notna(row["country"]):
@@ -199,7 +204,7 @@ async def get_universe_tickers(
                             if exchange_val:
                                 ticker["exchange"] = exchange_val
             except Exception as e:
-                pass  # Fallback failed, continue with what we have
+                pass  # FinanceDatabase fallback failed, continue with enriched data
 
         return {
             "universe": universe_id,
