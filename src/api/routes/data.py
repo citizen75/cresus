@@ -270,6 +270,60 @@ async def remove_tickers_from_universe(universe_id: str, request: TickersRequest
         return {"error": str(e)}, 400
 
 
+@router.get("/category/{category}")
+async def get_category_tickers(
+    category: str,
+    limit: int = Query(1000, description="Max number of tickers"),
+    enrich: bool = Query(True, description="Enrich with fundamentals data"),
+):
+    """Get all tickers in a category with optional enrichment.
+
+    Category mapping:
+    - stocks: All stock universes (srd, cac40, nasdaq_100, sp_25, xetra, etc.)
+    - etfs: All ETF universes (etf_pea, etf_fr, etf_pea_full)
+    - funds: Fund universes
+    - indices: Index universes
+    - currencies: Currency universes
+    """
+    category_map = {
+        "stocks": ["srd", "cac40", "nasdaq_100", "sp_25", "enx_large", "enx_mid", "enx_small", "xetra"],
+        "etfs": ["etf_pea", "etf_fr", "etf_pea_full", "etf_pea_test"],
+        "funds": [],  # No fund universes currently
+        "indices": ["index"],
+        "currencies": [],  # No currency universes currently
+    }
+
+    universes = category_map.get(category.lower(), [])
+    if not universes:
+        return {"category": category, "tickers": [], "count": 0}
+
+    all_tickers = []
+    try:
+        for uni_id in universes:
+            try:
+                uni = Universe(uni_id)
+                if uni.exists():
+                    tickers = uni.get_tickers_with_metadata()
+                    all_tickers.extend(tickers)
+            except Exception as e:
+                pass
+
+        # Optionally enrich with fundamentals
+        if enrich:
+            all_tickers = TickerIntelligence.batch_enrich_flat(all_tickers)
+
+        # Limit results
+        all_tickers = all_tickers[:limit]
+
+        return {
+            "category": category,
+            "tickers": all_tickers,
+            "count": len(all_tickers),
+        }
+    except Exception as e:
+        return {"error": str(e)}, 400
+
+
 @router.get("/ticker/{ticker}/enriched")
 async def get_enriched_ticker(ticker: str, use_cache: bool = Query(True)):
     """Get complete enriched ticker data.

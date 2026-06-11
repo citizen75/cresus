@@ -59,6 +59,13 @@ export default function Data() {
     }
   }, [selectedUniverse])
 
+  // Load tickers for selected category
+  useEffect(() => {
+    if (selectedCategory) {
+      loadCategoryTickers(selectedCategory)
+    }
+  }, [selectedCategory])
+
   const loadUniverses = async () => {
     try {
       setLoading(true)
@@ -89,6 +96,22 @@ export default function Data() {
       }
     } catch (err) {
       console.error('Failed to load tickers:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadCategoryTickers = async (category: string) => {
+    try {
+      setLoading(true)
+      const response = await fetch(`http://192.168.0.130:6501/api/v1/data/category/${category}`)
+      if (response.ok) {
+        const data = await response.json()
+        setTickers(data.tickers || [])
+      }
+    } catch (err) {
+      console.error('Failed to load category tickers:', err)
+      setTickers([])
     } finally {
       setLoading(false)
     }
