@@ -303,22 +303,23 @@ async def filter_tickers(
     """Filter tickers by country and asset type.
 
     Countries map to universes:
-    - FR: srd, cac40, etf_pea, etf_fr, etf_pea_full
-    - NL: (stocks from xetra/enx when available)
-    - DE: xetra, enx_mid, enx_small
-    - etc.
+    - FR: srd, cac40, nasdaq_tech, enx_large, enx_mid, enx_small, xetra, etf_pea, etf_fr, etf_pea_full
+    - US: nasdaq_100, nasdaq_tech, sp_25
+    - DE: xetra, enx_mid, enx_small, nasdaq_100, nasdaq_tech, sp_25
+    - EU: enx_large, enx_mid, enx_small, xetra, nasdaq_100, nasdaq_tech, sp_25
+    - NOTE: ETFs only available for FR (French ETFs: etf_pea, etf_fr, etf_pea_full)
     """
     country_universe_map = {
-        "FR": ["srd", "cac40", "etf_pea", "etf_fr", "etf_pea_full"],
-        "NL": ["sp_25"],
-        "DE": ["xetra", "enx_mid", "enx_small"],
+        "FR": ["srd", "cac40", "nasdaq_tech", "enx_large", "enx_mid", "enx_small", "xetra", "etf_pea", "etf_fr", "etf_pea_full"],
         "US": ["nasdaq_100", "nasdaq_tech", "sp_25"],
-        "EU": ["enx_large", "enx_mid", "enx_small", "xetra"],
+        "DE": ["xetra", "enx_mid", "enx_small", "nasdaq_100", "nasdaq_tech", "sp_25"],
+        "EU": ["enx_large", "enx_mid", "enx_small", "xetra", "nasdaq_100", "nasdaq_tech", "sp_25"],
     }
 
     asset_type_universes = {
-        "stocks": ["srd", "cac40", "nasdaq_100", "sp_25", "enx_large", "enx_mid", "enx_small", "xetra"],
-        "etfs": ["etf_pea", "etf_fr", "etf_pea_full"],
+        "stocks": ["srd", "cac40", "nasdaq_100", "nasdaq_tech", "sp_25", "enx_large", "enx_mid", "enx_small", "xetra"],
+        "etfs": ["etf_pea", "etf_fr", "etf_pea_full"],  # Only French ETFs available
+        "funds": [],
         "indices": ["index"],
     }
 
@@ -346,6 +347,16 @@ async def filter_tickers(
 
     # Remove duplicates
     universes_to_query = list(set(universes_to_query))
+
+    # If no universes found, return helpful message
+    if not universes_to_query:
+        return {
+            "countries": countries,
+            "asset_type": asset_type,
+            "tickers": [],
+            "count": 0,
+            "note": "No data available for this combination. ETFs are only available for France (FR).",
+        }
 
     all_tickers = []
     try:
