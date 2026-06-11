@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '@/services/api'
+import TradingChartWidget from '@/components/TradingChartWidget'
 
 interface Task {
   id: number
@@ -37,6 +38,7 @@ export default function Tasks() {
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [editingPanel, setEditingPanel] = useState(false)
+  const [chartTicker, setChartTicker] = useState<string | null>(null)
   const [panelFormData, setPanelFormData] = useState({
     title: '',
     description: '',
@@ -441,9 +443,12 @@ export default function Tasks() {
                     </span>
                   )}
                   {task.ticker && (
-                    <span className="px-2 py-1 bg-green-900/30 text-green-300 rounded text-xs">
+                    <button
+                      onClick={() => setChartTicker(task.ticker)}
+                      className="px-2 py-1 bg-green-900/30 text-green-300 rounded text-xs hover:bg-green-900/50 transition cursor-pointer"
+                    >
                       📈 {task.ticker}
-                    </span>
+                    </button>
                   )}
                   {task.assignee && (
                     <span className="px-2 py-1 bg-purple-900/30 text-purple-300 rounded text-xs">
@@ -492,7 +497,15 @@ export default function Tasks() {
                         <p className="text-sm text-slate-400 mb-1">Portfolio: <span className="text-blue-400 font-medium">{selectedTask.portfolio}</span></p>
                       )}
                       {selectedTask.ticker && (
-                        <p className="text-sm text-slate-400">Ticker: <span className="text-green-400 font-medium">{selectedTask.ticker}</span></p>
+                        <p className="text-sm text-slate-400">
+                          Ticker:{' '}
+                          <button
+                            onClick={() => setChartTicker(selectedTask.ticker)}
+                            className="text-green-400 font-medium hover:text-green-300 underline cursor-pointer transition"
+                          >
+                            {selectedTask.ticker}
+                          </button>
+                        </p>
                       )}
                     </div>
                     <button
@@ -876,6 +889,14 @@ export default function Tasks() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Trading Chart Widget */}
+      {chartTicker && (
+        <TradingChartWidget
+          ticker={chartTicker}
+          onClose={() => setChartTicker(null)}
+        />
       )}
     </div>
   )
