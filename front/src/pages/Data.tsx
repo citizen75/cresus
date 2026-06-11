@@ -243,16 +243,47 @@ export default function Data() {
     if (draggedRows.length === 0) return
 
     try {
+      // Load universe to check for existing tickers
+      const universeResponse = await fetch(
+        `http://192.168.0.130:6501/api/v1/data/universe/${universeId}`
+      )
+      const universeData = await universeResponse.json()
+      const existingSymbols = new Set(
+        (universeData.tickers || []).map((t: any) => t.symbol || t)
+      )
+
+      // Filter out duplicates
+      const newTickers = draggedRows.filter(
+        (ticker) => !existingSymbols.has(ticker)
+      )
+      const duplicateCount = draggedRows.length - newTickers.length
+
+      if (newTickers.length === 0) {
+        alert('All selected tickers are already in this universe')
+        setDraggedRows([])
+        setDropTarget(null)
+        return
+      }
+
+      // Add only new tickers
       const response = await fetch(
         `http://192.168.0.130:6501/api/v1/data/universe/${universeId}/tickers`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tickers: draggedRows }),
+          body: JSON.stringify({ tickers: newTickers }),
         }
       )
 
       if (response.ok) {
+        const result = await response.json()
+        if (duplicateCount > 0) {
+          alert(
+            `✅ Added ${result.added || newTickers.length} tickers\n⚠️ Skipped ${duplicateCount} duplicates`
+          )
+        } else {
+          alert(`✅ Added ${result.added || newTickers.length} tickers`)
+        }
         // Reload the universe
         await loadUniverses()
         setDraggedRows([])
@@ -260,6 +291,7 @@ export default function Data() {
       }
     } catch (err) {
       console.error('Failed to add tickers to universe:', err)
+      alert('Failed to add tickers to universe')
     }
   }
 

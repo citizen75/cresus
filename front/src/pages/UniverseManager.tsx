@@ -83,11 +83,19 @@ export default function UniverseManager() {
     }
 
     try {
-      const tickers = newTickers.split('\n').map(t => t.trim()).filter(t => t)
+      const rawTickers = newTickers.split('\n').map(t => t.trim()).filter(t => t)
+      // Remove duplicates (case-insensitive)
+      const uniqueTickers = Array.from(new Set(rawTickers.map(t => t.toUpperCase())))
+      const duplicateCount = rawTickers.length - uniqueTickers.length
+
+      if (duplicateCount > 0) {
+        setError(`Removed ${duplicateCount} duplicate ticker(s)`)
+      }
+
       const response = await fetch(`http://192.168.0.130:6501/api/v1/data/universe/${newUniverseName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tickers }),
+        body: JSON.stringify({ tickers: uniqueTickers }),
       })
 
       if (response.ok) {
@@ -109,11 +117,19 @@ export default function UniverseManager() {
     if (!selectedUniverse) return
 
     try {
-      const tickers = editTickers.split('\n').map(t => t.trim()).filter(t => t)
+      const rawTickers = editTickers.split('\n').map(t => t.trim()).filter(t => t)
+      // Remove duplicates (case-insensitive)
+      const uniqueTickers = Array.from(new Set(rawTickers.map(t => t.toUpperCase())))
+      const duplicateCount = rawTickers.length - uniqueTickers.length
+
+      if (duplicateCount > 0) {
+        alert(`Removed ${duplicateCount} duplicate ticker(s)`)
+      }
+
       const response = await fetch(`http://192.168.0.130:6501/api/v1/data/universe/${selectedUniverse.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tickers }),
+        body: JSON.stringify({ tickers: uniqueTickers }),
       })
 
       if (response.ok) {
