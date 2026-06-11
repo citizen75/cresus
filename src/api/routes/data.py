@@ -147,7 +147,29 @@ async def get_universe_tickers(
 
         # Optionally enrich with fundamentals
         if enrich:
-            tickers = TickerIntelligence.batch_enrich_flat(tickers)
+            tickers = TickerIntelligence.batch_enrich_flat(tickers, asset_type="equities")
+
+            # Fallback: Add country/exchange directly from FinanceDatabase if missing
+            try:
+                import financedatabase as fd
+                db = fd.Equities()
+                all_data = db.select()
+                for ticker in tickers:
+                    symbol = ticker.get("symbol", "").upper()
+                    if symbol in all_data.index and (not ticker.get("country") or not ticker.get("exchange")):
+                        row = all_data.loc[symbol]
+                        if not ticker.get("country") and "country" in all_data.columns:
+                            ticker["country"] = str(row["country"]) if pd.notna(row["country"]) else None
+                        if not ticker.get("exchange"):
+                            exchange_val = None
+                            if "exchange" in all_data.columns and pd.notna(row["exchange"]):
+                                exchange_val = str(row["exchange"])
+                            elif "market" in all_data.columns and pd.notna(row["market"]):
+                                exchange_val = str(row["market"])
+                            if exchange_val:
+                                ticker["exchange"] = exchange_val
+            except Exception as e:
+                pass  # Fallback failed, continue with what we have
 
         return {
             "universe": universe_id,
