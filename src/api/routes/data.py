@@ -128,7 +128,7 @@ async def search_tickers(
 @router.get("/universe/{universe_id}")
 async def get_universe_tickers(
     universe_id: str,
-    limit: int = Query(1000, description="Max number of tickers"),
+    limit: int = Query(None, description="Max number of tickers (None = all results)"),
     enrich: bool = Query(True, description="Enrich with fundamentals data"),
 ):
     """Get tickers for a specific universe with optional metadata enrichment.
@@ -143,7 +143,9 @@ async def get_universe_tickers(
         if not universe.exists():
             return {"error": f"Universe '{universe_id}' not found"}, 404
 
-        tickers = universe.get_tickers_with_metadata()[:limit]
+        tickers = universe.get_tickers_with_metadata()
+        if limit:
+            tickers = tickers[:limit]
 
         # Optionally enrich with fundamentals
         if enrich:
@@ -297,7 +299,7 @@ async def remove_tickers_from_universe(universe_id: str, request: TickersRequest
 async def filter_tickers(
     countries: str = Query(None, description="Comma-separated country codes (FR,US,DE,NL,etc.)"),
     asset_type: str = Query(None, description="Asset type (stocks, etfs, funds, indices)"),
-    limit: int = Query(1000, description="Max number of tickers"),
+    limit: int = Query(None, description="Max number of tickers (None = all results)"),
     enrich: bool = Query(True, description="Enrich with fundamentals data"),
 ):
     """Filter tickers by country and asset type using FinanceDatabase.
@@ -496,8 +498,9 @@ async def filter_tickers(
             except Exception:
                 pass  # Continue even if enrichment fails
 
-        # Limit results
-        unique_tickers = unique_tickers[:limit]
+        # Apply limit if specified (otherwise return all)
+        if limit:
+            unique_tickers = unique_tickers[:limit]
 
         return {
             "countries": countries,
