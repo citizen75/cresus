@@ -803,7 +803,8 @@ async def get_ticker_info(ticker: str):
 async def get_ticker_history(
     ticker: str,
     days: int = Query(365, description="Number of days of history"),
-    use_cache: bool = Query(True, description="Use cached data if available")
+    use_cache: bool = Query(True, description="Use cached data if available"),
+    indicator: str = Query(None, description="Optional indicator to compute (e.g., sha_10)")
 ):
     """Get historical price data for a ticker.
 
@@ -811,6 +812,7 @@ async def get_ticker_history(
         ticker: Ticker symbol
         days: Number of days of history (default: 365 for 1 year)
         use_cache: Whether to use cached data (default: True)
+        indicator: Optional indicator to compute (e.g., 'sha_10' for Simple HA candlesticks)
     """
     try:
         import yfinance as yf
@@ -896,6 +898,7 @@ async def get_ticker_history(
                     volume_val = row["Volume"]
 
                 history.append({
+                    "timestamp": date.strftime("%Y-%m-%d"),
                     "date": date.strftime("%Y-%m-%d"),
                     "close": round(float(close_val), 2),
                     "open": round(float(open_val), 2),
@@ -906,6 +909,38 @@ async def get_ticker_history(
             except (ValueError, TypeError, KeyError):
                 # Skip rows with bad data
                 continue
+
+        # Calculate SHA_10 (Simple Heikin-Ashi with 10-period average) if requested
+        if indicator == "sha_10" and history:
+            for i, candle in enumerate(history):
+                if i == 0:
+                    # First candle uses simple HA formula
+                    ha_close = (candle["open"] + candle["high"] + candle["low"] + candle["close"]) / 4
+                    ha_open = candle["open"]
+                else:
+                    prev_candle = history[i - 1]
+                    ha_close = (candle["open"] + candle["high"] + candle["low"] + candle["close"]) / 4
+                    ha_open = (history[i - 1].get("ha_open", prev_candle["open"]) + history[i - 1].get("ha_close", prev_candle["close"])) / 2
+
+                ha_high = max(candle["high"], ha_open, ha_close)
+                ha_low = min(candle["low"], ha_open, ha_close)
+
+                candle["ha_open"] = round(ha_open, 2)
+                candle["ha_close"] = round(ha_close, 2)
+                candle["ha_high"] = round(ha_high, 2)
+                candle["ha_low"] = round(ha_low, 2)
+
+            # Apply 10-period simple moving average smoothing to HA candlesticks
+            period = 10
+            for i in range(len(history)):
+                start = max(0, i - period + 1)
+                window = history[start:i + 1]
+
+                candle = history[i]
+                candle["sha_10_open"] = round(sum(c.get("ha_open", c["open"]) for c in window) / len(window), 2)
+                candle["sha_10_close"] = round(sum(c.get("ha_close", c["close"]) for c in window) / len(window), 2)
+                candle["sha_10_high"] = round(sum(c.get("ha_high", c["high"]) for c in window) / len(window), 2)
+                candle["sha_10_low"] = round(sum(c.get("ha_low", c["low"]) for c in window) / len(window), 2)
 
         # Save to cache
         try:
