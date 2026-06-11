@@ -26,6 +26,7 @@ export default function Dashboard() {
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null)
   const [selectedAlertMessage, setSelectedAlertMessage] = useState<any>(null)
   const [selectedPortfolioWidget, setSelectedPortfolioWidget] = useState<string | null>(null)
+  const [selectedPortfolioWidgetTicker, setSelectedPortfolioWidgetTicker] = useState<string | null>(null)
   const [selectedTableTicker, setSelectedTableTicker] = useState<string | null>(null)
   const [historicalData, setHistoricalData] = useState<Record<string, any[]>>({})
   const [tickerInfo, setTickerInfo] = useState<Record<string, any>>({})
@@ -433,9 +434,10 @@ export default function Dashboard() {
               }
               // For portfolio_holdings_widget messages: show PortfolioHoldingsWidget
               else if (messageData && messageData.widget === 'portfolio_holdings_widget') {
-                console.log(`[Dashboard] Portfolio message clicked:`, { id: messageData.id, portfolio: messageData.portfolio })
+                console.log(`[Dashboard] Portfolio message clicked:`, { id: messageData.id, portfolio: messageData.portfolio, ticker: messageData.ticker })
                 setSelectedAlertMessage(null)  // Clear results widget
                 setSelectedPortfolioWidget(messageData.portfolio)
+                setSelectedPortfolioWidgetTicker(messageData.ticker || null)
                 setRightPanelOpen(true)
               }
               // For old alert messages without widget field: show holdings if portfolio exists
@@ -565,7 +567,12 @@ export default function Dashboard() {
             <div className="p-4">
               <PortfolioHoldingsWidget
                 portfolioName={selectedPortfolioWidget}
-                onClose={() => setRightPanelOpen(false)}
+                filterTickers={selectedPortfolioWidgetTicker ? [selectedPortfolioWidgetTicker] : undefined}
+                onClose={() => {
+                  setSelectedPortfolioWidget(null)
+                  setSelectedPortfolioWidgetTicker(null)
+                  setRightPanelOpen(false)
+                }}
                 onGetHistoricalData={api.getHistoricalData.bind(api)}
               />
             </div>
