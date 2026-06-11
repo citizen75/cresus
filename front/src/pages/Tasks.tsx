@@ -115,6 +115,11 @@ export default function Tasks() {
         : allTasks
 
       setTasks(filteredTasks)
+
+      // Auto-select most recent task if none selected
+      if (!selectedTask && filteredTasks.length > 0) {
+        setSelectedTask(filteredTasks[0])
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load tasks')
     } finally {
