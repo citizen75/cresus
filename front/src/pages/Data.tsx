@@ -45,9 +45,12 @@ export default function Data() {
   const [selectedCountries, setSelectedCountries] = useState<string[]>(['FR'])
   const [selectedAssetType, setSelectedAssetType] = useState<string>('stocks')
   const [selectedExchanges, setSelectedExchanges] = useState<string[]>([])
+  const [selectedCurrencies, setSelectedCurrencies] = useState<string[]>([])
   const [showCountryDropdown, setShowCountryDropdown] = useState(false)
   const [showExchangeDropdown, setShowExchangeDropdown] = useState(false)
+  const [showCurrencyDropdown, setShowCurrencyDropdown] = useState(false)
   const [availableExchanges, setAvailableExchanges] = useState<string[]>([])
+  const [availableCurrencies, setAvailableCurrencies] = useState<string[]>([])
   const [sortColumn, setSortColumn] = useState<string>('symbol')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
@@ -135,19 +138,32 @@ export default function Data() {
     )
   }
 
-  // Collect unique exchanges from tickers
-  const updateAvailableExchanges = () => {
+  const toggleCurrency = (currency: string) => {
+    setSelectedCurrencies(prev =>
+      prev.includes(currency) ? prev.filter(c => c !== currency) : [...prev, currency]
+    )
+  }
+
+  // Collect unique exchanges and currencies from tickers
+  const updateAvailableFilters = () => {
     const exchanges = [...new Set(
       tickers
         .map(t => t.exchange)
         .filter((e): e is string => e !== undefined && e !== null && e !== '-')
     )].sort()
     setAvailableExchanges(exchanges)
+
+    const currencies = [...new Set(
+      tickers
+        .map(t => t.currency)
+        .filter((c): c is string => c !== undefined && c !== null && c !== '-')
+    )].sort()
+    setAvailableCurrencies(currencies)
   }
 
-  // Update available exchanges when tickers change
+  // Update available filters when tickers change
   useEffect(() => {
-    updateAvailableExchanges()
+    updateAvailableFilters()
   }, [tickers])
 
   const handleSort = (columnKey: string) => {
@@ -174,6 +190,12 @@ export default function Data() {
       // Exchange filter
       if (selectedExchanges.length > 0 && ticker.exchange) {
         if (!selectedExchanges.includes(ticker.exchange)) {
+          return false
+        }
+      }
+      // Currency filter
+      if (selectedCurrencies.length > 0 && ticker.currency) {
+        if (!selectedCurrencies.includes(ticker.currency)) {
           return false
         }
       }
@@ -398,6 +420,52 @@ export default function Data() {
                             className="w-3 h-3"
                           />
                           <span className="text-xs">{exchange}</span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+            </div>
+
+            {/* Currency Filter */}
+            <div className="relative">
+                <button
+                  onClick={() => setShowCurrencyDropdown(!showCurrencyDropdown)}
+                  className="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded text-xs flex items-center gap-1 transition whitespace-nowrap"
+                >
+                  <span>
+                    {selectedCurrencies.length === 0
+                      ? `💱 ${availableCurrencies.length === 0 ? 'Currency' : 'All'}`
+                      : `💱 ${selectedCurrencies.length}`}
+                  </span>
+                  <span className={`text-xs transition ${showCurrencyDropdown ? 'rotate-180' : ''}`}>▼</span>
+                </button>
+
+                {/* Dropdown Menu */}
+                {showCurrencyDropdown && (
+                  <div className="absolute top-full mt-1 left-0 bg-slate-800 border border-slate-700 rounded shadow-lg z-50 max-h-48 overflow-y-auto min-w-48">
+                    {availableCurrencies.length === 0 ? (
+                      <div className="px-2 py-2 text-xs text-slate-400">
+                        Load tickers to see currencies
+                      </div>
+                    ) : (
+                      availableCurrencies.map(currency => (
+                        <button
+                          key={currency}
+                          onClick={() => toggleCurrency(currency)}
+                          className={`w-full text-left px-2 py-1.5 text-xs transition flex items-center gap-1 ${
+                            selectedCurrencies.includes(currency)
+                              ? 'bg-purple-600/30 text-purple-300'
+                              : 'text-slate-300 hover:bg-slate-700'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedCurrencies.includes(currency)}
+                            onChange={() => {}}
+                            className="w-3 h-3"
+                          />
+                          <span className="text-xs">{currency}</span>
                         </button>
                       ))
                     )}
