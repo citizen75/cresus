@@ -44,17 +44,17 @@ export default function PortfolioHoldingsWidget({
 
   // Load raw positions from API or use initial results
   useEffect(() => {
+    // Use initial results if provided (from message)
+    if (initialResults && Array.isArray(initialResults) && initialResults.length > 0) {
+      console.log(`[PortfolioHoldingsWidget] Using ${initialResults.length} initial results from message`)
+      setRawPositions(initialResults)
+      setIsLoadingPositions(false)
+      return
+    }
+
+    // Otherwise fetch from API
     const loadPositions = async () => {
       if (!portfolioName) return
-
-      // Use initial results if provided (from message)
-      if (initialResults && initialResults.length > 0) {
-        console.log(`[PortfolioHoldingsWidget] Using initial results:`, initialResults.length)
-        setRawPositions(initialResults)
-        setIsLoadingPositions(false)
-        return
-      }
-
       setIsLoadingPositions(true)
       try {
         const baseUrl = getApiBaseUrl()
@@ -64,6 +64,7 @@ export default function PortfolioHoldingsWidget({
           if (!Array.isArray(posData)) {
             posData = posData.positions || []
           }
+          console.log(`[PortfolioHoldingsWidget] Loaded ${posData.length} positions from API`)
           setRawPositions(posData)
         }
       } catch (err) {
