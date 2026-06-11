@@ -20,6 +20,14 @@ interface Ticker {
   currency?: string
 }
 
+const ASSET_CATEGORIES = [
+  { id: 'stocks', label: 'Stocks', icon: '📈' },
+  { id: 'etfs', label: 'ETFs', icon: '💱' },
+  { id: 'funds', label: 'Funds', icon: '🏦' },
+  { id: 'indices', label: 'Indices', icon: '📊' },
+  { id: 'currencies', label: 'Currencies', icon: '💱' },
+]
+
 const MARKET_FILTERS = [
   { id: 'all', label: 'All Markets', icon: '🌍' },
   { id: 'europe', label: 'Europe', icon: '🇪🇺', universes: ['cac40', 'srd', 'enx_large', 'enx_mid', 'enx_small', 'xetra', 'etf_pea', 'etf_pea_full', 'etf_pea_test', 'etf_fr'] },
@@ -31,6 +39,7 @@ const MARKET_FILTERS = [
 export default function Data() {
   const navigate = useNavigate()
   const [universes, setUniverses] = useState<Universe[]>([])
+  const [selectedCategory, setSelectedCategory] = useState<string>('stocks')
   const [selectedUniverse, setSelectedUniverse] = useState<string | null>(null)
   const [tickers, setTickers] = useState<Ticker[]>([])
   const [loading, setLoading] = useState(false)
@@ -118,8 +127,34 @@ export default function Data() {
 
       {/* Main content */}
       <div className="flex-1 flex gap-4 p-6 overflow-hidden">
-        {/* Left Panel - Universes List */}
+        {/* Left Panel */}
         <div className="w-80 flex flex-col border border-slate-800 rounded-lg bg-slate-900">
+          {/* Asset Categories */}
+          <div className="border-b border-slate-800">
+            <div className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">Asset Types</div>
+            <div className="space-y-1 px-2 pb-3">
+              {ASSET_CATEGORIES.map(cat => (
+                <button
+                  key={cat.id}
+                  onClick={() => {
+                    setSelectedCategory(cat.id)
+                    setSelectedUniverse(null)
+                    setTickers([])
+                    setSearchQuery('')
+                  }}
+                  className={`w-full text-left px-3 py-2 rounded text-sm transition ${
+                    selectedCategory === cat.id
+                      ? 'bg-purple-600/30 text-purple-300'
+                      : 'text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <span className="mr-2">{cat.icon}</span>
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Market Selector */}
           <div className="relative p-3 border-b border-slate-800">
             <button
@@ -157,7 +192,7 @@ export default function Data() {
             )}
           </div>
 
-          {/* Header */}
+          {/* Universes Header */}
           <div className="px-4 py-3 border-b border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider">
             Universes ({filteredUniverses.length})
           </div>
