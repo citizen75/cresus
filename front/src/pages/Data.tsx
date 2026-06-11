@@ -103,16 +103,30 @@ export default function Data() {
   }
 
   const loadFilteredTickers = async () => {
-    if (selectedCountries.length === 0 || !selectedAssetType) {
+    // Don't call if no filters selected
+    if (selectedCountries.length === 0 && !selectedAssetType) {
       return
     }
 
     try {
       setLoading(true)
-      const countriesParam = selectedCountries.join(',')
-      const response = await fetch(
-        `http://192.168.0.130:6501/api/v1/data/filter?countries=${countriesParam}&asset_type=${selectedAssetType}`
-      )
+      let url = 'http://192.168.0.130:6501/api/v1/data/filter?'
+
+      // Add country filter if selected
+      if (selectedCountries.length > 0) {
+        const countriesParam = selectedCountries.join(',')
+        url += `countries=${countriesParam}&`
+      }
+
+      // Add asset type filter
+      if (selectedAssetType) {
+        url += `asset_type=${selectedAssetType}`
+      }
+
+      // Remove trailing & if present
+      url = url.replace(/&$/, '')
+
+      const response = await fetch(url)
       if (response.ok) {
         const data = await response.json()
         setTickers(data.tickers || [])
