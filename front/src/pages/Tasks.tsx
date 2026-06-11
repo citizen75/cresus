@@ -277,6 +277,18 @@ export default function Tasks() {
 
       {/* Filters */}
       <div className="px-6 py-4 border-b border-slate-800 flex gap-4">
+        <select
+          value={filterPortfolio}
+          onChange={(e) => setFilterPortfolio(e.target.value)}
+          className="px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
+        >
+          <option value="">All Portfolios</option>
+          {portfolios.map((p) => (
+            <option key={p} value={p}>
+              {p}
+            </option>
+          ))}
+        </select>
         <input
           type="text"
           placeholder="Search tasks..."
@@ -304,18 +316,6 @@ export default function Tasks() {
           <option value="High">High</option>
           <option value="Medium">Medium</option>
           <option value="Low">Low</option>
-        </select>
-        <select
-          value={filterPortfolio}
-          onChange={(e) => setFilterPortfolio(e.target.value)}
-          className="px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
-        >
-          <option value="">All Portfolios</option>
-          {portfolios.map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
         </select>
       </div>
 
