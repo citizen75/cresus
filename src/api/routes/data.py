@@ -824,93 +824,101 @@ async def get_ticker_history(
         cache_dir.mkdir(parents=True, exist_ok=True)
         cache_file = cache_dir / f"{ticker.upper()}_history.json"
 
-        # Try to load from cache (skip if indicator requested, to allow computation)
+        # Try to load from cache
         history = []
         fundamentals = {}
-        if use_cache and cache_file.exists() and not indicator:
+        source = "yahoo"
+        hist = None
+
+        if use_cache and cache_file.exists():
             try:
                 with open(cache_file, 'r') as f:
                     cached = json.load(f)
                     history = cached.get("history", [])
                     fundamentals = cached.get("fundamentals", {})
-                    if history:
-                        # Return cached data only if no indicator computation needed
+                    source = "cache"
+
+                    # If no indicator needed, return cached data as-is
+                    if not indicator and history:
                         return {
                             "ticker": ticker,
-                            "data": history,  # Frontend expects 'data' field
-                            "history": history,  # Keep for backward compatibility
+                            "data": history,
+                            "history": history,
                             "fundamentals": fundamentals,
                             "source": "cache"
                         }
+                    # If indicator requested, history is loaded and we'll compute below
             except Exception:
+                history = []  # Reset on error
                 pass  # Fall through to fetch from Yahoo
 
-        # Fetch from Yahoo Finance
-        hist = yf.download(ticker, period=f"{days}d", progress=False)
+        # Fetch from Yahoo Finance if not loaded from cache
+        if not history:
+            hist = yf.download(ticker, period=f"{days}d", progress=False)
 
-        if hist.empty:
-            return {
-                "ticker": ticker,
-                "data": [],
-                "history": []
-            }
+            if hist.empty:
+                return {
+                    "ticker": ticker,
+                    "data": [],
+                    "history": []
+                }
 
-        # Fetch fundamental data
-        fundamentals = {}
-        try:
-            ticker_obj = yf.Ticker(ticker)
-            info = ticker_obj.info or {}
-
-            fundamentals = {
-                "market_cap": info.get("marketCap"),
-                "pe_ratio": info.get("trailingPE"),
-                "eps": info.get("trailingEps"),
-                "dividend_yield": info.get("dividendYield"),
-                "52_week_high": info.get("fiftyTwoWeekHigh"),
-                "52_week_low": info.get("fiftyTwoWeekLow"),
-                "avg_volume": info.get("averageVolume"),
-                "beta": info.get("beta"),
-                "sector": info.get("sector"),
-                "industry": info.get("industry"),
-                "website": info.get("website"),
-                "employees": info.get("fullTimeEmployees"),
-                "description": info.get("longBusinessSummary"),
-            }
-        except Exception:
-            pass  # If fetching fundamentals fails, continue with history only
-
-        # Convert to list of dicts
-        history = []
-        for date, row in hist.iterrows():
+            # Fetch fundamental data
             try:
-                # Handle both single-level and multi-level column indices
-                if isinstance(hist.columns, pd.MultiIndex):
-                    # Multi-level index: access via tuple (e.g., ('Close', 'AAPL'))
-                    close_val = row[('Close', ticker)] if ('Close', ticker) in row.index else row[('Close', row.index[0])]
-                    open_val = row[('Open', ticker)] if ('Open', ticker) in row.index else row[('Open', row.index[0])]
-                    high_val = row[('High', ticker)] if ('High', ticker) in row.index else row[('High', row.index[0])]
-                    low_val = row[('Low', ticker)] if ('Low', ticker) in row.index else row[('Low', row.index[0])]
-                    volume_val = row[('Volume', ticker)] if ('Volume', ticker) in row.index else row[('Volume', row.index[0])]
-                else:
-                    # Single-level index: access normally
-                    close_val = row["Close"]
-                    open_val = row["Open"]
-                    high_val = row["High"]
-                    low_val = row["Low"]
-                    volume_val = row["Volume"]
+                ticker_obj = yf.Ticker(ticker)
+                info = ticker_obj.info or {}
 
-                history.append({
-                    "timestamp": date.strftime("%Y-%m-%d"),
-                    "date": date.strftime("%Y-%m-%d"),
-                    "close": round(float(close_val), 2),
-                    "open": round(float(open_val), 2),
-                    "high": round(float(high_val), 2),
-                    "low": round(float(low_val), 2),
-                    "volume": int(float(volume_val)) if pd.notna(volume_val) else 0,
-                })
-            except (ValueError, TypeError, KeyError):
-                # Skip rows with bad data
-                continue
+                fundamentals = {
+                    "market_cap": info.get("marketCap"),
+                    "pe_ratio": info.get("trailingPE"),
+                    "eps": info.get("trailingEps"),
+                    "dividend_yield": info.get("dividendYield"),
+                    "52_week_high": info.get("fiftyTwoWeekHigh"),
+                    "52_week_low": info.get("fiftyTwoWeekLow"),
+                    "avg_volume": info.get("averageVolume"),
+                    "beta": info.get("beta"),
+                    "sector": info.get("sector"),
+                    "industry": info.get("industry"),
+                    "website": info.get("website"),
+                    "employees": info.get("fullTimeEmployees"),
+                    "description": info.get("longBusinessSummary"),
+                }
+            except Exception:
+                pass  # If fetching fundamentals fails, continue with history only
+
+            # Convert Yahoo data to list of dicts
+            source = "yahoo"
+            history = []
+            for date, row in hist.iterrows():
+                try:
+                    # Handle both single-level and multi-level column indices
+                    if isinstance(hist.columns, pd.MultiIndex):
+                        # Multi-level index: access via tuple (e.g., ('Close', 'AAPL'))
+                        close_val = row[('Close', ticker)] if ('Close', ticker) in row.index else row[('Close', row.index[0])]
+                        open_val = row[('Open', ticker)] if ('Open', ticker) in row.index else row[('Open', row.index[0])]
+                        high_val = row[('High', ticker)] if ('High', ticker) in row.index else row[('High', row.index[0])]
+                        low_val = row[('Low', ticker)] if ('Low', ticker) in row.index else row[('Low', row.index[0])]
+                        volume_val = row[('Volume', ticker)] if ('Volume', ticker) in row.index else row[('Volume', row.index[0])]
+                    else:
+                        # Single-level index: access normally
+                        close_val = row["Close"]
+                        open_val = row["Open"]
+                        high_val = row["High"]
+                        low_val = row["Low"]
+                        volume_val = row["Volume"]
+
+                    history.append({
+                        "timestamp": date.strftime("%Y-%m-%d"),
+                        "date": date.strftime("%Y-%m-%d"),
+                        "close": round(float(close_val), 2),
+                        "open": round(float(open_val), 2),
+                        "high": round(float(high_val), 2),
+                        "low": round(float(low_val), 2),
+                        "volume": int(float(volume_val)) if pd.notna(volume_val) else 0,
+                    })
+                except (ValueError, TypeError, KeyError):
+                    # Skip rows with bad data
+                    continue
 
         # Calculate SHA_10 (Simple Heikin-Ashi with 10-period average) if requested
         if indicator == "sha_10" and history:
@@ -961,7 +969,7 @@ async def get_ticker_history(
             "data": history,  # Frontend expects 'data' field
             "history": history,  # Keep for backward compatibility
             "fundamentals": fundamentals,
-            "source": "yahoo"
+            "source": source + ("+indicator" if indicator else "")
         }
 
     except Exception as e:
