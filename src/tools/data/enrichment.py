@@ -7,6 +7,7 @@ import json
 
 from tools.universe.universe import Universe
 from tools.data.core import Fundamental
+from tools.data.financedatabase_manager import enrich_ticker as fd_enrich_ticker
 from utils.env import get_db_root
 
 logger = logging.getLogger(__name__)
@@ -96,7 +97,7 @@ class TickerIntelligence:
             "symbol": self.ticker,
             "metadata": {},
             "fundamentals": {},
-            "market": {},
+            "financedatabase": {},
         }
 
         # Load universe metadata (name, sector, industry, market_cap, price)
@@ -105,6 +106,14 @@ class TickerIntelligence:
             enriched["metadata"] = metadata
         else:
             enriched["metadata"]["symbol"] = self.ticker
+
+        # Load FinanceDatabase metadata (sector, industry, country, exchange, etc.)
+        try:
+            fd_metadata = fd_enrich_ticker(self.ticker, asset_type="equities")
+            if fd_metadata:
+                enriched["financedatabase"] = fd_metadata
+        except Exception as e:
+            logger.warning(f"Failed to load FinanceDatabase metadata for {self.ticker}: {e}")
 
         # Load fundamentals (P/E, earnings, margins, analyst ratings)
         fundamentals = self._load_fundamentals()
@@ -124,16 +133,21 @@ class TickerIntelligence:
         """Flatten enriched data for API responses.
 
         Merges all data sources into a single level for easier consumption.
+        Priority: FinanceDatabase > Fundamentals > Universe Metadata
         """
         combined = {}
 
-        # Add metadata
+        # Add metadata (universe data)
         if enriched["metadata"]:
             combined.update(enriched["metadata"])
 
-        # Add fundamentals
+        # Add fundamentals (yfinance data)
         if enriched["fundamentals"]:
             combined.update(enriched["fundamentals"])
+
+        # Add FinanceDatabase data (highest priority, overwrites previous)
+        if enriched["financedatabase"]:
+            combined.update(enriched["financedatabase"])
 
         return combined
 
