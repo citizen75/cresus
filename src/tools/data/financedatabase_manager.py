@@ -8,9 +8,13 @@ logger = logging.getLogger(__name__)
 
 # Initialize databases (expensive, done once)
 _equities = None
+_equities_data = None
 _etfs = None
+_etfs_data = None
 _funds = None
+_funds_data = None
 _indices = None
+_indices_data = None
 
 
 def get_equities():
@@ -49,6 +53,42 @@ def get_indices():
     return _indices
 
 
+def get_equities_data():
+    """Get cached equities data (loads once)."""
+    global _equities_data
+    if _equities_data is None:
+        logger.info("Loading all equities data...")
+        _equities_data = get_equities().select()
+    return _equities_data
+
+
+def get_etfs_data():
+    """Get cached ETFs data (loads once)."""
+    global _etfs_data
+    if _etfs_data is None:
+        logger.info("Loading all ETFs data...")
+        _etfs_data = get_etfs().select()
+    return _etfs_data
+
+
+def get_funds_data():
+    """Get cached funds data (loads once)."""
+    global _funds_data
+    if _funds_data is None:
+        logger.info("Loading all funds data...")
+        _funds_data = get_funds().select()
+    return _funds_data
+
+
+def get_indices_data():
+    """Get cached indices data (loads once)."""
+    global _indices_data
+    if _indices_data is None:
+        logger.info("Loading all indices data...")
+        _indices_data = get_indices().select()
+    return _indices_data
+
+
 def enrich_ticker(ticker_symbol: str, asset_type: str = "equities") -> Optional[Dict[str, Any]]:
     """Enrich a single ticker with FinanceDatabase metadata.
 
@@ -71,8 +111,15 @@ def enrich_ticker(ticker_symbol: str, asset_type: str = "equities") -> Optional[
         else:
             return None
 
-        # Query all data and search by index (ticker is the index in FinanceDatabase)
-        all_data = db.select()
+        # Get cached data (loads once per database)
+        if asset_type == "equities":
+            all_data = get_equities_data()
+        elif asset_type == "etfs":
+            all_data = get_etfs_data()
+        elif asset_type == "funds":
+            all_data = get_funds_data()
+        else:  # indices
+            all_data = get_indices_data()
 
         # Look up by index (ticker symbol is the index)
         if ticker_symbol.upper() not in all_data.index:
