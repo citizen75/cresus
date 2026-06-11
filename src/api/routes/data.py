@@ -346,7 +346,7 @@ async def filter_tickers(
 
         # Optionally enrich with fundamentals
         if enrich:
-            unique_tickers = TickerIntelligence.batch_enrich_flat(unique_tickers)
+            unique_tickers = TickerIntelligence.batch_enrich_flat(unique_tickers, asset_type=asset_type.lower() if asset_type else "equities")
 
         # Limit results
         unique_tickers = unique_tickers[:limit]
@@ -401,7 +401,7 @@ async def get_category_tickers(
 
         # Optionally enrich with fundamentals
         if enrich:
-            all_tickers = TickerIntelligence.batch_enrich_flat(all_tickers)
+            all_tickers = TickerIntelligence.batch_enrich_flat(all_tickers, asset_type=category.lower() if category.lower() in ["stocks", "etfs", "funds", "indices"] else "equities")
 
         # Limit results
         all_tickers = all_tickers[:limit]

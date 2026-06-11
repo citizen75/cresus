@@ -75,7 +75,7 @@ class TickerIntelligence:
         except Exception as e:
             logger.warning(f"Failed to save cache for {self.ticker}: {e}")
 
-    def get_enriched_data(self, use_cache: bool = True) -> Dict[str, Any]:
+    def get_enriched_data(self, use_cache: bool = True, asset_type: str = "equities") -> Dict[str, Any]:
         """Get complete enriched ticker data.
 
         Combines universe metadata, fundamentals, and market data.
@@ -109,7 +109,7 @@ class TickerIntelligence:
 
         # Load FinanceDatabase metadata (sector, industry, country, exchange, etc.)
         try:
-            fd_metadata = fd_enrich_ticker(self.ticker, asset_type="equities")
+            fd_metadata = fd_enrich_ticker(self.ticker, asset_type=asset_type)
             if fd_metadata:
                 enriched["financedatabase"] = fd_metadata
         except Exception as e:
@@ -199,11 +199,12 @@ class TickerIntelligence:
         return results
 
     @staticmethod
-    def batch_enrich_flat(tickers_data: list) -> list:
+    def batch_enrich_flat(tickers_data: list, asset_type: str = "equities") -> list:
         """Enrich ticker data with fundamentals and return flattened results.
 
         Args:
             tickers_data: List of ticker dicts with symbol, name, etc.
+            asset_type: Asset type for FinanceDatabase enrichment (equities, etfs, funds, indices)
 
         Returns:
             List of enriched ticker dicts with fundamentals merged in
@@ -218,7 +219,7 @@ class TickerIntelligence:
 
             try:
                 ti = TickerIntelligence(symbol)
-                enriched = ti.get_enriched_data(use_cache=True)
+                enriched = ti.get_enriched_data(use_cache=True, asset_type=asset_type)
 
                 # Start with original metadata
                 enriched_row = dict(ticker_dict)
