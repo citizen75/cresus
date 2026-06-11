@@ -9,6 +9,8 @@ interface Task {
   due_date?: string
   status: string
   assignee?: string
+  portfolio?: string
+  ticker?: string
   tags?: string[]
   dependencies?: number[]
   checklist?: Array<{ text: string; done: boolean }>
@@ -36,6 +38,8 @@ export default function Tasks() {
 
   const [filterStatus, setFilterStatus] = useState<string>('')
   const [filterPriority, setFilterPriority] = useState<string>('')
+  const [filterPortfolio, setFilterPortfolio] = useState<string>('')
+  const [portfolios, setPortfolios] = useState<string[]>([])
   const [searchQuery, setSearchQuery] = useState('')
 
   const [formData, setFormData] = useState({
@@ -45,13 +49,16 @@ export default function Tasks() {
     due_date: '',
     status: 'To-Do',
     assignee: '',
+    portfolio: '',
+    ticker: '',
     tags: '',
   })
 
   useEffect(() => {
     loadTasks()
     loadStats()
-  }, [filterStatus, filterPriority])
+    loadPortfolios()
+  }, [filterStatus, filterPriority, filterPortfolio])
 
   const loadTasks = async () => {
     try {
@@ -68,11 +75,34 @@ export default function Tasks() {
       if (!response.ok) throw new Error('Failed to load tasks')
 
       const data = await response.json()
-      setTasks(data.tasks || [])
+      const allTasks = data.tasks || []
+
+      // Client-side filter by portfolio if selected
+      const filteredTasks = filterPortfolio
+        ? allTasks.filter((t: Task) => t.portfolio === filterPortfolio)
+        : allTasks
+
+      setTasks(filteredTasks)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load tasks')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadPortfolios = async () => {
+    try {
+      const response = await fetch('http://192.168.0.130:6501/api/v1/portfolios')
+      if (!response.ok) throw new Error('Failed to load portfolios')
+
+      const data = await response.json()
+      // Only show real portfolios (exclude special ones starting with _)
+      const portfolioNames = (data.portfolios?.map((p: any) => p.name) || []).filter(
+        (name: string) => !name.startsWith('_')
+      )
+      setPortfolios(portfolioNames)
+    } catch (err) {
+      console.error('Failed to load portfolios:', err)
     }
   }
 
@@ -147,6 +177,8 @@ export default function Tasks() {
       due_date: '',
       status: 'To-Do',
       assignee: '',
+      portfolio: '',
+      ticker: '',
       tags: '',
     })
     setEditingTask(null)
@@ -162,6 +194,8 @@ export default function Tasks() {
       due_date: task.due_date || '',
       status: task.status,
       assignee: task.assignee || '',
+      portfolio: task.portfolio || '',
+      ticker: task.ticker || '',
       tags: task.tags?.join(', ') || '',
     })
     setShowCreateModal(true)
@@ -271,6 +305,18 @@ export default function Tasks() {
           <option value="Medium">Medium</option>
           <option value="Low">Low</option>
         </select>
+        <select
+          value={filterPortfolio}
+          onChange={(e) => setFilterPortfolio(e.target.value)}
+          className="px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
+        >
+          <option value="">All Portfolios</option>
+          {portfolios.map((p) => (
+            <option key={p} value={p}>
+              {p}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Task List */}
@@ -326,6 +372,16 @@ export default function Tasks() {
                   <span className={`px-2 py-1 rounded text-xs font-medium ${getPriorityColor(task.priority)}`}>
                     {task.priority}
                   </span>
+                  {task.portfolio && (
+                    <span className="px-2 py-1 bg-blue-900/30 text-blue-300 rounded text-xs">
+                      💼 {task.portfolio}
+                    </span>
+                  )}
+                  {task.ticker && (
+                    <span className="px-2 py-1 bg-green-900/30 text-green-300 rounded text-xs">
+                      📈 {task.ticker}
+                    </span>
+                  )}
                   {task.assignee && (
                     <span className="px-2 py-1 bg-purple-900/30 text-purple-300 rounded text-xs">
                       👤 {task.assignee}
@@ -437,6 +493,35 @@ export default function Tasks() {
                   className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
                   placeholder="Name"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-slate-400 mb-2">Portfolio</label>
+                  <select
+                    value={formData.portfolio}
+                    onChange={(e) => setFormData({ ...formData, portfolio: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="">None</option>
+                    {portfolios.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-slate-400 mb-2">Ticker</label>
+                  <input
+                    type="text"
+                    value={formData.ticker}
+                    onChange={(e) => setFormData({ ...formData, ticker: e.target.value.toUpperCase() })}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
+                    placeholder="AAPL"
+                  />
+                </div>
               </div>
 
               <div>
