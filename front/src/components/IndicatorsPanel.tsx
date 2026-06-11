@@ -115,7 +115,8 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
     if (!chartData.length) return
 
     const setupRSI = async () => {
-      if (!selectedIndicators.has('RSI 14') || !rsiContainerRef.current) return
+      if (!selectedIndicators.has('RSI 14')) return
+      if (!rsiContainerRef.current) return
 
       try {
         const lwc = await import('lightweight-charts')
@@ -178,7 +179,8 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
     }
 
     const setupMACD = async () => {
-      if (!selectedIndicators.has('MACD') || !macdContainerRef.current) return
+      if (!selectedIndicators.has('MACD')) return
+      if (!macdContainerRef.current) return
 
       try {
         const lwc = await import('lightweight-charts')
@@ -249,10 +251,18 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
     if (!range) return
 
     if (rsiChartRef.current && selectedIndicators.has('RSI 14')) {
-      rsiChartRef.current.timeScale().setVisibleRange(range)
+      try {
+        rsiChartRef.current.timeScale().setVisibleRange(range)
+      } catch (err) {
+        // Ignore chart not ready errors
+      }
     }
     if (macdChartRef.current && selectedIndicators.has('MACD')) {
-      macdChartRef.current.timeScale().setVisibleRange(range)
+      try {
+        macdChartRef.current.timeScale().setVisibleRange(range)
+      } catch (err) {
+        // Ignore chart not ready errors
+      }
     }
   }, [visibleWindow, chartData])
 
