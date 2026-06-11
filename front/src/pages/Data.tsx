@@ -422,6 +422,19 @@ export default function Data() {
     })
 
   // Define columns per asset type
+  // Detect asset type from actual data when viewing universe
+  const detectAssetTypeFromData = (): string => {
+    if (tickers.length === 0) return selectedAssetType
+
+    // Check if tickers look like ETFs (usually have .PA suffix and no sector/industry)
+    const likelyETFs = tickers.every(
+      t => t.symbol?.includes('.') && (!t.sector || t.sector === '-') && (!t.industry || t.industry === '-')
+    )
+
+    if (likelyETFs) return 'etfs'
+    return selectedAssetType
+  }
+
   const getTableColumns = (assetType: string) => {
     switch (assetType) {
       case 'stocks':
@@ -465,7 +478,9 @@ export default function Data() {
     }
   }
 
-  const tableColumns = getTableColumns(selectedAssetType)
+  // Use detected asset type when viewing universe, otherwise use selected filter
+  const displayAssetType = selectedUniverse ? detectAssetTypeFromData() : selectedAssetType
+  const tableColumns = getTableColumns(displayAssetType)
 
   return (
     <div className="flex-1 bg-slate-950 overflow-hidden flex flex-col">
