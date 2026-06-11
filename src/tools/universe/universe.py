@@ -108,3 +108,97 @@ class Universe:
             }
         except Exception as e:
             return None
+
+    def create(self, tickers: List[str], columns: Optional[List[str]] = None) -> bool:
+        """Create a new universe with given tickers.
+
+        Args:
+            tickers: List of ticker symbols
+            columns: Optional list of column names (default: ['TickerYahoo'])
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Ensure universes directory exists
+            self.filepath.parent.mkdir(parents=True, exist_ok=True)
+
+            # Create DataFrame
+            if columns is None:
+                columns = ['TickerYahoo']
+
+            data = {columns[0]: tickers}
+            df = pd.DataFrame(data)
+
+            # Save to CSV
+            df.to_csv(self.filepath, index=False, encoding='utf-8-sig')
+            return True
+        except Exception as e:
+            raise ValueError(f"Error creating universe '{self.universe_name}': {e}")
+
+    def delete(self) -> bool:
+        """Delete the universe file.
+
+        Returns:
+            True if successful, False if file doesn't exist
+        """
+        try:
+            if self.exists():
+                self.filepath.unlink()
+                return True
+            return False
+        except Exception as e:
+            raise ValueError(f"Error deleting universe '{self.universe_name}': {e}")
+
+    def add_tickers(self, tickers: List[str]) -> bool:
+        """Add tickers to the universe.
+
+        Args:
+            tickers: List of ticker symbols to add
+
+        Returns:
+            True if successful
+        """
+        try:
+            if not self.exists():
+                raise FileNotFoundError(f"Universe '{self.universe_name}' not found")
+
+            df = self.load_df()
+            ticker_col = 'TickerYahoo' if 'TickerYahoo' in df.columns else 'ISIN'
+
+            # Get existing tickers
+            existing = set(df[ticker_col].dropna().str.strip().str.upper().tolist())
+            new_tickers = [t for t in tickers if t.upper() not in existing]
+
+            if new_tickers:
+                new_df = pd.DataFrame({ticker_col: new_tickers})
+                df = pd.concat([df, new_df], ignore_index=True)
+                df.to_csv(self.filepath, index=False, encoding='utf-8-sig')
+
+            return True
+        except Exception as e:
+            raise ValueError(f"Error adding tickers to universe '{self.universe_name}': {e}")
+
+    def remove_tickers(self, tickers: List[str]) -> bool:
+        """Remove tickers from the universe.
+
+        Args:
+            tickers: List of ticker symbols to remove
+
+        Returns:
+            True if successful
+        """
+        try:
+            if not self.exists():
+                raise FileNotFoundError(f"Universe '{self.universe_name}' not found")
+
+            df = self.load_df()
+            ticker_col = 'TickerYahoo' if 'TickerYahoo' in df.columns else 'ISIN'
+
+            tickers_upper = set(t.upper() for t in tickers)
+            df = df[~df[ticker_col].str.upper().isin(tickers_upper)]
+            df.to_csv(self.filepath, index=False, encoding='utf-8-sig')
+
+            return True
+        except Exception as e:
+            raise ValueError(f"Error removing tickers from universe '{self.universe_name}': {e}")

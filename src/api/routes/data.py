@@ -1,8 +1,20 @@
 """Data management API routes."""
 
 from fastapi import APIRouter, Query
+from pydantic import BaseModel
+from typing import List, Optional
 from tools.data.financial import FinancialDataManager
 from tools.universe.universe import Universe
+
+# Request/Response models
+class UniverseCreateRequest(BaseModel):
+    """Request to create a new universe."""
+    tickers: List[str]
+    columns: Optional[List[str]] = ["TickerYahoo"]
+
+class TickersRequest(BaseModel):
+    """Request to add/remove tickers."""
+    tickers: List[str]
 
 router = APIRouter(prefix="/data", tags=["data"])
 manager = FinancialDataManager()
@@ -95,6 +107,107 @@ async def get_universe_info(universe_id: str):
         return {"universe": universe_id, "info": info}
     except Exception as e:
         return {"error": str(e)}, 500
+
+
+@router.post("/universe")
+async def create_universe(request: UniverseCreateRequest):
+    """Create a new universe with given tickers."""
+    try:
+        # TODO: Add universe_name to request
+        return {"error": "universe_name required"}, 400
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+
+@router.post("/universe/{universe_id}")
+async def create_universe_with_id(universe_id: str, request: UniverseCreateRequest):
+    """Create a new universe with given ID and tickers."""
+    try:
+        universe = Universe(universe_id)
+        if universe.exists():
+            return {"error": f"Universe '{universe_id}' already exists"}, 409
+
+        universe.create(request.tickers, request.columns)
+        return {
+            "status": "created",
+            "universe": universe_id,
+            "count": len(request.tickers),
+        }
+    except Exception as e:
+        return {"error": str(e)}, 400
+
+
+@router.put("/universe/{universe_id}")
+async def update_universe(universe_id: str, request: UniverseCreateRequest):
+    """Replace all tickers in a universe."""
+    try:
+        universe = Universe(universe_id)
+        if not universe.exists():
+            return {"error": f"Universe '{universe_id}' not found"}, 404
+
+        universe.delete()
+        universe.create(request.tickers, request.columns)
+        return {
+            "status": "updated",
+            "universe": universe_id,
+            "count": len(request.tickers),
+        }
+    except Exception as e:
+        return {"error": str(e)}, 400
+
+
+@router.delete("/universe/{universe_id}")
+async def delete_universe(universe_id: str):
+    """Delete a universe."""
+    try:
+        universe = Universe(universe_id)
+        if not universe.exists():
+            return {"error": f"Universe '{universe_id}' not found"}, 404
+
+        universe.delete()
+        return {"status": "deleted", "universe": universe_id}
+    except Exception as e:
+        return {"error": str(e)}, 400
+
+
+@router.post("/universe/{universe_id}/tickers")
+async def add_tickers_to_universe(universe_id: str, request: TickersRequest):
+    """Add tickers to an existing universe."""
+    try:
+        universe = Universe(universe_id)
+        if not universe.exists():
+            return {"error": f"Universe '{universe_id}' not found"}, 404
+
+        universe.add_tickers(request.tickers)
+        tickers = universe.get_tickers()
+        return {
+            "status": "added",
+            "universe": universe_id,
+            "count": len(tickers),
+            "added": len(request.tickers),
+        }
+    except Exception as e:
+        return {"error": str(e)}, 400
+
+
+@router.delete("/universe/{universe_id}/tickers")
+async def remove_tickers_from_universe(universe_id: str, request: TickersRequest):
+    """Remove tickers from a universe."""
+    try:
+        universe = Universe(universe_id)
+        if not universe.exists():
+            return {"error": f"Universe '{universe_id}' not found"}, 404
+
+        universe.remove_tickers(request.tickers)
+        tickers = universe.get_tickers()
+        return {
+            "status": "removed",
+            "universe": universe_id,
+            "count": len(tickers),
+            "removed": len(request.tickers),
+        }
+    except Exception as e:
+        return {"error": str(e)}, 400
 
 
 @router.get("/tickers/{ticker}")
