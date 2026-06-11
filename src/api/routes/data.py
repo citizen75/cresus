@@ -27,6 +27,12 @@ _universe_list_cache = None
 _universe_list_cache_time = 0
 CACHE_TTL = 300
 
+def _clear_universe_cache():
+  """Clear the universe list cache."""
+  global _universe_list_cache, _universe_list_cache_time
+  _universe_list_cache = None
+  _universe_list_cache_time = 0
+
 
 @router.get("/categories")
 async def get_categories():
@@ -213,6 +219,7 @@ async def create_universe_with_id(universe_id: str, request: UniverseCreateReque
             return {"error": f"Universe '{universe_id}' already exists"}, 409
 
         universe.create(request.tickers, request.columns)
+        _clear_universe_cache()  # Invalidate cache
         return {
             "status": "created",
             "universe": universe_id,
@@ -232,6 +239,7 @@ async def update_universe(universe_id: str, request: UniverseCreateRequest):
 
         universe.delete()
         universe.create(request.tickers, request.columns)
+        _clear_universe_cache()  # Invalidate cache
         return {
             "status": "updated",
             "universe": universe_id,
@@ -250,6 +258,7 @@ async def delete_universe(universe_id: str):
             return {"error": f"Universe '{universe_id}' not found"}, 404
 
         universe.delete()
+        _clear_universe_cache()  # Invalidate cache
         return {"status": "deleted", "universe": universe_id}
     except Exception as e:
         return {"error": str(e)}, 400
@@ -265,6 +274,7 @@ async def add_tickers_to_universe(universe_id: str, request: TickersRequest):
 
         universe.add_tickers(request.tickers)
         tickers = universe.get_tickers()
+        _clear_universe_cache()  # Invalidate cache
         return {
             "status": "added",
             "universe": universe_id,
@@ -285,6 +295,7 @@ async def remove_tickers_from_universe(universe_id: str, request: TickersRequest
 
         universe.remove_tickers(request.tickers)
         tickers = universe.get_tickers()
+        _clear_universe_cache()  # Invalidate cache
         return {
             "status": "removed",
             "universe": universe_id,
