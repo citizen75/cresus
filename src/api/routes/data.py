@@ -647,15 +647,31 @@ async def get_ticker_history(
         history = []
         for date, row in hist.iterrows():
             try:
+                # Handle both single-level and multi-level column indices
+                if isinstance(hist.columns, pd.MultiIndex):
+                    # Multi-level index: access via tuple (e.g., ('Close', 'AAPL'))
+                    close_val = row[('Close', ticker)] if ('Close', ticker) in row.index else row[('Close', row.index[0])]
+                    open_val = row[('Open', ticker)] if ('Open', ticker) in row.index else row[('Open', row.index[0])]
+                    high_val = row[('High', ticker)] if ('High', ticker) in row.index else row[('High', row.index[0])]
+                    low_val = row[('Low', ticker)] if ('Low', ticker) in row.index else row[('Low', row.index[0])]
+                    volume_val = row[('Volume', ticker)] if ('Volume', ticker) in row.index else row[('Volume', row.index[0])]
+                else:
+                    # Single-level index: access normally
+                    close_val = row["Close"]
+                    open_val = row["Open"]
+                    high_val = row["High"]
+                    low_val = row["Low"]
+                    volume_val = row["Volume"]
+
                 history.append({
                     "date": date.strftime("%Y-%m-%d"),
-                    "close": round(float(row["Close"]), 2),
-                    "open": round(float(row["Open"]), 2),
-                    "high": round(float(row["High"]), 2),
-                    "low": round(float(row["Low"]), 2),
-                    "volume": int(float(row["Volume"])) if pd.notna(row["Volume"]) else 0,
+                    "close": round(float(close_val), 2),
+                    "open": round(float(open_val), 2),
+                    "high": round(float(high_val), 2),
+                    "low": round(float(low_val), 2),
+                    "volume": int(float(volume_val)) if pd.notna(volume_val) else 0,
                 })
-            except (ValueError, TypeError):
+            except (ValueError, TypeError, KeyError):
                 # Skip rows with bad data
                 continue
 
