@@ -920,8 +920,8 @@ async def get_ticker_history(
                     # Skip rows with bad data
                     continue
 
-        # Calculate SHA_10 (Simple Heikin-Ashi with 10-period average) if requested
-        if indicator == "sha_10" and history:
+        # Calculate SHA_10 (Simple Heikin-Ashi with 10-period average) if requested and not already computed
+        if indicator == "sha_10" and history and not (history and 'sha_10_open' in history[0]):
             for i, candle in enumerate(history):
                 if i == 0:
                     # First candle uses simple HA formula
