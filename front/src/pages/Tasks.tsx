@@ -323,7 +323,7 @@ export default function Tasks() {
       {/* Two Panel Layout */}
       <div className="flex-1 flex gap-4 px-6 py-4 overflow-hidden">
         {/* Left Panel: Task List */}
-        <div className="w-96 flex flex-col border-r border-slate-800">
+        <div className="flex-1 flex flex-col border-r border-slate-800">
           <div className="flex-1 overflow-y-auto pr-4">
         {error && (
           <div className="mb-4 p-4 bg-red-900/20 border border-red-800 text-red-400 rounded">
