@@ -446,17 +446,16 @@ export default function Dashboard() {
               }
               // For old alert messages without widget field: show holdings if portfolio exists
               else if (portfolio && portfolio !== 'global') {
-                console.log(`[Dashboard] Old portfolio message clicked:`, { portfolio })
+                console.log(`[Dashboard] Old portfolio message clicked:`, { portfolio, tickers })
                 setSelectedAlertMessage(null)  // Clear results widget
-                setSelectedPortfolioWidget(portfolio)
                 setRightPanelOpen(true)
               }
 
               // Create alert info object and display holdings filtered by tickers
               const alertInfo: AlertInfo = {
-                title: '',
+                title: messageData?.title || '',
                 portfolio: portfolio,
-                tickers: tickers,
+                tickers: tickers || [],
                 content: `Portfolio: ${portfolio}`,
               }
 
