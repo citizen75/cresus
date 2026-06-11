@@ -17,6 +17,7 @@ const menuItems = [
   { icon: '⏰', label: 'Scheduler', path: '/scheduler' },
   { icon: '🔔', label: 'Alerts', path: '/alerts' },
   { icon: '🗄️', label: 'Data', path: '/data' },
+  { icon: '📦', label: 'Universes', path: '/universes' },
   { icon: '⚙️', label: 'Settings', path: '#' },
 ]
 

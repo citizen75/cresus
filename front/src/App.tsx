@@ -26,6 +26,7 @@ import ScreenerDetail from '@/pages/ScreenerDetail'
 import WatchlistPage from '@/pages/WatchlistPage'
 import Tasks from '@/pages/Tasks'
 import Data from '@/pages/Data'
+import UniverseManager from '@/pages/UniverseManager'
 
 export default function App() {
   useEffect(() => {
@@ -69,6 +70,7 @@ export default function App() {
           <Route path="/watchlist" element={<Layout><WatchlistPage /></Layout>} />
           <Route path="/tasks" element={<Layout><Tasks /></Layout>} />
           <Route path="/data" element={<Layout><Data /></Layout>} />
+          <Route path="/universes" element={<Layout><UniverseManager /></Layout>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         </BrowserRouter>
