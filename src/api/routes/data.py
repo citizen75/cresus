@@ -803,187 +803,86 @@ async def get_ticker_info(ticker: str):
 async def get_ticker_history(
     ticker: str,
     days: int = Query(365, description="Number of days of history"),
-    use_cache: bool = Query(True, description="Use cached data if available"),
     indicator: str = Query(None, description="Optional indicator to compute (e.g., sha_10)")
 ):
-    """Get historical price data for a ticker.
+    """Get historical price data using /src/tools/data/ (Parquet cache).
 
     Args:
         ticker: Ticker symbol
-        days: Number of days of history (default: 365 for 1 year)
-        use_cache: Whether to use cached data (default: True)
-        indicator: Optional indicator to compute (e.g., 'sha_10' for Simple HA candlesticks)
+        days: Number of days to return
+        indicator: Optional indicator (sha_10)
     """
     try:
-        import yfinance as yf
-        from pathlib import Path
-        import json
+        from tools.data.core import DataHistory, Fundamental
+        from datetime import datetime, timedelta
 
-        # Cache path - include days in key to prevent conflicts
-        cache_dir = Path("/Volumes/Data/dev/cresus/db/cache/history")
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        # Cache key includes days to prevent different requests from overwriting
-        cache_file = cache_dir / f"{ticker.upper()}_{days}d_history.json"
+        # Use existing tools/data classes with Parquet caching
+        data_history = DataHistory(ticker)
+        fundamental = Fundamental(ticker)
 
-        # Try to load from cache
+        # Load from Parquet cache (~/.cresus/db/cache/history/)
+        df = data_history.load_all()
+        if df.empty:
+            print(f"⏳ CACHE MISS: {ticker} - fetching from Yahoo...")
+            data_history.fetch()
+            df = data_history.load_all()
+        else:
+            print(f"✅ CACHE HIT: {ticker} ({len(df)} records from Parquet)")
+
+        if df.empty:
+            return {"ticker": ticker, "data": [], "history": []}
+
+        # Limit to requested days
+        if days:
+            cutoff = datetime.now() - timedelta(days=days)
+            if 'timestamp' in df.columns:
+                df = df[pd.to_datetime(df['timestamp']) >= cutoff]
+            else:
+                df = df[df.index >= cutoff]
+
+        # Convert to dict list
         history = []
-        fundamentals = {}
-        source = "yahoo"
-        hist = None
+        for idx, row in df.iterrows():
+            date_str = str(idx.date()) if hasattr(idx, 'date') else str(idx)[:10]
+            history.append({
+                "timestamp": date_str,
+                "date": date_str,
+                "open": float(row.get('open', row.get('Open', 0))),
+                "high": float(row.get('high', row.get('High', 0))),
+                "low": float(row.get('low', row.get('Low', 0))),
+                "close": float(row.get('close', row.get('Close', 0))),
+                "volume": int(row.get('volume', row.get('Volume', 0))),
+            })
 
-        if use_cache and cache_file.exists():
-            try:
-                with open(cache_file, 'r') as f:
-                    cached = json.load(f)
-                    history = cached.get("history", [])
-                    fundamentals = cached.get("fundamentals", {})
-                    source = "cache"
-                    print(f"✅ CACHE HIT: {ticker} ({len(history)} records, days={days})")
+        # Add SHA_10 if requested
+        if indicator == "sha_10" and history:
+            for i, c in enumerate(history):
+                ha_c = (c["open"] + c["high"] + c["low"] + c["close"]) / 4
+                ha_o = c["open"] if i == 0 else (history[i-1].get("ha_open", history[i-1]["open"]) + history[i-1].get("ha_close", history[i-1]["close"])) / 2
+                ha_h, ha_l = max(c["high"], ha_o, ha_c), min(c["low"], ha_o, ha_c)
+                c.update({"ha_open": ha_o, "ha_close": ha_c, "ha_high": ha_h, "ha_low": ha_l})
 
-                    # If no indicator needed, return cached data as-is
-                    if not indicator and history:
-                        print(f"✅ RETURN CACHED: {ticker} (no indicator)")
-                        return {
-                            "ticker": ticker,
-                            "data": history,
-                            "history": history,
-                            "fundamentals": fundamentals,
-                            "source": "cache"
-                        }
-                    # If indicator requested, history is loaded and we'll compute below
-            except Exception:
-                history = []  # Reset on error
-                pass  # Fall through to fetch from Yahoo
-
-        # Fetch from Yahoo Finance if not loaded from cache
-        if not history:
-            print(f"⏳ CACHE MISS: {ticker} - fetching {days} days from Yahoo...")
-            hist = yf.download(ticker, period=f"{days}d", progress=False)
-            print(f"✅ YAHOO FETCHED: {ticker} ({len(hist)} records)")
-
-            if hist.empty:
-                return {
-                    "ticker": ticker,
-                    "data": [],
-                    "history": []
-                }
-
-            # Fetch fundamental data
-            try:
-                ticker_obj = yf.Ticker(ticker)
-                info = ticker_obj.info or {}
-
-                fundamentals = {
-                    "market_cap": info.get("marketCap"),
-                    "pe_ratio": info.get("trailingPE"),
-                    "eps": info.get("trailingEps"),
-                    "dividend_yield": info.get("dividendYield"),
-                    "52_week_high": info.get("fiftyTwoWeekHigh"),
-                    "52_week_low": info.get("fiftyTwoWeekLow"),
-                    "avg_volume": info.get("averageVolume"),
-                    "beta": info.get("beta"),
-                    "sector": info.get("sector"),
-                    "industry": info.get("industry"),
-                    "website": info.get("website"),
-                    "employees": info.get("fullTimeEmployees"),
-                    "description": info.get("longBusinessSummary"),
-                }
-            except Exception:
-                pass  # If fetching fundamentals fails, continue with history only
-
-            # Convert Yahoo data to list of dicts
-            source = "yahoo"
-            history = []
-            for date, row in hist.iterrows():
-                try:
-                    # Handle both single-level and multi-level column indices
-                    if isinstance(hist.columns, pd.MultiIndex):
-                        # Multi-level index: access via tuple (e.g., ('Close', 'AAPL'))
-                        close_val = row[('Close', ticker)] if ('Close', ticker) in row.index else row[('Close', row.index[0])]
-                        open_val = row[('Open', ticker)] if ('Open', ticker) in row.index else row[('Open', row.index[0])]
-                        high_val = row[('High', ticker)] if ('High', ticker) in row.index else row[('High', row.index[0])]
-                        low_val = row[('Low', ticker)] if ('Low', ticker) in row.index else row[('Low', row.index[0])]
-                        volume_val = row[('Volume', ticker)] if ('Volume', ticker) in row.index else row[('Volume', row.index[0])]
-                    else:
-                        # Single-level index: access normally
-                        close_val = row["Close"]
-                        open_val = row["Open"]
-                        high_val = row["High"]
-                        low_val = row["Low"]
-                        volume_val = row["Volume"]
-
-                    history.append({
-                        "timestamp": date.strftime("%Y-%m-%d"),
-                        "date": date.strftime("%Y-%m-%d"),
-                        "close": round(float(close_val), 2),
-                        "open": round(float(open_val), 2),
-                        "high": round(float(high_val), 2),
-                        "low": round(float(low_val), 2),
-                        "volume": int(float(volume_val)) if pd.notna(volume_val) else 0,
-                    })
-                except (ValueError, TypeError, KeyError):
-                    # Skip rows with bad data
-                    continue
-
-        # Calculate SHA_10 (Simple Heikin-Ashi with 10-period average) if requested and not already computed
-        if indicator == "sha_10" and history and not (history and 'sha_10_open' in history[0]):
-            for i, candle in enumerate(history):
-                if i == 0:
-                    # First candle uses simple HA formula
-                    ha_close = (candle["open"] + candle["high"] + candle["low"] + candle["close"]) / 4
-                    ha_open = candle["open"]
-                else:
-                    prev_candle = history[i - 1]
-                    ha_close = (candle["open"] + candle["high"] + candle["low"] + candle["close"]) / 4
-                    ha_open = (history[i - 1].get("ha_open", prev_candle["open"]) + history[i - 1].get("ha_close", prev_candle["close"])) / 2
-
-                ha_high = max(candle["high"], ha_open, ha_close)
-                ha_low = min(candle["low"], ha_open, ha_close)
-
-                candle["ha_open"] = round(ha_open, 2)
-                candle["ha_close"] = round(ha_close, 2)
-                candle["ha_high"] = round(ha_high, 2)
-                candle["ha_low"] = round(ha_low, 2)
-
-            # Apply 10-period simple moving average smoothing to HA candlesticks
-            period = 10
             for i in range(len(history)):
-                start = max(0, i - period + 1)
-                window = history[start:i + 1]
+                window = history[max(0, i-9):i+1]
+                history[i].update({
+                    "sha_10_open": round(sum(x.get("ha_open", x["open"]) for x in window) / len(window), 2),
+                    "sha_10_close": round(sum(x.get("ha_close", x["close"]) for x in window) / len(window), 2),
+                    "sha_10_high": round(sum(x.get("ha_high", x["high"]) for x in window) / len(window), 2),
+                    "sha_10_low": round(sum(x.get("ha_low", x["low"]) for x in window) / len(window), 2),
+                })
 
-                candle = history[i]
-                candle["sha_10_open"] = round(sum(c.get("ha_open", c["open"]) for c in window) / len(window), 2)
-                candle["sha_10_close"] = round(sum(c.get("ha_close", c["close"]) for c in window) / len(window), 2)
-                candle["sha_10_high"] = round(sum(c.get("ha_high", c["high"]) for c in window) / len(window), 2)
-                candle["sha_10_low"] = round(sum(c.get("ha_low", c["low"]) for c in window) / len(window), 2)
-
-        # Save to cache
-        try:
-            with open(cache_file, 'w') as f:
-                json.dump({
-                    "ticker": ticker,
-                    "history": history,
-                    "fundamentals": fundamentals,
-                    "cached_at": pd.Timestamp.now().isoformat()
-                }, f)
-        except Exception:
-            pass  # Cache write failed, but we still return the data
-
+        fund = fundamental.load() or {}
         return {
             "ticker": ticker,
-            "data": history,  # Frontend expects 'data' field
-            "history": history,  # Keep for backward compatibility
-            "fundamentals": fundamentals,
-            "source": source + ("+indicator" if indicator else "")
+            "data": history,
+            "history": history,
+            "fundamentals": fund.get("data", {}),
+            "source": "parquet" + ("+sha_10" if indicator else "")
         }
 
     except Exception as e:
-        return {
-            "ticker": ticker,
-            "data": [],
-            "history": [],
-            "error": str(e)
-        }
+        print(f"❌ ERROR: {e}")
+        return {"ticker": ticker, "data": [], "history": [], "error": str(e)}
 
 
 @router.get("/fundamental/{ticker}")
