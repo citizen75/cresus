@@ -227,32 +227,32 @@ export default function Data() {
 
         {/* Right Panel */}
         <div className="flex-1 flex flex-col border border-slate-800 rounded-lg bg-slate-900 min-h-0">
-          {/* Filters Header */}
-          <div className="px-4 py-3 border-b border-slate-800 space-y-3">
-            {/* Country Filter */}
-            <div className="relative">
-              <label className="block text-xs font-semibold text-slate-400 uppercase mb-2">Countries</label>
-              <div className="relative">
+          {/* Filters Header - Compact */}
+          <div className="px-3 py-2 border-b border-slate-800 space-y-2">
+            {/* Row 1: Countries & Asset Type */}
+            <div className="flex gap-2 items-end">
+              {/* Country Filter */}
+              <div className="relative flex-1">
                 <button
                   onClick={() => setShowCountryDropdown(!showCountryDropdown)}
-                  className="w-full px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded text-sm flex items-center justify-between transition"
+                  className="w-full px-2 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded text-xs flex items-center justify-between transition"
                 >
-                  <span>
+                  <span className="text-xs">
                     {selectedCountries.length === 0
-                      ? 'Select countries...'
-                      : `${selectedCountries.length} selected`}
+                      ? '🌍 Countries'
+                      : `🌍 ${selectedCountries.length}`}
                   </span>
                   <span className={`text-xs transition ${showCountryDropdown ? 'rotate-180' : ''}`}>▼</span>
                 </button>
 
                 {/* Dropdown Menu */}
                 {showCountryDropdown && (
-                  <div className="absolute top-full mt-2 left-0 right-0 bg-slate-800 border border-slate-700 rounded shadow-lg z-50">
+                  <div className="absolute top-full mt-1 left-0 right-0 bg-slate-800 border border-slate-700 rounded shadow-lg z-50 max-h-48 overflow-y-auto">
                     {COUNTRIES.map(country => (
                       <button
                         key={country.code}
                         onClick={() => toggleCountry(country.code)}
-                        className={`w-full text-left px-3 py-2 text-sm transition flex items-center gap-2 ${
+                        className={`w-full text-left px-2 py-1.5 text-xs transition flex items-center gap-1 ${
                           selectedCountries.includes(country.code)
                             ? 'bg-purple-600/30 text-purple-300'
                             : 'text-slate-300 hover:bg-slate-700'
@@ -262,24 +262,21 @@ export default function Data() {
                           type="checkbox"
                           checked={selectedCountries.includes(country.code)}
                           onChange={() => {}}
-                          className="w-4 h-4"
+                          className="w-3 h-3"
                         />
-                        <span className="text-lg">{country.flag}</span>
-                        {country.label}
+                        <span>{country.flag}</span>
+                        <span className="text-xs">{country.label}</span>
                       </button>
                     ))}
                   </div>
                 )}
               </div>
-            </div>
 
-            {/* Asset Type Filter */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase mb-2">Asset Type</label>
+              {/* Asset Type Filter */}
               <select
                 value={selectedAssetType}
                 onChange={(e) => setSelectedAssetType(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
+                className="px-2 py-1.5 bg-slate-800 border border-slate-700 text-white rounded text-xs focus:outline-none focus:border-purple-500"
               >
                 {ASSET_TYPES.map(type => (
                   <option key={type.id} value={type.id}>
@@ -289,17 +286,14 @@ export default function Data() {
               </select>
             </div>
 
-            {/* Search Bar */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase mb-2">Search</label>
-              <input
-                type="text"
-                placeholder="Search tickers or names..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
-              />
-            </div>
+            {/* Row 2: Search Bar */}
+            <input
+              type="text"
+              placeholder="🔍 Search tickers or names..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-2 py-1.5 bg-slate-800 border border-slate-700 text-white rounded text-xs focus:outline-none focus:border-purple-500"
+            />
           </div>
 
           {/* Table */}
