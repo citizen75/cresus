@@ -623,18 +623,44 @@ async def get_ticker_info(ticker: str):
 @router.get("/history/{ticker}")
 async def get_ticker_history(
     ticker: str,
-    days: int = Query(365, description="Number of days of history")
+    days: int = Query(365, description="Number of days of history"),
+    use_cache: bool = Query(True, description="Use cached data if available")
 ):
     """Get historical price data for a ticker.
 
     Args:
         ticker: Ticker symbol
         days: Number of days of history (default: 365 for 1 year)
+        use_cache: Whether to use cached data (default: True)
     """
     try:
         import yfinance as yf
+        from pathlib import Path
+        import json
 
-        # Fetch data
+        # Cache path
+        cache_dir = Path("/Volumes/Data/dev/cresus/db/cache/history")
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_file = cache_dir / f"{ticker.upper()}_history.json"
+
+        # Try to load from cache
+        history = []
+        if use_cache and cache_file.exists():
+            try:
+                with open(cache_file, 'r') as f:
+                    cached = json.load(f)
+                    history = cached.get("history", [])
+                    if history:
+                        # Return cached data
+                        return {
+                            "ticker": ticker,
+                            "history": history,
+                            "source": "cache"
+                        }
+            except Exception:
+                pass  # Fall through to fetch from Yahoo
+
+        # Fetch from Yahoo Finance
         hist = yf.download(ticker, period=f"{days}d", progress=False)
 
         if hist.empty:
@@ -675,9 +701,21 @@ async def get_ticker_history(
                 # Skip rows with bad data
                 continue
 
+        # Save to cache
+        try:
+            with open(cache_file, 'w') as f:
+                json.dump({
+                    "ticker": ticker,
+                    "history": history,
+                    "cached_at": pd.Timestamp.now().isoformat()
+                }, f)
+        except Exception:
+            pass  # Cache write failed, but we still return the data
+
         return {
             "ticker": ticker,
-            "history": history
+            "history": history,
+            "source": "yahoo"
         }
 
     except Exception as e:
