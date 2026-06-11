@@ -26,6 +26,29 @@ async def get_categories():
     return {"categories": manager.get_asset_categories()}
 
 
+@router.get("/universes/list")
+async def list_all_universes():
+    """List all available universes."""
+    try:
+        universes = Universe.list_universes()
+        details = []
+        for uni_id in universes:
+            try:
+                uni = Universe(uni_id)
+                if uni.exists():
+                    tickers = uni.get_tickers()
+                    details.append({
+                        "id": uni_id,
+                        "name": manager._format_universe_name(uni_id),
+                        "count": len(tickers),
+                    })
+            except Exception:
+                pass
+        return {"universes": details, "total": len(details)}
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+
 @router.get("/universes")
 async def get_universes(category: str = Query(..., description="Asset category")):
     """Get universes for a category."""
@@ -52,29 +75,6 @@ async def search_tickers(
     """Search for tickers."""
     results = manager.search_tickers(q, category)
     return {"query": q, "category": category, "results": results, "count": len(results)}
-
-
-@router.get("/universes/list")
-async def list_all_universes():
-    """List all available universes."""
-    try:
-        universes = Universe.list_universes()
-        details = []
-        for uni_id in universes:
-            try:
-                uni = Universe(uni_id)
-                if uni.exists():
-                    tickers = uni.get_tickers()
-                    details.append({
-                        "id": uni_id,
-                        "name": manager._format_universe_name(uni_id),
-                        "count": len(tickers),
-                    })
-            except Exception:
-                pass
-        return {"universes": details, "total": len(details)}
-    except Exception as e:
-        return {"error": str(e)}, 500
 
 
 @router.get("/universe/{universe_id}")
