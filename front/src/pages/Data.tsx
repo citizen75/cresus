@@ -711,7 +711,7 @@ export default function Data() {
           </div>
 
           {/* Table */}
-          <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar">
+          <div className="flex-1 overflow-hidden flex flex-col">
             {loading ? (
               <div className="flex items-center justify-center h-full text-slate-400">
                 Loading tickers...
@@ -721,7 +721,8 @@ export default function Data() {
                 No tickers found
               </div>
             ) : (
-              <table className="w-full text-sm">
+              <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar">
+                <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-slate-800 border-b border-slate-700">
                   <tr>
                     <th className="px-4 py-3 text-slate-300 font-semibold text-left w-10">
@@ -793,7 +794,8 @@ export default function Data() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+              </div>
             )}
           </div>
 
