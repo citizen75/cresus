@@ -36,6 +36,18 @@ export default function Tasks() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [editingPanel, setEditingPanel] = useState(false)
+  const [panelFormData, setPanelFormData] = useState({
+    title: '',
+    description: '',
+    priority: 'Medium',
+    due_date: '',
+    status: 'To-Do',
+    assignee: '',
+    portfolio: '',
+    ticker: '',
+    tags: '',
+  })
 
   const [filterStatus, setFilterStatus] = useState<string>('')
   const [filterPriority, setFilterPriority] = useState<string>('')
@@ -60,6 +72,23 @@ export default function Tasks() {
     loadStats()
     loadPortfolios()
   }, [filterStatus, filterPriority, filterPortfolio])
+
+  useEffect(() => {
+    if (selectedTask) {
+      setPanelFormData({
+        title: selectedTask.title,
+        description: selectedTask.description || '',
+        priority: selectedTask.priority,
+        due_date: selectedTask.due_date || '',
+        status: selectedTask.status,
+        assignee: selectedTask.assignee || '',
+        portfolio: selectedTask.portfolio || '',
+        ticker: selectedTask.ticker || '',
+        tags: selectedTask.tags?.join(', ') || '',
+      })
+      setEditingPanel(false)
+    }
+  }, [selectedTask])
 
   const loadTasks = async () => {
     try {
@@ -148,6 +177,31 @@ export default function Tasks() {
       resetForm()
       loadTasks()
       loadStats()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save task')
+    }
+  }
+
+  const savePanelEdits = async () => {
+    if (!selectedTask) return
+
+    try {
+      const payload = {
+        ...panelFormData,
+        tags: panelFormData.tags ? panelFormData.tags.split(',').map(t => t.trim()) : [],
+      }
+
+      const response = await fetch(`http://192.168.0.130:6501/api/v1/tasks/${selectedTask.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) throw new Error('Failed to save task')
+
+      setEditingPanel(false)
+      loadTasks()
+      setSelectedTask(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save task')
     }
@@ -428,27 +482,26 @@ export default function Tasks() {
         <div className="flex-1 overflow-y-auto">
           {selectedTask ? (
             <div className="bg-slate-900 border border-slate-800 rounded-lg p-6">
-              {/* Header */}
-              <div className="flex items-start justify-between mb-6">
-                <div className="flex-1">
-                  <h2 className="text-2xl font-bold text-white mb-2">{selectedTask.title}</h2>
-                  {selectedTask.portfolio && (
-                    <p className="text-sm text-slate-400 mb-1">Portfolio: <span className="text-blue-400 font-medium">{selectedTask.portfolio}</span></p>
-                  )}
-                  {selectedTask.ticker && (
-                    <p className="text-sm text-slate-400">Ticker: <span className="text-green-400 font-medium">{selectedTask.ticker}</span></p>
-                  )}
-                </div>
-                <button
-                  onClick={() => {
-                    startEdit(selectedTask)
-                    setSelectedTask(null)
-                  }}
-                  className="px-3 py-1 bg-blue-600/20 text-blue-300 rounded text-sm hover:bg-blue-600/30 transition"
-                >
-                  Edit
-                </button>
-              </div>
+              {!editingPanel ? (
+                <>
+                  {/* Header */}
+                  <div className="flex items-start justify-between mb-6">
+                    <div className="flex-1">
+                      <h2 className="text-2xl font-bold text-white mb-2">{selectedTask.title}</h2>
+                      {selectedTask.portfolio && (
+                        <p className="text-sm text-slate-400 mb-1">Portfolio: <span className="text-blue-400 font-medium">{selectedTask.portfolio}</span></p>
+                      )}
+                      {selectedTask.ticker && (
+                        <p className="text-sm text-slate-400">Ticker: <span className="text-green-400 font-medium">{selectedTask.ticker}</span></p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setEditingPanel(true)}
+                      className="px-3 py-1 bg-blue-600/20 text-blue-300 rounded text-sm hover:bg-blue-600/30 transition"
+                    >
+                      Edit
+                    </button>
+                  </div>
 
               {/* Description */}
               {selectedTask.description && (
@@ -542,6 +595,140 @@ export default function Tasks() {
               >
                 Delete Task
               </button>
+                </>
+              ) : (
+                <>
+                  {/* Edit Mode */}
+                  <h2 className="text-2xl font-bold text-white mb-6">Edit Task</h2>
+
+                  <div className="space-y-4 max-h-[calc(100vh-300px)] overflow-y-auto">
+                    <div>
+                      <label className="block text-sm text-slate-400 mb-2">Title</label>
+                      <input
+                        type="text"
+                        value={panelFormData.title}
+                        onChange={(e) => setPanelFormData({ ...panelFormData, title: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm text-slate-400 mb-2">Description</label>
+                      <textarea
+                        value={panelFormData.description}
+                        onChange={(e) => setPanelFormData({ ...panelFormData, description: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
+                        rows={3}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm text-slate-400 mb-2">Priority</label>
+                        <select
+                          value={panelFormData.priority}
+                          onChange={(e) => setPanelFormData({ ...panelFormData, priority: e.target.value })}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
+                        >
+                          <option value="Low">Low</option>
+                          <option value="Medium">Medium</option>
+                          <option value="High">High</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm text-slate-400 mb-2">Status</label>
+                        <select
+                          value={panelFormData.status}
+                          onChange={(e) => setPanelFormData({ ...panelFormData, status: e.target.value })}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
+                        >
+                          <option value="To-Do">To-Do</option>
+                          <option value="In Progress">In Progress</option>
+                          <option value="Done">Done</option>
+                          <option value="Blocked">Blocked</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm text-slate-400 mb-2">Due Date</label>
+                      <input
+                        type="date"
+                        value={panelFormData.due_date}
+                        onChange={(e) => setPanelFormData({ ...panelFormData, due_date: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm text-slate-400 mb-2">Assignee</label>
+                      <input
+                        type="text"
+                        value={panelFormData.assignee}
+                        onChange={(e) => setPanelFormData({ ...panelFormData, assignee: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
+                        placeholder="Name"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm text-slate-400 mb-2">Portfolio</label>
+                        <select
+                          value={panelFormData.portfolio}
+                          onChange={(e) => setPanelFormData({ ...panelFormData, portfolio: e.target.value })}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
+                        >
+                          <option value="">None</option>
+                          {portfolios.map((p) => (
+                            <option key={p} value={p}>
+                              {p}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm text-slate-400 mb-2">Ticker</label>
+                        <input
+                          type="text"
+                          value={panelFormData.ticker}
+                          onChange={(e) => setPanelFormData({ ...panelFormData, ticker: e.target.value.toUpperCase() })}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
+                          placeholder="AAPL"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm text-slate-400 mb-2">Tags (comma-separated)</label>
+                      <input
+                        type="text"
+                        value={panelFormData.tags}
+                        onChange={(e) => setPanelFormData({ ...panelFormData, tags: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
+                        placeholder="urgent, project-x"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 mt-6 pt-6 border-t border-slate-700">
+                    <button
+                      onClick={savePanelEdits}
+                      className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded font-medium transition"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => setEditingPanel(false)}
+                      className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-medium transition"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           ) : (
             <div className="flex items-center justify-center h-full text-slate-500">
