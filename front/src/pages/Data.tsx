@@ -331,13 +331,12 @@ export default function Data() {
             <div className="relative">
               <button
                 onClick={() => setShowCountryDropdown(!showCountryDropdown)}
-                className="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded text-xs flex items-center gap-1 transition whitespace-nowrap"
+                className="px-3 py-1.5 bg-blue-900/30 hover:bg-blue-800/40 border border-blue-700/50 text-blue-300 rounded text-xs font-medium flex items-center gap-2 transition whitespace-nowrap"
+                title="Filter by country"
               >
-                <span>
-                  {selectedCountries.length === 0
-                    ? '🌍 Countries'
-                    : `🌍 ${selectedCountries.length}`}
-                </span>
+                <span>🌍</span>
+                <span>Country</span>
+                {selectedCountries.length > 0 && <span className="bg-blue-600 text-white px-1.5 rounded text-xs">{selectedCountries.length}</span>}
                 <span className={`text-xs transition ${showCountryDropdown ? 'rotate-180' : ''}`}>▼</span>
               </button>
 
@@ -372,7 +371,8 @@ export default function Data() {
             <select
               value={selectedAssetType}
               onChange={(e) => setSelectedAssetType(e.target.value)}
-              className="px-2 py-1.5 bg-slate-800 border border-slate-700 text-white rounded text-xs focus:outline-none focus:border-purple-500 whitespace-nowrap"
+              className="px-3 py-1.5 bg-green-900/30 hover:bg-green-800/40 border border-green-700/50 text-green-300 rounded text-xs font-medium focus:outline-none focus:border-green-600 whitespace-nowrap"
+              title="Filter by asset type"
             >
               {ASSET_TYPES.map(type => (
                 <option key={type.id} value={type.id}>
@@ -385,13 +385,12 @@ export default function Data() {
             <div className="relative">
                 <button
                   onClick={() => setShowExchangeDropdown(!showExchangeDropdown)}
-                  className="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded text-xs flex items-center gap-1 transition whitespace-nowrap"
+                  className="px-3 py-1.5 bg-amber-900/30 hover:bg-amber-800/40 border border-amber-700/50 text-amber-300 rounded text-xs font-medium flex items-center gap-2 transition whitespace-nowrap"
+                  title="Filter by exchange"
                 >
-                  <span>
-                    {selectedExchanges.length === 0
-                      ? `🏢 ${availableExchanges.length === 0 ? 'Exchange' : 'All'}`
-                      : `🏢 ${selectedExchanges.length}`}
-                  </span>
+                  <span>🏢</span>
+                  <span>Exchange</span>
+                  {selectedExchanges.length > 0 && <span className="bg-amber-600 text-white px-1.5 rounded text-xs">{selectedExchanges.length}</span>}
                   <span className={`text-xs transition ${showExchangeDropdown ? 'rotate-180' : ''}`}>▼</span>
                 </button>
 
@@ -431,13 +430,12 @@ export default function Data() {
             <div className="relative">
                 <button
                   onClick={() => setShowCurrencyDropdown(!showCurrencyDropdown)}
-                  className="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded text-xs flex items-center gap-1 transition whitespace-nowrap"
+                  className="px-3 py-1.5 bg-orange-900/30 hover:bg-orange-800/40 border border-orange-700/50 text-orange-300 rounded text-xs font-medium flex items-center gap-2 transition whitespace-nowrap"
+                  title="Filter by currency"
                 >
-                  <span>
-                    {selectedCurrencies.length === 0
-                      ? `💱 ${availableCurrencies.length === 0 ? 'Currency' : 'All'}`
-                      : `💱 ${selectedCurrencies.length}`}
-                  </span>
+                  <span>💱</span>
+                  <span>Currency</span>
+                  {selectedCurrencies.length > 0 && <span className="bg-orange-600 text-white px-1.5 rounded text-xs">{selectedCurrencies.length}</span>}
                   <span className={`text-xs transition ${showCurrencyDropdown ? 'rotate-180' : ''}`}>▼</span>
                 </button>
 
