@@ -85,6 +85,15 @@ export default function PortfolioHoldingsWidget({
     ? enrichedPositions.filter((pos: any) => filterTickers.includes(pos.ticker))
     : enrichedPositions
 
+  // Debug logging
+  if (filterTickers && filterTickers.length > 0) {
+    console.log(`[PortfolioHoldingsWidget] Filtering: ${enrichedPositions.length} positions by ${filterTickers.length} tickers`, {
+      tickers: filterTickers,
+      positionTickers: enrichedPositions.map((p: any) => p.ticker),
+      filteredCount: filteredPositions.length,
+    })
+  }
+
   // Load historical data for charts (use centralized hook)
   useEffect(() => {
     if (viewMode === 'charts' && filteredPositions && filteredPositions.length > 0 && Object.keys(historicalData).length === 0) {
