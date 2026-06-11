@@ -134,7 +134,36 @@ export function TradingDialog({
     try {
       const modeText = mode.toUpperCase()
       const title = `${modeText} ${ticker} ${tickerName}`
-      const description = `- ${modeText} ${ticker} ${tickerName}\n- price: ${priceVal.toFixed(3)}\n- quantity: ${qty}\n- fees: ${feesVal}\n- stop_loss: ${(stopVal * 100).toFixed(1)}%\n- target: ${(targetVal * 100).toFixed(1)}%`
+
+      // Calculate summary values
+      const total = priceVal * qty
+      const stopAmount = total * (1 - stopVal)
+      const targetAmount = total * (1 + targetVal)
+
+      // Format description
+      let description = `📊 Trade Details\n\n`
+      description += `Type: ${modeText}\n`
+      description += `Ticker: ${ticker}\n`
+      description += `Company: ${tickerName}\n\n`
+
+      description += `💰 Order Details\n\n`
+      description += `Price: €${priceVal.toFixed(3)}\n`
+      description += `Quantity: ${qty.toFixed(2)} shares\n`
+      description += `Fees: €${feesVal.toFixed(2)}\n\n`
+
+      description += `📈 Calculations\n\n`
+      description += `Total: €${total.toFixed(2)}\n`
+
+      if (mode === 'buy') {
+        description += `Stop Loss: €${stopAmount.toFixed(2)} (${(stopVal * 100).toFixed(1)}%)\n`
+        description += `Take Profit: €${targetAmount.toFixed(2)} (${(targetVal * 100).toFixed(1)}%)\n`
+      } else if (position?.avg_entry_price) {
+        const profit = (priceVal - position.avg_entry_price) * qty
+        const gainPct = ((priceVal - position.avg_entry_price) / position.avg_entry_price) * 100
+        description += `Entry Price: €${position.avg_entry_price.toFixed(3)}\n`
+        description += `Profit: €${profit.toFixed(2)}\n`
+        description += `Gain %: ${gainPct.toFixed(2)}%\n`
+      }
 
       const today = new Date().toISOString().split('T')[0]
 
