@@ -71,13 +71,14 @@ def enrich_ticker(ticker_symbol: str, asset_type: str = "equities") -> Optional[
         else:
             return None
 
-        # Query by symbol
-        results = db.select(symbol=ticker_symbol.upper())
-        if results.empty:
+        # Query all data and search by index (ticker is the index in FinanceDatabase)
+        all_data = db.select()
+
+        # Look up by index (ticker symbol is the index)
+        if ticker_symbol.upper() not in all_data.index:
             return None
 
-        # Get the first result (primary listing)
-        row = results.iloc[0]
+        row = all_data.loc[ticker_symbol.upper()]
 
         # Get exchange - try exchange first, fallback to market
         exchange_value = None
@@ -87,7 +88,7 @@ def enrich_ticker(ticker_symbol: str, asset_type: str = "equities") -> Optional[
             exchange_value = str(row.get("market"))
 
         return {
-            "symbol": str(row.get("symbol", ticker_symbol)),
+            "symbol": ticker_symbol.upper(),
             "name": str(row.get("name", ticker_symbol)),
             "sector": str(row.get("sector")) if pd.notna(row.get("sector")) else None,
             "industry": str(row.get("industry")) if pd.notna(row.get("industry")) else None,
