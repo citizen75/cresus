@@ -295,6 +295,39 @@ export default function Data() {
     }
   }
 
+  const removeFromUniverse = async () => {
+    if (!selectedUniverse || selectedRows.size === 0) return
+
+    if (!confirm(`Remove ${selectedRows.size} ticker(s) from ${selectedUniverse}?`)) {
+      return
+    }
+
+    try {
+      const tickersToRemove = Array.from(selectedRows)
+      const response = await fetch(
+        `http://192.168.0.130:6501/api/v1/data/universe/${selectedUniverse}/tickers`,
+        {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tickers: tickersToRemove }),
+        }
+      )
+
+      if (response.ok) {
+        const result = await response.json()
+        alert(`✅ Removed ${result.removed || selectedRows.size} ticker(s)`)
+        // Reload universes and clear selection
+        await loadUniverses()
+        setSelectedRows(new Set())
+      } else {
+        alert('Failed to remove tickers from universe')
+      }
+    } catch (err) {
+      console.error('Failed to remove tickers from universe:', err)
+      alert('Failed to remove tickers from universe')
+    }
+  }
+
   const openTickerDetail = async (ticker: Ticker) => {
     // Merge fundamental data from API
     const mergedTicker = { ...ticker }
@@ -766,8 +799,23 @@ export default function Data() {
 
           {/* Footer */}
           {filteredTickers.length > 0 && (
-            <div className="px-4 py-3 border-t border-slate-800 text-xs text-slate-500">
-              Showing {filteredTickers.length} of {tickers.length} tickers
+            <div className="px-4 py-3 border-t border-slate-800 flex items-center justify-between">
+              <div className="text-xs text-slate-500">
+                Showing {filteredTickers.length} of {tickers.length} tickers
+                {selectedRows.size > 0 && (
+                  <span className="ml-4 text-purple-400">
+                    ({selectedRows.size} selected)
+                  </span>
+                )}
+              </div>
+              {selectedRows.size > 0 && selectedUniverse && (
+                <button
+                  onClick={removeFromUniverse}
+                  className="px-3 py-1 bg-red-600/20 text-red-300 rounded text-xs hover:bg-red-600/30 transition font-medium"
+                >
+                  🗑️ Remove {selectedRows.size} from {selectedUniverse}
+                </button>
+              )}
             </div>
           )}
         </div>
