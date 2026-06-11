@@ -53,6 +53,9 @@ export default function Data() {
   const [availableCurrencies, setAvailableCurrencies] = useState<string[]>([])
   const [sortColumn, setSortColumn] = useState<string>('symbol')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set())
+  const [draggedRows, setDraggedRows] = useState<string[]>([])
+  const [dropTarget, setDropTarget] = useState<string | null>(null)
 
   // Load universes on mount
   useEffect(() => {
@@ -191,6 +194,60 @@ export default function Data() {
     }
   }
 
+  const toggleRowSelection = (symbol: string) => {
+    setSelectedRows(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(symbol)) {
+        newSet.delete(symbol)
+      } else {
+        newSet.add(symbol)
+      }
+      return newSet
+    })
+  }
+
+  const selectAllRows = () => {
+    if (selectedRows.size === filteredTickers.length) {
+      setSelectedRows(new Set())
+    } else {
+      setSelectedRows(new Set(filteredTickers.map(t => t.symbol)))
+    }
+  }
+
+  const handleRowDragStart = (symbol: string) => {
+    const selected = selectedRows.has(symbol) ? Array.from(selectedRows) : [symbol]
+    setDraggedRows(selected)
+  }
+
+  const handleUniverseDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+  }
+
+  const handleUniverseDrop = async (universeId: string) => {
+    if (draggedRows.length === 0) return
+
+    try {
+      const response = await fetch(
+        `http://192.168.0.130:6501/api/v1/data/universe/${universeId}/tickers`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tickers: draggedRows }),
+        }
+      )
+
+      if (response.ok) {
+        // Reload the universe
+        await loadUniverses()
+        setDraggedRows([])
+        setDropTarget(null)
+      }
+    } catch (err) {
+      console.error('Failed to add tickers to universe:', err)
+    }
+  }
+
   const filteredTickers = tickers
     .filter(ticker => {
       // Search filter
@@ -318,9 +375,22 @@ export default function Data() {
                 <button
                   key={universe.id}
                   onClick={() => setSelectedUniverse(universe.id)}
+                  onDragOver={(e) => {
+                    if (draggedRows.length > 0) {
+                      handleUniverseDragOver(e)
+                      setDropTarget(universe.id)
+                    }
+                  }}
+                  onDragLeave={() => setDropTarget(null)}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    handleUniverseDrop(universe.id)
+                  }}
                   className={`w-full text-left px-3 py-2 rounded transition ${
                     selectedUniverse === universe.id
                       ? 'bg-purple-600/30 text-purple-300 border border-purple-500'
+                      : dropTarget === universe.id
+                      ? 'bg-green-600/30 text-green-300 border border-green-500'
                       : 'text-slate-300 hover:bg-slate-800'
                   }`}
                 >
@@ -329,6 +399,11 @@ export default function Data() {
                       <div className="font-medium">{universe.name}</div>
                       <div className="text-xs text-slate-500">{universe.count || 0} tickers</div>
                     </div>
+                    {draggedRows.length > 0 && (
+                      <div className="text-xs bg-green-600 px-2 py-1 rounded">
+                        +{draggedRows.length}
+                      </div>
+                    )}
                   </div>
                 </button>
               ))
@@ -524,6 +599,14 @@ export default function Data() {
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-slate-800 border-b border-slate-700">
                   <tr>
+                    <th className="px-4 py-3 text-slate-300 font-semibold text-left w-10">
+                      <input
+                        type="checkbox"
+                        checked={selectedRows.size > 0 && selectedRows.size === filteredTickers.length}
+                        onChange={selectAllRows}
+                        className="w-4 h-4 cursor-pointer"
+                      />
+                    </th>
                     {tableColumns.map(col => (
                       <th
                         key={col.key}
@@ -546,7 +629,24 @@ export default function Data() {
                 </thead>
                 <tbody className="divide-y divide-slate-800">
                   {filteredTickers.map((ticker, idx) => (
-                    <tr key={`${ticker.symbol}-${idx}`} className="hover:bg-slate-800/50 transition">
+                    <tr
+                      key={`${ticker.symbol}-${idx}`}
+                      draggable={selectedRows.has(ticker.symbol) || selectedRows.size === 0}
+                      onDragStart={() => handleRowDragStart(ticker.symbol)}
+                      className={`transition ${
+                        selectedRows.has(ticker.symbol)
+                          ? 'bg-purple-600/30 text-purple-200'
+                          : 'hover:bg-slate-800/50'
+                      } ${selectedRows.size > 0 ? 'cursor-move' : ''}`}
+                    >
+                      <td className="px-4 py-3 w-10">
+                        <input
+                          type="checkbox"
+                          checked={selectedRows.has(ticker.symbol)}
+                          onChange={() => toggleRowSelection(ticker.symbol)}
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                      </td>
                       {tableColumns.map(col => (
                         <td
                           key={col.key}
