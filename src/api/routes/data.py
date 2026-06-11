@@ -315,7 +315,7 @@ async def filter_tickers(
     try:
         import financedatabase as fd
 
-        # Country code to FinanceDatabase country name mapping
+        # Country code to FinanceDatabase country name mapping (for stocks)
         country_name_map = {
             "FR": "France",
             "US": "United States",
@@ -335,6 +335,26 @@ async def filter_tickers(
             "BR": "Brazil",
             "MX": "Mexico",
             "ZA": "South Africa",
+        }
+
+        # Country code to exchange MIC codes mapping (for ETFs)
+        country_to_exchanges = {
+            "US": ["ARCX", "XNAS", "XNYS"],  # NYSE ARCA, NASDAQ, NYSE
+            "FR": ["XPAR", "XFRA"],  # Euronext Paris, Euroclear
+            "DE": ["XBER", "XMUN", "XDUS", "XFRA", "XHAM"],  # German exchanges
+            "NL": ["XAMS"],  # Amsterdam
+            "GB": ["XLON"],  # London Stock Exchange
+            "IT": ["XMIL"],  # Milan
+            "ES": ["XMAD"],  # Madrid
+            "CH": ["XSWX"],  # Swiss Exchange
+            "SE": ["XSTO"],  # Stockholm
+            "CA": ["XTSE"],  # Toronto
+            "AU": ["XASX"],  # Australian
+            "JP": ["XTKS"],  # Tokyo
+            "HK": ["XHKG"],  # Hong Kong
+            "SG": ["XSES"],  # Singapore
+            "BR": ["BVMF"],  # Brazil
+            "MX": ["XMEX"],  # Mexico
         }
 
         all_tickers = []
@@ -363,18 +383,18 @@ async def filter_tickers(
         query_kwargs = {}
 
         if countries:
-            # Parse country codes and convert to names
+            # Parse country codes
             country_list = [c.strip().upper() for c in countries.split(",")]
-            country_names = []
-            for code in country_list:
-                if code in country_name_map:
-                    country_names.append(country_name_map[code])
 
-            if country_names:
-                # Query for each country and combine results
-                for country_name in country_names:
+            if asset_type_lower == "etfs":
+                # ETFs: Query by exchange MIC codes
+                exchanges = []
+                for code in country_list:
+                    exchanges.extend(country_to_exchanges.get(code, []))
+
+                if exchanges:
                     try:
-                        data = db.select(country=country_name)
+                        data = db.select(mic=exchanges)
                         if not data.empty:
                             for idx, row in data.iterrows():
                                 ticker_data = {
@@ -382,23 +402,51 @@ async def filter_tickers(
                                     "name": str(row.get("name", idx)) if pd.notna(row.get("name")) else idx,
                                 }
 
-                                # Add available fields based on asset type
+                                # Add available fields
                                 if "currency" in data.columns and pd.notna(row.get("currency")):
                                     ticker_data["currency"] = str(row.get("currency"))
                                 if "exchange" in data.columns and pd.notna(row.get("exchange")):
                                     ticker_data["exchange"] = str(row.get("exchange"))
-                                if "country" in data.columns and pd.notna(row.get("country")):
-                                    ticker_data["country"] = str(row.get("country"))
-
-                                # Add sector for stocks
-                                if asset_type_lower == "stocks" and "sector" in data.columns and pd.notna(row.get("sector")):
-                                    ticker_data["sector"] = str(row.get("sector"))
-                                if asset_type_lower == "stocks" and "industry" in data.columns and pd.notna(row.get("industry")):
-                                    ticker_data["industry"] = str(row.get("industry"))
 
                                 all_tickers.append(ticker_data)
                     except Exception:
                         pass
+            else:
+                # Stocks, Funds, Indices: Query by country name
+                country_names = []
+                for code in country_list:
+                    if code in country_name_map:
+                        country_names.append(country_name_map[code])
+
+                if country_names:
+                    for country_name in country_names:
+                        try:
+                            data = db.select(country=country_name)
+                            if not data.empty:
+                                for idx, row in data.iterrows():
+                                    ticker_data = {
+                                        "symbol": idx,
+                                        "name": str(row.get("name", idx)) if pd.notna(row.get("name")) else idx,
+                                    }
+
+                                    # Add available fields based on asset type
+                                    if "currency" in data.columns and pd.notna(row.get("currency")):
+                                        ticker_data["currency"] = str(row.get("currency"))
+                                    if "exchange" in data.columns and pd.notna(row.get("exchange")):
+                                        ticker_data["exchange"] = str(row.get("exchange"))
+                                    if "country" in data.columns and pd.notna(row.get("country")):
+                                        ticker_data["country"] = str(row.get("country"))
+
+                                    # Add sector/industry for stocks
+                                    if asset_type_lower == "stocks":
+                                        if "sector" in data.columns and pd.notna(row.get("sector")):
+                                            ticker_data["sector"] = str(row.get("sector"))
+                                        if "industry" in data.columns and pd.notna(row.get("industry")):
+                                            ticker_data["industry"] = str(row.get("industry"))
+
+                                    all_tickers.append(ticker_data)
+                        except Exception:
+                            pass
         else:
             # No country filter - get all tickers for this asset type
             try:
