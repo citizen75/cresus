@@ -22,6 +22,14 @@ export default function PortfolioHoldingsWidget({
   initialResults,
   onGetHistoricalData,
 }: PortfolioHoldingsWidgetProps) {
+  // Debug props
+  console.log(`[PortfolioHoldingsWidget] Props:`, {
+    portfolioName,
+    filterTickers,
+    filterTickersLength: filterTickers?.length,
+    initialResults: initialResults?.length,
+  })
+
   const [rawPositions, setRawPositions] = useState<any[]>([])
   const [isLoadingPositions, setIsLoadingPositions] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
