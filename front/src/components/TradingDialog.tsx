@@ -30,6 +30,7 @@ export function TradingDialog({
   const [fees, setFees] = useState<string>('0')
   const [stopLoss, setStopLoss] = useState<string>('7') // Default 7%
   const [takeProfit, setTakeProfit] = useState<string>('2') // Default 2%
+  const [createTodo, setCreateTodo] = useState(false)
   const [loadingTicker, setLoadingTicker] = useState(false)
 
   // Fetch ticker name when ticker changes
@@ -97,7 +98,7 @@ export function TradingDialog({
     }
   }, [isOpen])
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!ticker) {
       alert('Please enter a ticker')
       return
@@ -119,8 +120,45 @@ export function TradingDialog({
     const stopVal = parseFloat(stopLoss || '0') / 100 // Convert percentage to decimal
     const targetVal = parseFloat(takeProfit || '0') / 100 // Convert percentage to decimal
 
-    onConfirm(qty, priceVal, feesVal, stopVal, targetVal)
+    if (createTodo) {
+      // Create a task instead of executing the trade
+      await createTodoTask(qty, priceVal, feesVal, stopVal, targetVal)
+    } else {
+      // Execute the trade normally
+      onConfirm(qty, priceVal, feesVal, stopVal, targetVal)
+    }
     resetForm()
+  }
+
+  const createTodoTask = async (qty: number, priceVal: number, feesVal: number, stopVal: number, targetVal: number) => {
+    try {
+      const modeText = mode.toUpperCase()
+      const title = `${modeText} ${ticker} ${tickerName}`
+      const description = `- ${modeText} ${ticker} ${tickerName}\n- price: ${priceVal.toFixed(3)}\n- quantity: ${qty}\n- fees: ${feesVal}\n- stop_loss: ${(stopVal * 100).toFixed(1)}%\n- target: ${(targetVal * 100).toFixed(1)}%`
+
+      const today = new Date().toISOString().split('T')[0]
+
+      const response = await fetch('http://192.168.0.130:6501/api/v1/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          description,
+          priority: 'High',
+          due_date: today,
+          status: 'To-Do',
+          tags: ['trading', mode],
+        }),
+      })
+
+      if (!response.ok) throw new Error('Failed to create task')
+
+      alert(`Task created: ${title}`)
+      onClose()
+    } catch (err) {
+      console.error('Failed to create task:', err)
+      alert('Failed to create task')
+    }
   }
 
   const resetForm = () => {
@@ -130,6 +168,7 @@ export function TradingDialog({
     setFees('0')
     setStopLoss('7')
     setTakeProfit('2')
+    setCreateTodo(false)
   }
 
   if (!isOpen) return null
@@ -273,6 +312,20 @@ export function TradingDialog({
           </div>
         )}
 
+        {/* Todo Checkbox */}
+        <div className="flex items-center gap-2 mb-3">
+          <input
+            type="checkbox"
+            id="create-todo"
+            checked={createTodo}
+            onChange={(e) => setCreateTodo(e.target.checked)}
+            className="w-4 h-4 rounded border-slate-600 cursor-pointer"
+          />
+          <label htmlFor="create-todo" className="text-sm text-slate-300 cursor-pointer">
+            Create task instead of trading
+          </label>
+        </div>
+
         {/* Actions */}
         <div className="flex gap-2">
           <button
@@ -289,7 +342,7 @@ export function TradingDialog({
                 : 'bg-red-600 hover:bg-red-700'
             }`}
           >
-            {mode === 'buy' ? 'Buy' : 'Sell'}
+            {createTodo ? 'Create Task' : (mode === 'buy' ? 'Buy' : 'Sell')}
           </button>
         </div>
       </div>
