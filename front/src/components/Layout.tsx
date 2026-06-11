@@ -6,6 +6,7 @@ interface LayoutProps {
 
 const menuItems = [
   { icon: '🏠', label: 'Home', path: '/' },
+  { icon: '✅', label: 'Tasks', path: '/tasks' },
   { icon: '💼', label: 'Portfolios', path: '/portfolios' },
   { icon: '🎯', label: 'Strategies', path: '/strategies' },
   { icon: '📊', label: 'Insights', path: '/insights' },
@@ -15,7 +16,6 @@ const menuItems = [
   { icon: '📈', label: 'Chart', path: '/chart' },
   { icon: '⏰', label: 'Scheduler', path: '/scheduler' },
   { icon: '🔔', label: 'Alerts', path: '/alerts' },
-  { icon: '✅', label: 'Tasks', path: '/tasks' },
   { icon: '⚙️', label: 'Settings', path: '#' },
 ]
 

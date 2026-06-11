@@ -72,6 +72,31 @@ export function TradingDialog({
     }
   }, [isOpen, initialTicker])
 
+  // Pre-fill form when opening dialog for sell
+  useEffect(() => {
+    if (isOpen && mode === 'sell' && position) {
+      // Pre-fill quantity
+      if (position.quantity) {
+        setQuantity(String(position.quantity))
+      }
+      // Pre-fill price with current price or entry price
+      const closePrice = position.close || position.price || position.avg_entry_price || 0
+      if (closePrice) {
+        setPrice(String(closePrice))
+      }
+      // Pre-fill stop loss and take profit for sell
+      setStopLoss('5') // 5% stop loss for sell
+      setTakeProfit('3') // 3% take profit for sell
+    }
+  }, [isOpen, mode, position])
+
+  // Reset form when dialog closes
+  useEffect(() => {
+    if (!isOpen) {
+      resetForm()
+    }
+  }, [isOpen])
+
   const handleConfirm = () => {
     if (!ticker) {
       alert('Please enter a ticker')
