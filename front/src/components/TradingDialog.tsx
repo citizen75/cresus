@@ -205,6 +205,7 @@ export function TradingDialog({
         body: JSON.stringify({
           title,
           description,
+          portfolio: effectivePortfolioName,
           priority: 'High',
           due_date: today,
           status: 'To-Do',

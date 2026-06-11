@@ -17,6 +17,7 @@ class TaskRequest(BaseModel):
     due_date: Optional[str] = None
     status: str = TaskStatus.TODO.value
     assignee: Optional[str] = None
+    portfolio: Optional[str] = None
     tags: Optional[List[str]] = None
     dependencies: Optional[List[int]] = None
     checklist: Optional[List[Dict[str, Any]]] = None
@@ -32,6 +33,7 @@ class TaskResponse(BaseModel):
     due_date: Optional[str]
     status: str
     assignee: Optional[str]
+    portfolio: Optional[str]
     tags: List[str]
     dependencies: List[int]
     checklist: List[Dict[str, Any]]
@@ -74,6 +76,7 @@ async def create_task(request: TaskRequest):
             due_date=request.due_date,
             status=request.status,
             assignee=request.assignee,
+            portfolio=request.portfolio,
             tags=request.tags,
             dependencies=request.dependencies,
             checklist=request.checklist,
@@ -193,6 +196,7 @@ async def update_task(task_id: int, request: TaskRequest):
             due_date=request.due_date,
             status=request.status,
             assignee=request.assignee,
+            portfolio=request.portfolio,
             tags=request.tags,
             dependencies=request.dependencies,
             checklist=request.checklist,
@@ -278,6 +282,7 @@ def _task_to_dict(task: Task) -> Dict[str, Any]:
         "due_date": task.due_date,
         "status": task.status,
         "assignee": task.assignee,
+        "portfolio": task.portfolio,
         "tags": task.tags or [],
         "dependencies": task.dependencies or [],
         "checklist": task.checklist or [],

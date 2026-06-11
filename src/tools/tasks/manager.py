@@ -38,6 +38,7 @@ class Task:
     due_date: Optional[str] = None
     status: str = TaskStatus.TODO.value
     assignee: Optional[str] = None
+    portfolio: Optional[str] = None
     tags: Optional[List[str]] = None
     dependencies: Optional[List[int]] = None  # Task IDs
     checklist: Optional[List[Dict[str, Any]]] = None  # [{"text": "...", "done": bool}]
@@ -91,6 +92,7 @@ class TaskManager:
                     due_date TEXT,
                     status TEXT DEFAULT 'To-Do',
                     assignee TEXT,
+                    portfolio TEXT,
                     tags TEXT,
                     dependencies TEXT,
                     checklist TEXT,
@@ -110,6 +112,7 @@ class TaskManager:
         due_date: Optional[str] = None,
         status: str = TaskStatus.TODO.value,
         assignee: Optional[str] = None,
+        portfolio: Optional[str] = None,
         tags: Optional[List[str]] = None,
         dependencies: Optional[List[int]] = None,
         checklist: Optional[List[Dict[str, Any]]] = None,
@@ -124,6 +127,7 @@ class TaskManager:
             due_date: Due date (ISO format)
             status: Task status (To-Do/In Progress/Done/Blocked)
             assignee: Person responsible
+            portfolio: Portfolio context (e.g., "My Investment")
             tags: Task tags/labels
             dependencies: List of task IDs this depends on
             checklist: List of sub-tasks
@@ -140,6 +144,7 @@ class TaskManager:
             due_date=due_date,
             status=status,
             assignee=assignee,
+            portfolio=portfolio,
             tags=tags or [],
             dependencies=dependencies or [],
             checklist=checklist or [],
@@ -153,12 +158,12 @@ class TaskManager:
             cursor.execute("""
                 INSERT INTO tasks (
                     title, description, priority, due_date, status,
-                    assignee, tags, dependencies, checklist, attachments,
+                    assignee, portfolio, tags, dependencies, checklist, attachments,
                     created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 task.title, task.description, task.priority, task.due_date,
-                task.status, task.assignee,
+                task.status, task.assignee, task.portfolio,
                 json.dumps(task.tags) if task.tags else None,
                 json.dumps(task.dependencies) if task.dependencies else None,
                 json.dumps(task.checklist) if task.checklist else None,
@@ -262,7 +267,7 @@ class TaskManager:
         # Update allowed fields
         allowed_fields = {
             'title', 'description', 'priority', 'due_date', 'status',
-            'assignee', 'tags', 'dependencies', 'checklist', 'attachments'
+            'assignee', 'portfolio', 'tags', 'dependencies', 'checklist', 'attachments'
         }
 
         for key, value in kwargs.items():
@@ -276,12 +281,12 @@ class TaskManager:
             cursor.execute("""
                 UPDATE tasks SET
                     title = ?, description = ?, priority = ?, due_date = ?,
-                    status = ?, assignee = ?, tags = ?, dependencies = ?,
+                    status = ?, assignee = ?, portfolio = ?, tags = ?, dependencies = ?,
                     checklist = ?, attachments = ?, updated_at = ?
                 WHERE id = ?
             """, (
                 task.title, task.description, task.priority, task.due_date,
-                task.status, task.assignee,
+                task.status, task.assignee, task.portfolio,
                 json.dumps(task.tags) if task.tags else None,
                 json.dumps(task.dependencies) if task.dependencies else None,
                 json.dumps(task.checklist) if task.checklist else None,
@@ -364,6 +369,7 @@ class TaskManager:
             due_date=row['due_date'],
             status=row['status'],
             assignee=row['assignee'],
+            portfolio=row.get('portfolio'),
             tags=json.loads(row['tags']) if row['tags'] else [],
             dependencies=json.loads(row['dependencies']) if row['dependencies'] else [],
             checklist=json.loads(row['checklist']) if row['checklist'] else [],
