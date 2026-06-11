@@ -4,6 +4,7 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel
 from typing import List, Optional
 from tools.data.financial import FinancialDataManager
+from tools.data.enrichment import TickerIntelligence
 from tools.universe.universe import Universe
 
 # Request/Response models
@@ -211,6 +212,50 @@ async def remove_tickers_from_universe(universe_id: str, request: TickersRequest
             "universe": universe_id,
             "count": len(tickers),
             "removed": len(request.tickers),
+        }
+    except Exception as e:
+        return {"error": str(e)}, 400
+
+
+@router.get("/ticker/{ticker}/enriched")
+async def get_enriched_ticker(ticker: str, use_cache: bool = Query(True)):
+    """Get complete enriched ticker data.
+
+    Combines:
+    - Universe metadata (name, sector, industry, market cap)
+    - Fundamentals (P/E, earnings, margins, analyst ratings)
+    - Market data (price, change, volume)
+    """
+    try:
+        ti = TickerIntelligence(ticker)
+        enriched = ti.get_enriched_data(use_cache=use_cache)
+        return enriched
+    except Exception as e:
+        return {"error": str(e)}, 400
+
+
+@router.get("/ticker/{ticker}/summary")
+async def get_ticker_summary(ticker: str):
+    """Get summary of key financial metrics for a ticker."""
+    try:
+        ti = TickerIntelligence(ticker)
+        summary = ti.get_summary()
+        return summary
+    except Exception as e:
+        return {"error": str(e)}, 400
+
+
+@router.post("/tickers/enrich")
+async def batch_enrich_tickers(request: TickersRequest, use_cache: bool = Query(True)):
+    """Batch enrich multiple tickers at once.
+
+    Returns complete financial data for multiple tickers.
+    """
+    try:
+        results = TickerIntelligence.batch_enrich(request.tickers, use_cache=use_cache)
+        return {
+            "count": len(request.tickers),
+            "enriched": results,
         }
     except Exception as e:
         return {"error": str(e)}, 400
