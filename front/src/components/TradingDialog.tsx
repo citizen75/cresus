@@ -8,6 +8,7 @@ interface TradingDialogProps {
   ticker: string
   position?: any
   currentPrice?: number
+  portfolioName?: string
   onClose: () => void
   onConfirm: (quantity: number, price?: number, fees?: number, stopLoss?: number, takeProfit?: number) => void
 }
@@ -18,6 +19,7 @@ export function TradingDialog({
   ticker: initialTicker,
   position,
   currentPrice: initialPrice = 0,
+  portfolioName,
   onClose,
   onConfirm,
 }: TradingDialogProps) {
@@ -142,6 +144,9 @@ export function TradingDialog({
 
       // Format description
       let description = `📊 Trade Details\n\n`
+      if (portfolioName) {
+        description += `Portfolio: ${portfolioName}\n`
+      }
       description += `Type: ${modeText}\n`
       description += `Ticker: ${ticker}\n`
       description += `Company: ${tickerName}\n\n`
@@ -218,6 +223,7 @@ export function TradingDialog({
               {mode === 'buy' ? '📈' : '📉'} {ticker || '...'}
             </h2>
             {tickerName && <p className="text-xs text-slate-400">{tickerName}</p>}
+            {portfolioName && <p className="text-xs text-slate-500 mt-1">Portfolio: {portfolioName}</p>}
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-200">✕</button>
         </div>

@@ -531,6 +531,7 @@ export default function PortfolioHoldingsWidget({
         ticker={tradingTicker || ''}
         position={tradingPosition}
         currentPrice={tradingPosition?.current_price || 0}
+        portfolioName={portfolioName}
         onClose={() => setTradingDialogOpen(false)}
         onConfirm={handleTradingConfirm}
       />
