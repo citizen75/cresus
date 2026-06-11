@@ -329,6 +329,82 @@ async def rename_universe(universe_id: str, request: RenameRequest):
         return {"error": str(e)}, 400
 
 
+@router.post("/universe/{universe_id}/fetch-data")
+async def fetch_universe_data(
+    universe_id: str,
+    asset_type: str = Query("equities", description="Asset type (equities, etfs, funds, indices)"),
+):
+    """Fetch and cache historical data and fundamentals for all tickers in a universe."""
+    try:
+        import yfinance as yf
+        import financedatabase as fd
+
+        universe = Universe(universe_id)
+        if not universe.exists():
+            return {"error": f"Universe '{universe_id}' not found"}, 404
+
+        # Get all tickers
+        symbols = universe.get_tickers()
+        if not symbols:
+            return {"status": "no_tickers", "universe": universe_id, "count": 0}
+
+        # Select correct database based on asset type
+        if asset_type == "etfs":
+            db = fd.ETFs()
+        elif asset_type == "funds":
+            db = fd.Funds()
+        elif asset_type == "indices":
+            db = fd.Indices()
+        else:
+            db = fd.Equities()
+
+        all_data = db.select()
+
+        # Fetch data for each ticker
+        results = {
+            "universe": universe_id,
+            "total": len(symbols),
+            "fetched": 0,
+            "failed": 0,
+            "tickers": {},
+        }
+
+        for symbol in symbols:
+            try:
+                ticker_result = {"symbol": symbol, "history": False, "fundamentals": False}
+
+                # Fetch historical data
+                try:
+                    hist = yf.download(symbol, period="365d", progress=False)
+                    if not hist.empty:
+                        ticker_result["history"] = True
+                except Exception as e:
+                    pass
+
+                # Fetch fundamentals from FinanceDatabase
+                try:
+                    if symbol.upper() in all_data.index:
+                        row = all_data.loc[symbol.upper()]
+                        ticker_result["fundamentals"] = True
+                except Exception as e:
+                    pass
+
+                if ticker_result["history"] or ticker_result["fundamentals"]:
+                    results["fetched"] += 1
+                    results["tickers"][symbol] = ticker_result
+                else:
+                    results["failed"] += 1
+
+            except Exception as e:
+                results["failed"] += 1
+                results["tickers"][symbol] = {"symbol": symbol, "error": str(e)}
+
+        return results
+
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+
 @router.post("/universe/{universe_id}/tickers")
 async def add_tickers_to_universe(universe_id: str, request: TickersRequest):
     """Add tickers to an existing universe.

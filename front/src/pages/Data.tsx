@@ -42,6 +42,8 @@ export default function Data() {
   const [activeTab, setActiveTab] = useState<'data' | 'universes'>('data')
   const [universes, setUniverses] = useState<Universe[]>([])
   const [selectedUniverse, setSelectedUniverse] = useState<string | null>(null)
+  const [fetchingData, setFetchingData] = useState<string | null>(null)
+  const [fetchStatus, setFetchStatus] = useState<string>('')
   const [tickers, setTickers] = useState<Ticker[]>([])
   const [loading, setLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -230,6 +232,34 @@ export default function Data() {
       navigate('/data/universes')
     } else {
       navigate('/data')
+    }
+  }
+
+  // Fetch data for universe
+  const fetchUniverseData = async (universeId: string, assetType: string = 'equities') => {
+    setFetchingData(universeId)
+    setFetchStatus('Fetching data...')
+
+    try {
+      const response = await fetch(
+        `http://192.168.0.130:6501/api/v1/data/universe/${universeId}/fetch-data?asset_type=${assetType}`,
+        { method: 'POST' }
+      )
+
+      if (response.ok) {
+        const result = await response.json()
+        setFetchStatus(
+          `✅ Fetched ${result.fetched}/${result.total} tickers (${result.failed} failed)`
+        )
+        setTimeout(() => setFetchStatus(''), 5000)
+      } else {
+        setFetchStatus('❌ Failed to fetch data')
+      }
+    } catch (err) {
+      setFetchStatus('❌ Error fetching data')
+      console.error(err)
+    } finally {
+      setFetchingData(null)
     }
   }
 
@@ -961,50 +991,67 @@ export default function Data() {
                   </div>
                   <p className="text-xs text-slate-400">{universe.id}</p>
                   {selectedUniverse === universe.id && (
-                    <div className="mt-3 pt-3 border-t border-slate-700 flex gap-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          const newName = prompt(
-                            `Rename "${universe.name}" to:`,
-                            universe.name
-                          )
-                          if (newName && newName !== universe.name) {
-                            fetch(
-                              `http://192.168.0.130:6501/api/v1/data/universe/${universe.id}`,
-                              {
-                                method: 'PATCH',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ new_id: newName }),
-                              }
-                            ).then((res) => {
-                              if (res.ok) {
-                                loadUniverses()
-                                setSelectedUniverse(newName)
-                              } else {
-                                alert('Failed to rename universe')
-                              }
-                            })
-                          }
-                        }}
-                        className="flex-1 px-2 py-1 bg-blue-600/20 text-blue-300 rounded text-xs hover:bg-blue-600/30"
-                      >
-                        ✏️ Rename
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          if (confirm(`Delete universe "${universe.name}"?`)) {
-                            fetch(
-                              `http://192.168.0.130:6501/api/v1/data/universe/${universe.id}`,
-                              { method: 'DELETE' }
-                            ).then(() => loadUniverses())
-                          }
-                        }}
-                        className="flex-1 px-2 py-1 bg-red-600/20 text-red-300 rounded text-xs hover:bg-red-600/30"
-                      >
-                        🗑️ Delete
-                      </button>
+                    <div className="mt-3 pt-3 border-t border-slate-700 space-y-2">
+                      {fetchStatus && (
+                        <div className="px-2 py-1 bg-slate-700 text-slate-300 rounded text-xs text-center">
+                          {fetchStatus}
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            fetchUniverseData(universe.id)
+                          }}
+                          disabled={fetchingData === universe.id}
+                          className="flex-1 px-2 py-1 bg-green-600/20 text-green-300 rounded text-xs hover:bg-green-600/30 disabled:opacity-50"
+                        >
+                          {fetchingData === universe.id ? '⏳ Fetching...' : '📥 Fetch Data'}
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            const newName = prompt(
+                              `Rename "${universe.name}" to:`,
+                              universe.name
+                            )
+                            if (newName && newName !== universe.name) {
+                              fetch(
+                                `http://192.168.0.130:6501/api/v1/data/universe/${universe.id}`,
+                                {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ new_id: newName }),
+                                }
+                              ).then((res) => {
+                                if (res.ok) {
+                                  loadUniverses()
+                                  setSelectedUniverse(newName)
+                                } else {
+                                  alert('Failed to rename universe')
+                                }
+                              })
+                            }
+                          }}
+                          className="flex-1 px-2 py-1 bg-blue-600/20 text-blue-300 rounded text-xs hover:bg-blue-600/30"
+                        >
+                          ✏️ Rename
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (confirm(`Delete universe "${universe.name}"?`)) {
+                              fetch(
+                                `http://192.168.0.130:6501/api/v1/data/universe/${universe.id}`,
+                                { method: 'DELETE' }
+                              ).then(() => loadUniverses())
+                            }
+                          }}
+                          className="flex-1 px-2 py-1 bg-red-600/20 text-red-300 rounded text-xs hover:bg-red-600/30"
+                        >
+                          🗑️ Delete
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
