@@ -62,14 +62,27 @@ async def get_tickers(
     category: str = Query(..., description="Asset category"),
     universe: str = Query(..., description="Universe ID"),
     limit: int = Query(1000, description="Max number of tickers"),
+    enrich: bool = Query(True, description="Enrich with fundamentals data"),
 ):
-    """Get tickers for a category and universe with metadata."""
+    """Get tickers for a category and universe with optional metadata enrichment.
+
+    Args:
+        category: Asset category
+        universe: Universe ID
+        limit: Max number of tickers to return
+        enrich: Whether to enrich with fundamentals (sector, industry, price, etc.)
+    """
     try:
         uni = Universe(universe)
         if not uni.exists():
             return {"error": f"Universe '{universe}' not found"}, 404
 
         tickers = uni.get_tickers_with_metadata()[:limit]
+
+        # Optionally enrich with fundamentals
+        if enrich:
+            tickers = TickerIntelligence.batch_enrich_flat(tickers)
+
         return {"category": category, "universe": universe, "tickers": tickers, "count": len(tickers)}
     except Exception as e:
         return {"error": str(e)}, 400
@@ -86,14 +99,28 @@ async def search_tickers(
 
 
 @router.get("/universe/{universe_id}")
-async def get_universe_tickers(universe_id: str, limit: int = Query(1000, description="Max number of tickers")):
-    """Get tickers for a specific universe with metadata."""
+async def get_universe_tickers(
+    universe_id: str,
+    limit: int = Query(1000, description="Max number of tickers"),
+    enrich: bool = Query(True, description="Enrich with fundamentals data"),
+):
+    """Get tickers for a specific universe with optional metadata enrichment.
+
+    Args:
+        universe_id: Universe ID
+        limit: Max number of tickers
+        enrich: Whether to enrich with fundamentals (sector, industry, price, etc.)
+    """
     try:
         universe = Universe(universe_id)
         if not universe.exists():
             return {"error": f"Universe '{universe_id}' not found"}, 404
 
         tickers = universe.get_tickers_with_metadata()[:limit]
+
+        # Optionally enrich with fundamentals
+        if enrich:
+            tickers = TickerIntelligence.batch_enrich_flat(tickers)
 
         return {
             "universe": universe_id,

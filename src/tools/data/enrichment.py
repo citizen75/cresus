@@ -183,3 +183,58 @@ class TickerIntelligence:
                 results[ticker] = {"symbol": ticker, "error": str(e)}
 
         return results
+
+    @staticmethod
+    def batch_enrich_flat(tickers_data: list) -> list:
+        """Enrich ticker data with fundamentals and return flattened results.
+
+        Args:
+            tickers_data: List of ticker dicts with symbol, name, etc.
+
+        Returns:
+            List of enriched ticker dicts with fundamentals merged in
+        """
+        enriched_tickers = []
+
+        for ticker_dict in tickers_data:
+            symbol = ticker_dict.get("symbol")
+            if not symbol:
+                enriched_tickers.append(ticker_dict)
+                continue
+
+            try:
+                ti = TickerIntelligence(symbol)
+                enriched = ti.get_enriched_data(use_cache=True)
+
+                # Start with original metadata
+                enriched_row = dict(ticker_dict)
+
+                # Add fundamentals data if available
+                if enriched.get("fundamentals") and enriched["fundamentals"].get("data"):
+                    fund_data = enriched["fundamentals"]["data"]
+
+                    # Add company info
+                    if fund_data.get("company"):
+                        company = fund_data["company"]
+                        enriched_row["sector"] = company.get("sector")
+                        enriched_row["industry"] = company.get("industry")
+
+                    # Add quotation data
+                    if fund_data.get("quotation"):
+                        quotation = fund_data["quotation"]
+                        price = quotation.get("current_price")
+                        enriched_row["price"] = f"{price:.2f}" if price else None
+
+                    # Add analysts data
+                    if fund_data.get("analysts"):
+                        analysts = fund_data["analysts"]
+                        enriched_row["recommendation"] = analysts.get("recommendation")
+                        enriched_row["target_price"] = analysts.get("target_price")
+
+                enriched_tickers.append(enriched_row)
+
+            except Exception as e:
+                logger.warning(f"Failed to enrich {symbol}: {e}")
+                enriched_tickers.append(ticker_dict)
+
+        return enriched_tickers
