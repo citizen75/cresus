@@ -38,6 +38,7 @@ const ASSET_TYPES = [
 
 export default function Data() {
   const navigate = useNavigate()
+  const [activeTab, setActiveTab] = useState<'data' | 'universes'>('data')
   const [universes, setUniverses] = useState<Universe[]>([])
   const [selectedUniverse, setSelectedUniverse] = useState<string | null>(null)
   const [tickers, setTickers] = useState<Ticker[]>([])
@@ -519,20 +520,43 @@ export default function Data() {
   return (
     <div className="flex-1 bg-slate-950 overflow-hidden flex flex-col">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Financial Database</h1>
-          <p className="text-sm text-slate-400 mt-1">Browse universes and filtered tickers</p>
+      <div className="px-6 py-4 border-b border-slate-800">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold text-white">Financial Database</h1>
+            <p className="text-sm text-slate-400 mt-1">
+              {activeTab === 'data' ? 'Browse universes and filtered tickers' : 'Manage and organize your universes'}
+            </p>
+          </div>
         </div>
-        <button
-          onClick={() => navigate('/data/universes')}
-          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded font-medium transition"
-        >
-          📦 Manage Universes
-        </button>
+
+        {/* Tabs */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => setActiveTab('data')}
+            className={`px-4 py-2 rounded font-medium transition ${
+              activeTab === 'data'
+                ? 'bg-purple-600 text-white'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+            }`}
+          >
+            📊 Data
+          </button>
+          <button
+            onClick={() => setActiveTab('universes')}
+            className={`px-4 py-2 rounded font-medium transition ${
+              activeTab === 'universes'
+                ? 'bg-purple-600 text-white'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+            }`}
+          >
+            📦 Universes
+          </button>
+        </div>
       </div>
 
-      {/* Main content */}
+      {/* Main content - Data Tab */}
+      {activeTab === 'data' && (
       <div className="flex-1 flex gap-4 p-6 overflow-hidden">
         {/* Left Panel - Universes List */}
         <div className="w-80 flex flex-col border border-slate-800 rounded-lg bg-slate-900">
@@ -871,6 +895,76 @@ export default function Data() {
           )}
         </div>
       </div>
+      )}
+
+      {/* Main content - Universes Tab */}
+      {activeTab === 'universes' && (
+      <div className="flex-1 overflow-hidden p-6">
+        <div className="flex flex-col gap-4 h-full">
+          {/* Create Universe Button */}
+          <button
+            onClick={() => {
+              const name = prompt('Enter universe name:')
+              if (name) {
+                fetch(`http://192.168.0.130:6501/api/v1/data/universe/${name}`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ tickers: [] }),
+                }).then(() => {
+                  loadUniverses()
+                })
+              }
+            }}
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded font-medium transition w-fit"
+          >
+            ➕ Create Universe
+          </button>
+
+          {/* Universes Grid */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {universes.map((universe) => (
+                <div
+                  key={universe.id}
+                  onClick={() => setSelectedUniverse(universe.id)}
+                  className={`p-4 rounded-lg border-2 cursor-pointer transition ${
+                    selectedUniverse === universe.id
+                      ? 'border-purple-500 bg-purple-600/20'
+                      : 'border-slate-700 bg-slate-800 hover:border-slate-600'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-semibold text-white">{universe.name}</h3>
+                    <span className="text-sm bg-slate-700 px-2 py-1 rounded">
+                      {universe.count || 0} tickers
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400">{universe.id}</p>
+                  {selectedUniverse === universe.id && (
+                    <div className="mt-3 pt-3 border-t border-slate-700 flex gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          if (confirm(`Delete universe "${universe.name}"?`)) {
+                            fetch(
+                              `http://192.168.0.130:6501/api/v1/data/universe/${universe.id}`,
+                              { method: 'DELETE' }
+                            ).then(() => loadUniverses())
+                          }
+                        }}
+                        className="flex-1 px-2 py-1 bg-red-600/20 text-red-300 rounded text-xs hover:bg-red-600/30"
+                      >
+                        🗑️ Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+      )}
 
       {/* Ticker Detail Modal */}
       {selectedTickerDetail && (
