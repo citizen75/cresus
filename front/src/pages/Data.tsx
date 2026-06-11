@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import CardChart from '@/components/CardChart'
 
 interface Universe {
@@ -38,6 +38,7 @@ const ASSET_TYPES = [
 
 export default function Data() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [activeTab, setActiveTab] = useState<'data' | 'universes'>('data')
   const [universes, setUniverses] = useState<Universe[]>([])
   const [selectedUniverse, setSelectedUniverse] = useState<string | null>(null)
@@ -212,6 +213,25 @@ export default function Data() {
     window.addEventListener('keydown', handleEsc)
     return () => window.removeEventListener('keydown', handleEsc)
   }, [selectedTickerDetail])
+
+  // Sync active tab with URL
+  useEffect(() => {
+    if (location.pathname.includes('/universes')) {
+      setActiveTab('universes')
+    } else {
+      setActiveTab('data')
+    }
+  }, [location.pathname])
+
+  // Update URL when tab changes
+  const handleTabChange = (tab: 'data' | 'universes') => {
+    setActiveTab(tab)
+    if (tab === 'universes') {
+      navigate('/data/universes')
+    } else {
+      navigate('/data')
+    }
+  }
 
   const handleSort = (columnKey: string) => {
     if (sortColumn === columnKey) {
@@ -533,7 +553,7 @@ export default function Data() {
         {/* Tabs */}
         <div className="flex gap-2">
           <button
-            onClick={() => setActiveTab('data')}
+            onClick={() => handleTabChange('data')}
             className={`px-4 py-2 rounded font-medium transition ${
               activeTab === 'data'
                 ? 'bg-purple-600 text-white'
@@ -543,7 +563,7 @@ export default function Data() {
             📊 Data
           </button>
           <button
-            onClick={() => setActiveTab('universes')}
+            onClick={() => handleTabChange('universes')}
             className={`px-4 py-2 rounded font-medium transition ${
               activeTab === 'universes'
                 ? 'bg-purple-600 text-white'
