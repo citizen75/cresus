@@ -62,9 +62,16 @@ async def get_tickers(
     universe: str = Query(..., description="Universe ID"),
     limit: int = Query(1000, description="Max number of tickers"),
 ):
-    """Get tickers for a category and universe."""
-    tickers = manager.get_tickers(category, universe, limit)
-    return {"category": category, "universe": universe, "tickers": tickers, "count": len(tickers)}
+    """Get tickers for a category and universe with metadata."""
+    try:
+        uni = Universe(universe)
+        if not uni.exists():
+            return {"error": f"Universe '{universe}' not found"}, 404
+
+        tickers = uni.get_tickers_with_metadata()[:limit]
+        return {"category": category, "universe": universe, "tickers": tickers, "count": len(tickers)}
+    except Exception as e:
+        return {"error": str(e)}, 400
 
 
 @router.get("/search")
