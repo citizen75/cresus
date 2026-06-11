@@ -272,7 +272,7 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
 
             // Extract SHA candlestick data if available
             const shaData = data
-              .filter((d: any) => d.sha_10_open && d.sha_10_high && d.sha_10_low && d.sha_10_close)
+              .filter((d: any) => 'sha_10_open' in d && 'sha_10_high' in d && 'sha_10_low' in d && 'sha_10_close' in d && d.sha_10_open !== null && d.sha_10_close !== null)
               .map((d: any) => ({
                 time: d.timestamp.substring(0, 10),
                 open: parseFloat(d.sha_10_open),
@@ -290,8 +290,12 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
               }
             })
 
-            // Extract indicator columns from data
-            const excludeColumns = new Set(['timestamp', 'ticker', 'open', 'high', 'low', 'close', 'volume', 'date', 'Date', 'Open', 'High', 'Low', 'Close', 'Volume'])
+            // Extract indicator columns from data (exclude OHLCV, SHA_10, and HA columns)
+            const excludeColumns = new Set([
+              'timestamp', 'ticker', 'open', 'high', 'low', 'close', 'volume', 'date', 'Date', 'Open', 'High', 'Low', 'Close', 'Volume',
+              'ha_open', 'ha_high', 'ha_low', 'ha_close',  // Heikin-Ashi intermediate columns
+              'sha_10_open', 'sha_10_high', 'sha_10_low', 'sha_10_close'  // SHA_10 candlestick columns
+            ])
             const indicators = Object.keys(data[0] || {}).filter(col => !excludeColumns.has(col))
 
             console.log(`Loaded ${candles.length} candles for ${ticker} (SHA_10: ${shaData.length}, Indicators: ${indicators.join(', ')})`)
