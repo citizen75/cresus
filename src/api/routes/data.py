@@ -824,20 +824,21 @@ async def get_ticker_history(
         cache_dir.mkdir(parents=True, exist_ok=True)
         cache_file = cache_dir / f"{ticker.upper()}_history.json"
 
-        # Try to load from cache
+        # Try to load from cache (skip if indicator requested, to allow computation)
         history = []
         fundamentals = {}
-        if use_cache and cache_file.exists():
+        if use_cache and cache_file.exists() and not indicator:
             try:
                 with open(cache_file, 'r') as f:
                     cached = json.load(f)
                     history = cached.get("history", [])
                     fundamentals = cached.get("fundamentals", {})
                     if history:
-                        # Return cached data
+                        # Return cached data only if no indicator computation needed
                         return {
                             "ticker": ticker,
-                            "history": history,
+                            "data": history,  # Frontend expects 'data' field
+                            "history": history,  # Keep for backward compatibility
                             "fundamentals": fundamentals,
                             "source": "cache"
                         }
@@ -850,6 +851,7 @@ async def get_ticker_history(
         if hist.empty:
             return {
                 "ticker": ticker,
+                "data": [],
                 "history": []
             }
 
@@ -956,7 +958,8 @@ async def get_ticker_history(
 
         return {
             "ticker": ticker,
-            "history": history,
+            "data": history,  # Frontend expects 'data' field
+            "history": history,  # Keep for backward compatibility
             "fundamentals": fundamentals,
             "source": "yahoo"
         }
@@ -964,6 +967,7 @@ async def get_ticker_history(
     except Exception as e:
         return {
             "ticker": ticker,
+            "data": [],
             "history": [],
             "error": str(e)
         }
