@@ -42,6 +42,29 @@ async def search_tickers(
     return {"query": q, "category": category, "results": results, "count": len(results)}
 
 
+@router.get("/universes/list")
+async def list_all_universes():
+    """List all available universes."""
+    try:
+        universes = Universe.list_universes()
+        details = []
+        for uni_id in universes:
+            try:
+                uni = Universe(uni_id)
+                if uni.exists():
+                    tickers = uni.get_tickers()
+                    details.append({
+                        "id": uni_id,
+                        "name": manager._format_universe_name(uni_id),
+                        "count": len(tickers),
+                    })
+            except Exception:
+                pass
+        return {"universes": details, "total": len(details)}
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+
 @router.get("/universe/{universe_id}")
 async def get_universe_tickers(universe_id: str, limit: int = Query(1000, description="Max number of tickers")):
     """Get tickers for a specific universe."""
@@ -58,6 +81,18 @@ async def get_universe_tickers(universe_id: str, limit: int = Query(1000, descri
             "tickers": tickers,
             "count": len(tickers),
         }
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+
+@router.get("/universe/{universe_id}/info")
+async def get_universe_info(universe_id: str):
+    """Get information about a specific universe."""
+    try:
+        info = Universe.get_universe_info(universe_id)
+        if not info:
+            return {"error": f"Universe '{universe_id}' not found"}, 404
+        return {"universe": universe_id, "info": info}
     except Exception as e:
         return {"error": str(e)}, 500
 
