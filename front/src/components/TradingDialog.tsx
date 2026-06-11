@@ -312,6 +312,49 @@ export function TradingDialog({
           </div>
         )}
 
+        {/* Summary */}
+        <div className="bg-slate-800 rounded-lg p-3 mb-3 border border-slate-700">
+          {mode === 'buy' ? (
+            <>
+              <div className="flex justify-between mb-2">
+                <span className="text-slate-400">Total:</span>
+                <span className="text-white font-semibold">€{(priceVal * qtyVal).toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between mb-2">
+                <span className="text-slate-400">Stop:</span>
+                <span className="text-red-400 font-semibold">€{(priceVal * qtyVal * (1 - parseFloat(stopLoss || '0') / 100)).toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Target:</span>
+                <span className="text-green-400 font-semibold">€{(priceVal * qtyVal * (1 + parseFloat(takeProfit || '0') / 100)).toFixed(2)}</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex justify-between mb-2">
+                <span className="text-slate-400">Total:</span>
+                <span className="text-white font-semibold">€{(priceVal * qtyVal).toFixed(2)}</span>
+              </div>
+              {position?.avg_entry_price && (
+                <>
+                  <div className="flex justify-between mb-2">
+                    <span className="text-slate-400">Profit:</span>
+                    <span className={`font-semibold ${(priceVal - position.avg_entry_price) * qtyVal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      €{((priceVal - position.avg_entry_price) * qtyVal).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Gain %:</span>
+                    <span className={`font-semibold ${(priceVal - position.avg_entry_price) / position.avg_entry_price >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {(((priceVal - position.avg_entry_price) / position.avg_entry_price) * 100).toFixed(2)}%
+                    </span>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </div>
+
         {/* Todo Checkbox */}
         <div className="flex items-center gap-2 mb-3">
           <input
