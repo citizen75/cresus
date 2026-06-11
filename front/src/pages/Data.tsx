@@ -137,26 +137,27 @@ export default function Data() {
         return [
           { key: 'symbol', label: 'Symbol' },
           { key: 'name', label: 'Name' },
+          { key: 'country', label: 'Country' },
           { key: 'sector', label: 'Sector' },
           { key: 'industry', label: 'Industry' },
-          { key: 'market_cap', label: 'Market Cap', align: 'right' },
+          { key: 'exchange', label: 'Exchange' },
           { key: 'price', label: 'Price', align: 'right' },
         ]
       case 'etfs':
         return [
           { key: 'symbol', label: 'Symbol' },
           { key: 'name', label: 'Name' },
+          { key: 'country', label: 'Country' },
           { key: 'currency', label: 'Currency' },
           { key: 'exchange', label: 'Exchange' },
-          { key: 'country', label: 'Country' },
           { key: 'price', label: 'Price', align: 'right' },
         ]
       case 'funds':
         return [
           { key: 'symbol', label: 'Symbol' },
           { key: 'name', label: 'Name' },
-          { key: 'currency', label: 'Currency' },
           { key: 'country', label: 'Country' },
+          { key: 'currency', label: 'Currency' },
           { key: 'price', label: 'Price', align: 'right' },
         ]
       case 'indices':
@@ -164,6 +165,7 @@ export default function Data() {
           { key: 'symbol', label: 'Symbol' },
           { key: 'name', label: 'Name' },
           { key: 'country', label: 'Country' },
+          { key: 'exchange', label: 'Exchange' },
           { key: 'currency', label: 'Currency' },
           { key: 'price', label: 'Price', align: 'right' },
         ]
