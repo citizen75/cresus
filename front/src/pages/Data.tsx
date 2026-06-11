@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import CardChart from '@/components/CardChart'
 
 interface Universe {
   id: string
@@ -727,43 +728,72 @@ export default function Data() {
             {/* Content */}
             <div className="flex-1 overflow-hidden flex">
               {/* Left: Fundamental Data */}
-              <div className="w-80 border-r border-slate-800 overflow-y-auto p-6">
+              <div className="w-96 border-r border-slate-800 overflow-y-auto p-6">
                 <h3 className="text-lg font-semibold text-white mb-4">Fundamentals</h3>
-                <div className="space-y-3">
+                <div className="space-y-4">
+                  {/* Price Section */}
                   {selectedTickerDetail.price && (
-                    <div>
-                      <p className="text-xs text-slate-400">Price</p>
-                      <p className="text-lg font-medium text-green-400">${selectedTickerDetail.price}</p>
+                    <div className="pb-4 border-b border-slate-700">
+                      <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">Price</p>
+                      <p className="text-2xl font-bold text-green-400">${selectedTickerDetail.price}</p>
                     </div>
                   )}
-                  {selectedTickerDetail.country && (
-                    <div>
-                      <p className="text-xs text-slate-400">Country</p>
-                      <p className="text-sm text-slate-300">{selectedTickerDetail.country}</p>
+
+                  {/* Exchange & Market Section */}
+                  <div className="space-y-2">
+                    {selectedTickerDetail.exchange && (
+                      <div>
+                        <p className="text-xs text-slate-400">Exchange</p>
+                        <p className="text-sm font-medium text-slate-300">{selectedTickerDetail.exchange}</p>
+                      </div>
+                    )}
+                    {selectedTickerDetail.country && (
+                      <div>
+                        <p className="text-xs text-slate-400">Country</p>
+                        <p className="text-sm font-medium text-slate-300">{selectedTickerDetail.country}</p>
+                      </div>
+                    )}
+                    {selectedTickerDetail.currency && (
+                      <div>
+                        <p className="text-xs text-slate-400">Currency</p>
+                        <p className="text-sm font-medium text-slate-300">{selectedTickerDetail.currency}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Classification Section */}
+                  <div className="space-y-2 border-t border-slate-700 pt-3">
+                    {selectedTickerDetail.sector && (
+                      <div>
+                        <p className="text-xs text-slate-400">Sector</p>
+                        <p className="text-sm font-medium text-blue-300">{selectedTickerDetail.sector}</p>
+                      </div>
+                    )}
+                    {selectedTickerDetail.industry && (
+                      <div>
+                        <p className="text-xs text-slate-400">Industry</p>
+                        <p className="text-sm font-medium text-blue-300">{selectedTickerDetail.industry}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Additional Fields */}
+                  {selectedTickerDetail.market_cap && (
+                    <div className="border-t border-slate-700 pt-3">
+                      <p className="text-xs text-slate-400">Market Cap</p>
+                      <p className="text-sm font-medium text-slate-300">{selectedTickerDetail.market_cap}</p>
                     </div>
                   )}
-                  {selectedTickerDetail.exchange && (
+                  {selectedTickerDetail.recommendation && (
                     <div>
-                      <p className="text-xs text-slate-400">Exchange</p>
-                      <p className="text-sm text-slate-300">{selectedTickerDetail.exchange}</p>
+                      <p className="text-xs text-slate-400">Analyst Rating</p>
+                      <p className="text-sm font-medium text-yellow-400">{selectedTickerDetail.recommendation}</p>
                     </div>
                   )}
-                  {selectedTickerDetail.currency && (
+                  {selectedTickerDetail.target_price && (
                     <div>
-                      <p className="text-xs text-slate-400">Currency</p>
-                      <p className="text-sm text-slate-300">{selectedTickerDetail.currency}</p>
-                    </div>
-                  )}
-                  {selectedTickerDetail.sector && (
-                    <div>
-                      <p className="text-xs text-slate-400">Sector</p>
-                      <p className="text-sm text-slate-300">{selectedTickerDetail.sector}</p>
-                    </div>
-                  )}
-                  {selectedTickerDetail.industry && (
-                    <div>
-                      <p className="text-xs text-slate-400">Industry</p>
-                      <p className="text-sm text-slate-300">{selectedTickerDetail.industry}</p>
+                      <p className="text-xs text-slate-400">Target Price</p>
+                      <p className="text-sm font-medium text-slate-300">${selectedTickerDetail.target_price}</p>
                     </div>
                   )}
                 </div>
@@ -777,66 +807,7 @@ export default function Data() {
                     Loading chart data...
                   </div>
                 ) : tickerHistory.length > 0 ? (
-                  <div className="bg-slate-800/50 rounded-lg p-4">
-                    <svg viewBox="0 0 800 300" className="w-full h-80">
-                      {/* Simple line chart */}
-                      {tickerHistory.length > 1 && (
-                        (() => {
-                          const prices = tickerHistory.map(d => d.close)
-                          const minPrice = Math.min(...prices)
-                          const maxPrice = Math.max(...prices)
-                          const priceRange = maxPrice - minPrice
-                          const width = 800
-                          const height = 300
-                          const padding = 40
-
-                          return (
-                            <>
-                              {/* Y-axis */}
-                              <line x1={padding} y1={padding} x2={padding} y2={height - padding} stroke="#64748b" strokeWidth="2" />
-                              {/* X-axis */}
-                              <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#64748b" strokeWidth="2" />
-
-                              {/* Y-axis labels */}
-                              <text x={padding - 10} y={padding + 5} textAnchor="end" className="text-xs fill-slate-400">
-                                ${maxPrice.toFixed(0)}
-                              </text>
-                              <text x={padding - 10} y={height - padding + 5} textAnchor="end" className="text-xs fill-slate-400">
-                                ${minPrice.toFixed(0)}
-                              </text>
-
-                              {/* Price line */}
-                              <polyline
-                                points={tickerHistory
-                                  .map((d, i) => {
-                                    const x = padding + (i / (tickerHistory.length - 1)) * (width - padding * 2)
-                                    const y = height - padding - ((d.close - minPrice) / priceRange) * (height - padding * 2)
-                                    return `${x},${y}`
-                                  })
-                                  .join(' ')}
-                                fill="none"
-                                stroke="#10b981"
-                                strokeWidth="2"
-                              />
-
-                              {/* Current price point */}
-                              {tickerHistory.length > 0 && (
-                                <circle
-                                  cx={width - padding}
-                                  cy={height - padding - ((tickerHistory[tickerHistory.length - 1].close - minPrice) / priceRange) * (height - padding * 2)}
-                                  r="4"
-                                  fill="#10b981"
-                                />
-                              )}
-                            </>
-                          )
-                        })()
-                      )}
-                    </svg>
-                    <p className="text-xs text-slate-400 mt-4">
-                      {tickerHistory[0]?.date} → {tickerHistory[tickerHistory.length - 1]?.date}
-                    </p>
-                  </div>
+                  <CardChart data={tickerHistory} ticker={selectedTickerDetail.symbol} />
                 ) : (
                   <div className="flex items-center justify-center h-80 text-slate-400">
                     No historical data available
