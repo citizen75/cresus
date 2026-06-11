@@ -70,7 +70,7 @@ export default function App() {
           <Route path="/watchlist" element={<Layout><WatchlistPage /></Layout>} />
           <Route path="/tasks" element={<Layout><Tasks /></Layout>} />
           <Route path="/data" element={<Layout><Data /></Layout>} />
-          <Route path="/universes" element={<Layout><UniverseManager /></Layout>} />
+          <Route path="/data/universes" element={<Layout><UniverseManager /></Layout>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         </BrowserRouter>

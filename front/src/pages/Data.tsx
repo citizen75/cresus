@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 const ASSET_CATEGORIES = [
   { id: 'stocks', label: 'Stocks', icon: '📈' },
@@ -24,6 +25,7 @@ interface Ticker {
 }
 
 export default function Data() {
+  const navigate = useNavigate()
   const [selectedCategory, setSelectedCategory] = useState<string>('stocks')
   const [universes, setUniverses] = useState<Universe[]>([])
   const [selectedUniverse, setSelectedUniverse] = useState<string | null>(null)
@@ -86,9 +88,17 @@ export default function Data() {
   return (
     <div className="flex-1 bg-slate-950 overflow-hidden flex flex-col">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-slate-800">
-        <h1 className="text-2xl font-bold text-white">Data Management</h1>
-        <p className="text-sm text-slate-400 mt-1">Browse and manage financial data by asset type</p>
+      <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Data Management</h1>
+          <p className="text-sm text-slate-400 mt-1">Browse and manage financial data by asset type</p>
+        </div>
+        <button
+          onClick={() => navigate('/data/universes')}
+          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded font-medium transition"
+        >
+          📦 Manage Universes
+        </button>
       </div>
 
       {/* Main content */}
