@@ -27,6 +27,8 @@ export default function Dashboard() {
   const [selectedAlertMessage, setSelectedAlertMessage] = useState<any>(null)
   const [selectedPortfolioWidget, setSelectedPortfolioWidget] = useState<string | null>(null)
   const [selectedPortfolioWidgetTicker, setSelectedPortfolioWidgetTicker] = useState<string | null>(null)
+  const [selectedPortfolioWidgetResults, setSelectedPortfolioWidgetResults] = useState<any[]>([])
+  const [selectedPortfolioWidgetFilters, setSelectedPortfolioWidgetFilters] = useState<any>(null)
   const [selectedTableTicker, setSelectedTableTicker] = useState<string | null>(null)
   const [historicalData, setHistoricalData] = useState<Record<string, any[]>>({})
   const [tickerInfo, setTickerInfo] = useState<Record<string, any>>({})
@@ -434,10 +436,12 @@ export default function Dashboard() {
               }
               // For portfolio_holdings_widget messages: show PortfolioHoldingsWidget
               else if (messageData && messageData.widget === 'portfolio_holdings_widget') {
-                console.log(`[Dashboard] Portfolio message clicked:`, { id: messageData.id, portfolio: messageData.portfolio, ticker: messageData.ticker })
+                console.log(`[Dashboard] Portfolio message clicked:`, { id: messageData.id, portfolio: messageData.portfolio, results: messageData.results })
                 setSelectedAlertMessage(null)  // Clear results widget
                 setSelectedPortfolioWidget(messageData.portfolio)
                 setSelectedPortfolioWidgetTicker(messageData.ticker || null)
+                setSelectedPortfolioWidgetResults(messageData.results || [])
+                setSelectedPortfolioWidgetFilters(messageData.filters || null)
                 setRightPanelOpen(true)
               }
               // For old alert messages without widget field: show holdings if portfolio exists
@@ -568,9 +572,12 @@ export default function Dashboard() {
               <PortfolioHoldingsWidget
                 portfolioName={selectedPortfolioWidget}
                 filterTickers={selectedPortfolioWidgetTicker ? [selectedPortfolioWidgetTicker] : undefined}
+                initialResults={selectedPortfolioWidgetResults.length > 0 ? selectedPortfolioWidgetResults : undefined}
                 onClose={() => {
                   setSelectedPortfolioWidget(null)
                   setSelectedPortfolioWidgetTicker(null)
+                  setSelectedPortfolioWidgetResults([])
+                  setSelectedPortfolioWidgetFilters(null)
                   setRightPanelOpen(false)
                 }}
                 onGetHistoricalData={api.getHistoricalData.bind(api)}

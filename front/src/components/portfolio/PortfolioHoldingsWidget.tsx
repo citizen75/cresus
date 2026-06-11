@@ -11,6 +11,7 @@ interface PortfolioHoldingsWidgetProps {
   portfolioName: string
   onClose?: () => void
   filterTickers?: string[] // Only show these tickers
+  initialResults?: any[] // Pre-loaded results from message
   onGetHistoricalData?: (ticker: string, days: number) => Promise<any>
 }
 
@@ -18,6 +19,7 @@ export default function PortfolioHoldingsWidget({
   portfolioName,
   onClose,
   filterTickers,
+  initialResults,
   onGetHistoricalData,
 }: PortfolioHoldingsWidgetProps) {
   const [rawPositions, setRawPositions] = useState<any[]>([])
@@ -40,10 +42,19 @@ export default function PortfolioHoldingsWidget({
   // Use centralized data loader
   const { historicalData, loadData, setHistoricalData } = useHistoricalDataLoader()
 
-  // Load raw positions from API
+  // Load raw positions from API or use initial results
   useEffect(() => {
     const loadPositions = async () => {
       if (!portfolioName) return
+
+      // Use initial results if provided (from message)
+      if (initialResults && initialResults.length > 0) {
+        console.log(`[PortfolioHoldingsWidget] Using initial results:`, initialResults.length)
+        setRawPositions(initialResults)
+        setIsLoadingPositions(false)
+        return
+      }
+
       setIsLoadingPositions(true)
       try {
         const baseUrl = getApiBaseUrl()
@@ -62,7 +73,7 @@ export default function PortfolioHoldingsWidget({
       }
     }
     loadPositions()
-  }, [portfolioName])
+  }, [portfolioName, initialResults])
 
   // Use hook to enrich positions with fundamental data
   const { enrichedPositions, fundamentalData, isLoading: isEnriching } = useEnrichedPositions(rawPositions, portfolioName)
