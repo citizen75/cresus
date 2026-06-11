@@ -188,14 +188,14 @@ export default function Data() {
         }
       }
       // Exchange filter
-      if (selectedExchanges.length > 0 && ticker.exchange) {
-        if (!selectedExchanges.includes(ticker.exchange)) {
+      if (selectedExchanges.length > 0) {
+        if (!ticker.exchange || !selectedExchanges.includes(ticker.exchange)) {
           return false
         }
       }
       // Currency filter
-      if (selectedCurrencies.length > 0 && ticker.currency) {
-        if (!selectedCurrencies.includes(ticker.currency)) {
+      if (selectedCurrencies.length > 0) {
+        if (!ticker.currency || !selectedCurrencies.includes(ticker.currency)) {
           return false
         }
       }
