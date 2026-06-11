@@ -843,7 +843,20 @@ async def get_ticker_history(
         # Convert to dict list
         history = []
         for idx, row in df.iterrows():
-            date_str = str(idx.date()) if hasattr(idx, 'date') else str(idx)[:10]
+            # Handle both DatetimeIndex and numeric indices
+            if hasattr(idx, 'strftime'):
+                # DatetimeIndex - proper datetime
+                date_str = idx.strftime('%Y-%m-%d')
+            elif 'timestamp' in row and row['timestamp']:
+                # timestamp column exists
+                date_str = pd.to_datetime(row['timestamp']).strftime('%Y-%m-%d')
+            else:
+                # Fallback: assume numeric index is days since epoch
+                try:
+                    date_str = pd.Timestamp(int(idx), unit='D').strftime('%Y-%m-%d')
+                except:
+                    date_str = str(idx)[:10]
+
             history.append({
                 "timestamp": date_str,
                 "date": date_str,
