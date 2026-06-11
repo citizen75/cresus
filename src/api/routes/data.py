@@ -645,16 +645,19 @@ async def get_ticker_history(
 
         # Try to load from cache
         history = []
+        fundamentals = {}
         if use_cache and cache_file.exists():
             try:
                 with open(cache_file, 'r') as f:
                     cached = json.load(f)
                     history = cached.get("history", [])
+                    fundamentals = cached.get("fundamentals", {})
                     if history:
                         # Return cached data
                         return {
                             "ticker": ticker,
                             "history": history,
+                            "fundamentals": fundamentals,
                             "source": "cache"
                         }
             except Exception:
@@ -668,6 +671,30 @@ async def get_ticker_history(
                 "ticker": ticker,
                 "history": []
             }
+
+        # Fetch fundamental data
+        fundamentals = {}
+        try:
+            ticker_obj = yf.Ticker(ticker)
+            info = ticker_obj.info or {}
+
+            fundamentals = {
+                "market_cap": info.get("marketCap"),
+                "pe_ratio": info.get("trailingPE"),
+                "eps": info.get("trailingEps"),
+                "dividend_yield": info.get("dividendYield"),
+                "52_week_high": info.get("fiftyTwoWeekHigh"),
+                "52_week_low": info.get("fiftyTwoWeekLow"),
+                "avg_volume": info.get("averageVolume"),
+                "beta": info.get("beta"),
+                "sector": info.get("sector"),
+                "industry": info.get("industry"),
+                "website": info.get("website"),
+                "employees": info.get("fullTimeEmployees"),
+                "description": info.get("longBusinessSummary"),
+            }
+        except Exception:
+            pass  # If fetching fundamentals fails, continue with history only
 
         # Convert to list of dicts
         history = []
@@ -707,6 +734,7 @@ async def get_ticker_history(
                 json.dump({
                     "ticker": ticker,
                     "history": history,
+                    "fundamentals": fundamentals,
                     "cached_at": pd.Timestamp.now().isoformat()
                 }, f)
         except Exception:
@@ -715,6 +743,7 @@ async def get_ticker_history(
         return {
             "ticker": ticker,
             "history": history,
+            "fundamentals": fundamentals,
             "source": "yahoo"
         }
 

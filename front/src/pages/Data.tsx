@@ -253,17 +253,37 @@ export default function Data() {
   }
 
   const openTickerDetail = async (ticker: Ticker) => {
-    setSelectedTickerDetail(ticker)
+    // Merge fundamental data from API
+    const mergedTicker = { ...ticker }
+    setSelectedTickerDetail(mergedTicker)
     setHistoryLoading(true)
 
     try {
-      // Fetch 1 year of historical data
+      // Fetch 1 year of historical data and fundamentals
       const response = await fetch(
         `http://192.168.0.130:6501/api/v1/data/history/${ticker.symbol}?days=365`
       )
       if (response.ok) {
         const data = await response.json()
         setTickerHistory(data.history || [])
+
+        // Merge fundamental data into ticker detail
+        if (data.fundamentals) {
+          const fundamentals = data.fundamentals
+          const updatedTicker = {
+            ...mergedTicker,
+            market_cap: fundamentals.market_cap,
+            pe_ratio: fundamentals.pe_ratio,
+            eps: fundamentals.eps,
+            dividend_yield: fundamentals.dividend_yield,
+            high_52w: fundamentals["52_week_high"],
+            low_52w: fundamentals["52_week_low"],
+            avg_volume: fundamentals.avg_volume,
+            beta: fundamentals.beta,
+            description: fundamentals.description,
+          }
+          setSelectedTickerDetail(updatedTicker)
+        }
       }
     } catch (err) {
       console.error('Failed to load ticker history:', err)
@@ -781,11 +801,51 @@ export default function Data() {
                   {selectedTickerDetail.market_cap && (
                     <div className="border-t border-slate-700 pt-3">
                       <p className="text-xs text-slate-400">Market Cap</p>
-                      <p className="text-sm font-medium text-slate-300">{selectedTickerDetail.market_cap}</p>
+                      <p className="text-sm font-medium text-slate-300">
+                        {typeof selectedTickerDetail.market_cap === 'number'
+                          ? `$${(selectedTickerDetail.market_cap / 1e9).toFixed(2)}B`
+                          : selectedTickerDetail.market_cap}
+                      </p>
+                    </div>
+                  )}
+                  {selectedTickerDetail.pe_ratio && (
+                    <div>
+                      <p className="text-xs text-slate-400">P/E Ratio</p>
+                      <p className="text-sm font-medium text-slate-300">{selectedTickerDetail.pe_ratio.toFixed(2)}</p>
+                    </div>
+                  )}
+                  {selectedTickerDetail.eps && (
+                    <div>
+                      <p className="text-xs text-slate-400">EPS (TTM)</p>
+                      <p className="text-sm font-medium text-slate-300">${selectedTickerDetail.eps.toFixed(2)}</p>
+                    </div>
+                  )}
+                  {selectedTickerDetail.dividend_yield && (
+                    <div>
+                      <p className="text-xs text-slate-400">Dividend Yield</p>
+                      <p className="text-sm font-medium text-green-400">{(selectedTickerDetail.dividend_yield * 100).toFixed(2)}%</p>
+                    </div>
+                  )}
+                  {selectedTickerDetail.high_52w && (
+                    <div>
+                      <p className="text-xs text-slate-400">52W High</p>
+                      <p className="text-sm font-medium text-slate-300">${selectedTickerDetail.high_52w.toFixed(2)}</p>
+                    </div>
+                  )}
+                  {selectedTickerDetail.low_52w && (
+                    <div>
+                      <p className="text-xs text-slate-400">52W Low</p>
+                      <p className="text-sm font-medium text-slate-300">${selectedTickerDetail.low_52w.toFixed(2)}</p>
+                    </div>
+                  )}
+                  {selectedTickerDetail.beta && (
+                    <div>
+                      <p className="text-xs text-slate-400">Beta</p>
+                      <p className="text-sm font-medium text-slate-300">{selectedTickerDetail.beta.toFixed(2)}</p>
                     </div>
                   )}
                   {selectedTickerDetail.recommendation && (
-                    <div>
+                    <div className="border-t border-slate-700 pt-3">
                       <p className="text-xs text-slate-400">Analyst Rating</p>
                       <p className="text-sm font-medium text-yellow-400">{selectedTickerDetail.recommendation}</p>
                     </div>
