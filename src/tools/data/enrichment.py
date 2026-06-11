@@ -224,6 +224,13 @@ class TickerIntelligence:
                 # Start with original metadata
                 enriched_row = dict(ticker_dict)
 
+                # Add FinanceDatabase metadata (country, exchange, sector, industry, etc.)
+                if enriched.get("financedatabase"):
+                    fd_data = enriched["financedatabase"]
+                    for key, value in fd_data.items():
+                        if value is not None:
+                            enriched_row[key] = value
+
                 # Add fundamentals data if available
                 if enriched.get("fundamentals") and enriched["fundamentals"].get("data"):
                     fund_data = enriched["fundamentals"]["data"]
@@ -231,8 +238,10 @@ class TickerIntelligence:
                     # Add company info
                     if fund_data.get("company"):
                         company = fund_data["company"]
-                        enriched_row["sector"] = company.get("sector")
-                        enriched_row["industry"] = company.get("industry")
+                        if company.get("sector"):
+                            enriched_row["sector"] = company.get("sector")
+                        if company.get("industry"):
+                            enriched_row["industry"] = company.get("industry")
 
                     # Add quotation data
                     if fund_data.get("quotation"):
