@@ -286,8 +286,8 @@ export default function Data() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800">
-                  {filteredTickers.map(ticker => (
-                    <tr key={ticker.symbol} className="hover:bg-slate-800/50 transition">
+                  {filteredTickers.map((ticker, idx) => (
+                    <tr key={`${ticker.symbol}-${idx}`} className="hover:bg-slate-800/50 transition">
                       <td className="px-4 py-3 font-medium text-purple-300">{ticker.symbol}</td>
                       <td className="px-4 py-3 text-slate-300">{ticker.name || '-'}</td>
                       <td className="px-4 py-3 text-slate-400">{ticker.sector || '-'}</td>
