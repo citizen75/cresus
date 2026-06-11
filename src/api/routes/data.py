@@ -1,344 +1,50 @@
-"""Data API endpoints for historical OHLCV data."""
+"""Data management API routes."""
 
-from fastapi import APIRouter, HTTPException
-from typing import Optional
-import pandas as pd
+from fastapi import APIRouter, Query
+from tools.data.manager import DataManager
 
-from tools.data import DataHistory, Fundamental
-from tools.universe import Universe
-from tools.indicators import calculate as calculate_indicators
+router = APIRouter(prefix="/api/v1/data", tags=["data"])
+manager = DataManager()
 
-router = APIRouter(prefix="/data", tags=["data"])
+
+@router.get("/categories")
+async def get_categories():
+    """Get available asset categories."""
+    return {"categories": manager.get_asset_categories()}
 
 
 @router.get("/universes")
-async def list_universes():
-	"""List all available universes."""
-	try:
-		universes = Universe.list_universes()
-		return {"universes": universes}
-	except Exception as e:
-		raise HTTPException(500, f"Error listing universes: {str(e)}")
+async def get_universes(category: str = Query(..., description="Asset category")):
+    """Get universes for a category."""
+    universes = manager.get_universes(category)
+    return {"category": category, "universes": universes}
 
 
-@router.get("/history")
-async def get_history_by_query(
-    ticker: str,
-    days: Optional[int] = 365,
-    columns: Optional[str] = None
+@router.get("/tickers")
+async def get_tickers(
+    category: str = Query(..., description="Asset category"),
+    universe: str = Query(..., description="Universe ID"),
+    limit: int = Query(1000, description="Max number of tickers"),
 ):
-	"""Get historical OHLCV data for a ticker (query parameter version).
-
-	Returns historical price data from cache.
-
-	Args:
-		ticker: Stock ticker symbol (e.g., AAPL, STMPA.PA)
-		days: Number of days of history to return (default 365)
-		columns: Comma-separated list of columns to return (default: all)
-				 Available: timestamp, open, high, low, close, volume
-
-	Returns:
-		Historical data with OHLCV values
-	"""
-	try:
-		# Load historical data
-		history = DataHistory(ticker)
-		df = history.load_all()
-
-		if df.empty:
-			raise HTTPException(404, f"No historical data for {ticker}")
-
-		# Filter to last N days
-		if days and days > 0:
-			df = df.tail(days)
-
-		# Select specific columns if requested
-		if columns:
-			requested_cols = [col.strip().lower() for col in columns.split(',')]
-			available_cols = [col for col in requested_cols if col in df.columns]
-			if available_cols:
-				df = df[available_cols]
-
-		# Convert to list of dicts, handling NaN values
-		records = df.to_dict(orient='records')
-		for record in records:
-			for col in record:
-				value = record[col]
-				if pd.isna(value):
-					record[col] = None
-				elif col == 'volume':
-					record[col] = int(value) if not pd.isna(value) else None
-				elif col in ['open', 'high', 'low', 'close']:
-					record[col] = float(value) if not pd.isna(value) else None
-
-		return {
-			"ticker": ticker,
-			"count": len(records),
-			"days": days,
-			"history": records,
-		}
-
-	except HTTPException:
-		raise
-	except Exception as e:
-		raise HTTPException(500, f"Error loading historical data: {str(e)}")
+    """Get tickers for a category and universe."""
+    tickers = manager.get_tickers(category, universe, limit)
+    return {"category": category, "universe": universe, "tickers": tickers, "count": len(tickers)}
 
 
-@router.get("/history/{ticker}")
-async def get_ticker_history(
-    ticker: str,
-    days: Optional[int] = 365,
-    columns: Optional[str] = None,
-    indicator: Optional[str] = None
+@router.get("/search")
+async def search_tickers(
+    q: str = Query(..., description="Search query"),
+    category: str = Query(None, description="Optional category filter"),
 ):
-	"""Get historical OHLCV data for a ticker with optional indicators.
-
-	Returns historical price data from cache, optionally with calculated indicators.
-
-	Args:
-		ticker: Stock ticker symbol (e.g., AAPL, STMPA.PA)
-		days: Number of days of history to return (default 365)
-		columns: Comma-separated list of columns to return (default: all)
-				 Available: timestamp, open, high, low, close, volume
-		indicator: Indicator to calculate and include (e.g., sha_10, ema_20, rsi_14)
-
-	Returns:
-		Historical data with OHLCV values and optional indicator columns
-	"""
-	try:
-		# Load historical data
-		history = DataHistory(ticker)
-		df = history.load_all()
-
-		if df.empty:
-			raise HTTPException(404, f"No historical data for {ticker}")
-
-		# Filter to last N days
-		if days and days > 0:
-			df = df.tail(days)
-
-		# Calculate indicator if requested
-		if indicator:
-			try:
-				# Sort in ascending order (oldest first) for indicator calculation
-				df_for_calc = df.sort_values('timestamp', ascending=True).reset_index(drop=True)
-
-				# Keep only essential OHLCV columns for indicator calculation
-				# (Exclude Dividends, Stock Splits which can interfere)
-				keep_cols = [col for col in df_for_calc.columns if col.lower() in ['timestamp', 'open', 'high', 'low', 'close', 'volume', 'ticker']]
-				df_for_calc = df_for_calc[keep_cols]
-
-				# Normalize all column names to lowercase for indicator calculation
-				df_normalized = df_for_calc.copy()
-				df_normalized.columns = [col.lower() for col in df_normalized.columns]
-
-				indicator_lower = indicator.lower()
-
-				# Expand multi-component indicators (sha, bb, macd, etc)
-				# to include all components needed for candlestick or other visualizations
-				indicators_to_calculate = [indicator_lower]
-
-				# For SHA, request just the base indicator
-				# The heikin_ashi.calculate_smooth() function returns OHLC values with wicks removed based on signals
-				if indicator_lower.startswith('sha'):
-					pass  # Use indicator_lower as-is
-				elif indicator_lower.startswith('bb'):  # Bollinger Bands
-					indicators_to_calculate = [
-						f"{indicator_lower}_upper",
-						f"{indicator_lower}_middle",
-						f"{indicator_lower}_lower",
-					]
-				elif indicator_lower.startswith('macd'):  # MACD
-					indicators_to_calculate = [
-						f"{indicator_lower}_line",
-						f"{indicator_lower}_signal",
-						f"{indicator_lower}_histogram",
-					]
-				elif indicator_lower.startswith('dmi'):  # DMI
-					indicators_to_calculate = [
-						f"{indicator_lower}_plus",
-						f"{indicator_lower}_minus",
-					]
-
-				# Calculate indicator using DSL formula on normalized dataframe
-				# Run in thread pool to avoid blocking event loop
-				import asyncio
-				loop = asyncio.get_event_loop()
-				indicator_results = await loop.run_in_executor(
-					None,
-					calculate_indicators,
-					indicators_to_calculate,
-					df_normalized
-				)
-
-				# Create a mapping of timestamp -> indicator values for proper merging
-				for col_name, col_data in indicator_results.items():
-					# Create a dictionary mapping timestamp to value
-					ts_value_map = dict(zip(df_for_calc['timestamp'], col_data))
-					# Apply values to original df using timestamp lookup
-					df[col_name] = df['timestamp'].map(ts_value_map)
-			except Exception as e:
-				from loguru import logger
-				import traceback
-				logger.error(f"Indicator calc failed for {ticker} {indicator}: {str(e)}\n{traceback.format_exc()}")
-				raise HTTPException(400, f"Error calculating indicator '{indicator}': {str(e)}")
-
-		# Select specific columns if requested
-		if columns:
-			requested_cols = [col.strip().lower() for col in columns.split(',')]
-			available_cols = [col for col in requested_cols if col in df.columns]
-			if available_cols:
-				df = df[available_cols]
-
-		# Convert to list of dicts, handling NaN values
-		records = df.to_dict(orient='records')
-		for record in records:
-			for col in record:
-				value = record[col]
-				if pd.isna(value):
-					record[col] = None
-				elif col == 'volume':
-					record[col] = int(value) if not pd.isna(value) else None
-				elif col in ['open', 'high', 'low', 'close']:
-					record[col] = float(value) if not pd.isna(value) else None
-				elif isinstance(value, (int, float)) and not pd.isna(value):
-					record[col] = float(value)
-
-		return {
-			"ticker": ticker,
-			"count": len(records),
-			"days": days,
-			"indicator": indicator,
-			"data": records,
-		}
-
-	except HTTPException:
-		raise
-	except Exception as e:
-		raise HTTPException(500, f"Error loading historical data: {str(e)}")
+    """Search for tickers."""
+    results = manager.search_tickers(q, category)
+    return {"query": q, "category": category, "results": results, "count": len(results)}
 
 
-@router.get("/history/{ticker}/latest")
-async def get_ticker_latest(ticker: str):
-	"""Get the latest OHLCV data point for a ticker."""
-	try:
-		history = DataHistory(ticker)
-		df = history.load_all()
-
-		if df.empty:
-			raise HTTPException(404, f"No historical data for {ticker}")
-
-		latest = df.iloc[-1]
-
-		record = {}
-		for col in df.columns:
-			value = latest[col]
-			if pd.isna(value):
-				record[col] = None
-			elif col == 'volume':
-				record[col] = int(value)
-			elif col in ['open', 'high', 'low', 'close']:
-				record[col] = float(value)
-			else:
-				record[col] = str(value)
-
-		return {
-			"ticker": ticker,
-			"latest": record,
-		}
-
-	except HTTPException:
-		raise
-	except Exception as e:
-		raise HTTPException(500, f"Error loading historical data: {str(e)}")
-
-
-@router.get("/fundamental/{ticker}")
-async def get_ticker_fundamental(ticker: str):
-	"""Get fundamental data for a ticker (current price, bid/ask, etc).
-
-	Fetches latest fundamental data from cache or yfinance.
-	Returns quotation data including current price, bid, ask.
-	"""
-	try:
-		fundamental = Fundamental(ticker)
-
-		# Try to load from cache first
-		cached = fundamental.load()
-		if cached and cached.get("status") == "success":
-			return cached
-
-		# Fetch fresh data
-		data = fundamental.fetch()
-
-		if data.get("status") == "error":
-			# Return cached data if available, even if stale
-			if cached:
-				return cached
-			# Return minimal error response instead of 500
-			return {
-				"ticker": ticker,
-				"status": "error",
-				"message": data.get("message", "Could not fetch fundamental data"),
-				"data": {
-					"quotation": {
-						"current_price": None,
-						"previous_close": None,
-						"bid": None,
-						"ask": None,
-					},
-					"company": {
-						"name": ticker,
-						"sector": None,
-						"industry": None,
-					},
-				}
-			}
-
-		return data
-
-	except HTTPException:
-		raise
-	except Exception as e:
-		# Return minimal response instead of 500
-		return {
-			"ticker": ticker,
-			"status": "error",
-			"message": f"Error loading fundamental data: {str(e)}",
-			"data": {
-				"quotation": {
-					"current_price": None,
-					"previous_close": None,
-					"bid": None,
-					"ask": None,
-				},
-				"company": {
-					"name": ticker,
-					"sector": None,
-					"industry": None,
-				},
-			}
-		}
-
-
-@router.post("/cache/refresh")
-async def refresh_portfolio_cache():
-	"""Manually trigger refresh of fundamental data for all portfolio tickers.
-
-	This endpoint fetches and caches fundamental data for all tickers in real portfolios.
-	Useful for manual updates or testing the cron job.
-
-	Returns:
-		Cache refresh results
-	"""
-	try:
-		from tools.portfolio.manager import PortfolioManager
-		pm = PortfolioManager()
-		result = pm.fetch_all_ticker_data(days=365)
-		return {
-			"status": "success",
-			"message": f"Cache refresh complete: {result['tickers_processed']}/{result['tickers_total']} tickers updated",
-			**result,
-		}
-	except Exception as e:
-		raise HTTPException(500, f"Error refreshing cache: {str(e)}")
+@router.get("/tickers/{ticker}")
+async def get_ticker_info(ticker: str):
+    """Get detailed information about a ticker."""
+    info = manager.get_ticker_info(ticker)
+    if not info:
+        return {"error": "Ticker not found"}, 404
+    return {"ticker": ticker, "info": info}
