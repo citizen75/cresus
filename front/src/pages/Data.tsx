@@ -45,6 +45,8 @@ export default function Data() {
   const [selectedCountries, setSelectedCountries] = useState<string[]>(['FR'])
   const [selectedAssetType, setSelectedAssetType] = useState<string>('stocks')
   const [showCountryDropdown, setShowCountryDropdown] = useState(false)
+  const [sortColumn, setSortColumn] = useState<string>('symbol')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
   // Load universes on mount
   useEffect(() => {
@@ -124,11 +126,46 @@ export default function Data() {
     )
   }
 
-  const filteredTickers = tickers.filter(ticker =>
-    searchQuery === '' ||
-    ticker.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    ticker.name?.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const handleSort = (columnKey: string) => {
+    if (sortColumn === columnKey) {
+      // Toggle direction if same column
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      // New column, default to ascending
+      setSortColumn(columnKey)
+      setSortDirection('asc')
+    }
+  }
+
+  const filteredTickers = tickers
+    .filter(ticker =>
+      searchQuery === '' ||
+      ticker.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      ticker.name?.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => {
+      const aVal = a[sortColumn as keyof Ticker]
+      const bVal = b[sortColumn as keyof Ticker]
+
+      // Handle undefined/null values
+      if (aVal === undefined || aVal === null) return 1
+      if (bVal === undefined || bVal === null) return -1
+
+      // Convert to string for comparison
+      const aStr = String(aVal).toLowerCase()
+      const bStr = String(bVal).toLowerCase()
+
+      // Try numeric comparison first
+      const aNum = parseFloat(aStr)
+      const bNum = parseFloat(bStr)
+      if (!isNaN(aNum) && !isNaN(bNum)) {
+        return sortDirection === 'asc' ? aNum - bNum : bNum - aNum
+      }
+
+      // Fallback to string comparison
+      const comparison = aStr.localeCompare(bStr)
+      return sortDirection === 'asc' ? comparison : -comparison
+    })
 
   // Define columns per asset type
   const getTableColumns = (assetType: string) => {
@@ -312,11 +349,19 @@ export default function Data() {
                     {tableColumns.map(col => (
                       <th
                         key={col.key}
-                        className={`px-4 py-3 text-slate-300 font-semibold ${
+                        onClick={() => handleSort(col.key)}
+                        className={`px-4 py-3 text-slate-300 font-semibold cursor-pointer hover:bg-slate-700/50 transition ${
                           col.align === 'right' ? 'text-right' : 'text-left'
-                        }`}
+                        } ${sortColumn === col.key ? 'bg-slate-700 text-purple-300' : ''}`}
                       >
-                        {col.label}
+                        <div className="flex items-center gap-1">
+                          <span>{col.label}</span>
+                          {sortColumn === col.key && (
+                            <span className="text-xs">
+                              {sortDirection === 'asc' ? '↑' : '↓'}
+                            </span>
+                          )}
+                        </div>
                       </th>
                     ))}
                   </tr>
