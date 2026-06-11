@@ -346,7 +346,10 @@ export default function Data() {
                   {COUNTRIES.map(country => (
                     <button
                       key={country.code}
-                      onClick={() => toggleCountry(country.code)}
+                      onClick={() => {
+                        toggleCountry(country.code)
+                        setShowCountryDropdown(false)
+                      }}
                       className={`w-full text-left px-2 py-1.5 text-xs transition flex items-center gap-1 ${
                         selectedCountries.includes(country.code)
                           ? 'bg-purple-600/30 text-purple-300'
@@ -405,7 +408,10 @@ export default function Data() {
                       availableExchanges.map(exchange => (
                         <button
                           key={exchange}
-                          onClick={() => toggleExchange(exchange)}
+                          onClick={() => {
+                            toggleExchange(exchange)
+                            setShowExchangeDropdown(false)
+                          }}
                           className={`w-full text-left px-2 py-1.5 text-xs transition flex items-center gap-1 ${
                             selectedExchanges.includes(exchange)
                               ? 'bg-purple-600/30 text-purple-300'
@@ -450,7 +456,10 @@ export default function Data() {
                       availableCurrencies.map(currency => (
                         <button
                           key={currency}
-                          onClick={() => toggleCurrency(currency)}
+                          onClick={() => {
+                            toggleCurrency(currency)
+                            setShowCurrencyDropdown(false)
+                          }}
                           className={`w-full text-left px-2 py-1.5 text-xs transition flex items-center gap-1 ${
                             selectedCurrencies.includes(currency)
                               ? 'bg-purple-600/30 text-purple-300'
