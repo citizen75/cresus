@@ -44,11 +44,11 @@ class Universe:
     def get_tickers(self) -> List[str]:
         """Get list of ticker symbols from universe.
 
-        Uses TickerYahoo column if available, otherwise falls back to ISIN.
-        Automatically excludes blacklisted tickers.
+        Tries multiple column names: TickerYahoo, Symbol, ISIN, ticker
+        Automatically excludes blacklisted tickers and empty values.
 
         Returns:
-            List of ticker symbols or ISINs (excluding blacklisted)
+            List of ticker symbols (excluding blacklisted and empty)
         """
         if not self.exists():
             raise FileNotFoundError(f"Universe '{self.universe_name}' not found")
@@ -58,20 +58,24 @@ class Universe:
             blacklist = get_blacklist()
             blacklisted_tickers = blacklist.get_tickers()
 
-            # Try TickerYahoo first (preferred)
-            if "TickerYahoo" in df.columns:
-                tickers = df["TickerYahoo"].dropna().str.strip().tolist()
-                # Filter empty strings and blacklisted tickers
-                return [t for t in tickers if t and t.upper() not in blacklisted_tickers]
+            # Try multiple column name variations (in order of preference)
+            ticker_col = None
+            for col_name in ["TickerYahoo", "Symbol", "ticker", "Ticker", "ISIN"]:
+                if col_name in df.columns:
+                    ticker_col = col_name
+                    break
 
-            # Fallback to ISIN if TickerYahoo not available
-            if "ISIN" in df.columns:
-                isins = df["ISIN"].dropna().str.strip().tolist()
-                # Filter empty strings and blacklisted ISINs
-                return [i for i in isins if i and i.upper() not in blacklisted_tickers]
+            if ticker_col is None:
+                raise ValueError(f"Universe file missing ticker column (tried: TickerYahoo, Symbol, ticker, Ticker, ISIN)")
 
-            # If neither column exists, raise error
-            raise ValueError(f"Universe file missing both 'TickerYahoo' and 'ISIN' columns")
+            # Extract tickers from the column
+            tickers = df[ticker_col].dropna().astype(str).str.strip().tolist()
+
+            # Filter out empty strings and blacklisted tickers
+            return [
+                t for t in tickers
+                if t and t.upper() not in blacklisted_tickers and t != ""
+            ]
 
         except pd.errors.ParserError as e:
             raise ValueError(f"Error parsing universe file '{self.universe_name}': {e}")
@@ -238,11 +242,21 @@ class Universe:
                 raise FileNotFoundError(f"Universe '{self.universe_name}' not found")
 
             df = self.load_df()
-            ticker_col = 'TickerYahoo' if 'TickerYahoo' in df.columns else 'ISIN'
+
+            # Detect ticker column (same logic as get_tickers)
+            ticker_col = None
+            for col_name in ["TickerYahoo", "Symbol", "ticker", "Ticker", "ISIN"]:
+                if col_name in df.columns:
+                    ticker_col = col_name
+                    break
+
+            if ticker_col is None:
+                # Default to TickerYahoo if creating new universe
+                ticker_col = "TickerYahoo"
 
             # Get existing tickers
-            existing = set(df[ticker_col].dropna().str.strip().str.upper().tolist())
-            new_tickers = [t for t in tickers if t.upper() not in existing]
+            existing = set(df[ticker_col].dropna().astype(str).str.strip().str.upper().tolist())
+            new_tickers = [t for t in tickers if t and t.upper() not in existing]
 
             if new_tickers:
                 new_df = pd.DataFrame({ticker_col: new_tickers})
@@ -267,10 +281,19 @@ class Universe:
                 raise FileNotFoundError(f"Universe '{self.universe_name}' not found")
 
             df = self.load_df()
-            ticker_col = 'TickerYahoo' if 'TickerYahoo' in df.columns else 'ISIN'
 
-            tickers_upper = set(t.upper() for t in tickers)
-            df = df[~df[ticker_col].str.upper().isin(tickers_upper)]
+            # Detect ticker column (same logic as get_tickers)
+            ticker_col = None
+            for col_name in ["TickerYahoo", "Symbol", "ticker", "Ticker", "ISIN"]:
+                if col_name in df.columns:
+                    ticker_col = col_name
+                    break
+
+            if ticker_col is None:
+                raise ValueError(f"Universe file missing ticker column")
+
+            tickers_upper = set(t.upper() for t in tickers if t)
+            df = df[~df[ticker_col].astype(str).str.upper().isin(tickers_upper)]
             df.to_csv(self.filepath, index=False, encoding='utf-8-sig')
 
             return True
