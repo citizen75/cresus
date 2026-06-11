@@ -79,10 +79,10 @@ export function TradingDialog({
       if (position.quantity) {
         setQuantity(String(position.quantity))
       }
-      // Pre-fill price with current close price (latest)
+      // Pre-fill price with current close price (latest) - max 3 decimal places
       const currentClosePrice = position.close || position.current_price || position.price || 0
       if (currentClosePrice) {
-        setPrice(String(currentClosePrice))
+        setPrice(String(parseFloat(currentClosePrice).toFixed(3)))
       }
       // Pre-fill stop loss and take profit for sell
       setStopLoss('5') // 5% stop loss for sell
