@@ -187,6 +187,17 @@ export default function Data() {
     updateAvailableFilters()
   }, [tickers])
 
+  // Handle ESC key to close dialog
+  useEffect(() => {
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && selectedTickerDetail) {
+        closeTickerDetail()
+      }
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [selectedTickerDetail])
+
   const handleSort = (columnKey: string) => {
     if (sortColumn === columnKey) {
       // Toggle direction if same column
