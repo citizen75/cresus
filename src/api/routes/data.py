@@ -157,19 +157,39 @@ async def get_universe_tickers(
 
         # Optionally enrich with fundamentals
         if enrich:
-            tickers = TickerIntelligence.batch_enrich_flat(tickers, asset_type=asset_type)
+            try:
+                tickers = TickerIntelligence.batch_enrich_flat(tickers, asset_type=asset_type)
+            except Exception as e:
+                # If enrichment fails, continue with basic data
+                pass
 
-            # Fallback: Add country/exchange directly from FinanceDatabase if missing
+            # Fallback: Add country/exchange/currency directly from FinanceDatabase if missing
             try:
                 import financedatabase as fd
-                db = fd.Equities()
+
+                # Select correct database based on asset type
+                if asset_type == "etfs":
+                    db = fd.ETFs()
+                elif asset_type == "funds":
+                    db = fd.Funds()
+                elif asset_type == "indices":
+                    db = fd.Indices()
+                else:
+                    db = fd.Equities()
+
                 all_data = db.select()
                 for ticker in tickers:
                     symbol = ticker.get("symbol", "").upper()
-                    if symbol in all_data.index and (not ticker.get("country") or not ticker.get("exchange")):
+                    if symbol in all_data.index:
                         row = all_data.loc[symbol]
-                        if not ticker.get("country") and "country" in all_data.columns:
-                            ticker["country"] = str(row["country"]) if pd.notna(row["country"]) else None
+
+                        # Add missing fields
+                        if not ticker.get("name") and "name" in all_data.columns and pd.notna(row["name"]):
+                            ticker["name"] = str(row["name"])
+                        if not ticker.get("country") and "country" in all_data.columns and pd.notna(row["country"]):
+                            ticker["country"] = str(row["country"])
+                        if not ticker.get("currency") and "currency" in all_data.columns and pd.notna(row["currency"]):
+                            ticker["currency"] = str(row["currency"])
                         if not ticker.get("exchange"):
                             exchange_val = None
                             if "exchange" in all_data.columns and pd.notna(row["exchange"]):
