@@ -99,6 +99,7 @@ def enrich_ticker(ticker_symbol: str, asset_type: str = "equities") -> Optional[
     Returns:
         Dictionary with enriched ticker data, or None if not found
     """
+    logger.debug(f"Enriching {ticker_symbol} ({asset_type})")
     try:
         if asset_type == "equities":
             db = get_equities()
@@ -137,7 +138,7 @@ def enrich_ticker(ticker_symbol: str, asset_type: str = "equities") -> Optional[
         except (KeyError, TypeError):
             pass
 
-        return {
+        result = {
             "symbol": ticker_symbol.upper(),
             "name": str(row["name"]) if "name" in row and pd.notna(row["name"]) else ticker_symbol,
             "sector": str(row["sector"]) if "sector" in row and pd.notna(row["sector"]) else None,
@@ -150,8 +151,10 @@ def enrich_ticker(ticker_symbol: str, asset_type: str = "equities") -> Optional[
             "website": str(row["website"]) if "website" in row and pd.notna(row["website"]) else None,
             "market_cap": str(row["market_cap"]) if "market_cap" in row and pd.notna(row["market_cap"]) else None,
         }
+        logger.debug(f"Enriched {ticker_symbol}: country={result.get('country')}, exchange={result.get('exchange')}")
+        return result
     except Exception as e:
-        logger.warning(f"Failed to enrich {ticker_symbol}: {e}")
+        logger.error(f"Failed to enrich {ticker_symbol}: {e}", exc_info=True)
         return None
 
 
