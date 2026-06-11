@@ -974,11 +974,15 @@ async def get_ticker_fundamental(ticker: str):
         }
 
     except Exception as e:
-        return {
-            "ticker": ticker,
-            "data": {
-                "company": {},
-                "quotation": {}
-            },
-            "error": str(e)
-        }, 500
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=500,
+            content={
+                "ticker": ticker,
+                "data": {
+                    "company": {},
+                    "quotation": {}
+                },
+                "error": str(e)
+            }
+        )
