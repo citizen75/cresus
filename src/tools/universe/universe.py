@@ -25,6 +25,22 @@ class Universe:
         """Check if universe file exists."""
         return self.filepath.exists()
 
+    def count_tickers(self) -> int:
+        """Fast count of tickers without loading all data.
+
+        Returns:
+            Number of tickers in universe (minus header)
+        """
+        if not self.exists():
+            raise FileNotFoundError(f"Universe '{self.universe_name}' not found")
+
+        try:
+            # Fast line count: subtract 1 for header
+            with open(self.filepath, 'r', encoding='utf-8-sig') as f:
+                return sum(1 for _ in f) - 1
+        except Exception as e:
+            raise ValueError(f"Error counting tickers in universe '{self.universe_name}': {e}")
+
     def get_tickers(self) -> List[str]:
         """Get list of ticker symbols from universe.
 

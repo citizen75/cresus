@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 from typing import List, Optional
+import time
 from tools.data.financial import FinancialDataManager
 from tools.data.enrichment import TickerIntelligence
 from tools.universe.universe import Universe
@@ -20,6 +21,11 @@ class TickersRequest(BaseModel):
 router = APIRouter(prefix="/data", tags=["data"])
 manager = FinancialDataManager()
 
+# Cache for universe list (TTL: 300 seconds / 5 minutes)
+_universe_list_cache = None
+_universe_list_cache_time = 0
+CACHE_TTL = 300
+
 
 @router.get("/categories")
 async def get_categories():
@@ -28,24 +34,44 @@ async def get_categories():
 
 
 @router.get("/universes/list")
-async def list_all_universes():
-    """List all available universes."""
+async def list_all_universes(use_cache: bool = Query(True, description="Use cached universe list")):
+    """List all available universes with fast ticker counts.
+
+    Uses optimized counting and caching for performance.
+    """
+    global _universe_list_cache, _universe_list_cache_time
+
+    # Check cache
+    if use_cache and _universe_list_cache is not None:
+        if time.time() - _universe_list_cache_time < CACHE_TTL:
+            return _universe_list_cache
+
     try:
         universes = Universe.list_universes()
         details = []
+
         for uni_id in universes:
             try:
                 uni = Universe(uni_id)
                 if uni.exists():
-                    tickers = uni.get_tickers()
+                    # Use fast count instead of loading all tickers
+                    count = uni.count_tickers()
                     details.append({
                         "id": uni_id,
                         "name": manager._format_universe_name(uni_id),
-                        "count": len(tickers),
+                        "count": count,
                     })
-            except Exception:
+            except Exception as e:
+                # Log but continue
                 pass
-        return {"universes": details, "total": len(details)}
+
+        result = {"universes": details, "total": len(details)}
+
+        # Cache the result
+        _universe_list_cache = result
+        _universe_list_cache_time = time.time()
+
+        return result
     except Exception as e:
         return {"error": str(e)}, 500
 
