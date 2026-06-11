@@ -1,14 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-const ASSET_CATEGORIES = [
-  { id: 'stocks', label: 'Stocks', icon: '📈' },
-  { id: 'etfs', label: 'ETFs', icon: '💱' },
-  { id: 'funds', label: 'Funds', icon: '🏦' },
-  { id: 'indices', label: 'Indices', icon: '📊' },
-  { id: 'currencies', label: 'Currencies', icon: '💱' },
-]
-
 interface Universe {
   id: string
   name: string
@@ -30,35 +22,35 @@ interface Ticker {
 
 export default function Data() {
   const navigate = useNavigate()
-  const [selectedCategory, setSelectedCategory] = useState<string>('stocks')
   const [universes, setUniverses] = useState<Universe[]>([])
   const [selectedUniverse, setSelectedUniverse] = useState<string | null>(null)
   const [tickers, setTickers] = useState<Ticker[]>([])
   const [loading, setLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
 
-  // Load universes for selected category
+  // Load universes on mount
   useEffect(() => {
-    loadUniverses(selectedCategory)
-  }, [selectedCategory])
+    loadUniverses()
+  }, [])
 
   // Load tickers for selected universe
   useEffect(() => {
     if (selectedUniverse) {
-      loadTickers(selectedCategory, selectedUniverse)
+      loadTickers(selectedUniverse)
     }
-  }, [selectedUniverse, selectedCategory])
+  }, [selectedUniverse])
 
-  const loadUniverses = async (category: string) => {
+  const loadUniverses = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`http://192.168.0.130:6501/api/v1/data/universes?category=${category}`)
+      const response = await fetch(`http://192.168.0.130:6501/api/v1/data/universes/list`)
       if (response.ok) {
         const data = await response.json()
-        setUniverses(data.universes || [])
+        const universeList = data.universes || []
+        setUniverses(universeList)
         // Auto-select first universe
-        if (data.universes && data.universes.length > 0) {
-          setSelectedUniverse(data.universes[0].id)
+        if (universeList.length > 0) {
+          setSelectedUniverse(universeList[0].id)
         }
       }
     } catch (err) {
@@ -68,10 +60,10 @@ export default function Data() {
     }
   }
 
-  const loadTickers = async (category: string, universe: string) => {
+  const loadTickers = async (universe: string) => {
     try {
       setLoading(true)
-      const response = await fetch(`http://192.168.0.130:6501/api/v1/data/tickers?category=${category}&universe=${universe}`)
+      const response = await fetch(`http://192.168.0.130:6501/api/v1/data/universe/${universe}`)
       if (response.ok) {
         const data = await response.json()
         setTickers(data.tickers || [])
@@ -107,60 +99,36 @@ export default function Data() {
 
       {/* Main content */}
       <div className="flex-1 flex gap-4 p-6 overflow-hidden">
-        {/* Left Panel */}
-        <div className="w-64 flex flex-col border border-slate-800 rounded-lg bg-slate-900">
-          {/* Categories */}
-          <div className="border-b border-slate-800">
-            <div className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">Asset Types</div>
-            <div className="space-y-1 px-2 pb-3">
-              {ASSET_CATEGORIES.map(cat => (
+        {/* Left Panel - Universes List */}
+        <div className="w-80 flex flex-col border border-slate-800 rounded-lg bg-slate-900">
+          <div className="px-4 py-3 border-b border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+            Universes ({universes.length})
+          </div>
+          <div className="flex-1 overflow-y-auto px-2 py-3 space-y-1">
+            {loading && universes.length === 0 ? (
+              <div className="text-center text-slate-500 py-8">Loading universes...</div>
+            ) : universes.length === 0 ? (
+              <div className="text-center text-slate-500 py-8">No universes available</div>
+            ) : (
+              universes.map(universe => (
                 <button
-                  key={cat.id}
-                  onClick={() => {
-                    setSelectedCategory(cat.id)
-                    setSelectedUniverse(null)
-                    setTickers([])
-                  }}
-                  className={`w-full text-left px-3 py-2 rounded text-sm transition ${
-                    selectedCategory === cat.id
-                      ? 'bg-purple-600/30 text-purple-300'
+                  key={universe.id}
+                  onClick={() => setSelectedUniverse(universe.id)}
+                  className={`w-full text-left px-3 py-2 rounded transition ${
+                    selectedUniverse === universe.id
+                      ? 'bg-purple-600/30 text-purple-300 border border-purple-500'
                       : 'text-slate-300 hover:bg-slate-800'
                   }`}
                 >
-                  <span className="mr-2">{cat.icon}</span>
-                  {cat.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Universes */}
-          <div className="flex-1 flex flex-col min-h-0">
-            <div className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800">
-              Universes
-            </div>
-            <div className="flex-1 overflow-y-auto px-2 py-3 space-y-1">
-              {universes.length === 0 ? (
-                <div className="text-xs text-slate-500 px-3 py-2">No universes available</div>
-              ) : (
-                universes.map(universe => (
-                  <button
-                    key={universe.id}
-                    onClick={() => setSelectedUniverse(universe.id)}
-                    className={`w-full text-left px-3 py-2 rounded text-sm transition ${
-                      selectedUniverse === universe.id
-                        ? 'bg-purple-600/30 text-purple-300'
-                        : 'text-slate-400 hover:bg-slate-800'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span>{universe.name}</span>
-                      {universe.count && <span className="text-xs text-slate-500">({universe.count})</span>}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-medium">{universe.name}</div>
+                      <div className="text-xs text-slate-500">{universe.count || 0} tickers</div>
                     </div>
-                  </button>
-                ))
-              )}
-            </div>
+                  </div>
+                </button>
+              ))
+            )}
           </div>
         </div>
 
