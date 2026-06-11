@@ -753,56 +753,48 @@ export default function Data() {
               {/* Left: Fundamental Data */}
               <div className="w-96 border-r border-slate-800 overflow-y-auto p-6">
                 <h3 className="text-lg font-semibold text-white mb-4">Fundamentals</h3>
-                <div className="space-y-4">
-                  {/* Price Section */}
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Price - Full Width */}
                   {selectedTickerDetail.price && (
-                    <div className="pb-4 border-b border-slate-700">
+                    <div className="col-span-2 pb-3 border-b border-slate-700">
                       <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">Price</p>
                       <p className="text-2xl font-bold text-green-400">${selectedTickerDetail.price}</p>
                     </div>
                   )}
 
-                  {/* Exchange & Market Section */}
-                  <div className="space-y-2">
-                    {selectedTickerDetail.exchange && (
-                      <div>
-                        <p className="text-xs text-slate-400">Exchange</p>
-                        <p className="text-sm font-medium text-slate-300">{selectedTickerDetail.exchange}</p>
-                      </div>
-                    )}
-                    {selectedTickerDetail.country && (
-                      <div>
-                        <p className="text-xs text-slate-400">Country</p>
-                        <p className="text-sm font-medium text-slate-300">{selectedTickerDetail.country}</p>
-                      </div>
-                    )}
-                    {selectedTickerDetail.currency && (
-                      <div>
-                        <p className="text-xs text-slate-400">Currency</p>
-                        <p className="text-sm font-medium text-slate-300">{selectedTickerDetail.currency}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Classification Section */}
-                  <div className="space-y-2 border-t border-slate-700 pt-3">
-                    {selectedTickerDetail.sector && (
-                      <div>
-                        <p className="text-xs text-slate-400">Sector</p>
-                        <p className="text-sm font-medium text-blue-300">{selectedTickerDetail.sector}</p>
-                      </div>
-                    )}
-                    {selectedTickerDetail.industry && (
-                      <div>
-                        <p className="text-xs text-slate-400">Industry</p>
-                        <p className="text-sm font-medium text-blue-300">{selectedTickerDetail.industry}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Additional Fields */}
+                  {/* 2-Column Grid Items */}
+                  {selectedTickerDetail.exchange && (
+                    <div>
+                      <p className="text-xs text-slate-400">Exchange</p>
+                      <p className="text-sm font-medium text-slate-300">{selectedTickerDetail.exchange}</p>
+                    </div>
+                  )}
+                  {selectedTickerDetail.country && (
+                    <div>
+                      <p className="text-xs text-slate-400">Country</p>
+                      <p className="text-sm font-medium text-slate-300">{selectedTickerDetail.country}</p>
+                    </div>
+                  )}
+                  {selectedTickerDetail.currency && (
+                    <div>
+                      <p className="text-xs text-slate-400">Currency</p>
+                      <p className="text-sm font-medium text-slate-300">{selectedTickerDetail.currency}</p>
+                    </div>
+                  )}
+                  {selectedTickerDetail.sector && (
+                    <div>
+                      <p className="text-xs text-slate-400">Sector</p>
+                      <p className="text-sm font-medium text-blue-300">{selectedTickerDetail.sector}</p>
+                    </div>
+                  )}
+                  {selectedTickerDetail.industry && (
+                    <div>
+                      <p className="text-xs text-slate-400">Industry</p>
+                      <p className="text-sm font-medium text-blue-300">{selectedTickerDetail.industry}</p>
+                    </div>
+                  )}
                   {selectedTickerDetail.market_cap && (
-                    <div className="border-t border-slate-700 pt-3">
+                    <div>
                       <p className="text-xs text-slate-400">Market Cap</p>
                       <p className="text-sm font-medium text-slate-300">
                         {typeof selectedTickerDetail.market_cap === 'number'
@@ -848,7 +840,7 @@ export default function Data() {
                     </div>
                   )}
                   {selectedTickerDetail.recommendation && (
-                    <div className="border-t border-slate-700 pt-3">
+                    <div>
                       <p className="text-xs text-slate-400">Analyst Rating</p>
                       <p className="text-sm font-medium text-yellow-400">{selectedTickerDetail.recommendation}</p>
                     </div>
