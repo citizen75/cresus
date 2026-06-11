@@ -129,23 +129,26 @@ def enrich_ticker(ticker_symbol: str, asset_type: str = "equities") -> Optional[
 
         # Get exchange - try exchange first, fallback to market
         exchange_value = None
-        if pd.notna(row.get("exchange")):
-            exchange_value = str(row.get("exchange"))
-        elif pd.notna(row.get("market")):
-            exchange_value = str(row.get("market"))
+        try:
+            if pd.notna(row["exchange"]):
+                exchange_value = str(row["exchange"])
+            elif pd.notna(row["market"]):
+                exchange_value = str(row["market"])
+        except (KeyError, TypeError):
+            pass
 
         return {
             "symbol": ticker_symbol.upper(),
-            "name": str(row.get("name", ticker_symbol)),
-            "sector": str(row.get("sector")) if pd.notna(row.get("sector")) else None,
-            "industry": str(row.get("industry")) if pd.notna(row.get("industry")) else None,
-            "industry_group": str(row.get("industry_group")) if pd.notna(row.get("industry_group")) else None,
-            "country": str(row.get("country")) if pd.notna(row.get("country")) else None,
-            "currency": str(row.get("currency")) if pd.notna(row.get("currency")) else None,
+            "name": str(row["name"]) if "name" in row and pd.notna(row["name"]) else ticker_symbol,
+            "sector": str(row["sector"]) if "sector" in row and pd.notna(row["sector"]) else None,
+            "industry": str(row["industry"]) if "industry" in row and pd.notna(row["industry"]) else None,
+            "industry_group": str(row["industry_group"]) if "industry_group" in row and pd.notna(row["industry_group"]) else None,
+            "country": str(row["country"]) if "country" in row and pd.notna(row["country"]) else None,
+            "currency": str(row["currency"]) if "currency" in row and pd.notna(row["currency"]) else None,
             "exchange": exchange_value,
-            "market": str(row.get("market")) if pd.notna(row.get("market")) else None,
-            "website": str(row.get("website")) if pd.notna(row.get("website")) else None,
-            "market_cap": str(row.get("market_cap")) if pd.notna(row.get("market_cap")) else None,
+            "market": str(row["market"]) if "market" in row and pd.notna(row["market"]) else None,
+            "website": str(row["website"]) if "website" in row and pd.notna(row["website"]) else None,
+            "market_cap": str(row["market_cap"]) if "market_cap" in row and pd.notna(row["market_cap"]) else None,
         }
     except Exception as e:
         logger.warning(f"Failed to enrich {ticker_symbol}: {e}")
