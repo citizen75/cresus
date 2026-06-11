@@ -19,6 +19,10 @@ class TickersRequest(BaseModel):
     """Request to add/remove tickers."""
     tickers: List[str]
 
+class EnrichedTickersRequest(BaseModel):
+    """Request to add enriched tickers with metadata."""
+    tickers: List[dict]  # List of {"symbol": "...", "name": "...", etc}
+
 router = APIRouter(prefix="/data", tags=["data"])
 manager = FinancialDataManager()
 
@@ -293,13 +297,40 @@ async def delete_universe(universe_id: str):
 
 @router.post("/universe/{universe_id}/tickers")
 async def add_tickers_to_universe(universe_id: str, request: TickersRequest):
-    """Add tickers to an existing universe."""
+    """Add tickers to an existing universe.
+
+    Optionally accepts enriched ticker data to preserve metadata.
+    """
     try:
         universe = Universe(universe_id)
         if not universe.exists():
             return {"error": f"Universe '{universe_id}' not found"}, 404
 
-        universe.add_tickers(request.tickers)
+        # If enriched data provided, add tickers with metadata columns
+        if hasattr(request, 'enriched') and request.enriched:
+            try:
+                df = universe.load_df()
+                # Add enriched rows
+                for ticker_data in request.enriched:
+                    new_row = {
+                        'TickerYahoo': ticker_data.get('symbol'),
+                        'name': ticker_data.get('name'),
+                        'country': ticker_data.get('country'),
+                        'currency': ticker_data.get('currency'),
+                        'exchange': ticker_data.get('exchange'),
+                        'sector': ticker_data.get('sector'),
+                        'industry': ticker_data.get('industry'),
+                    }
+                    # Add row to dataframe
+                    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+                df.to_csv(universe.filepath, index=False, encoding='utf-8-sig')
+            except Exception as e:
+                # Fallback to simple add if enriched add fails
+                universe.add_tickers(request.tickers)
+        else:
+            # Simple add without enrichment data
+            universe.add_tickers(request.tickers)
+
         tickers = universe.get_tickers()
         _clear_universe_cache()  # Invalidate cache
         return {

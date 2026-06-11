@@ -56,6 +56,7 @@ export default function Data() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set())
   const [draggedRows, setDraggedRows] = useState<string[]>([])
+  const [draggedTickerData, setDraggedTickerData] = useState<Ticker[]>([])
   const [dropTarget, setDropTarget] = useState<string | null>(null)
   const [selectedTickerDetail, setSelectedTickerDetail] = useState<Ticker | null>(null)
   const [tickerHistory, setTickerHistory] = useState<Array<{date: string, close: number}>>([])
@@ -245,6 +246,10 @@ export default function Data() {
   const handleRowDragStart = (symbol: string) => {
     const selected = selectedRows.has(symbol) ? Array.from(selectedRows) : [symbol]
     setDraggedRows(selected)
+
+    // Also capture full ticker data for enrichment
+    const tickerData = filteredTickers.filter((t) => selected.includes(t.symbol))
+    setDraggedTickerData(tickerData)
   }
 
   const handleUniverseDragOver = (e: React.DragEvent) => {
@@ -278,13 +283,29 @@ export default function Data() {
         return
       }
 
-      // Add only new tickers
+      // Add only new tickers (with enriched data if available)
+      const tickersToAdd = draggedTickerData
+        .filter((t) => newTickers.includes(t.symbol))
+        .map((t) => ({
+          symbol: t.symbol,
+          name: t.name,
+          country: t.country,
+          currency: t.currency,
+          exchange: t.exchange,
+          sector: t.sector,
+          industry: t.industry,
+          price: t.price,
+        }))
+
       const response = await fetch(
         `http://192.168.0.130:6501/api/v1/data/universe/${universeId}/tickers`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tickers: newTickers }),
+          body: JSON.stringify({
+            tickers: newTickers,
+            enriched: tickersToAdd  // Send enriched data separately
+          }),
         }
       )
 
