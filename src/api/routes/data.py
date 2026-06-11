@@ -136,6 +136,7 @@ async def get_universe_tickers(
     universe_id: str,
     limit: int = Query(None, description="Max number of tickers (None = all results)"),
     enrich: bool = Query(True, description="Enrich with fundamentals data"),
+    asset_type: str = Query("equities", description="Asset type (equities, etfs, funds, indices)"),
 ):
     """Get tickers for a specific universe with optional metadata enrichment.
 
@@ -143,6 +144,7 @@ async def get_universe_tickers(
         universe_id: Universe ID
         limit: Max number of tickers
         enrich: Whether to enrich with fundamentals (sector, industry, price, etc.)
+        asset_type: Asset type for enrichment (equities, etfs, funds, indices)
     """
     try:
         universe = Universe(universe_id)
@@ -155,7 +157,7 @@ async def get_universe_tickers(
 
         # Optionally enrich with fundamentals
         if enrich:
-            tickers = TickerIntelligence.batch_enrich_flat(tickers, asset_type="equities")
+            tickers = TickerIntelligence.batch_enrich_flat(tickers, asset_type=asset_type)
 
             # Fallback: Add country/exchange directly from FinanceDatabase if missing
             try:

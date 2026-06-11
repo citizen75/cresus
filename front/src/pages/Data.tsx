@@ -96,7 +96,20 @@ export default function Data() {
   const loadUniverseTickers = async (universe: string) => {
     try {
       setLoading(true)
-      const response = await fetch(`http://192.168.0.130:6501/api/v1/data/universe/${universe}`)
+
+      // Try to detect asset type from universe name
+      let assetType = 'equities'
+      if (universe.toLowerCase().includes('etf')) {
+        assetType = 'etfs'
+      } else if (universe.toLowerCase().includes('fund')) {
+        assetType = 'funds'
+      } else if (universe.toLowerCase().includes('indic') || universe.toLowerCase().includes('index')) {
+        assetType = 'indices'
+      }
+
+      const response = await fetch(
+        `http://192.168.0.130:6501/api/v1/data/universe/${universe}?asset_type=${assetType}`
+      )
       if (response.ok) {
         const data = await response.json()
         setTickers(data.tickers || [])
