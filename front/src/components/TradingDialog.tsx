@@ -206,6 +206,7 @@ export function TradingDialog({
           title,
           description,
           portfolio: effectivePortfolioName,
+          ticker,
           priority: 'High',
           due_date: today,
           status: 'To-Do',

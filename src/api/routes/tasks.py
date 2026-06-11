@@ -18,6 +18,7 @@ class TaskRequest(BaseModel):
     status: str = TaskStatus.TODO.value
     assignee: Optional[str] = None
     portfolio: Optional[str] = None
+    ticker: Optional[str] = None
     tags: Optional[List[str]] = None
     dependencies: Optional[List[int]] = None
     checklist: Optional[List[Dict[str, Any]]] = None
@@ -34,6 +35,7 @@ class TaskResponse(BaseModel):
     status: str
     assignee: Optional[str]
     portfolio: Optional[str]
+    ticker: Optional[str]
     tags: List[str]
     dependencies: List[int]
     checklist: List[Dict[str, Any]]
@@ -77,6 +79,7 @@ async def create_task(request: TaskRequest):
             status=request.status,
             assignee=request.assignee,
             portfolio=request.portfolio,
+            ticker=request.ticker,
             tags=request.tags,
             dependencies=request.dependencies,
             checklist=request.checklist,
@@ -197,6 +200,7 @@ async def update_task(task_id: int, request: TaskRequest):
             status=request.status,
             assignee=request.assignee,
             portfolio=request.portfolio,
+            ticker=request.ticker,
             tags=request.tags,
             dependencies=request.dependencies,
             checklist=request.checklist,
@@ -283,6 +287,7 @@ def _task_to_dict(task: Task) -> Dict[str, Any]:
         "status": task.status,
         "assignee": task.assignee,
         "portfolio": task.portfolio,
+        "ticker": task.ticker,
         "tags": task.tags or [],
         "dependencies": task.dependencies or [],
         "checklist": task.checklist or [],
