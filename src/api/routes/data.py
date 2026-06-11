@@ -1,7 +1,7 @@
 """Data management API routes."""
 
 from fastapi import APIRouter, Query
-from tools.data.manager import FinancialDataManager
+from tools.data.financial import FinancialDataManager
 
 router = APIRouter(prefix="/api/v1/data", tags=["data"])
 manager = FinancialDataManager()
