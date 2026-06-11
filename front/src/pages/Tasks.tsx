@@ -184,6 +184,26 @@ export default function Tasks() {
     }
   }
 
+  const quickUpdateTask = async (updates: Record<string, any>) => {
+    if (!selectedTask) return
+
+    try {
+      const response = await fetch(`http://192.168.0.130:6501/api/v1/tasks/${selectedTask.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      })
+
+      if (!response.ok) throw new Error('Failed to update task')
+
+      loadTasks()
+      // Update selected task with new values
+      setSelectedTask({ ...selectedTask, ...updates })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update task')
+    }
+  }
+
   const savePanelEdits = async () => {
     if (!selectedTask) return
 
@@ -508,12 +528,24 @@ export default function Tasks() {
                         </p>
                       )}
                     </div>
-                    <button
-                      onClick={() => setEditingPanel(true)}
-                      className="px-3 py-1 bg-blue-600/20 text-blue-300 rounded text-sm hover:bg-blue-600/30 transition"
-                    >
-                      Edit
-                    </button>
+                    <div className="flex gap-2 flex-wrap justify-end">
+                      <select
+                        value={selectedTask.status}
+                        onChange={(e) => quickUpdateTask({ status: e.target.value })}
+                        className={`px-3 py-1 rounded text-sm font-medium cursor-pointer focus:outline-none ${getStatusColor(selectedTask.status)}`}
+                      >
+                        <option value="To-Do">To-Do</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Done">Done</option>
+                        <option value="Blocked">Blocked</option>
+                      </select>
+                      <button
+                        onClick={() => setEditingPanel(true)}
+                        className="px-3 py-1 bg-blue-600/20 text-blue-300 rounded text-sm hover:bg-blue-600/30 transition"
+                      >
+                        Edit
+                      </button>
+                    </div>
                   </div>
 
               {/* Description */}
