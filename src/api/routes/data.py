@@ -837,9 +837,11 @@ async def get_ticker_history(
                     history = cached.get("history", [])
                     fundamentals = cached.get("fundamentals", {})
                     source = "cache"
+                    print(f"✅ CACHE HIT: {ticker} ({len(history)} records, days={days})")
 
                     # If no indicator needed, return cached data as-is
                     if not indicator and history:
+                        print(f"✅ RETURN CACHED: {ticker} (no indicator)")
                         return {
                             "ticker": ticker,
                             "data": history,
@@ -854,7 +856,9 @@ async def get_ticker_history(
 
         # Fetch from Yahoo Finance if not loaded from cache
         if not history:
+            print(f"⏳ CACHE MISS: {ticker} - fetching {days} days from Yahoo...")
             hist = yf.download(ticker, period=f"{days}d", progress=False)
+            print(f"✅ YAHOO FETCHED: {ticker} ({len(hist)} records)")
 
             if hist.empty:
                 return {
