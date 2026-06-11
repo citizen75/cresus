@@ -6,8 +6,20 @@ interface Universe {
   count: number
 }
 
+interface Ticker {
+  symbol: string
+  name?: string
+  sector?: string
+  industry?: string
+  market_cap?: string
+  price?: string
+  recommendation?: string
+  target_price?: number
+  [key: string]: any
+}
+
 interface UniverseDetail extends Universe {
-  tickers: string[]
+  tickers: Ticker[]
 }
 
 export default function UniverseManager() {
@@ -51,10 +63,11 @@ export default function UniverseManager() {
           id: universeId,
           name: universes.find(u => u.id === universeId)?.name || universeId,
           count: data.count,
-          tickers: data.tickers.map((t: any) => t.symbol),
+          tickers: data.tickers || [],
         }
         setSelectedUniverse(detail)
-        setEditTickers(detail.tickers.join('\n'))
+        // For edit modal, just show symbols
+        setEditTickers(detail.tickers.map((t: any) => t.symbol || t).join('\n'))
       }
     } catch (err) {
       setError('Failed to load universe detail')
