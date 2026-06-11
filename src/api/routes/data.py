@@ -819,10 +819,11 @@ async def get_ticker_history(
         from pathlib import Path
         import json
 
-        # Cache path
+        # Cache path - include days in key to prevent conflicts
         cache_dir = Path("/Volumes/Data/dev/cresus/db/cache/history")
         cache_dir.mkdir(parents=True, exist_ok=True)
-        cache_file = cache_dir / f"{ticker.upper()}_history.json"
+        # Cache key includes days to prevent different requests from overwriting
+        cache_file = cache_dir / f"{ticker.upper()}_{days}d_history.json"
 
         # Try to load from cache
         history = []
