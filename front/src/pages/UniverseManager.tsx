@@ -212,15 +212,32 @@ export default function UniverseManager() {
                 </div>
               </div>
 
-              {/* Tickers List */}
-              <div className="flex-1 overflow-y-auto px-6 py-4">
-                <div className="space-y-1">
-                  {selectedUniverse.tickers.map((ticker, idx) => (
-                    <div key={idx} className="px-3 py-2 bg-slate-800 rounded text-sm text-slate-300 font-mono">
-                      {ticker}
-                    </div>
-                  ))}
-                </div>
+              {/* Tickers Table */}
+              <div className="flex-1 overflow-auto">
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-slate-800 border-b border-slate-700">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-slate-300 font-semibold">Symbol</th>
+                      <th className="px-3 py-2 text-left text-slate-300 font-semibold">Name</th>
+                      <th className="px-3 py-2 text-left text-slate-300 font-semibold">Sector</th>
+                      <th className="px-3 py-2 text-left text-slate-300 font-semibold">Industry</th>
+                      <th className="px-3 py-2 text-right text-slate-300 font-semibold">Market Cap</th>
+                      <th className="px-3 py-2 text-right text-slate-300 font-semibold">Price</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800">
+                    {selectedUniverse.tickers.map((ticker: any, idx: number) => (
+                      <tr key={idx} className="hover:bg-slate-800/50 transition">
+                        <td className="px-3 py-2 font-mono text-purple-300 font-medium">{ticker.symbol || ticker}</td>
+                        <td className="px-3 py-2 text-slate-300">{ticker.name || ticker}</td>
+                        <td className="px-3 py-2 text-slate-400">{ticker.sector || '-'}</td>
+                        <td className="px-3 py-2 text-slate-400">{ticker.industry || '-'}</td>
+                        <td className="px-3 py-2 text-right text-slate-400">{ticker.market_cap || '-'}</td>
+                        <td className="px-3 py-2 text-right text-slate-400">{ticker.price || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </>
           ) : (

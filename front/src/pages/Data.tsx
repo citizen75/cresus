@@ -20,7 +20,11 @@ interface Ticker {
   name?: string
   sector?: string
   industry?: string
-  market_cap?: number
+  market_cap?: string
+  price?: string
+  change?: string
+  revenue?: string
+  isin?: string
   currency?: string
 }
 
@@ -190,6 +194,8 @@ export default function Data() {
                     <th className="px-4 py-3 text-left text-slate-300 font-semibold">Symbol</th>
                     <th className="px-4 py-3 text-left text-slate-300 font-semibold">Name</th>
                     <th className="px-4 py-3 text-left text-slate-300 font-semibold">Sector</th>
+                    <th className="px-4 py-3 text-left text-slate-300 font-semibold">Industry</th>
+                    <th className="px-4 py-3 text-right text-slate-300 font-semibold">Price</th>
                     <th className="px-4 py-3 text-right text-slate-300 font-semibold">Market Cap</th>
                   </tr>
                 </thead>
@@ -199,9 +205,9 @@ export default function Data() {
                       <td className="px-4 py-3 font-medium text-purple-300">{ticker.symbol}</td>
                       <td className="px-4 py-3 text-slate-300">{ticker.name || '-'}</td>
                       <td className="px-4 py-3 text-slate-400">{ticker.sector || '-'}</td>
-                      <td className="px-4 py-3 text-right text-slate-400">
-                        {ticker.market_cap ? `${(ticker.market_cap / 1e9).toFixed(1)}B` : '-'}
-                      </td>
+                      <td className="px-4 py-3 text-slate-400">{ticker.industry || '-'}</td>
+                      <td className="px-4 py-3 text-right text-slate-400">{ticker.price || '-'}</td>
+                      <td className="px-4 py-3 text-right text-slate-400">{ticker.market_cap || '-'}</td>
                     </tr>
                   ))}
                 </tbody>
