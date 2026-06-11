@@ -191,51 +191,52 @@ export default function Data() {
 
         {/* Right Panel */}
         <div className="flex-1 flex flex-col border border-slate-800 rounded-lg bg-slate-900 min-h-0">
-          {/* Market Selector */}
-          <div className="relative px-4 py-3 border-b border-slate-800">
-            <button
-              onClick={() => setShowMarketDropdown(!showMarketDropdown)}
-              className="w-full px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded text-sm flex items-center justify-between transition"
-            >
-              <span>
-                <span className="text-lg mr-2">{currentMarket?.icon}</span>
-                {currentMarket?.label}
-              </span>
-              <span className={`text-xs transition ${showMarketDropdown ? 'rotate-180' : ''}`}>▼</span>
-            </button>
+          {/* Market Selector + Search Bar (inline) */}
+          <div className="px-4 py-3 border-b border-slate-800 flex gap-3 items-center">
+            {/* Market Selector */}
+            <div className="relative w-48">
+              <button
+                onClick={() => setShowMarketDropdown(!showMarketDropdown)}
+                className="w-full px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded text-sm flex items-center justify-between transition"
+              >
+                <span>
+                  <span className="text-lg mr-2">{currentMarket?.icon}</span>
+                  {currentMarket?.label}
+                </span>
+                <span className={`text-xs transition ${showMarketDropdown ? 'rotate-180' : ''}`}>▼</span>
+              </button>
 
-            {/* Dropdown Menu */}
-            {showMarketDropdown && (
-              <div className="absolute top-full mt-2 left-4 right-4 bg-slate-800 border border-slate-700 rounded shadow-lg z-50">
-                {MARKET_FILTERS.map(market => (
-                  <button
-                    key={market.id}
-                    onClick={() => {
-                      setSelectedMarket(market.id)
-                      setShowMarketDropdown(false)
-                    }}
-                    className={`w-full text-left px-3 py-2 text-sm transition ${
-                      selectedMarket === market.id
-                        ? 'bg-purple-600/30 text-purple-300'
-                        : 'text-slate-300 hover:bg-slate-700'
-                    }`}
-                  >
-                    <span className="text-lg mr-2">{market.icon}</span>
-                    {market.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+              {/* Dropdown Menu */}
+              {showMarketDropdown && (
+                <div className="absolute top-full mt-2 left-0 right-0 bg-slate-800 border border-slate-700 rounded shadow-lg z-50">
+                  {MARKET_FILTERS.map(market => (
+                    <button
+                      key={market.id}
+                      onClick={() => {
+                        setSelectedMarket(market.id)
+                        setShowMarketDropdown(false)
+                      }}
+                      className={`w-full text-left px-3 py-2 text-sm transition ${
+                        selectedMarket === market.id
+                          ? 'bg-purple-600/30 text-purple-300'
+                          : 'text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      <span className="text-lg mr-2">{market.icon}</span>
+                      {market.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
-          {/* Search */}
-          <div className="px-4 py-3 border-b border-slate-800">
+            {/* Search */}
             <input
               type="text"
               placeholder="Search tickers or names..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
+              className="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
             />
           </div>
 
