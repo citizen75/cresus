@@ -27,6 +27,7 @@ export default function UniverseManager() {
   const [selectedUniverse, setSelectedUniverse] = useState<UniverseDetail | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
 
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -66,6 +67,7 @@ export default function UniverseManager() {
           tickers: data.tickers || [],
         }
         setSelectedUniverse(detail)
+        setSearchQuery('')  // Clear search when selecting new universe
         // For edit modal, just show symbols
         setEditTickers(detail.tickers.map((t: any) => t.symbol || t).join('\n'))
       }
@@ -225,33 +227,79 @@ export default function UniverseManager() {
                 </div>
               </div>
 
+              {/* Search Bar */}
+              <div className="px-6 py-4 border-b border-slate-800">
+                <input
+                  type="text"
+                  placeholder="Search tickers, names, sectors..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
               {/* Tickers Table */}
               <div className="flex-1 overflow-auto">
-                <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-slate-800 border-b border-slate-700">
-                    <tr>
-                      <th className="px-3 py-2 text-left text-slate-300 font-semibold">Symbol</th>
-                      <th className="px-3 py-2 text-left text-slate-300 font-semibold">Name</th>
-                      <th className="px-3 py-2 text-left text-slate-300 font-semibold">Sector</th>
-                      <th className="px-3 py-2 text-left text-slate-300 font-semibold">Industry</th>
-                      <th className="px-3 py-2 text-right text-slate-300 font-semibold">Market Cap</th>
-                      <th className="px-3 py-2 text-right text-slate-300 font-semibold">Price</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800">
-                    {selectedUniverse.tickers.map((ticker: any, idx: number) => (
-                      <tr key={idx} className="hover:bg-slate-800/50 transition">
-                        <td className="px-3 py-2 font-mono text-purple-300 font-medium">{ticker.symbol || ticker}</td>
-                        <td className="px-3 py-2 text-slate-300">{ticker.name || ticker}</td>
-                        <td className="px-3 py-2 text-slate-400">{ticker.sector || '-'}</td>
-                        <td className="px-3 py-2 text-slate-400">{ticker.industry || '-'}</td>
-                        <td className="px-3 py-2 text-right text-slate-400">{ticker.market_cap || '-'}</td>
-                        <td className="px-3 py-2 text-right text-slate-400">{ticker.price || '-'}</td>
+                {selectedUniverse.tickers.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-slate-500">
+                    No tickers in this universe
+                  </div>
+                ) : (
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0 bg-slate-800 border-b border-slate-700">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-slate-300 font-semibold">Symbol</th>
+                        <th className="px-3 py-2 text-left text-slate-300 font-semibold">Name</th>
+                        <th className="px-3 py-2 text-left text-slate-300 font-semibold">Sector</th>
+                        <th className="px-3 py-2 text-left text-slate-300 font-semibold">Industry</th>
+                        <th className="px-3 py-2 text-right text-slate-300 font-semibold">Market Cap</th>
+                        <th className="px-3 py-2 text-right text-slate-300 font-semibold">Price</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800">
+                      {selectedUniverse.tickers
+                        .filter((ticker: any) => {
+                          const query = searchQuery.toLowerCase()
+                          return (
+                            query === '' ||
+                            (ticker.symbol && ticker.symbol.toLowerCase().includes(query)) ||
+                            (ticker.name && ticker.name.toLowerCase().includes(query)) ||
+                            (ticker.sector && ticker.sector.toLowerCase().includes(query)) ||
+                            (ticker.industry && ticker.industry.toLowerCase().includes(query))
+                          )
+                        })
+                        .map((ticker: any, idx: number) => (
+                          <tr key={idx} className="hover:bg-slate-800/50 transition">
+                            <td className="px-3 py-2 font-mono text-purple-300 font-medium">{ticker.symbol || ticker}</td>
+                            <td className="px-3 py-2 text-slate-300">{ticker.name || ticker}</td>
+                            <td className="px-3 py-2 text-slate-400">{ticker.sector || '-'}</td>
+                            <td className="px-3 py-2 text-slate-400">{ticker.industry || '-'}</td>
+                            <td className="px-3 py-2 text-right text-slate-400">{ticker.market_cap || '-'}</td>
+                            <td className="px-3 py-2 text-right text-slate-400">{ticker.price || '-'}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
+
+              {/* Footer with count */}
+              {selectedUniverse.tickers.length > 0 && (
+                <div className="px-6 py-3 border-t border-slate-800 text-xs text-slate-500">
+                  Showing{' '}
+                  {selectedUniverse.tickers.filter((t: any) => {
+                    const query = searchQuery.toLowerCase()
+                    return (
+                      query === '' ||
+                      (t.symbol && t.symbol.toLowerCase().includes(query)) ||
+                      (t.name && t.name.toLowerCase().includes(query)) ||
+                      (t.sector && t.sector.toLowerCase().includes(query)) ||
+                      (t.industry && t.industry.toLowerCase().includes(query))
+                    )
+                  }).length}{' '}
+                  of {selectedUniverse.tickers.length} tickers
+                </div>
+              )}
             </>
           ) : (
             <div className="flex items-center justify-center h-full text-slate-500">
