@@ -109,11 +109,16 @@ class TickerIntelligence:
 
         # Load FinanceDatabase metadata (sector, industry, country, exchange, etc.)
         try:
+            logger.debug(f"Calling fd_enrich_ticker for {self.ticker} ({asset_type})")
             fd_metadata = fd_enrich_ticker(self.ticker, asset_type=asset_type)
+            logger.debug(f"fd_enrich_ticker returned: {fd_metadata is not None}")
             if fd_metadata:
+                logger.debug(f"FinanceDB data: country={fd_metadata.get('country')}, exchange={fd_metadata.get('exchange')}")
                 enriched["financedatabase"] = fd_metadata
+            else:
+                logger.debug(f"fd_enrich_ticker returned None for {self.ticker}")
         except Exception as e:
-            logger.warning(f"Failed to load FinanceDatabase metadata for {self.ticker}: {e}")
+            logger.error(f"Failed to load FinanceDatabase metadata for {self.ticker}: {e}", exc_info=True)
 
         # Load fundamentals (P/E, earnings, margins, analyst ratings)
         fundamentals = self._load_fundamentals()
