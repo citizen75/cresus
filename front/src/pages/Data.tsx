@@ -683,17 +683,20 @@ export default function Data() {
                       draggable={selectedRows.has(ticker.symbol) || selectedRows.size === 0}
                       onDragStart={() => handleRowDragStart(ticker.symbol)}
                       onClick={() => {
-                        if (!selectedRows.has(ticker.symbol)) {
+                        // Only open dialog if no rows selected (not in drag-drop mode)
+                        if (selectedRows.size === 0) {
                           openTickerDetail(ticker)
                         }
                       }}
                       className={`transition ${
                         selectedRows.has(ticker.symbol)
                           ? 'bg-purple-600/30 text-purple-200'
-                          : 'hover:bg-slate-800/50 cursor-pointer'
+                          : selectedRows.size === 0
+                          ? 'hover:bg-slate-800/50 cursor-pointer'
+                          : 'hover:bg-slate-800/50'
                       } ${selectedRows.size > 0 ? 'cursor-move' : ''}`}
                     >
-                      <td className="px-4 py-3 w-10">
+                      <td className="px-4 py-3 w-10" onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           checked={selectedRows.has(ticker.symbol)}
