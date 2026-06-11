@@ -360,15 +360,14 @@ export default function Data() {
             </select>
 
             {/* Exchange Filter */}
-            {availableExchanges.length > 0 && (
-              <div className="relative">
+            <div className="relative">
                 <button
                   onClick={() => setShowExchangeDropdown(!showExchangeDropdown)}
                   className="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded text-xs flex items-center gap-1 transition whitespace-nowrap"
                 >
                   <span>
                     {selectedExchanges.length === 0
-                      ? '🏢 Exchange'
+                      ? `🏢 ${availableExchanges.length === 0 ? 'Exchange' : 'All'}`
                       : `🏢 ${selectedExchanges.length}`}
                   </span>
                   <span className={`text-xs transition ${showExchangeDropdown ? 'rotate-180' : ''}`}>▼</span>
@@ -398,8 +397,7 @@ export default function Data() {
                     ))}
                   </div>
                 )}
-              </div>
-            )}
+            </div>
 
             {/* Search Bar */}
             <input
