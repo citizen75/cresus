@@ -173,13 +173,15 @@ export function ConversationWidget({
     // Auto-select last message on page load if none selected
     if (messages.length > 0 && !selectedMessageId) {
       const lastMsg = messages[messages.length - 1]
-      console.log(`[ConversationWidget] Auto-selecting last message:`, { id: lastMsg.id, hasPortfolio: !!lastMsg.portfolio })
+      console.log(`[ConversationWidget] Auto-selecting last message:`, { id: lastMsg.id, portfolio: lastMsg.portfolio, tickers: lastMsg.tickers, widget: lastMsg.widget })
       setSelectedMessage(lastMsg)
 
       // Auto-trigger the handler to display the message
-      if (onPortfolioClick && lastMsg.portfolio) {
+      if (onPortfolioClick) {
+        const portfolio = lastMsg.portfolio || 'global'
         const tickers = lastMsg.tickers || []
-        onPortfolioClick(lastMsg.portfolio, tickers, lastMsg.widget, lastMsg)
+        console.log(`[ConversationWidget] Auto-triggering onPortfolioClick:`, { portfolio, tickers, widget: lastMsg.widget })
+        onPortfolioClick(portfolio, tickers, lastMsg.widget, lastMsg)
       }
     }
   }, [messages, selectedMessageId, onPortfolioClick])
