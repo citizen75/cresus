@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Query
 from tools.data.financial import FinancialDataManager
 
-router = APIRouter(prefix="/api/v1/data", tags=["data"])
+router = APIRouter(prefix="/data", tags=["data"])
 manager = FinancialDataManager()
 
 
