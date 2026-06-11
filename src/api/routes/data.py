@@ -913,81 +913,31 @@ async def get_ticker_history(
 
 @router.get("/fundamental/{ticker}")
 async def get_ticker_fundamental(ticker: str):
-    """Get fundamental data for a ticker.
+    """Get fundamental data for a ticker (cached from tools.data.core.Fundamental).
 
     Args:
         ticker: Ticker symbol
     """
     try:
-        import yfinance as yf
+        from tools.data.core import Fundamental
 
-        # Fetch fundamental data from Yahoo Finance
-        ticker_obj = yf.Ticker(ticker)
-        info = ticker_obj.info or {}
+        fundamental = Fundamental(ticker)
 
-        fundamentals = {
-            "name": info.get("longName") or info.get("shortName") or ticker,
-            "country": info.get("country"),
-            "currency": info.get("currency"),
-            "exchange": info.get("exchange"),
-            "sector": info.get("sector"),
-            "industry": info.get("industry"),
-            "market_cap": info.get("marketCap"),
-            "pe_ratio": info.get("trailingPE"),
-            "eps": info.get("trailingEps"),
-            "dividend_yield": info.get("dividendYield"),
-            "52_week_high": info.get("fiftyTwoWeekHigh"),
-            "52_week_low": info.get("fiftyTwoWeekLow"),
-            "avg_volume": info.get("averageVolume"),
-            "beta": info.get("beta"),
-            "website": info.get("website"),
-            "employees": info.get("fullTimeEmployees"),
-            "description": info.get("longBusinessSummary"),
-        }
+        # Try to load from cache first (instant if available)
+        cached_data = fundamental.load()
+        if cached_data:
+            print(f"✅ Using cached fundamental for {ticker}")
+            return cached_data
 
-        # Try to enrich with FinanceDatabase if available
-        try:
-            import financedatabase as fd
+        # If not cached, fetch and cache (slow first time)
+        print(f"📡 Fetching fresh fundamental for {ticker}")
+        result = fundamental.fetch()
 
-            # Try Equities first, then ETFs if not found
-            for db_class in [fd.Equities, fd.ETFs, fd.Funds, fd.Indices]:
-                try:
-                    db = db_class()
-                    all_data = db.select()
-                    if ticker.upper() in all_data.index:
-                        row = all_data.loc[ticker.upper()]
-
-                        # Fill missing fields from FinanceDatabase
-                        if not fundamentals.get("name") and "name" in all_data.columns and pd.notna(row["name"]):
-                            fundamentals["name"] = str(row["name"])
-                        if not fundamentals.get("country") and "country" in all_data.columns and pd.notna(row["country"]):
-                            fundamentals["country"] = str(row["country"])
-                        if not fundamentals.get("currency") and "currency" in all_data.columns and pd.notna(row["currency"]):
-                            fundamentals["currency"] = str(row["currency"])
-                        if not fundamentals.get("exchange"):
-                            exchange_val = None
-                            if "exchange" in all_data.columns and pd.notna(row["exchange"]):
-                                exchange_val = str(row["exchange"])
-                            elif "market" in all_data.columns and pd.notna(row["market"]):
-                                exchange_val = str(row["market"])
-                            if exchange_val:
-                                fundamentals["exchange"] = exchange_val
-                        break
-                except Exception:
-                    continue
-        except Exception:
-            pass  # FinanceDatabase not available, continue with Yahoo data
-
-        return {
-            "ticker": ticker,
-            "data": {
-                "company": fundamentals,  # For TradingChart
-                "quotation": fundamentals  # For Dashboard
-            }
-        }
+        return result
 
     except Exception as e:
         from fastapi.responses import JSONResponse
+        print(f"❌ Error fetching fundamental for {ticker}: {e}")
         return JSONResponse(
             status_code=500,
             content={
