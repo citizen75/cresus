@@ -375,26 +375,32 @@ export default function Data() {
 
                 {/* Dropdown Menu */}
                 {showExchangeDropdown && (
-                  <div className="absolute top-full mt-1 left-0 bg-slate-800 border border-slate-700 rounded shadow-lg z-50 max-h-48 overflow-y-auto">
-                    {availableExchanges.map(exchange => (
-                      <button
-                        key={exchange}
-                        onClick={() => toggleExchange(exchange)}
-                        className={`w-full text-left px-2 py-1.5 text-xs transition flex items-center gap-1 ${
-                          selectedExchanges.includes(exchange)
-                            ? 'bg-purple-600/30 text-purple-300'
-                            : 'text-slate-300 hover:bg-slate-700'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedExchanges.includes(exchange)}
-                          onChange={() => {}}
-                          className="w-3 h-3"
-                        />
-                        <span className="text-xs">{exchange}</span>
-                      </button>
-                    ))}
+                  <div className="absolute top-full mt-1 left-0 bg-slate-800 border border-slate-700 rounded shadow-lg z-50 max-h-48 overflow-y-auto min-w-48">
+                    {availableExchanges.length === 0 ? (
+                      <div className="px-2 py-2 text-xs text-slate-400">
+                        Load tickers to see exchanges
+                      </div>
+                    ) : (
+                      availableExchanges.map(exchange => (
+                        <button
+                          key={exchange}
+                          onClick={() => toggleExchange(exchange)}
+                          className={`w-full text-left px-2 py-1.5 text-xs transition flex items-center gap-1 ${
+                            selectedExchanges.includes(exchange)
+                              ? 'bg-purple-600/30 text-purple-300'
+                              : 'text-slate-300 hover:bg-slate-700'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedExchanges.includes(exchange)}
+                            onChange={() => {}}
+                            className="w-3 h-3"
+                          />
+                          <span className="text-xs">{exchange}</span>
+                        </button>
+                      ))
+                    )}
                   </div>
                 )}
             </div>
