@@ -20,6 +20,14 @@ interface Ticker {
   currency?: string
 }
 
+const MARKET_FILTERS = [
+  { id: 'all', label: 'All Markets', icon: '🌍' },
+  { id: 'europe', label: 'Europe', icon: '🇪🇺', universes: ['cac40', 'srd', 'enx_large', 'enx_mid', 'enx_small', 'xetra', 'etf_pea', 'etf_pea_full', 'etf_pea_test', 'etf_fr'] },
+  { id: 'usa', label: 'USA', icon: '🇺🇸', universes: ['nasdaq_100', 'nasdaq_tech', 'sp_25'] },
+  { id: 'indices', label: 'Indices', icon: '📊', universes: ['index'] },
+  { id: 'other', label: 'Other', icon: '🌐', universes: ['single'] },
+]
+
 export default function Data() {
   const navigate = useNavigate()
   const [universes, setUniverses] = useState<Universe[]>([])
@@ -27,6 +35,8 @@ export default function Data() {
   const [tickers, setTickers] = useState<Ticker[]>([])
   const [loading, setLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [selectedMarket, setSelectedMarket] = useState<string>('all')
+  const [showMarketDropdown, setShowMarketDropdown] = useState(false)
 
   // Load universes on mount
   useEffect(() => {
@@ -75,11 +85,20 @@ export default function Data() {
     }
   }
 
+  // Filter universes by selected market
+  const filteredUniverses = universes.filter(uni => {
+    if (selectedMarket === 'all') return true
+    const market = MARKET_FILTERS.find(m => m.id === selectedMarket)
+    return market?.universes?.includes(uni.id) || false
+  })
+
   const filteredTickers = tickers.filter(ticker =>
     searchQuery === '' ||
     ticker.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
     ticker.name?.toLowerCase().includes(searchQuery.toLowerCase())
   )
+
+  const currentMarket = MARKET_FILTERS.find(m => m.id === selectedMarket)
 
   return (
     <div className="flex-1 bg-slate-950 overflow-hidden flex flex-col">
@@ -101,16 +120,56 @@ export default function Data() {
       <div className="flex-1 flex gap-4 p-6 overflow-hidden">
         {/* Left Panel - Universes List */}
         <div className="w-80 flex flex-col border border-slate-800 rounded-lg bg-slate-900">
-          <div className="px-4 py-3 border-b border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-            Universes ({universes.length})
+          {/* Market Selector */}
+          <div className="relative p-3 border-b border-slate-800">
+            <button
+              onClick={() => setShowMarketDropdown(!showMarketDropdown)}
+              className="w-full px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded text-sm flex items-center justify-between transition"
+            >
+              <span>
+                <span className="text-lg mr-2">{currentMarket?.icon}</span>
+                {currentMarket?.label}
+              </span>
+              <span className={`text-xs transition ${showMarketDropdown ? 'rotate-180' : ''}`}>▼</span>
+            </button>
+
+            {/* Dropdown Menu */}
+            {showMarketDropdown && (
+              <div className="absolute top-full mt-2 left-3 right-3 bg-slate-800 border border-slate-700 rounded shadow-lg z-50">
+                {MARKET_FILTERS.map(market => (
+                  <button
+                    key={market.id}
+                    onClick={() => {
+                      setSelectedMarket(market.id)
+                      setShowMarketDropdown(false)
+                    }}
+                    className={`w-full text-left px-3 py-2 text-sm transition ${
+                      selectedMarket === market.id
+                        ? 'bg-purple-600/30 text-purple-300'
+                        : 'text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    <span className="text-lg mr-2">{market.icon}</span>
+                    {market.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
+
+          {/* Header */}
+          <div className="px-4 py-3 border-b border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+            Universes ({filteredUniverses.length})
+          </div>
+
+          {/* Universes List */}
           <div className="flex-1 overflow-y-auto px-2 py-3 space-y-1">
             {loading && universes.length === 0 ? (
               <div className="text-center text-slate-500 py-8">Loading universes...</div>
-            ) : universes.length === 0 ? (
-              <div className="text-center text-slate-500 py-8">No universes available</div>
+            ) : filteredUniverses.length === 0 ? (
+              <div className="text-center text-slate-500 py-8">No universes in this market</div>
             ) : (
-              universes.map(universe => (
+              filteredUniverses.map(universe => (
                 <button
                   key={universe.id}
                   onClick={() => setSelectedUniverse(universe.id)}
