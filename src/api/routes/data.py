@@ -971,3 +971,89 @@ async def get_ticker_history(
             "history": [],
             "error": str(e)
         }
+
+
+@router.get("/fundamental/{ticker}")
+async def get_ticker_fundamental(ticker: str):
+    """Get fundamental data for a ticker.
+
+    Args:
+        ticker: Ticker symbol
+    """
+    try:
+        import yfinance as yf
+
+        # Fetch fundamental data from Yahoo Finance
+        ticker_obj = yf.Ticker(ticker)
+        info = ticker_obj.info or {}
+
+        fundamentals = {
+            "name": info.get("longName") or info.get("shortName") or ticker,
+            "country": info.get("country"),
+            "currency": info.get("currency"),
+            "exchange": info.get("exchange"),
+            "sector": info.get("sector"),
+            "industry": info.get("industry"),
+            "market_cap": info.get("marketCap"),
+            "pe_ratio": info.get("trailingPE"),
+            "eps": info.get("trailingEps"),
+            "dividend_yield": info.get("dividendYield"),
+            "52_week_high": info.get("fiftyTwoWeekHigh"),
+            "52_week_low": info.get("fiftyTwoWeekLow"),
+            "avg_volume": info.get("averageVolume"),
+            "beta": info.get("beta"),
+            "website": info.get("website"),
+            "employees": info.get("fullTimeEmployees"),
+            "description": info.get("longBusinessSummary"),
+        }
+
+        # Try to enrich with FinanceDatabase if available
+        try:
+            import financedatabase as fd
+
+            # Try Equities first, then ETFs if not found
+            for db_class in [fd.Equities, fd.ETFs, fd.Funds, fd.Indices]:
+                try:
+                    db = db_class()
+                    all_data = db.select()
+                    if ticker.upper() in all_data.index:
+                        row = all_data.loc[ticker.upper()]
+
+                        # Fill missing fields from FinanceDatabase
+                        if not fundamentals.get("name") and "name" in all_data.columns and pd.notna(row["name"]):
+                            fundamentals["name"] = str(row["name"])
+                        if not fundamentals.get("country") and "country" in all_data.columns and pd.notna(row["country"]):
+                            fundamentals["country"] = str(row["country"])
+                        if not fundamentals.get("currency") and "currency" in all_data.columns and pd.notna(row["currency"]):
+                            fundamentals["currency"] = str(row["currency"])
+                        if not fundamentals.get("exchange"):
+                            exchange_val = None
+                            if "exchange" in all_data.columns and pd.notna(row["exchange"]):
+                                exchange_val = str(row["exchange"])
+                            elif "market" in all_data.columns and pd.notna(row["market"]):
+                                exchange_val = str(row["market"])
+                            if exchange_val:
+                                fundamentals["exchange"] = exchange_val
+                        break
+                except Exception:
+                    continue
+        except Exception:
+            pass  # FinanceDatabase not available, continue with Yahoo data
+
+        return {
+            "ticker": ticker,
+            "data": {
+                "company": fundamentals,  # For TradingChart
+                "quotation": fundamentals  # For Dashboard
+            }
+        }
+
+    except Exception as e:
+        return {
+            "ticker": ticker,
+            "data": {
+                "company": {},
+                "quotation": {}
+            },
+            "error": str(e)
+        }, 500
