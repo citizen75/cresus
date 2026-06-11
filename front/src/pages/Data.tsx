@@ -294,7 +294,7 @@ export default function Data() {
           </div>
 
           {/* Table */}
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar">
             {loading ? (
               <div className="flex items-center justify-center h-full text-slate-400">
                 Loading tickers...
