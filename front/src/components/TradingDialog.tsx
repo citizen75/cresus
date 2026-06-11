@@ -25,7 +25,7 @@ export function TradingDialog({
   const [tickerName, setTickerName] = useState('')
   const [price, setPrice] = useState<string>(initialPrice ? parseFloat(initialPrice).toFixed(3) : '')
   const [quantity, setQuantity] = useState<string>(
-    mode === 'sell' && position?.quantity ? String(position.quantity) : ''
+    mode === 'sell' && position?.quantity ? String(position.quantity) : mode === 'buy' ? '1' : ''
   )
   const [fees, setFees] = useState<string>('0')
   const [stopLoss, setStopLoss] = useState<string>('7') // Default 7%
