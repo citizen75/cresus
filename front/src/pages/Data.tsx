@@ -267,7 +267,8 @@ export default function Data() {
         {/* Right Panel */}
         <div className="flex-1 flex flex-col border border-slate-800 rounded-lg bg-slate-900 min-h-0">
           {/* Filters Header - All Inline */}
-          <div className="px-3 py-2 border-b border-slate-800 flex gap-2 items-center">
+          <div className="px-3 py-2 border-b border-slate-800 flex gap-2 items-center justify-between">
+            <div className="flex gap-2 items-center flex-1">
             {/* Country Filter */}
             <div className="relative">
               <button
@@ -330,6 +331,12 @@ export default function Data() {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="flex-1 px-2 py-1.5 bg-slate-800 border border-slate-700 text-white rounded text-xs focus:outline-none focus:border-purple-500"
             />
+            </div>
+
+            {/* Count Display */}
+            <div className="text-xs text-slate-400 whitespace-nowrap pl-2 border-l border-slate-700">
+              {filteredTickers.length} / {tickers.length}
+            </div>
           </div>
 
           {/* Table */}
