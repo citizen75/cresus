@@ -40,15 +40,34 @@ class FinancialDataManager:
                 universe = Universe(uni_id)
                 if universe.exists():
                     tickers = universe.get_tickers()
+                    count = len(tickers)
                     universes.append({
                         "id": uni_id,
-                        "name": uni_id.replace("_", " ").title(),
-                        "count": len(tickers),
+                        "name": self._format_universe_name(uni_id),
+                        "count": count,
                     })
+                    self.logger.debug(f"Universe {uni_id}: {count} tickers")
             except Exception as e:
                 self.logger.warning(f"Failed to load universe {uni_id}: {e}")
 
         return universes
+
+    @staticmethod
+    def _format_universe_name(universe_id: str) -> str:
+        """Format universe ID as human-readable name."""
+        names = {
+            "srd": "Euronext SRD (France)",
+            "cac40": "CAC 40 Index",
+            "nasdaq_100": "NASDAQ 100",
+            "sp500": "S&P 500",
+            "etf_pea": "ETF PEA (France)",
+            "etf_fr": "French ETFs",
+            "funds_fr": "French Funds",
+            "indices_main": "Major Indices",
+            "forex_major": "Major Pairs",
+            "forex_exotic": "Exotic Pairs",
+        }
+        return names.get(universe_id, universe_id.replace("_", " ").title())
 
     def get_tickers(self, category: str, universe: str, limit: int = 1000) -> List[Dict[str, Any]]:
         """Get tickers for a category and universe."""
