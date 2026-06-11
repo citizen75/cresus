@@ -1,10 +1,10 @@
 """Data management API routes."""
 
 from fastapi import APIRouter, Query
-from tools.data.manager import DataManager
+from tools.data.manager import FinancialDataManager
 
 router = APIRouter(prefix="/api/v1/data", tags=["data"])
-manager = DataManager()
+manager = FinancialDataManager()
 
 
 @router.get("/categories")

@@ -1,4 +1,4 @@
-"""Data management tools for financial database and universes."""
+"""Financial data management tools."""
 
 import logging
 from typing import List, Dict, Any, Optional
@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Optional
 logger = logging.getLogger(__name__)
 
 
-class DataManager:
+class FinancialDataManager:
     """Manage financial data and universes."""
 
     def __init__(self):
