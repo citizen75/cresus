@@ -13,7 +13,7 @@ export function useHistoricalDataLoader() {
     async (
       tickers: string[],
       fetchFn: (ticker: string, days: number) => Promise<any>,
-      days: number = 1825
+      days: number = 730  // Default to 2 years instead of 5
     ): Promise<{ [ticker: string]: any[] } | null> => {
       if (!tickers.length || !fetchFn) return null
 

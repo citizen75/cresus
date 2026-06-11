@@ -26,6 +26,10 @@ class EnrichedTickersRequest(BaseModel):
 router = APIRouter(prefix="/data", tags=["data"])
 manager = FinancialDataManager()
 
+# Cache for loaded data to avoid repeated Parquet reads
+_data_cache = {}
+_cache_max_size = 5  # Keep last 5 tickers
+
 # Cache for universe list (TTL: 300 seconds / 5 minutes)
 _universe_list_cache = None
 _universe_list_cache_time = 0
@@ -814,20 +818,28 @@ async def get_ticker_history(
     """
     try:
         from tools.data.core import DataHistory, Fundamental
+        from tools.indicators import calculate
         from datetime import datetime, timedelta
 
-        # Use existing tools/data classes with Parquet caching
-        data_history = DataHistory(ticker)
-        fundamental = Fundamental(ticker)
-
-        # Load from Parquet cache (~/.cresus/db/cache/history/)
-        df = data_history.load_all()
-        if df.empty:
-            print(f"⏳ CACHE MISS: {ticker} - fetching from Yahoo...")
-            data_history.fetch()
-            df = data_history.load_all()
+        # Check in-memory cache first
+        global _data_cache
+        if ticker in _data_cache:
+            df = _data_cache[ticker]
         else:
-            print(f"✅ CACHE HIT: {ticker} ({len(df)} records from Parquet)")
+            # Load from Parquet cache (~/.cresus/db/cache/history/)
+            data_history = DataHistory(ticker)
+            df = data_history.load_all()
+            if df.empty:
+                data_history.fetch()
+                df = data_history.load_all()
+
+            # Store in memory cache
+            if len(_data_cache) >= _cache_max_size:
+                _data_cache.pop(next(iter(_data_cache)))
+            _data_cache[ticker] = df
+
+        # Load fundamental data
+        fundamental = Fundamental(ticker)
 
         if df.empty:
             return {"ticker": ticker, "data": [], "history": []}
@@ -836,28 +848,32 @@ async def get_ticker_history(
         if days:
             cutoff = datetime.now() - timedelta(days=days)
             if 'timestamp' in df.columns:
-                df = df[pd.to_datetime(df['timestamp']) >= cutoff]
+                df_filtered = df[pd.to_datetime(df['timestamp']) >= cutoff].copy()
             else:
-                df = df[df.index >= cutoff]
+                df_filtered = df[df.index >= cutoff].copy()
+        else:
+            df_filtered = df.copy()
 
-        # Convert to dict list
+        # Calculate indicators on the filtered dataset
+        indicators_dict = {}
+        if not df_filtered.empty and indicator:
+            try:
+                indicators_dict = calculate([indicator], df_filtered)
+            except Exception as e:
+                pass
+
+        # Convert to dict list and merge indicators
         history = []
-        for idx, row in df.iterrows():
-            # Handle both DatetimeIndex and numeric indices
-            if hasattr(idx, 'strftime'):
-                # DatetimeIndex - proper datetime
-                date_str = idx.strftime('%Y-%m-%d')
-            elif 'timestamp' in row and row['timestamp']:
-                # timestamp column exists
+        for idx, row in df_filtered.iterrows():
+            # Handle timestamp/date
+            if 'timestamp' in row and row['timestamp']:
                 date_str = pd.to_datetime(row['timestamp']).strftime('%Y-%m-%d')
+            elif hasattr(idx, 'strftime'):
+                date_str = idx.strftime('%Y-%m-%d')
             else:
-                # Fallback: assume numeric index is days since epoch
-                try:
-                    date_str = pd.Timestamp(int(idx), unit='D').strftime('%Y-%m-%d')
-                except:
-                    date_str = str(idx)[:10]
+                date_str = str(idx)[:10]
 
-            history.append({
+            row_dict = {
                 "timestamp": date_str,
                 "date": date_str,
                 "open": float(row.get('open', row.get('Open', 0))),
@@ -865,24 +881,20 @@ async def get_ticker_history(
                 "low": float(row.get('low', row.get('Low', 0))),
                 "close": float(row.get('close', row.get('Close', 0))),
                 "volume": int(row.get('volume', row.get('Volume', 0))),
-            })
+            }
 
-        # Add SHA_10 if requested
-        if indicator == "sha_10" and history:
-            for i, c in enumerate(history):
-                ha_c = (c["open"] + c["high"] + c["low"] + c["close"]) / 4
-                ha_o = c["open"] if i == 0 else (history[i-1].get("ha_open", history[i-1]["open"]) + history[i-1].get("ha_close", history[i-1]["close"])) / 2
-                ha_h, ha_l = max(c["high"], ha_o, ha_c), min(c["low"], ha_o, ha_c)
-                c.update({"ha_open": ha_o, "ha_close": ha_c, "ha_high": ha_h, "ha_low": ha_l})
+            # Add indicators if available
+            for ind_key, ind_series in indicators_dict.items():
+                # Find the value for this row (by position in the filtered dataframe)
+                position = df_filtered.index.get_loc(idx)
+                if position < len(ind_series):
+                    val = ind_series.iloc[position]
+                    if pd.notna(val):
+                        if hasattr(val, 'item'):
+                            val = val.item()
+                        row_dict[ind_key] = round(float(val), 4) if isinstance(val, (int, float)) else val
 
-            for i in range(len(history)):
-                window = history[max(0, i-9):i+1]
-                history[i].update({
-                    "sha_10_open": round(sum(x.get("ha_open", x["open"]) for x in window) / len(window), 2),
-                    "sha_10_close": round(sum(x.get("ha_close", x["close"]) for x in window) / len(window), 2),
-                    "sha_10_high": round(sum(x.get("ha_high", x["high"]) for x in window) / len(window), 2),
-                    "sha_10_low": round(sum(x.get("ha_low", x["low"]) for x in window) / len(window), 2),
-                })
+            history.append(row_dict)
 
         fund = fundamental.load() or {}
         return {
@@ -890,11 +902,12 @@ async def get_ticker_history(
             "data": history,
             "history": history,
             "fundamentals": fund.get("data", {}),
-            "source": "parquet" + ("+sha_10" if indicator else "")
+            "source": "parquet+indicators"
         }
 
     except Exception as e:
-        print(f"❌ ERROR: {e}")
+        import traceback
+        traceback.print_exc()
         return {"ticker": ticker, "data": [], "history": [], "error": str(e)}
 
 

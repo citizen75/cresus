@@ -4,8 +4,8 @@ Validates strategy configurations against required structure and rules.
 """
 
 from typing import Dict, List, Any, Tuple, Set, Union
-from src.tools.formula import check_syntax, extract_indicators, validate_formulas
-from src.tools.indicators import check_indicator, CheckResult
+from tools.formula import check_syntax, extract_indicators, validate_formulas
+from tools.indicators import check_indicator, CheckResult
 
 # Data fields that are not indicators (OHLCV data)
 DATA_FIELDS = {'open', 'high', 'low', 'close', 'volume', 'timestamp', 'ticker', 'date'}
