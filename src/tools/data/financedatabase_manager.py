@@ -78,6 +78,14 @@ def enrich_ticker(ticker_symbol: str, asset_type: str = "equities") -> Optional[
 
         # Get the first result (primary listing)
         row = results.iloc[0]
+
+        # Get exchange - try exchange first, fallback to market
+        exchange_value = None
+        if pd.notna(row.get("exchange")):
+            exchange_value = str(row.get("exchange"))
+        elif pd.notna(row.get("market")):
+            exchange_value = str(row.get("market"))
+
         return {
             "symbol": str(row.get("symbol", ticker_symbol)),
             "name": str(row.get("name", ticker_symbol)),
@@ -86,7 +94,7 @@ def enrich_ticker(ticker_symbol: str, asset_type: str = "equities") -> Optional[
             "industry_group": str(row.get("industry_group")) if pd.notna(row.get("industry_group")) else None,
             "country": str(row.get("country")) if pd.notna(row.get("country")) else None,
             "currency": str(row.get("currency")) if pd.notna(row.get("currency")) else None,
-            "exchange": str(row.get("exchange")) if pd.notna(row.get("exchange")) else None,
+            "exchange": exchange_value,
             "market": str(row.get("market")) if pd.notna(row.get("market")) else None,
             "website": str(row.get("website")) if pd.notna(row.get("website")) else None,
             "market_cap": str(row.get("market_cap")) if pd.notna(row.get("market_cap")) else None,
@@ -149,6 +157,13 @@ def search_by_country(country: str, asset_type: str = "equities", market: Option
         # Convert to list of dicts
         tickers = []
         for idx, row in results.iterrows():
+            # Get exchange - try exchange first, fallback to market
+            exchange_value = None
+            if pd.notna(row.get("exchange")):
+                exchange_value = str(row.get("exchange"))
+            elif pd.notna(row.get("market")):
+                exchange_value = str(row.get("market"))
+
             tickers.append({
                 "symbol": str(row.get("symbol")),
                 "name": str(row.get("name")),
@@ -156,6 +171,7 @@ def search_by_country(country: str, asset_type: str = "equities", market: Option
                 "industry": str(row.get("industry")) if pd.notna(row.get("industry")) else None,
                 "country": str(row.get("country")) if pd.notna(row.get("country")) else None,
                 "currency": str(row.get("currency")) if pd.notna(row.get("currency")) else None,
+                "exchange": exchange_value,
             })
 
         return tickers
