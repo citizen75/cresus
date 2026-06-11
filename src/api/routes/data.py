@@ -295,77 +295,136 @@ async def remove_tickers_from_universe(universe_id: str, request: TickersRequest
 
 @router.get("/filter")
 async def filter_tickers(
-    countries: str = Query(None, description="Comma-separated country codes (FR,NL,DE)"),
+    countries: str = Query(None, description="Comma-separated country codes (FR,US,DE,NL,etc.)"),
     asset_type: str = Query(None, description="Asset type (stocks, etfs, funds, indices)"),
     limit: int = Query(1000, description="Max number of tickers"),
     enrich: bool = Query(True, description="Enrich with fundamentals data"),
 ):
-    """Filter tickers by country and asset type.
+    """Filter tickers by country and asset type using FinanceDatabase.
 
-    Countries map to universes:
-    - FR: srd, cac40, nasdaq_tech, enx_large, enx_mid, enx_small, xetra, etf_pea, etf_fr, etf_pea_full
-    - US: nasdaq_100, nasdaq_tech, sp_25
-    - DE: xetra, enx_mid, enx_small, nasdaq_100, nasdaq_tech, sp_25
-    - EU: enx_large, enx_mid, enx_small, xetra, nasdaq_100, nasdaq_tech, sp_25
-    - NOTE: ETFs only available for FR (French ETFs: etf_pea, etf_fr, etf_pea_full)
+    Queries FinanceDatabase directly for maximum coverage:
+    - All countries and exchanges supported
+    - All asset types available
+    - No universe file limitations
+
+    Examples:
+    - ?countries=US&asset_type=etfs → US ETFs (NASDAQ, NYSE ARCA, etc.)
+    - ?countries=FR,DE&asset_type=stocks → French and German stocks
+    - ?asset_type=etfs → All ETFs (worldwide)
     """
-    country_universe_map = {
-        "FR": ["srd", "cac40", "nasdaq_tech", "enx_large", "enx_mid", "enx_small", "xetra", "etf_pea", "etf_fr", "etf_pea_full"],
-        "US": ["nasdaq_100", "nasdaq_tech", "sp_25"],
-        "DE": ["xetra", "enx_mid", "enx_small", "nasdaq_100", "nasdaq_tech", "sp_25"],
-        "EU": ["enx_large", "enx_mid", "enx_small", "xetra", "nasdaq_100", "nasdaq_tech", "sp_25"],
-    }
+    try:
+        import financedatabase as fd
 
-    asset_type_universes = {
-        "stocks": ["srd", "cac40", "nasdaq_100", "nasdaq_tech", "sp_25", "enx_large", "enx_mid", "enx_small", "xetra"],
-        "etfs": ["etf_pea", "etf_fr", "etf_pea_full"],  # Only French ETFs available
-        "funds": [],
-        "indices": ["index"],
-    }
-
-    # Determine universes to query
-    universes_to_query = []
-
-    if countries and asset_type:
-        # Both filters applied
-        country_list = [c.strip().upper() for c in countries.split(",")]
-        asset_unis = asset_type_universes.get(asset_type.lower(), [])
-        for country in country_list:
-            country_unis = country_universe_map.get(country, [])
-            universes_to_query.extend([u for u in country_unis if u in asset_unis])
-    elif countries:
-        # Only country filter
-        country_list = [c.strip().upper() for c in countries.split(",")]
-        for country in country_list:
-            universes_to_query.extend(country_universe_map.get(country, []))
-    elif asset_type:
-        # Only asset type filter
-        universes_to_query = asset_type_universes.get(asset_type.lower(), [])
-    else:
-        # No filters
-        return {"tickers": [], "count": 0}
-
-    # Remove duplicates
-    universes_to_query = list(set(universes_to_query))
-
-    # If no universes found, return helpful message
-    if not universes_to_query:
-        return {
-            "countries": countries,
-            "asset_type": asset_type,
-            "tickers": [],
-            "count": 0,
-            "note": "No data available for this combination. ETFs are only available for France (FR).",
+        # Country code to FinanceDatabase country name mapping
+        country_name_map = {
+            "FR": "France",
+            "US": "United States",
+            "DE": "Germany",
+            "NL": "Netherlands",
+            "GB": "United Kingdom",
+            "IT": "Italy",
+            "ES": "Spain",
+            "CH": "Switzerland",
+            "SE": "Sweden",
+            "CA": "Canada",
+            "AU": "Australia",
+            "JP": "Japan",
+            "HK": "Hong Kong",
+            "SG": "Singapore",
+            "IN": "India",
+            "BR": "Brazil",
+            "MX": "Mexico",
+            "ZA": "South Africa",
         }
 
-    all_tickers = []
-    try:
-        for uni_id in universes_to_query:
+        all_tickers = []
+
+        # Determine which database to query
+        asset_type_lower = asset_type.lower() if asset_type else None
+
+        if asset_type_lower == "stocks":
+            db = fd.Equities()
+        elif asset_type_lower == "etfs":
+            db = fd.ETFs()
+        elif asset_type_lower == "funds":
+            db = fd.Funds()
+        elif asset_type_lower == "indices":
+            db = fd.Indices()
+        else:
+            return {
+                "countries": countries,
+                "asset_type": asset_type,
+                "tickers": [],
+                "count": 0,
+                "error": "Invalid asset_type. Must be: stocks, etfs, funds, or indices"
+            }
+
+        # Build query filters
+        query_kwargs = {}
+
+        if countries:
+            # Parse country codes and convert to names
+            country_list = [c.strip().upper() for c in countries.split(",")]
+            country_names = []
+            for code in country_list:
+                if code in country_name_map:
+                    country_names.append(country_name_map[code])
+
+            if country_names:
+                # Query for each country and combine results
+                for country_name in country_names:
+                    try:
+                        data = db.select(country=country_name)
+                        if not data.empty:
+                            for idx, row in data.iterrows():
+                                ticker_data = {
+                                    "symbol": idx,
+                                    "name": str(row.get("name", idx)) if pd.notna(row.get("name")) else idx,
+                                }
+
+                                # Add available fields based on asset type
+                                if "currency" in data.columns and pd.notna(row.get("currency")):
+                                    ticker_data["currency"] = str(row.get("currency"))
+                                if "exchange" in data.columns and pd.notna(row.get("exchange")):
+                                    ticker_data["exchange"] = str(row.get("exchange"))
+                                if "country" in data.columns and pd.notna(row.get("country")):
+                                    ticker_data["country"] = str(row.get("country"))
+
+                                # Add sector for stocks
+                                if asset_type_lower == "stocks" and "sector" in data.columns and pd.notna(row.get("sector")):
+                                    ticker_data["sector"] = str(row.get("sector"))
+                                if asset_type_lower == "stocks" and "industry" in data.columns and pd.notna(row.get("industry")):
+                                    ticker_data["industry"] = str(row.get("industry"))
+
+                                all_tickers.append(ticker_data)
+                    except Exception:
+                        pass
+        else:
+            # No country filter - get all tickers for this asset type
             try:
-                uni = Universe(uni_id)
-                if uni.exists():
-                    tickers = uni.get_tickers_with_metadata()
-                    all_tickers.extend(tickers)
+                data = db.select()
+                if not data.empty:
+                    for idx, row in data.iterrows():
+                        ticker_data = {
+                            "symbol": idx,
+                            "name": str(row.get("name", idx)) if pd.notna(row.get("name")) else idx,
+                        }
+
+                        # Add available fields
+                        if "currency" in data.columns and pd.notna(row.get("currency")):
+                            ticker_data["currency"] = str(row.get("currency"))
+                        if "exchange" in data.columns and pd.notna(row.get("exchange")):
+                            ticker_data["exchange"] = str(row.get("exchange"))
+                        if "country" in data.columns and pd.notna(row.get("country")):
+                            ticker_data["country"] = str(row.get("country"))
+
+                        # Add sector for stocks
+                        if asset_type_lower == "stocks" and "sector" in data.columns and pd.notna(row.get("sector")):
+                            ticker_data["sector"] = str(row.get("sector"))
+                        if asset_type_lower == "stocks" and "industry" in data.columns and pd.notna(row.get("industry")):
+                            ticker_data["industry"] = str(row.get("industry"))
+
+                        all_tickers.append(ticker_data)
             except Exception:
                 pass
 
@@ -378,38 +437,15 @@ async def filter_tickers(
                 seen.add(symbol)
                 unique_tickers.append(ticker)
 
-        # Optionally enrich with fundamentals
-        if enrich:
-            unique_tickers = TickerIntelligence.batch_enrich_flat(unique_tickers, asset_type=asset_type.lower() if asset_type else "equities")
-
-            # Fallback: Add country/exchange directly from FinanceDatabase if missing
+        # Optionally enrich with additional data (price, fundamentals)
+        if enrich and unique_tickers:
             try:
-                import financedatabase as fd
-                if asset_type and asset_type.lower() == "equities":
-                    db = fd.Equities()
-                elif asset_type and asset_type.lower() == "etfs":
-                    db = fd.ETFs()
-                else:
-                    db = None
-
-                if db:
-                    all_data = db.select()
-                    for ticker in unique_tickers:
-                        symbol = ticker.get("symbol", "").upper()
-                        if symbol in all_data.index and (not ticker.get("country") or not ticker.get("exchange")):
-                            row = all_data.loc[symbol]
-                            if not ticker.get("country") and "country" in all_data.columns:
-                                ticker["country"] = str(row["country"]) if pd.notna(row["country"]) else None
-                            if not ticker.get("exchange"):
-                                exchange_val = None
-                                if "exchange" in all_data.columns and pd.notna(row["exchange"]):
-                                    exchange_val = str(row["exchange"])
-                                elif "market" in all_data.columns and pd.notna(row["market"]):
-                                    exchange_val = str(row["market"])
-                                if exchange_val:
-                                    ticker["exchange"] = exchange_val
-            except Exception as e:
-                pass  # Fallback failed, continue with what we have
+                unique_tickers = TickerIntelligence.batch_enrich_flat(
+                    unique_tickers,
+                    asset_type=asset_type_lower if asset_type_lower else "equities"
+                )
+            except Exception:
+                pass  # Continue even if enrichment fails
 
         # Limit results
         unique_tickers = unique_tickers[:limit]
@@ -420,6 +456,7 @@ async def filter_tickers(
             "tickers": unique_tickers,
             "count": len(unique_tickers),
         }
+
     except Exception as e:
         return {"error": str(e)}, 400
 
