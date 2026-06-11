@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import CardChart from '@/components/CardChart'
+import Scheduler from '@/pages/Scheduler'
+import Logs from '@/pages/Logs'
 
 interface Universe {
   id: string
@@ -39,7 +41,7 @@ const ASSET_TYPES = [
 export default function Data() {
   const navigate = useNavigate()
   const location = useLocation()
-  const [activeTab, setActiveTab] = useState<'data' | 'universes'>('data')
+  const [activeTab, setActiveTab] = useState<'data' | 'universes' | 'scheduler' | 'logs'>('data')
   const [universes, setUniverses] = useState<Universe[]>([])
   const [selectedUniverse, setSelectedUniverse] = useState<string | null>(null)
   const [fetchingData, setFetchingData] = useState<string | null>(null)
@@ -218,7 +220,11 @@ export default function Data() {
 
   // Sync active tab with URL
   useEffect(() => {
-    if (location.pathname.includes('/universes')) {
+    if (location.pathname.includes('/scheduler')) {
+      setActiveTab('scheduler')
+    } else if (location.pathname.includes('/logs')) {
+      setActiveTab('logs')
+    } else if (location.pathname.includes('/universes')) {
       setActiveTab('universes')
     } else {
       setActiveTab('data')
@@ -226,10 +232,14 @@ export default function Data() {
   }, [location.pathname])
 
   // Update URL when tab changes
-  const handleTabChange = (tab: 'data' | 'universes') => {
+  const handleTabChange = (tab: 'data' | 'universes' | 'scheduler' | 'logs') => {
     setActiveTab(tab)
     if (tab === 'universes') {
       navigate('/data/universes')
+    } else if (tab === 'scheduler') {
+      navigate('/data/scheduler')
+    } else if (tab === 'logs') {
+      navigate('/data/logs')
     } else {
       navigate('/data')
     }
@@ -581,10 +591,10 @@ export default function Data() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 overflow-x-auto pb-2">
           <button
             onClick={() => handleTabChange('data')}
-            className={`px-4 py-2 rounded font-medium transition ${
+            className={`px-4 py-2 rounded font-medium transition whitespace-nowrap ${
               activeTab === 'data'
                 ? 'bg-purple-600 text-white'
                 : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
@@ -594,13 +604,33 @@ export default function Data() {
           </button>
           <button
             onClick={() => handleTabChange('universes')}
-            className={`px-4 py-2 rounded font-medium transition ${
+            className={`px-4 py-2 rounded font-medium transition whitespace-nowrap ${
               activeTab === 'universes'
                 ? 'bg-purple-600 text-white'
                 : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
             }`}
           >
             📦 Universes
+          </button>
+          <button
+            onClick={() => handleTabChange('scheduler')}
+            className={`px-4 py-2 rounded font-medium transition whitespace-nowrap ${
+              activeTab === 'scheduler'
+                ? 'bg-purple-600 text-white'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+            }`}
+          >
+            ⏰ Scheduler
+          </button>
+          <button
+            onClick={() => handleTabChange('logs')}
+            className={`px-4 py-2 rounded font-medium transition whitespace-nowrap ${
+              activeTab === 'logs'
+                ? 'bg-purple-600 text-white'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+            }`}
+          >
+            📋 Logs
           </button>
         </div>
       </div>
@@ -1059,6 +1089,20 @@ export default function Data() {
             </div>
           </div>
         </div>
+      </div>
+      )}
+
+      {/* Main content - Scheduler Tab */}
+      {activeTab === 'scheduler' && (
+      <div className="flex-1 overflow-hidden">
+        <Scheduler />
+      </div>
+      )}
+
+      {/* Main content - Logs Tab */}
+      {activeTab === 'logs' && (
+      <div className="flex-1 overflow-hidden">
+        <Logs />
       </div>
       )}
 

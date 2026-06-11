@@ -70,6 +70,8 @@ export default function App() {
           <Route path="/tasks" element={<Layout><Tasks /></Layout>} />
           <Route path="/data" element={<Layout><Data /></Layout>} />
           <Route path="/data/universes" element={<Layout><Data /></Layout>} />
+          <Route path="/data/scheduler" element={<Layout><Data /></Layout>} />
+          <Route path="/data/logs" element={<Layout><Data /></Layout>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         </BrowserRouter>
