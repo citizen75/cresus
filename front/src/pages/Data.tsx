@@ -44,7 +44,10 @@ export default function Data() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCountries, setSelectedCountries] = useState<string[]>(['FR'])
   const [selectedAssetType, setSelectedAssetType] = useState<string>('stocks')
+  const [selectedExchanges, setSelectedExchanges] = useState<string[]>([])
   const [showCountryDropdown, setShowCountryDropdown] = useState(false)
+  const [showExchangeDropdown, setShowExchangeDropdown] = useState(false)
+  const [availableExchanges, setAvailableExchanges] = useState<string[]>([])
   const [sortColumn, setSortColumn] = useState<string>('symbol')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
@@ -126,6 +129,27 @@ export default function Data() {
     )
   }
 
+  const toggleExchange = (exchange: string) => {
+    setSelectedExchanges(prev =>
+      prev.includes(exchange) ? prev.filter(e => e !== exchange) : [...prev, exchange]
+    )
+  }
+
+  // Collect unique exchanges from tickers
+  const updateAvailableExchanges = () => {
+    const exchanges = [...new Set(
+      tickers
+        .map(t => t.exchange)
+        .filter((e): e is string => e !== undefined && e !== null && e !== '-')
+    )].sort()
+    setAvailableExchanges(exchanges)
+  }
+
+  // Update available exchanges when tickers change
+  useEffect(() => {
+    updateAvailableExchanges()
+  }, [tickers])
+
   const handleSort = (columnKey: string) => {
     if (sortColumn === columnKey) {
       // Toggle direction if same column
@@ -138,11 +162,23 @@ export default function Data() {
   }
 
   const filteredTickers = tickers
-    .filter(ticker =>
-      searchQuery === '' ||
-      ticker.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ticker.name?.toLowerCase().includes(searchQuery.toLowerCase())
-    )
+    .filter(ticker => {
+      // Search filter
+      if (searchQuery !== '') {
+        const query = searchQuery.toLowerCase()
+        if (!((ticker.symbol && ticker.symbol.toLowerCase().includes(query)) ||
+              (ticker.name && ticker.name.toLowerCase().includes(query)))) {
+          return false
+        }
+      }
+      // Exchange filter
+      if (selectedExchanges.length > 0 && ticker.exchange) {
+        if (!selectedExchanges.includes(ticker.exchange)) {
+          return false
+        }
+      }
+      return true
+    })
     .sort((a, b) => {
       const aVal = a[sortColumn as keyof Ticker]
       const bVal = b[sortColumn as keyof Ticker]
@@ -322,6 +358,48 @@ export default function Data() {
                 </option>
               ))}
             </select>
+
+            {/* Exchange Filter */}
+            {availableExchanges.length > 0 && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowExchangeDropdown(!showExchangeDropdown)}
+                  className="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded text-xs flex items-center gap-1 transition whitespace-nowrap"
+                >
+                  <span>
+                    {selectedExchanges.length === 0
+                      ? '🏢 Exchange'
+                      : `🏢 ${selectedExchanges.length}`}
+                  </span>
+                  <span className={`text-xs transition ${showExchangeDropdown ? 'rotate-180' : ''}`}>▼</span>
+                </button>
+
+                {/* Dropdown Menu */}
+                {showExchangeDropdown && (
+                  <div className="absolute top-full mt-1 left-0 bg-slate-800 border border-slate-700 rounded shadow-lg z-50 max-h-48 overflow-y-auto">
+                    {availableExchanges.map(exchange => (
+                      <button
+                        key={exchange}
+                        onClick={() => toggleExchange(exchange)}
+                        className={`w-full text-left px-2 py-1.5 text-xs transition flex items-center gap-1 ${
+                          selectedExchanges.includes(exchange)
+                            ? 'bg-purple-600/30 text-purple-300'
+                            : 'text-slate-300 hover:bg-slate-700'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedExchanges.includes(exchange)}
+                          onChange={() => {}}
+                          className="w-3 h-3"
+                        />
+                        <span className="text-xs">{exchange}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Search Bar */}
             <input
