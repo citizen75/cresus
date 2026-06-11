@@ -486,7 +486,8 @@ async def filter_tickers(
                 unique_tickers.append(ticker)
 
         # Optionally enrich with additional data (price, fundamentals)
-        if enrich and unique_tickers:
+        # Note: Enrichment only for stocks with reasonable limits (ETF enrichment is too slow)
+        if enrich and unique_tickers and asset_type_lower != "etfs" and len(unique_tickers) < 500:
             try:
                 unique_tickers = TickerIntelligence.batch_enrich_flat(
                     unique_tickers,
