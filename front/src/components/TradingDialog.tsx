@@ -34,6 +34,9 @@ export function TradingDialog({
   const [takeProfit, setTakeProfit] = useState<string>('2') // Default 2%
   const [createTodo, setCreateTodo] = useState(false)
   const [loadingTicker, setLoadingTicker] = useState(false)
+  const [selectedPortfolio, setSelectedPortfolio] = useState(portfolioName || '')
+  const [portfolios, setPortfolios] = useState<string[]>([])
+  const [loadingPortfolios, setLoadingPortfolios] = useState(false)
 
   // Fetch ticker name when ticker changes
   useEffect(() => {
@@ -100,6 +103,29 @@ export function TradingDialog({
     }
   }, [isOpen])
 
+  // Fetch portfolios if not provided
+  useEffect(() => {
+    if (isOpen && !portfolioName) {
+      fetchPortfolios()
+    }
+  }, [isOpen, portfolioName])
+
+  const fetchPortfolios = async () => {
+    try {
+      setLoadingPortfolios(true)
+      const response = await fetch('http://192.168.0.130:6501/api/v1/portfolios')
+      if (!response.ok) throw new Error('Failed to fetch portfolios')
+
+      const data = await response.json()
+      const portfolioList = data.portfolios?.map((p: any) => p.name) || []
+      setPortfolios(portfolioList)
+    } catch (err) {
+      console.error('Failed to fetch portfolios:', err)
+    } finally {
+      setLoadingPortfolios(false)
+    }
+  }
+
   const handleConfirm = async () => {
     if (!ticker) {
       alert('Please enter a ticker')
@@ -144,8 +170,9 @@ export function TradingDialog({
 
       // Format description
       let description = `📊 Trade Details\n\n`
-      if (portfolioName) {
-        description += `Portfolio: ${portfolioName}\n`
+      const effectivePortfolioName = portfolioName || selectedPortfolio
+      if (effectivePortfolioName) {
+        description += `Portfolio: ${effectivePortfolioName}\n`
       }
       description += `Type: ${modeText}\n`
       description += `Ticker: ${ticker}\n`
@@ -244,6 +271,26 @@ export function TradingDialog({
 
         {/* Inputs Grid */}
         <div className="space-y-2 mb-3">
+          {!portfolioName && (
+            <div>
+              <label className="text-xs text-slate-400">Portfolio</label>
+              <select
+                value={selectedPortfolio}
+                onChange={(e) => setSelectedPortfolio(e.target.value)}
+                disabled={loadingPortfolios}
+                className="w-full px-2 py-1 bg-slate-800 border border-slate-700 text-white text-sm rounded focus:outline-none focus:border-purple-600 disabled:opacity-50"
+              >
+                <option value="">
+                  {loadingPortfolios ? 'Loading portfolios...' : 'Select portfolio'}
+                </option>
+                {portfolios.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           {!initialTicker && (
             <div>
               <label className="text-xs text-slate-400">Ticker</label>
