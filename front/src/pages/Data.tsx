@@ -130,6 +130,50 @@ export default function Data() {
     ticker.name?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
+  // Define columns per asset type
+  const getTableColumns = (assetType: string) => {
+    switch (assetType) {
+      case 'stocks':
+        return [
+          { key: 'symbol', label: 'Symbol' },
+          { key: 'name', label: 'Name' },
+          { key: 'sector', label: 'Sector' },
+          { key: 'industry', label: 'Industry' },
+          { key: 'market_cap', label: 'Market Cap', align: 'right' },
+          { key: 'price', label: 'Price', align: 'right' },
+        ]
+      case 'etfs':
+        return [
+          { key: 'symbol', label: 'Symbol' },
+          { key: 'name', label: 'Name' },
+          { key: 'currency', label: 'Currency' },
+          { key: 'exchange', label: 'Exchange' },
+          { key: 'country', label: 'Country' },
+          { key: 'price', label: 'Price', align: 'right' },
+        ]
+      case 'funds':
+        return [
+          { key: 'symbol', label: 'Symbol' },
+          { key: 'name', label: 'Name' },
+          { key: 'currency', label: 'Currency' },
+          { key: 'country', label: 'Country' },
+          { key: 'price', label: 'Price', align: 'right' },
+        ]
+      case 'indices':
+        return [
+          { key: 'symbol', label: 'Symbol' },
+          { key: 'name', label: 'Name' },
+          { key: 'country', label: 'Country' },
+          { key: 'currency', label: 'Currency' },
+          { key: 'price', label: 'Price', align: 'right' },
+        ]
+      default:
+        return []
+    }
+  }
+
+  const tableColumns = getTableColumns(selectedAssetType)
+
   return (
     <div className="flex-1 bg-slate-950 overflow-hidden flex flex-col">
       {/* Header */}
@@ -272,23 +316,31 @@ export default function Data() {
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-slate-800 border-b border-slate-700">
                   <tr>
-                    <th className="px-4 py-3 text-left text-slate-300 font-semibold">Symbol</th>
-                    <th className="px-4 py-3 text-left text-slate-300 font-semibold">Name</th>
-                    <th className="px-4 py-3 text-left text-slate-300 font-semibold">Sector</th>
-                    <th className="px-4 py-3 text-left text-slate-300 font-semibold">Industry</th>
-                    <th className="px-4 py-3 text-right text-slate-300 font-semibold">Price</th>
-                    <th className="px-4 py-3 text-right text-slate-300 font-semibold">Market Cap</th>
+                    {tableColumns.map(col => (
+                      <th
+                        key={col.key}
+                        className={`px-4 py-3 text-slate-300 font-semibold ${
+                          col.align === 'right' ? 'text-right' : 'text-left'
+                        }`}
+                      >
+                        {col.label}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800">
                   {filteredTickers.map((ticker, idx) => (
                     <tr key={`${ticker.symbol}-${idx}`} className="hover:bg-slate-800/50 transition">
-                      <td className="px-4 py-3 font-medium text-purple-300">{ticker.symbol}</td>
-                      <td className="px-4 py-3 text-slate-300">{ticker.name || '-'}</td>
-                      <td className="px-4 py-3 text-slate-400">{ticker.sector || '-'}</td>
-                      <td className="px-4 py-3 text-slate-400">{ticker.industry || '-'}</td>
-                      <td className="px-4 py-3 text-right text-slate-400">{ticker.price || '-'}</td>
-                      <td className="px-4 py-3 text-right text-slate-400">{ticker.market_cap || '-'}</td>
+                      {tableColumns.map(col => (
+                        <td
+                          key={col.key}
+                          className={`px-4 py-3 text-slate-400 ${
+                            col.key === 'symbol' ? 'font-medium text-purple-300' : ''
+                          } ${col.align === 'right' ? 'text-right' : ''}`}
+                        >
+                          {ticker[col.key as keyof Ticker] || '-'}
+                        </td>
+                      ))}
                     </tr>
                   ))}
                 </tbody>
