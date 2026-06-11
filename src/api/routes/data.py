@@ -295,6 +295,40 @@ async def delete_universe(universe_id: str):
         return {"error": str(e)}, 400
 
 
+class RenameRequest(BaseModel):
+    """Request to rename a universe."""
+    new_id: str
+
+
+@router.patch("/universe/{universe_id}")
+async def rename_universe(universe_id: str, request: RenameRequest):
+    """Rename a universe."""
+    try:
+        from pathlib import Path
+
+        old_universe = Universe(universe_id)
+        if not old_universe.exists():
+            return {"error": f"Universe '{universe_id}' not found"}, 404
+
+        new_universe = Universe(request.new_id)
+        if new_universe.exists():
+            return {"error": f"Universe '{request.new_id}' already exists"}, 409
+
+        # Rename the file
+        old_path = old_universe.filepath
+        new_path = new_universe.filepath
+        old_path.rename(new_path)
+
+        _clear_universe_cache()  # Invalidate cache
+        return {
+            "status": "renamed",
+            "old_id": universe_id,
+            "new_id": request.new_id,
+        }
+    except Exception as e:
+        return {"error": str(e)}, 400
+
+
 @router.post("/universe/{universe_id}/tickers")
 async def add_tickers_to_universe(universe_id: str, request: TickersRequest):
     """Add tickers to an existing universe.

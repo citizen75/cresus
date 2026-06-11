@@ -945,6 +945,35 @@ export default function Data() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
+                          const newName = prompt(
+                            `Rename "${universe.name}" to:`,
+                            universe.name
+                          )
+                          if (newName && newName !== universe.name) {
+                            fetch(
+                              `http://192.168.0.130:6501/api/v1/data/universe/${universe.id}`,
+                              {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ new_id: newName }),
+                              }
+                            ).then((res) => {
+                              if (res.ok) {
+                                loadUniverses()
+                                setSelectedUniverse(newName)
+                              } else {
+                                alert('Failed to rename universe')
+                              }
+                            })
+                          }
+                        }}
+                        className="flex-1 px-2 py-1 bg-blue-600/20 text-blue-300 rounded text-xs hover:bg-blue-600/30"
+                      >
+                        ✏️ Rename
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
                           if (confirm(`Delete universe "${universe.name}"?`)) {
                             fetch(
                               `http://192.168.0.130:6501/api/v1/data/universe/${universe.id}`,
