@@ -4,6 +4,7 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel
 from typing import List, Optional
 import time
+import pandas as pd
 from tools.data.financial import FinancialDataManager
 from tools.data.enrichment import TickerIntelligence
 from tools.universe.universe import Universe
@@ -347,6 +348,35 @@ async def filter_tickers(
         # Optionally enrich with fundamentals
         if enrich:
             unique_tickers = TickerIntelligence.batch_enrich_flat(unique_tickers, asset_type=asset_type.lower() if asset_type else "equities")
+
+            # Fallback: Add country/exchange directly from FinanceDatabase if missing
+            try:
+                import financedatabase as fd
+                if asset_type and asset_type.lower() == "equities":
+                    db = fd.Equities()
+                elif asset_type and asset_type.lower() == "etfs":
+                    db = fd.ETFs()
+                else:
+                    db = None
+
+                if db:
+                    all_data = db.select()
+                    for ticker in unique_tickers:
+                        symbol = ticker.get("symbol", "").upper()
+                        if symbol in all_data.index and (not ticker.get("country") or not ticker.get("exchange")):
+                            row = all_data.loc[symbol]
+                            if not ticker.get("country") and "country" in all_data.columns:
+                                ticker["country"] = str(row["country"]) if pd.notna(row["country"]) else None
+                            if not ticker.get("exchange"):
+                                exchange_val = None
+                                if "exchange" in all_data.columns and pd.notna(row["exchange"]):
+                                    exchange_val = str(row["exchange"])
+                                elif "market" in all_data.columns and pd.notna(row["market"]):
+                                    exchange_val = str(row["market"])
+                                if exchange_val:
+                                    ticker["exchange"] = exchange_val
+            except Exception as e:
+                pass  # Fallback failed, continue with what we have
 
         # Limit results
         unique_tickers = unique_tickers[:limit]
