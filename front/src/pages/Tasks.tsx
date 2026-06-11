@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '@/services/api'
-import TradingChartWidget from '@/components/TradingChartWidget'
+import { ChartModal } from '@/components/ChartModal'
 
 interface Task {
   id: number
@@ -891,9 +891,9 @@ export default function Tasks() {
         </div>
       )}
 
-      {/* Trading Chart Widget */}
+      {/* Chart Modal */}
       {chartTicker && (
-        <TradingChartWidget
+        <ChartModal
           ticker={chartTicker}
           onClose={() => setChartTicker(null)}
         />
