@@ -676,7 +676,7 @@ export default function Tasks() {
                       <div>
                         <label className="block text-sm text-slate-400 mb-2">Portfolio</label>
                         <select
-                          value={panelFormData.portfolio}
+                          value={panelFormData.portfolio || ''}
                           onChange={(e) => setPanelFormData({ ...panelFormData, portfolio: e.target.value })}
                           className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
                         >
@@ -693,7 +693,7 @@ export default function Tasks() {
                         <label className="block text-sm text-slate-400 mb-2">Ticker</label>
                         <input
                           type="text"
-                          value={panelFormData.ticker}
+                          value={panelFormData.ticker || ''}
                           onChange={(e) => setPanelFormData({ ...panelFormData, ticker: e.target.value.toUpperCase() })}
                           className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-purple-500"
                           placeholder="AAPL"
