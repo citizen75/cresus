@@ -80,10 +80,7 @@ export default function Dashboard() {
             setSelectedAlertMessage(msg)
             setRightPanelOpen(true)  // Open right panel to show results
 
-            // IMPORTANT: Break here to select the FIRST (most recent) alert only!
-            break
-
-            // Parse alert content for legacy support
+            // Parse alert content for portfolio and tickers
             const lines = msg.content.split('\n')
             const alertInfo: AlertInfo = {
               title: '',
@@ -117,10 +114,10 @@ export default function Dashboard() {
               setSelectedAlertId(alertId)
               setAlertHistory([{ id: alertId, info: alertInfo }])
               setRightPanelOpen(true)
-              setTimeout(() => {
-                conversationPanelRef.current?.scrollToBottom()
-              }, 100)
             }
+
+            // IMPORTANT: Break here to select the FIRST (most recent) alert only!
+            break
           }
         }
 
