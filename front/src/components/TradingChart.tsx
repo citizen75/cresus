@@ -263,7 +263,7 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
             }
 
             candles = data.map((d: any) => ({
-              time: d.timestamp.substring(0, 10),
+              time: (d.timestamp || d.date || '').substring(0, 10),
               open: parseFloat(d.open),
               high: parseFloat(d.high),
               low: parseFloat(d.low),
@@ -274,7 +274,7 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
             const shaData = data
               .filter((d: any) => 'sha_10_open' in d && 'sha_10_high' in d && 'sha_10_low' in d && 'sha_10_close' in d && d.sha_10_open !== null && d.sha_10_close !== null)
               .map((d: any) => ({
-                time: d.timestamp.substring(0, 10),
+                time: (d.timestamp || d.date || '').substring(0, 10),
                 open: parseFloat(d.sha_10_open),
                 high: parseFloat(d.sha_10_high),
                 low: parseFloat(d.sha_10_low),
@@ -284,7 +284,7 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
             volume = data.map((d: any) => {
               const color = parseFloat(d.close) >= parseFloat(d.open) ? '#26a69a' : '#ef5350'
               return {
-                time: d.timestamp.substring(0, 10),
+                time: (d.timestamp || d.date || '').substring(0, 10),
                 value: parseInt(d.volume),
                 color,
               }
@@ -569,8 +569,9 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
               if (param.time && rawDataRef.current.length > 0 && indicatorColumnsRef.current.length > 0) {
                 const timeStr = String(param.time)
                 const dataPoint = rawDataRef.current.find(d => {
-                  if (!d.timestamp) return false
-                  const dTime = String(d.timestamp).substring(0, 10)
+                  const dateField = d.timestamp || d.date
+                  if (!dateField) return false
+                  const dTime = String(dateField).substring(0, 10)
                   return dTime === timeStr
                 })
                 if (dataPoint) {
