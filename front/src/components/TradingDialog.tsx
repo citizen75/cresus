@@ -23,7 +23,7 @@ export function TradingDialog({
 }: TradingDialogProps) {
   const [ticker, setTicker] = useState(initialTicker || '')
   const [tickerName, setTickerName] = useState('')
-  const [price, setPrice] = useState<string>(String(initialPrice || ''))
+  const [price, setPrice] = useState<string>(initialPrice ? parseFloat(initialPrice).toFixed(3) : '')
   const [quantity, setQuantity] = useState<string>(
     mode === 'sell' && position?.quantity ? String(position.quantity) : ''
   )
@@ -125,7 +125,7 @@ export function TradingDialog({
 
   const resetForm = () => {
     setTicker(initialTicker || '')
-    setPrice(initialPrice ? initialPrice.toString() : '')
+    setPrice(initialPrice ? parseFloat(initialPrice).toFixed(3) : '')
     setQuantity('')
     setFees('0')
     setStopLoss('7')
