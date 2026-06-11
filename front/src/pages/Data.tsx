@@ -155,43 +155,6 @@ export default function Data() {
             </div>
           </div>
 
-          {/* Market Selector */}
-          <div className="relative p-3 border-b border-slate-800">
-            <button
-              onClick={() => setShowMarketDropdown(!showMarketDropdown)}
-              className="w-full px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded text-sm flex items-center justify-between transition"
-            >
-              <span>
-                <span className="text-lg mr-2">{currentMarket?.icon}</span>
-                {currentMarket?.label}
-              </span>
-              <span className={`text-xs transition ${showMarketDropdown ? 'rotate-180' : ''}`}>▼</span>
-            </button>
-
-            {/* Dropdown Menu */}
-            {showMarketDropdown && (
-              <div className="absolute top-full mt-2 left-3 right-3 bg-slate-800 border border-slate-700 rounded shadow-lg z-50">
-                {MARKET_FILTERS.map(market => (
-                  <button
-                    key={market.id}
-                    onClick={() => {
-                      setSelectedMarket(market.id)
-                      setShowMarketDropdown(false)
-                    }}
-                    className={`w-full text-left px-3 py-2 text-sm transition ${
-                      selectedMarket === market.id
-                        ? 'bg-purple-600/30 text-purple-300'
-                        : 'text-slate-300 hover:bg-slate-700'
-                    }`}
-                  >
-                    <span className="text-lg mr-2">{market.icon}</span>
-                    {market.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
           {/* Universes Header */}
           <div className="px-4 py-3 border-b border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider">
             Universes ({filteredUniverses.length})
@@ -228,6 +191,43 @@ export default function Data() {
 
         {/* Right Panel */}
         <div className="flex-1 flex flex-col border border-slate-800 rounded-lg bg-slate-900 min-h-0">
+          {/* Market Selector */}
+          <div className="relative px-4 py-3 border-b border-slate-800">
+            <button
+              onClick={() => setShowMarketDropdown(!showMarketDropdown)}
+              className="w-full px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded text-sm flex items-center justify-between transition"
+            >
+              <span>
+                <span className="text-lg mr-2">{currentMarket?.icon}</span>
+                {currentMarket?.label}
+              </span>
+              <span className={`text-xs transition ${showMarketDropdown ? 'rotate-180' : ''}`}>▼</span>
+            </button>
+
+            {/* Dropdown Menu */}
+            {showMarketDropdown && (
+              <div className="absolute top-full mt-2 left-4 right-4 bg-slate-800 border border-slate-700 rounded shadow-lg z-50">
+                {MARKET_FILTERS.map(market => (
+                  <button
+                    key={market.id}
+                    onClick={() => {
+                      setSelectedMarket(market.id)
+                      setShowMarketDropdown(false)
+                    }}
+                    className={`w-full text-left px-3 py-2 text-sm transition ${
+                      selectedMarket === market.id
+                        ? 'bg-purple-600/30 text-purple-300'
+                        : 'text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    <span className="text-lg mr-2">{market.icon}</span>
+                    {market.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Search */}
           <div className="px-4 py-3 border-b border-slate-800">
             <input
