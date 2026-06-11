@@ -169,7 +169,20 @@ export function ConversationWidget({
 
   useEffect(() => {
     scrollToBottom()
-  }, [messages])
+
+    // Auto-select last message on page load if none selected
+    if (messages.length > 0 && !selectedMessageId) {
+      const lastMsg = messages[messages.length - 1]
+      console.log(`[ConversationWidget] Auto-selecting last message:`, { id: lastMsg.id, hasPortfolio: !!lastMsg.portfolio })
+      setSelectedMessage(lastMsg)
+
+      // Auto-trigger the handler to display the message
+      if (onPortfolioClick && lastMsg.portfolio) {
+        const tickers = lastMsg.tickers || []
+        onPortfolioClick(lastMsg.portfolio, tickers, lastMsg.widget, lastMsg)
+      }
+    }
+  }, [messages, selectedMessageId, onPortfolioClick])
 
   // Subscribe to conversation (keep open across page changes)
   useEffect(() => {
