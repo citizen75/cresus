@@ -62,6 +62,64 @@ class Universe:
         except Exception as e:
             raise ValueError(f"Error reading universe '{self.universe_name}': {e}")
 
+    def get_tickers_with_metadata(self) -> List[Dict[str, Any]]:
+        """Get ticker symbols with metadata from universe.
+
+        Returns:
+            List of dicts with ticker data and metadata
+        """
+        if not self.exists():
+            raise FileNotFoundError(f"Universe '{self.universe_name}' not found")
+
+        try:
+            df = self.load_df()
+            blacklist = get_blacklist()
+            blacklisted_tickers = blacklist.get_tickers()
+
+            # Identify ticker column
+            ticker_col = "TickerYahoo" if "TickerYahoo" in df.columns else "ISIN"
+
+            # Filter blacklisted tickers
+            df = df[~df[ticker_col].str.upper().isin(blacklisted_tickers)].copy()
+            df = df.dropna(subset=[ticker_col])
+
+            # Build ticker list with metadata
+            tickers_data = []
+            for idx, row in df.iterrows():
+                ticker_symbol = str(row[ticker_col]).strip()
+                if not ticker_symbol:
+                    continue
+
+                ticker_data = {
+                    "symbol": ticker_symbol,
+                    "name": str(row.get("Name", ticker_symbol)).strip() if "Name" in df.columns else ticker_symbol,
+                }
+
+                # Add optional metadata columns if available
+                optional_fields = {
+                    "sector": "Sector",
+                    "industry": "Industry",
+                    "market_cap": "Market Cap",
+                    "price": "Price",
+                    "change": "Change",
+                    "revenue": "Revenue",
+                    "isin": "Isin",
+                    "currency": "Currency",
+                }
+
+                for field_key, col_name in optional_fields.items():
+                    if col_name in df.columns:
+                        value = row.get(col_name)
+                        if pd.notna(value):
+                            ticker_data[field_key] = str(value).strip()
+
+                tickers_data.append(ticker_data)
+
+            return tickers_data
+
+        except Exception as e:
+            raise ValueError(f"Error reading universe '{self.universe_name}' with metadata: {e}")
+
     def load_df(self) -> pd.DataFrame:
         """Load universe as DataFrame.
 

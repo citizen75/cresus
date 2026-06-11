@@ -79,14 +79,13 @@ async def search_tickers(
 
 @router.get("/universe/{universe_id}")
 async def get_universe_tickers(universe_id: str, limit: int = Query(1000, description="Max number of tickers")):
-    """Get tickers for a specific universe."""
+    """Get tickers for a specific universe with metadata."""
     try:
         universe = Universe(universe_id)
         if not universe.exists():
             return {"error": f"Universe '{universe_id}' not found"}, 404
 
-        ticker_symbols = universe.get_tickers()[:limit]
-        tickers = [{"symbol": symbol, "name": symbol} for symbol in ticker_symbols]
+        tickers = universe.get_tickers_with_metadata()[:limit]
 
         return {
             "universe": universe_id,
