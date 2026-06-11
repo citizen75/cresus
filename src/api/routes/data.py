@@ -270,6 +270,97 @@ async def remove_tickers_from_universe(universe_id: str, request: TickersRequest
         return {"error": str(e)}, 400
 
 
+@router.get("/filter")
+async def filter_tickers(
+    countries: str = Query(None, description="Comma-separated country codes (FR,NL,DE)"),
+    asset_type: str = Query(None, description="Asset type (stocks, etfs, funds, indices)"),
+    limit: int = Query(1000, description="Max number of tickers"),
+    enrich: bool = Query(True, description="Enrich with fundamentals data"),
+):
+    """Filter tickers by country and asset type.
+
+    Countries map to universes:
+    - FR: srd, cac40, etf_pea, etf_fr, etf_pea_full
+    - NL: (stocks from xetra/enx when available)
+    - DE: xetra, enx_mid, enx_small
+    - etc.
+    """
+    country_universe_map = {
+        "FR": ["srd", "cac40", "etf_pea", "etf_fr", "etf_pea_full"],
+        "NL": ["sp_25"],
+        "DE": ["xetra", "enx_mid", "enx_small"],
+        "US": ["nasdaq_100", "nasdaq_tech", "sp_25"],
+        "EU": ["enx_large", "enx_mid", "enx_small", "xetra"],
+    }
+
+    asset_type_universes = {
+        "stocks": ["srd", "cac40", "nasdaq_100", "sp_25", "enx_large", "enx_mid", "enx_small", "xetra"],
+        "etfs": ["etf_pea", "etf_fr", "etf_pea_full"],
+        "indices": ["index"],
+    }
+
+    # Determine universes to query
+    universes_to_query = []
+
+    if countries and asset_type:
+        # Both filters applied
+        country_list = [c.strip().upper() for c in countries.split(",")]
+        asset_unis = asset_type_universes.get(asset_type.lower(), [])
+        for country in country_list:
+            country_unis = country_universe_map.get(country, [])
+            universes_to_query.extend([u for u in country_unis if u in asset_unis])
+    elif countries:
+        # Only country filter
+        country_list = [c.strip().upper() for c in countries.split(",")]
+        for country in country_list:
+            universes_to_query.extend(country_universe_map.get(country, []))
+    elif asset_type:
+        # Only asset type filter
+        universes_to_query = asset_type_universes.get(asset_type.lower(), [])
+    else:
+        # No filters
+        return {"tickers": [], "count": 0}
+
+    # Remove duplicates
+    universes_to_query = list(set(universes_to_query))
+
+    all_tickers = []
+    try:
+        for uni_id in universes_to_query:
+            try:
+                uni = Universe(uni_id)
+                if uni.exists():
+                    tickers = uni.get_tickers_with_metadata()
+                    all_tickers.extend(tickers)
+            except Exception:
+                pass
+
+        # Deduplicate by symbol
+        seen = set()
+        unique_tickers = []
+        for ticker in all_tickers:
+            symbol = ticker.get("symbol", "").upper()
+            if symbol and symbol not in seen:
+                seen.add(symbol)
+                unique_tickers.append(ticker)
+
+        # Optionally enrich with fundamentals
+        if enrich:
+            unique_tickers = TickerIntelligence.batch_enrich_flat(unique_tickers)
+
+        # Limit results
+        unique_tickers = unique_tickers[:limit]
+
+        return {
+            "countries": countries,
+            "asset_type": asset_type,
+            "tickers": unique_tickers,
+            "count": len(unique_tickers),
+        }
+    except Exception as e:
+        return {"error": str(e)}, 400
+
+
 @router.get("/category/{category}")
 async def get_category_tickers(
     category: str,
