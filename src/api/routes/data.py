@@ -618,3 +618,52 @@ async def get_ticker_info(ticker: str):
     if not info:
         return {"error": "Ticker not found"}, 404
     return {"ticker": ticker, "info": info}
+
+
+@router.get("/history/{ticker}")
+async def get_ticker_history(
+    ticker: str,
+    days: int = Query(365, description="Number of days of history")
+):
+    """Get historical price data for a ticker.
+
+    Args:
+        ticker: Ticker symbol
+        days: Number of days of history (default: 365 for 1 year)
+    """
+    try:
+        import yfinance as yf
+        from datetime import datetime, timedelta
+
+        # Fetch data
+        hist = yf.download(ticker, period=f"{days}d", progress=False)
+
+        if hist.empty:
+            return {
+                "ticker": ticker,
+                "history": []
+            }
+
+        # Convert to list of dicts
+        history = []
+        for date, row in hist.iterrows():
+            history.append({
+                "date": date.strftime("%Y-%m-%d"),
+                "close": round(float(row["Close"]), 2),
+                "open": round(float(row["Open"]), 2),
+                "high": round(float(row["High"]), 2),
+                "low": round(float(row["Low"]), 2),
+                "volume": int(row["Volume"]) if pd.notna(row["Volume"]) else 0,
+            })
+
+        return {
+            "ticker": ticker,
+            "history": history
+        }
+
+    except Exception as e:
+        return {
+            "ticker": ticker,
+            "history": [],
+            "error": str(e)
+        }

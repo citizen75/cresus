@@ -56,6 +56,9 @@ export default function Data() {
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set())
   const [draggedRows, setDraggedRows] = useState<string[]>([])
   const [dropTarget, setDropTarget] = useState<string | null>(null)
+  const [selectedTickerDetail, setSelectedTickerDetail] = useState<Ticker | null>(null)
+  const [tickerHistory, setTickerHistory] = useState<Array<{date: string, close: number}>>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
 
   // Load universes on mount
   useEffect(() => {
@@ -246,6 +249,31 @@ export default function Data() {
     } catch (err) {
       console.error('Failed to add tickers to universe:', err)
     }
+  }
+
+  const openTickerDetail = async (ticker: Ticker) => {
+    setSelectedTickerDetail(ticker)
+    setHistoryLoading(true)
+
+    try {
+      // Fetch 1 year of historical data
+      const response = await fetch(
+        `http://192.168.0.130:6501/api/v1/data/history/${ticker.symbol}?days=365`
+      )
+      if (response.ok) {
+        const data = await response.json()
+        setTickerHistory(data.history || [])
+      }
+    } catch (err) {
+      console.error('Failed to load ticker history:', err)
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  const closeTickerDetail = () => {
+    setSelectedTickerDetail(null)
+    setTickerHistory([])
   }
 
   const filteredTickers = tickers
@@ -633,10 +661,15 @@ export default function Data() {
                       key={`${ticker.symbol}-${idx}`}
                       draggable={selectedRows.has(ticker.symbol) || selectedRows.size === 0}
                       onDragStart={() => handleRowDragStart(ticker.symbol)}
+                      onClick={() => {
+                        if (!selectedRows.has(ticker.symbol)) {
+                          openTickerDetail(ticker)
+                        }
+                      }}
                       className={`transition ${
                         selectedRows.has(ticker.symbol)
                           ? 'bg-purple-600/30 text-purple-200'
-                          : 'hover:bg-slate-800/50'
+                          : 'hover:bg-slate-800/50 cursor-pointer'
                       } ${selectedRows.size > 0 ? 'cursor-move' : ''}`}
                     >
                       <td className="px-4 py-3 w-10">
@@ -672,6 +705,148 @@ export default function Data() {
           )}
         </div>
       </div>
+
+      {/* Ticker Detail Modal */}
+      {selectedTickerDetail && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-white">{selectedTickerDetail.symbol}</h2>
+                <p className="text-sm text-slate-400">{selectedTickerDetail.name}</p>
+              </div>
+              <button
+                onClick={closeTickerDetail}
+                className="text-slate-400 hover:text-white text-2xl transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-hidden flex">
+              {/* Left: Fundamental Data */}
+              <div className="w-80 border-r border-slate-800 overflow-y-auto p-6">
+                <h3 className="text-lg font-semibold text-white mb-4">Fundamentals</h3>
+                <div className="space-y-3">
+                  {selectedTickerDetail.price && (
+                    <div>
+                      <p className="text-xs text-slate-400">Price</p>
+                      <p className="text-lg font-medium text-green-400">${selectedTickerDetail.price}</p>
+                    </div>
+                  )}
+                  {selectedTickerDetail.country && (
+                    <div>
+                      <p className="text-xs text-slate-400">Country</p>
+                      <p className="text-sm text-slate-300">{selectedTickerDetail.country}</p>
+                    </div>
+                  )}
+                  {selectedTickerDetail.exchange && (
+                    <div>
+                      <p className="text-xs text-slate-400">Exchange</p>
+                      <p className="text-sm text-slate-300">{selectedTickerDetail.exchange}</p>
+                    </div>
+                  )}
+                  {selectedTickerDetail.currency && (
+                    <div>
+                      <p className="text-xs text-slate-400">Currency</p>
+                      <p className="text-sm text-slate-300">{selectedTickerDetail.currency}</p>
+                    </div>
+                  )}
+                  {selectedTickerDetail.sector && (
+                    <div>
+                      <p className="text-xs text-slate-400">Sector</p>
+                      <p className="text-sm text-slate-300">{selectedTickerDetail.sector}</p>
+                    </div>
+                  )}
+                  {selectedTickerDetail.industry && (
+                    <div>
+                      <p className="text-xs text-slate-400">Industry</p>
+                      <p className="text-sm text-slate-300">{selectedTickerDetail.industry}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Right: Price History Chart */}
+              <div className="flex-1 p-6 overflow-y-auto">
+                <h3 className="text-lg font-semibold text-white mb-4">1-Year Price History</h3>
+                {historyLoading ? (
+                  <div className="flex items-center justify-center h-80 text-slate-400">
+                    Loading chart data...
+                  </div>
+                ) : tickerHistory.length > 0 ? (
+                  <div className="bg-slate-800/50 rounded-lg p-4">
+                    <svg viewBox="0 0 800 300" className="w-full h-80">
+                      {/* Simple line chart */}
+                      {tickerHistory.length > 1 && (
+                        (() => {
+                          const prices = tickerHistory.map(d => d.close)
+                          const minPrice = Math.min(...prices)
+                          const maxPrice = Math.max(...prices)
+                          const priceRange = maxPrice - minPrice
+                          const width = 800
+                          const height = 300
+                          const padding = 40
+
+                          return (
+                            <>
+                              {/* Y-axis */}
+                              <line x1={padding} y1={padding} x2={padding} y2={height - padding} stroke="#64748b" strokeWidth="2" />
+                              {/* X-axis */}
+                              <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#64748b" strokeWidth="2" />
+
+                              {/* Y-axis labels */}
+                              <text x={padding - 10} y={padding + 5} textAnchor="end" className="text-xs fill-slate-400">
+                                ${maxPrice.toFixed(0)}
+                              </text>
+                              <text x={padding - 10} y={height - padding + 5} textAnchor="end" className="text-xs fill-slate-400">
+                                ${minPrice.toFixed(0)}
+                              </text>
+
+                              {/* Price line */}
+                              <polyline
+                                points={tickerHistory
+                                  .map((d, i) => {
+                                    const x = padding + (i / (tickerHistory.length - 1)) * (width - padding * 2)
+                                    const y = height - padding - ((d.close - minPrice) / priceRange) * (height - padding * 2)
+                                    return `${x},${y}`
+                                  })
+                                  .join(' ')}
+                                fill="none"
+                                stroke="#10b981"
+                                strokeWidth="2"
+                              />
+
+                              {/* Current price point */}
+                              {tickerHistory.length > 0 && (
+                                <circle
+                                  cx={width - padding}
+                                  cy={height - padding - ((tickerHistory[tickerHistory.length - 1].close - minPrice) / priceRange) * (height - padding * 2)}
+                                  r="4"
+                                  fill="#10b981"
+                                />
+                              )}
+                            </>
+                          )
+                        })()
+                      )}
+                    </svg>
+                    <p className="text-xs text-slate-400 mt-4">
+                      {tickerHistory[0]?.date} → {tickerHistory[tickerHistory.length - 1]?.date}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-80 text-slate-400">
+                    No historical data available
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
