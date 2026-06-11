@@ -227,72 +227,69 @@ export default function Data() {
 
         {/* Right Panel */}
         <div className="flex-1 flex flex-col border border-slate-800 rounded-lg bg-slate-900 min-h-0">
-          {/* Filters Header - Compact */}
-          <div className="px-3 py-2 border-b border-slate-800 space-y-2">
-            {/* Row 1: Countries & Asset Type */}
-            <div className="flex gap-2 items-end">
-              {/* Country Filter */}
-              <div className="relative flex-1">
-                <button
-                  onClick={() => setShowCountryDropdown(!showCountryDropdown)}
-                  className="w-full px-2 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded text-xs flex items-center justify-between transition"
-                >
-                  <span className="text-xs">
-                    {selectedCountries.length === 0
-                      ? '🌍 Countries'
-                      : `🌍 ${selectedCountries.length}`}
-                  </span>
-                  <span className={`text-xs transition ${showCountryDropdown ? 'rotate-180' : ''}`}>▼</span>
-                </button>
-
-                {/* Dropdown Menu */}
-                {showCountryDropdown && (
-                  <div className="absolute top-full mt-1 left-0 right-0 bg-slate-800 border border-slate-700 rounded shadow-lg z-50 max-h-48 overflow-y-auto">
-                    {COUNTRIES.map(country => (
-                      <button
-                        key={country.code}
-                        onClick={() => toggleCountry(country.code)}
-                        className={`w-full text-left px-2 py-1.5 text-xs transition flex items-center gap-1 ${
-                          selectedCountries.includes(country.code)
-                            ? 'bg-purple-600/30 text-purple-300'
-                            : 'text-slate-300 hover:bg-slate-700'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedCountries.includes(country.code)}
-                          onChange={() => {}}
-                          className="w-3 h-3"
-                        />
-                        <span>{country.flag}</span>
-                        <span className="text-xs">{country.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Asset Type Filter */}
-              <select
-                value={selectedAssetType}
-                onChange={(e) => setSelectedAssetType(e.target.value)}
-                className="px-2 py-1.5 bg-slate-800 border border-slate-700 text-white rounded text-xs focus:outline-none focus:border-purple-500"
+          {/* Filters Header - All Inline */}
+          <div className="px-3 py-2 border-b border-slate-800 flex gap-2 items-center">
+            {/* Country Filter */}
+            <div className="relative">
+              <button
+                onClick={() => setShowCountryDropdown(!showCountryDropdown)}
+                className="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded text-xs flex items-center gap-1 transition whitespace-nowrap"
               >
-                {ASSET_TYPES.map(type => (
-                  <option key={type.id} value={type.id}>
-                    {type.icon} {type.label}
-                  </option>
-                ))}
-              </select>
+                <span>
+                  {selectedCountries.length === 0
+                    ? '🌍 Countries'
+                    : `🌍 ${selectedCountries.length}`}
+                </span>
+                <span className={`text-xs transition ${showCountryDropdown ? 'rotate-180' : ''}`}>▼</span>
+              </button>
+
+              {/* Dropdown Menu */}
+              {showCountryDropdown && (
+                <div className="absolute top-full mt-1 left-0 bg-slate-800 border border-slate-700 rounded shadow-lg z-50 max-h-48 overflow-y-auto">
+                  {COUNTRIES.map(country => (
+                    <button
+                      key={country.code}
+                      onClick={() => toggleCountry(country.code)}
+                      className={`w-full text-left px-2 py-1.5 text-xs transition flex items-center gap-1 ${
+                        selectedCountries.includes(country.code)
+                          ? 'bg-purple-600/30 text-purple-300'
+                          : 'text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedCountries.includes(country.code)}
+                        onChange={() => {}}
+                        className="w-3 h-3"
+                      />
+                      <span>{country.flag}</span>
+                      <span className="text-xs">{country.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Row 2: Search Bar */}
+            {/* Asset Type Filter */}
+            <select
+              value={selectedAssetType}
+              onChange={(e) => setSelectedAssetType(e.target.value)}
+              className="px-2 py-1.5 bg-slate-800 border border-slate-700 text-white rounded text-xs focus:outline-none focus:border-purple-500 whitespace-nowrap"
+            >
+              {ASSET_TYPES.map(type => (
+                <option key={type.id} value={type.id}>
+                  {type.icon} {type.label}
+                </option>
+              ))}
+            </select>
+
+            {/* Search Bar */}
             <input
               type="text"
-              placeholder="🔍 Search tickers or names..."
+              placeholder="🔍 Search..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-2 py-1.5 bg-slate-800 border border-slate-700 text-white rounded text-xs focus:outline-none focus:border-purple-500"
+              className="flex-1 px-2 py-1.5 bg-slate-800 border border-slate-700 text-white rounded text-xs focus:outline-none focus:border-purple-500"
             />
           </div>
 
