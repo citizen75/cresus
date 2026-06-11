@@ -35,6 +35,7 @@ export default function Tasks() {
   const [error, setError] = useState<string | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
 
   const [filterStatus, setFilterStatus] = useState<string>('')
   const [filterPriority, setFilterPriority] = useState<string>('')
@@ -319,8 +320,11 @@ export default function Tasks() {
         </select>
       </div>
 
-      {/* Task List */}
-      <div className="flex-1 overflow-y-auto px-6 py-4">
+      {/* Two Panel Layout */}
+      <div className="flex-1 flex gap-4 px-6 py-4 overflow-hidden">
+        {/* Left Panel: Task List */}
+        <div className="w-96 flex flex-col border-r border-slate-800">
+          <div className="flex-1 overflow-y-auto pr-4">
         {error && (
           <div className="mb-4 p-4 bg-red-900/20 border border-red-800 text-red-400 rounded">
             {error}
@@ -340,7 +344,12 @@ export default function Tasks() {
             {filteredTasks.map(task => (
               <div
                 key={task.id}
-                className="bg-slate-900 border border-slate-800 rounded-lg p-4 hover:border-slate-700 transition"
+                onClick={() => setSelectedTask(task)}
+                className={`bg-slate-900 border rounded-lg p-4 transition cursor-pointer ${
+                  selectedTask?.id === task.id
+                    ? 'border-purple-500 bg-slate-800'
+                    : 'border-slate-800 hover:border-slate-700'
+                }`}
               >
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1">
@@ -411,7 +420,135 @@ export default function Tasks() {
               </div>
             ))}
           </div>
-        )}
+          )}
+          </div>
+        </div>
+
+        {/* Right Panel: Selected Task Details */}
+        <div className="flex-1 overflow-y-auto">
+          {selectedTask ? (
+            <div className="bg-slate-900 border border-slate-800 rounded-lg p-6">
+              {/* Header */}
+              <div className="flex items-start justify-between mb-6">
+                <div className="flex-1">
+                  <h2 className="text-2xl font-bold text-white mb-2">{selectedTask.title}</h2>
+                  {selectedTask.portfolio && (
+                    <p className="text-sm text-slate-400 mb-1">Portfolio: <span className="text-blue-400 font-medium">{selectedTask.portfolio}</span></p>
+                  )}
+                  {selectedTask.ticker && (
+                    <p className="text-sm text-slate-400">Ticker: <span className="text-green-400 font-medium">{selectedTask.ticker}</span></p>
+                  )}
+                </div>
+                <button
+                  onClick={() => {
+                    startEdit(selectedTask)
+                    setSelectedTask(null)
+                  }}
+                  className="px-3 py-1 bg-blue-600/20 text-blue-300 rounded text-sm hover:bg-blue-600/30 transition"
+                >
+                  Edit
+                </button>
+              </div>
+
+              {/* Description */}
+              {selectedTask.description && (
+                <div className="mb-6 pb-6 border-b border-slate-700">
+                  <h3 className="text-sm font-semibold text-slate-300 mb-2">Description</h3>
+                  <p className="text-sm text-slate-400 whitespace-pre-wrap">{selectedTask.description}</p>
+                </div>
+              )}
+
+              {/* Status & Priority */}
+              <div className="grid grid-cols-2 gap-4 mb-6 pb-6 border-b border-slate-700">
+                <div>
+                  <p className="text-xs text-slate-500 mb-1">Status</p>
+                  <span className={`px-3 py-1 rounded text-sm font-medium inline-block ${getStatusColor(selectedTask.status)}`}>
+                    {selectedTask.status}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 mb-1">Priority</p>
+                  <span className={`px-3 py-1 rounded text-sm font-medium inline-block ${getPriorityColor(selectedTask.priority)}`}>
+                    {selectedTask.priority}
+                  </span>
+                </div>
+              </div>
+
+              {/* Details */}
+              <div className="grid grid-cols-2 gap-4 mb-6 pb-6 border-b border-slate-700">
+                {selectedTask.due_date && (
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">Due Date</p>
+                    <p className="text-sm text-slate-300">📅 {new Date(selectedTask.due_date).toLocaleDateString()}</p>
+                  </div>
+                )}
+                {selectedTask.assignee && (
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">Assignee</p>
+                    <p className="text-sm text-slate-300">👤 {selectedTask.assignee}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Tags */}
+              {selectedTask.tags && selectedTask.tags.length > 0 && (
+                <div className="mb-6 pb-6 border-b border-slate-700">
+                  <p className="text-xs text-slate-500 mb-2">Tags</p>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedTask.tags.map(tag => (
+                      <span key={tag} className="px-2 py-1 bg-slate-800 text-slate-300 rounded text-xs">
+                        #{tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Checklist */}
+              {selectedTask.checklist && selectedTask.checklist.length > 0 && (
+                <div className="mb-6 pb-6 border-b border-slate-700">
+                  <p className="text-xs text-slate-500 mb-2">Checklist</p>
+                  <div className="space-y-2">
+                    {selectedTask.checklist.map((item, idx) => (
+                      <div key={idx} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={item.done}
+                          readOnly
+                          className="w-4 h-4"
+                        />
+                        <span className={item.done ? 'text-slate-500 line-through' : 'text-slate-300'}>
+                          {item.text}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Timestamps */}
+              <div className="text-xs text-slate-500">
+                <p>Created: {new Date(selectedTask.created_at).toLocaleString()}</p>
+                <p>Updated: {new Date(selectedTask.updated_at).toLocaleString()}</p>
+              </div>
+
+              {/* Delete Button */}
+              <button
+                onClick={() => {
+                  deleteTask(selectedTask.id)
+                  setSelectedTask(null)
+                }}
+                className="mt-6 w-full px-4 py-2 bg-red-600/20 text-red-300 rounded text-sm hover:bg-red-600/30 transition font-medium"
+              >
+                Delete Task
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-full text-slate-500">
+              <p>Select a task to view details</p>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Create/Edit Modal */}
