@@ -5,6 +5,8 @@ from pydantic import BaseModel
 from typing import List, Optional
 import time
 import pandas as pd
+from datetime import datetime
+from loguru import logger
 from tools.data.financial import FinancialDataManager
 from tools.data.enrichment import TickerIntelligence
 from tools.universe.universe import Universe
@@ -29,6 +31,12 @@ manager = FinancialDataManager()
 # Cache for loaded data to avoid repeated Parquet reads
 _data_cache = {}
 _cache_max_size = 5  # Keep last 5 tickers
+
+def clear_data_cache():
+    """Clear the API in-memory cache."""
+    global _data_cache
+    _data_cache.clear()
+    logger.info("✅ Cleared data cache")
 
 # Cache for universe list (TTL: 300 seconds / 5 minutes)
 _universe_list_cache = None
@@ -829,9 +837,19 @@ async def get_ticker_history(
             # Load from Parquet cache (~/.cresus/db/cache/history/)
             data_history = DataHistory(ticker)
             df = data_history.load_all()
+
+            # If data is empty or too old (> 2 days), fetch fresh data
             if df.empty:
+                logger.info(f"Data empty for {ticker}, fetching...")
                 data_history.fetch()
                 df = data_history.load_all()
+            elif not df.empty and 'timestamp' in df.columns:
+                latest_date = pd.to_datetime(df['timestamp']).max()
+                days_old = (datetime.now() - latest_date).days
+                if days_old > 2:
+                    logger.info(f"Data for {ticker} is {days_old} days old, fetching fresh...")
+                    data_history.fetch()
+                    df = data_history.load_all()
 
             # Store in memory cache
             if len(_data_cache) >= _cache_max_size:
@@ -844,22 +862,34 @@ async def get_ticker_history(
         if df.empty:
             return {"ticker": ticker, "data": [], "history": []}
 
-        # Limit to requested days
+        # Limit to requested days (but if no recent data, return all available)
         if days:
             cutoff = datetime.now() - timedelta(days=days)
             if 'timestamp' in df.columns:
                 df_filtered = df[pd.to_datetime(df['timestamp']) >= cutoff].copy()
             else:
                 df_filtered = df[df.index >= cutoff].copy()
+
+            # If filtering left no data, return all available data instead
+            if df_filtered.empty and not df.empty:
+                logger.warning(f"No data within {days} days for {ticker}, returning all available data")
+                df_filtered = df.copy()
         else:
             df_filtered = df.copy()
 
         # Calculate indicators on the filtered dataset
         indicators_dict = {}
-        if not df_filtered.empty and indicator:
+        if not df_filtered.empty:
+            # Always calculate SHA_10 (required by frontend)
+            indicators_to_calc = ['sha_10']
+            if indicator and indicator not in indicators_to_calc:
+                indicators_to_calc.append(indicator)
+
             try:
-                indicators_dict = calculate([indicator], df_filtered)
+                indicators_dict = calculate(indicators_to_calc, df_filtered)
+                logger.debug(f"Calculated indicators: {list(indicators_dict.keys())}")
             except Exception as e:
+                logger.warning(f"Failed to calculate indicators for {ticker}: {e}")
                 pass
 
         # Convert to dict list and merge indicators
@@ -889,10 +919,14 @@ async def get_ticker_history(
                 position = df_filtered.index.get_loc(idx)
                 if position < len(ind_series):
                     val = ind_series.iloc[position]
+                    # Include all indicators, even NaN values (frontend filters based on column presence)
                     if pd.notna(val):
                         if hasattr(val, 'item'):
                             val = val.item()
                         row_dict[ind_key] = round(float(val), 4) if isinstance(val, (int, float)) else val
+                    else:
+                        # Include NaN as null in JSON
+                        row_dict[ind_key] = None
 
             history.append(row_dict)
 
@@ -909,6 +943,25 @@ async def get_ticker_history(
         import traceback
         traceback.print_exc()
         return {"ticker": ticker, "data": [], "history": [], "error": str(e)}
+
+
+@router.post("/cache/clear")
+async def clear_cache_endpoint(ticker: str = Query(None, description="Optional: clear specific ticker cache")):
+    """Clear API cache (development/debug endpoint).
+
+    Args:
+        ticker: Optional ticker to clear, or None to clear all
+    """
+    global _data_cache
+    if ticker:
+        if ticker in _data_cache:
+            _data_cache.pop(ticker)
+            return {"status": "success", "message": f"Cleared cache for {ticker}"}
+        else:
+            return {"status": "not_found", "message": f"No cache for {ticker}"}
+    else:
+        clear_data_cache()
+        return {"status": "success", "message": "Cleared all API cache"}
 
 
 @router.get("/fundamental/{ticker}")

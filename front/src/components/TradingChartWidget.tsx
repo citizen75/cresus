@@ -4,11 +4,13 @@ import TradingChartControlsWidget from './TradingChartControlsWidget'
 import { useHistoricalDataLoader } from '@/hooks/useHistoricalDataLoader'
 import { api } from '@/services/api'
 
+import { logger } from '@/services/logger'
 interface TradingChartWidgetProps {
   ticker: string
   title?: string
   showControls?: boolean
   onGetHistoricalData?: (ticker: string, days: number) => Promise<any>
+  dataCache?: Map<string, any[]>
 }
 
 export default function TradingChartWidget({
@@ -16,6 +18,7 @@ export default function TradingChartWidget({
   title,
   showControls = true,
   onGetHistoricalData,
+  dataCache,
 }: TradingChartWidgetProps) {
   const [timeframe, setTimeframe] = useState('1D')
   const [visibleWindow, setVisibleWindow] = useState<'1M' | '3M' | '6M' | 'YTD' | '1Y' | '2Y'>('1Y')
@@ -25,13 +28,14 @@ export default function TradingChartWidget({
 
   // Use centralized data loader
   const { loadData } = useHistoricalDataLoader()
-  const [chartData, setChartData] = useState<any[] | undefined>(undefined)
+  const [chartData, setChartData] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(false)
 
   // Track which ticker we're currently fetching to prevent duplicate requests
   const fetchingTickerRef = useRef<string | null>(null)
 
-  // Cache historical data per ticker to avoid re-fetching
-  const dataCacheRef = useRef<Record<string, any[]>>({})
+  // Use provided cache or create a local one
+  const cache = dataCache || useRef<Record<string, any[]>>({})
 
   // Load chart data on mount or when ticker changes
   useEffect(() => {
@@ -44,36 +48,59 @@ export default function TradingChartWidget({
     const fetchData = async () => {
       fetchingTickerRef.current = ticker
 
-      // Check cache first
-      if (dataCacheRef.current[ticker]) {
-        console.log(`⚡ Using cached data for ${ticker}`)
-        setChartData(dataCacheRef.current[ticker])
+      // Check cache first (handle both Map and object formats)
+      let cachedData
+      if (dataCache instanceof Map) {
+        cachedData = dataCache.get(ticker)
+      } else if (cache && typeof cache === 'object' && 'current' in cache) {
+        cachedData = (cache as any).current[ticker]
+      }
+
+      if (cachedData) {
+        logger.debug(`⚡ Using cached data for ${ticker}`)
+        setChartData(cachedData)
+        setIsLoading(false)
         fetchingTickerRef.current = null
         return
       }
 
       try {
-        console.log(`📡 Fetching data for ${ticker}...`)
+        setIsLoading(true)
+        console.log(`[TradingChartWidget] Fetching data for ${ticker}...`)
+        logger.debug(`📡 Fetching data for ${ticker}...`)
         let response
         if (onGetHistoricalData) {
           // Custom fetch function - call with just ticker and days
+          console.log(`[TradingChartWidget] Using custom onGetHistoricalData`)
           response = await onGetHistoricalData(ticker, 730)
         } else {
           // Use default API with sha_10 indicator
+          console.log(`[TradingChartWidget] Using default API getHistoricalData`)
           response = await api.getHistoricalData(ticker, 730, { indicator: 'sha_10' })
         }
+        console.log(`[TradingChartWidget] Response:`, response)
         if (response && response.data) {
-          // Cache the data
-          dataCacheRef.current[ticker] = response.data
+          // Cache the data in the appropriate format
+          if (dataCache instanceof Map) {
+            dataCache.set(ticker, response.data)
+          } else if (cache && typeof cache === 'object' && 'current' in cache) {
+            (cache as any).current[ticker] = response.data
+          }
+          logger.debug(`✅ Setting chart data: ${response.data.length} rows for ${ticker}`)
+          console.log(`[TradingChartWidget] Setting chartData for ${ticker}:`, response.data)
           setChartData(response.data)
-          console.log(`✅ Cached data for ${ticker}`)
+        } else {
+          logger.warning(`No data in response for ${ticker}`)
+          console.log(`[TradingChartWidget] No data in response:`, response)
+          setChartData([])
         }
       } finally {
+        setIsLoading(false)
         fetchingTickerRef.current = null
       }
     }
     fetchData()
-  }, [ticker])  // Only depend on ticker, not the unstable onGetHistoricalData function
+  }, [ticker, dataCache, cache])  // Depend on cache reference too
 
   const handleToggleIndicator = (indicator: string) => {
     const newIndicators = new Set(selectedIndicators)
@@ -89,11 +116,6 @@ export default function TradingChartWidget({
     <div className="flex h-full gap-4 bg-slate-950">
       {/* Left - Chart */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {title && (
-          <div className="px-4 py-3 border-b border-slate-800 flex-shrink-0">
-            <h2 className="text-lg font-bold text-white">{title || ticker}</h2>
-          </div>
-        )}
         <div className="flex-1 overflow-hidden">
           <TradingChart
             timeframe={timeframe}
@@ -102,6 +124,7 @@ export default function TradingChartWidget({
             visibleWindow={visibleWindow}
             onCursorMove={setHoverData}
             chartData={chartData}
+            isLoading={isLoading}
           />
         </div>
       </div>

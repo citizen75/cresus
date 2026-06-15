@@ -3,6 +3,7 @@ import CardChart from './CardChart'
 import TradingChartWidget from './TradingChartWidget'
 import { useHistoricalDataLoader } from '@/hooks/useHistoricalDataLoader'
 
+import { logger } from '@/services/logger'
 interface ResultsWidgetProps {
   data: any[] // Array of result objects
   searchQuery: string
@@ -22,6 +23,14 @@ interface ResultsWidgetProps {
   onBuy?: (ticker: string) => void // Buy button callback
   onDeleteRow?: (ticker: string) => Promise<void>
   watchlistName?: string
+}
+
+// Persistent cache across component remounts
+const chartDataCache = new Map<string, any[]>()
+
+// Function to clear the cache (exported for debugging)
+export const clearChartDataCache = () => {
+  chartDataCache.clear()
 }
 
 export default function ResultsWidget({
@@ -63,7 +72,7 @@ export default function ResultsWidget({
   useEffect(() => {
     if (viewMode === 'charts' && data.length > 0 && Object.keys(historicalData).length === 0 && onGetHistoricalData && onSetHistoricalData) {
       const tickers = Array.from(new Set(data.map((row: any) => row.ticker).filter(Boolean)))
-      console.log(`[ResultsWidget] Loading data for ${tickers.length} tickers`)
+      logger.debug(`[ResultsWidget] Loading data for ${tickers.length} tickers`)
       loadData(tickers, onGetHistoricalData).then(loaded => {
         if (loaded) onSetHistoricalData(loaded)
       })
@@ -102,7 +111,7 @@ export default function ResultsWidget({
         })
       }, 500)
     } catch (err) {
-      console.error('Failed to add to watchlist:', err)
+      logger.error('Failed to add to watchlist:', err)
       setAddingToWatchlist(prev => {
         const next = new Set(prev)
         next.delete(ticker)
@@ -119,7 +128,7 @@ export default function ResultsWidget({
       await onDeleteRow(ticker)
       setDeletingTicker(null)
     } catch (err) {
-      console.error('Failed to delete ticker:', err)
+      logger.error('Failed to delete ticker:', err)
       setDeletingTicker(null)
     }
   }
@@ -461,7 +470,7 @@ export default function ResultsWidget({
                     onClick={(e) => {
                       e.preventDefault()
                       e.stopPropagation()
-                      console.log(`[ResultsWidget] Chart clicked: ${ticker}`)
+                      logger.debug(`[ResultsWidget] Chart clicked: ${ticker}`)
                       setSelectedTickerForChart(ticker)
                     }}
                     className="bg-slate-800 rounded-lg overflow-hidden border border-slate-700 flex flex-col h-full cursor-pointer hover:border-slate-600 transition"
@@ -540,11 +549,10 @@ export default function ResultsWidget({
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedTickerForChart(null)}>
           <div className="bg-slate-950 border border-slate-800 rounded-lg w-full h-[90vh] max-w-7xl flex flex-col" onClick={(e) => e.stopPropagation()}>
             {/* Header with Close Button */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 flex-shrink-0">
-              <h2 className="text-2xl font-bold text-white">{selectedTickerForChart}</h2>
+            <div className="flex justify-end px-4 py-3 border-b border-slate-800 flex-shrink-0">
               <button
                 onClick={() => setSelectedTickerForChart(null)}
-                className="text-slate-400 hover:text-white transition text-2xl"
+                className="text-slate-400 hover:text-white transition text-lg"
               >
                 ✕
               </button>
@@ -555,6 +563,7 @@ export default function ResultsWidget({
               <TradingChartWidget
                 ticker={selectedTickerForChart}
                 showControls={true}
+                dataCache={chartDataCache}
               />
             </div>
           </div>
