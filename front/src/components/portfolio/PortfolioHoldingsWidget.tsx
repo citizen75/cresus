@@ -5,6 +5,7 @@ import { PortfolioHoldingsTable } from './PortfolioHoldingsTable'
 import CardChart from '@/components/CardChart'
 import { ChartModal } from '@/components/ChartModal'
 import { TradingDialog } from '@/components/TradingDialog'
+import TickerSearchDialog from '@/components/TickerSearchDialog'
 import { getApiBaseUrl, api } from '@/services/api'
 
 interface PortfolioHoldingsWidgetProps {
@@ -46,6 +47,7 @@ export default function PortfolioHoldingsWidget({
   const [tradingMode, setTradingMode] = useState<'buy' | 'sell'>('buy')
   const [tradingTicker, setTradingTicker] = useState<string | null>(null)
   const [tradingPosition, setTradingPosition] = useState<any>(null)
+  const [searchDialogOpen, setSearchDialogOpen] = useState(false)
 
   // Use centralized data loader
   const { historicalData, loadData, setHistoricalData } = useHistoricalDataLoader()
@@ -177,6 +179,14 @@ export default function PortfolioHoldingsWidget({
     setTradingTicker(ticker)
     setTradingPosition(position)
     setTradingMode('sell')
+    setTradingDialogOpen(true)
+  }
+
+  const handleSearchDialogSelectTicker = (ticker: string, company?: string) => {
+    setSearchDialogOpen(false)
+    setTradingTicker(ticker)
+    setTradingPosition(null) // No position data for new ticker
+    setTradingMode('buy')
     setTradingDialogOpen(true)
   }
 
@@ -317,6 +327,14 @@ export default function PortfolioHoldingsWidget({
               </option>
             ))}
         </select>
+
+        {/* Buy New Ticker Button */}
+        <button
+          onClick={() => setSearchDialogOpen(true)}
+          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm rounded font-medium transition whitespace-nowrap"
+        >
+          + Buy Ticker
+        </button>
 
         {/* Table/Charts Toggle */}
         <div className="flex gap-1 bg-slate-800 border border-slate-700 rounded p-1 flex-shrink-0">
@@ -552,6 +570,14 @@ export default function PortfolioHoldingsWidget({
           onClose={() => setChartModalTicker(null)}
         />
       )}
+
+      {/* Ticker Search Dialog */}
+      <TickerSearchDialog
+        isOpen={searchDialogOpen}
+        onClose={() => setSearchDialogOpen(false)}
+        onSelectTicker={handleSearchDialogSelectTicker}
+        portfolioName={portfolioName}
+      />
 
       {/* Trading Dialog */}
       <TradingDialog
