@@ -8,6 +8,7 @@ import AIWatchlist from '@/components/portfolio/AIWatchlist'
 import OrdersView from '@/components/portfolio/OrdersView'
 import PortfolioBacktest from '@/components/portfolio/PortfolioBacktest'
 import PortfolioSettings from '@/components/portfolio/PortfolioSettings'
+import PortfolioHoldingsWidget from '@/components/portfolio/PortfolioHoldingsWidget'
 import { ConversationWidget } from '@/components/ConversationWidget'
 
 const TABS = [
@@ -154,6 +155,7 @@ function PortfolioDetailContent() {
           {activeTab === 'watchlist' && <AIWatchlist name={name} />}
           {activeTab === 'orders' && <OrdersView name={name} />}
           {activeTab === 'backtest' && <PortfolioBacktest name={name} />}
+          {activeTab === 'holdings' && <PortfolioHoldingsWidget portfolioName={name} />}
           {activeTab === 'settings' && <PortfolioSettings name={name} />}
           {activeTab === 'activity' && <div className="text-slate-400 py-12 text-center">Activity tab - Coming soon</div>}
         </div>
