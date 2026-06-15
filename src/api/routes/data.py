@@ -1002,3 +1002,52 @@ async def get_ticker_fundamental(ticker: str):
                 "error": str(e)
             }
         )
+
+
+@router.get("/tickers/all")
+async def get_all_tickers(limit: int = Query(5000, description="Max number of tickers")):
+    """Get all available tickers from all universes with enriched metadata.
+
+    Useful for ticker search dialogs without needing to specify universe.
+    """
+    try:
+        all_tickers = []
+        universes = Universe.list_universes()
+
+        for universe_id in universes:
+            try:
+                uni = Universe(universe_id)
+                if not uni.exists():
+                    continue
+
+                tickers = uni.get_tickers_with_metadata()
+                if tickers:
+                    all_tickers.extend(tickers)
+            except Exception as e:
+                logger.warning(f"Failed to load tickers from universe {universe_id}: {e}")
+                continue
+
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_tickers = []
+        for ticker_data in all_tickers:
+            ticker_sym = ticker_data.get('ticker') if isinstance(ticker_data, dict) else str(ticker_data)
+            if ticker_sym not in seen:
+                seen.add(ticker_sym)
+                unique_tickers.append(ticker_data)
+
+        # Limit results
+        unique_tickers = unique_tickers[:limit]
+
+        # Enrich with fundamentals
+        if unique_tickers:
+            unique_tickers = TickerIntelligence.batch_enrich_flat(unique_tickers)
+
+        return {
+            "tickers": unique_tickers,
+            "count": len(unique_tickers),
+            "universes": len(universes)
+        }
+    except Exception as e:
+        logger.error(f"Error getting all tickers: {e}")
+        return {"error": str(e), "tickers": [], "count": 0}, 400

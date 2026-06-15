@@ -207,6 +207,10 @@ class CresusAPI {
     return (await this.client.get(`/data/fundamental/${ticker}`)).data
   }
 
+  async getAllTickers() {
+    return (await this.client.get('/data/tickers/all')).data
+  }
+
   async getBacktestWatchlist(strategy: string, backtest_id?: string) {
     // Load from portfolio directory (live mode) or backtest directory (legacy)
     const endpoint = backtest_id

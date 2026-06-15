@@ -45,12 +45,14 @@ export default function TickerSearchDialog({
     setIsLoading(true)
     try {
       const response = await api.getAllTickers?.()
-      if (response && Array.isArray(response)) {
-        setTickers(response)
+      if (response) {
+        // Handle both array and object responses
+        const tickersList = Array.isArray(response) ? response : response.tickers || []
+        setTickers(tickersList)
 
         // Extract unique exchanges and currencies
-        const exchanges = Array.from(new Set(response.map((t: TickerData) => t.exchange).filter(Boolean))) as string[]
-        const currencies = Array.from(new Set(response.map((t: TickerData) => t.currency).filter(Boolean))) as string[]
+        const exchanges = Array.from(new Set(tickersList.map((t: TickerData) => t.exchange).filter(Boolean))) as string[]
+        const currencies = Array.from(new Set(tickersList.map((t: TickerData) => t.currency).filter(Boolean))) as string[]
 
         setAvailableExchanges(exchanges)
         setAvailableCurrencies(currencies)
