@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from '@/services/api'
 import IndicatorsPanel from './IndicatorsPanel'
-
-import { logger } from '@/services/logger'
 interface TradingChartProps {
   timeframe: string
   title?: string
@@ -182,9 +180,7 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
           fundamentalResult = await api.getFundamental(ticker)
           fundamentalCacheRef.current[ticker] = fundamentalResult
           console.log(`[TradingChart] Fetched fundamental:`, fundamentalResult)
-          logger.debug(`📊 Fetched fundamental for ${ticker}`)
         } else {
-          logger.debug(`✅ Using cached fundamental for ${ticker}`)
         }
 
         const tickerInfo = {
@@ -214,7 +210,6 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
           setDailyChangePercent(changePercent)
         }
       } catch (err) {
-        logger.error('Failed to fetch ticker data:', err)
         setTickerData(null)
         if (!propsCurrentPrice) {
           setCompanyName('')
@@ -274,7 +269,6 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
             const hasShaIndicators = data.some((d: any) => d.sha_10_open !== undefined)
             console.log(`[TradingChart setupChart] hasShaIndicators=${hasShaIndicators}`)
             if (!hasShaIndicators) {
-              logger.debug(`⏳ Waiting for enriched data with SHA_10 indicators...`)
               // Don't render yet - wait for the API response with indicators
               throw new Error(`Data not yet enriched with indicators`)
             }
@@ -298,7 +292,6 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
                 close: parseFloat(d.sha_10_close),
               }))
 
-            logger.debug(`🔍 Extracted SHA_10 data: ${shaData.length} valid candles from ${data.length} total records`)
 
             volume = data.map((d: any) => {
               const color = parseFloat(d.close) >= parseFloat(d.open) ? '#26a69a' : '#ef5350'
@@ -317,7 +310,6 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
             ])
             const indicators = Object.keys(data[0] || {}).filter(col => !excludeColumns.has(col))
 
-            logger.debug(`Loaded ${candles.length} candles for ${ticker} (SHA_10: ${shaData.length}, Indicators: ${indicators.join(', ')})`)
             setChartData(candles)
             setShaCandles(shaData)
             rawDataRef.current = data
@@ -349,7 +341,6 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
             }
           } catch (err) {
             console.error(`[TradingChart setupChart] Error:`, err)
-            logger.error('Failed to fetch historical data:', err)
             const { candles: genCandles, volume: genVolume } = generateDatasets(timeframe)
             candles = genCandles
             volume = genVolume
@@ -437,9 +428,7 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
                 bottom: 0.15,
               },
             })
-            logger.debug(`✅ SHA_10 series added with ${shaCandles.length} candles`)
           } catch (err) {
-            logger.error('Error adding SHA candlesticks:', err)
           }
         }
 
@@ -672,7 +661,6 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
         if (!chartRef.current) chartRef.current = {}
         chartRef.current.unsubscribeCrosshair = unsubscribeCrosshair
       } catch (error) {
-        logger.error('Chart error:', error)
       }
     }
 
@@ -701,17 +689,14 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
 
   // Add SHA candlesticks series when data becomes available
   useEffect(() => {
-    logger.debug(`🔍 SHA series effect running: chart=${!!chartRef.current}, shaCandles=${shaCandles?.length || 0}, showSHA10=${showSHA10}`)
 
     if (!chartRef.current || !shaCandles || shaCandles.length === 0) {
-      logger.debug(`⏭️ Skipping SHA series: chart=${!!chartRef.current}, shaCandles=${shaCandles?.length || 0}`)
       return
     }
 
     try {
       // If series already exists, just update its data and visibility
       if (shaSeriesRef.current) {
-        logger.debug(`📊 Updating existing SHA series with ${shaCandles.length} candles`)
         shaSeriesRef.current.setData(shaCandles)
         shaSeriesRef.current.applyOptions({ visible: showSHA10 })
         return
@@ -720,12 +705,9 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
       const CandlestickSeries = (chartRef.current as any).CandlestickSeries
 
       if (!CandlestickSeries) {
-        logger.warn('CandlestickSeries not available')
         return
       }
 
-      logger.debug(`📌 Creating SHA series with styling: upColor=#ffffff, downColor=#9333ea`)
-      logger.debug(`📌 Sample SHA data:`, shaCandles.slice(0, 2))
 
       const shaSeries = chartRef.current.addSeries(CandlestickSeries, {
         upColor: '#ffffff',
@@ -737,9 +719,7 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
       }, 0)  // Add to pane 0 (same as candlesticks)
 
       shaSeriesRef.current = shaSeries
-      logger.debug(`📌 Setting data on SHA series with ${shaCandles.length} candles`)
       shaSeries.setData(shaCandles)
-      logger.debug(`📌 Data set successfully`)
 
       // Apply price scale options
       shaSeries.priceScale().applyOptions({
@@ -749,9 +729,7 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
         },
       })
 
-      logger.debug(`✅ SHA_10 series added with ${shaCandles.length} candles`)
     } catch (err) {
-      logger.error('Error adding SHA candlesticks:', err)
     }
   }, [shaCandles, showSHA10])
 
