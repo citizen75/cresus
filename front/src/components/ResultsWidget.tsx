@@ -3,7 +3,6 @@ import CardChart from './CardChart'
 import TradingChartWidget from './TradingChartWidget'
 import { useHistoricalDataLoader } from '@/hooks/useHistoricalDataLoader'
 
-import { logger } from '@/services/logger'
 interface ResultsWidgetProps {
   data: any[] // Array of result objects
   searchQuery: string
@@ -72,7 +71,6 @@ export default function ResultsWidget({
   useEffect(() => {
     if (viewMode === 'charts' && data.length > 0 && Object.keys(historicalData).length === 0 && onGetHistoricalData && onSetHistoricalData) {
       const tickers = Array.from(new Set(data.map((row: any) => row.ticker).filter(Boolean)))
-      logger.debug(`[ResultsWidget] Loading data for ${tickers.length} tickers`)
       loadData(tickers, onGetHistoricalData).then(loaded => {
         if (loaded) onSetHistoricalData(loaded)
       })
