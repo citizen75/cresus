@@ -44,10 +44,20 @@ export default function TickerSearchDialog({
   const loadTickers = async () => {
     setIsLoading(true)
     try {
-      const response = await api.getAllTickers?.()
+      console.log('[TickerSearchDialog] Loading tickers...')
+      if (!api.getAllTickers) {
+        console.error('[TickerSearchDialog] getAllTickers method not found on API')
+        setIsLoading(false)
+        return
+      }
+
+      const response = await api.getAllTickers()
+      console.log('[TickerSearchDialog] Response:', response)
+
       if (response) {
         // Handle both array and object responses
         const tickersList = Array.isArray(response) ? response : response.tickers || []
+        console.log('[TickerSearchDialog] Setting tickers:', tickersList.length)
         setTickers(tickersList)
 
         // Extract unique exchanges and currencies
@@ -58,7 +68,7 @@ export default function TickerSearchDialog({
         setAvailableCurrencies(currencies)
       }
     } catch (err) {
-      console.error('Failed to load tickers:', err)
+      console.error('[TickerSearchDialog] Error loading tickers:', err)
     } finally {
       setIsLoading(false)
     }
