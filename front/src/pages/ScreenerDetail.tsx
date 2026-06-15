@@ -217,7 +217,6 @@ export default function ScreenerDetail() {
         setPreviewMatchCount(0)
       }
     } catch (err: any) {
-      console.error('Failed to test formula:', err)
       // Extract error detail from API response
       let errorMessage = 'Formula test failed'
       if (err.response?.data?.detail) {
@@ -242,7 +241,6 @@ export default function ScreenerDetail() {
       setError(null)
     } catch (err) {
       setError('Failed to load screener')
-      console.error(err)
     } finally {
       setLoading(false)
     }
@@ -255,7 +253,6 @@ export default function ScreenerDetail() {
       const response = await api.listScreenerResults(paramName)
       setResults(response.results || [])
     } catch (err) {
-      console.error('Failed to load results:', err)
       setError('Failed to load results')
     } finally {
       setLoadingResults(false)
@@ -283,7 +280,6 @@ export default function ScreenerDetail() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to run screener')
-      console.error(err)
     } finally {
       setRunning(false)
     }
@@ -310,7 +306,6 @@ export default function ScreenerDetail() {
       await loadScreener()
     } catch (err) {
       setError('Failed to update screener')
-      console.error(err)
     }
   }
 
@@ -322,7 +317,6 @@ export default function ScreenerDetail() {
       setSelectedResultId(resultId)
     } catch (err) {
       setError('Failed to load result')
-      console.error(err)
     }
   }
 
@@ -339,7 +333,6 @@ export default function ScreenerDetail() {
       await loadResults()
     } catch (err) {
       setError('Failed to delete result')
-      console.error(err)
     }
   }
 
@@ -354,7 +347,6 @@ export default function ScreenerDetail() {
       await loadResults()
     } catch (err) {
       setError('Failed to clear results')
-      console.error(err)
     }
   }
 
@@ -364,7 +356,6 @@ export default function ScreenerDetail() {
       navigate('/screener')
     } catch (err) {
       setError('Failed to delete screener')
-      console.error(err)
     }
   }
 
@@ -707,83 +698,9 @@ export default function ScreenerDetail() {
         </div>
       )}
 
-      {/* Preview Results Section (shown when editing and test was run) */}
-      {editMode && previewResults.length > 0 && (
-        <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-800">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-white">Test Results ({filteredAndSortedPreviewResults.length} of {previewMatchCount})</h2>
-            </div>
-            <input
-              type="text"
-              placeholder="Search results..."
-              value={previewSearchQuery}
-              onChange={(e) => setPreviewSearchQuery(e.target.value)}
-              className="w-full px-4 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm focus:outline-none focus:border-slate-600"
-            />
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-800/50 border-b border-slate-800">
-                <tr>
-                  {previewResults.length > 0 &&
-                    Object.keys(previewResults[0]).map((key) => (
-                      <th
-                        key={key}
-                        onClick={() => handlePreviewColumnSort(key)}
-                        className="px-6 py-3 text-left text-slate-300 font-medium cursor-pointer hover:bg-slate-700/50 transition"
-                      >
-                        <div className="flex items-center gap-2">
-                          {key}
-                          {previewSortColumn === key && (
-                            <span className="text-xs text-slate-400">
-                              {previewSortDirection === 'asc' ? '↑' : '↓'}
-                            </span>
-                          )}
-                        </div>
-                      </th>
-                    ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800">
-                {filteredAndSortedPreviewResults.map((row, idx) => (
-                  <tr
-                    key={idx}
-                    className="hover:bg-slate-800/50 cursor-pointer transition"
-                    onClick={() => {
-                      console.log('Preview row clicked:', row)
-                      setSelectedRow(row)
-                    }}
-                  >
-                    {Object.entries(row).map(([key, value], colIdx) => {
-                      let displayValue = String(value || '')
-                      const numValue = typeof value === 'number' ? value : parseFloat(String(value || 0))
-
-                      if (!isNaN(numValue)) {
-                        if (key.toLowerCase().includes('volume') || key.toLowerCase().includes('vol')) {
-                          displayValue = numValue.toFixed(0)
-                        } else {
-                          displayValue = numValue.toFixed(3)
-                        }
-                      }
-                      return (
-                        <td key={colIdx} className="px-6 py-3 text-slate-300">
-                          {displayValue}
-                        </td>
-                      )
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
       {/* Row Details Modal */}
       {selectedRow && (() => {
-        console.log('Modal rendering with selectedRow:', selectedRow)
         return (
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-slate-900 rounded-lg border border-slate-800 w-full max-w-6xl h-screen max-h-[90vh] flex flex-col">
