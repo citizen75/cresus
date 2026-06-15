@@ -187,7 +187,15 @@ export default function TickerSearchDialog({
         {/* Results Table */}
         <div className="flex-1 overflow-y-auto">
           {isLoading ? (
-            <div className="p-12 text-center text-slate-400">Loading tickers...</div>
+            <div className="p-12 text-center text-slate-400">
+              <div>Loading tickers...</div>
+              <div className="text-sm mt-2">Please wait, this may take a moment</div>
+            </div>
+          ) : tickers.length === 0 && !isLoading ? (
+            <div className="p-12 text-center text-slate-400">
+              <div>No tickers could be loaded</div>
+              <div className="text-sm mt-2">Try entering a ticker manually or check your connection</div>
+            </div>
           ) : filteredTickers.length === 0 ? (
             <div className="p-12 text-center text-slate-400">
               {searchQuery ? 'No tickers found matching your search' : 'No tickers available'}
@@ -259,16 +267,50 @@ export default function TickerSearchDialog({
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-slate-800 flex items-center justify-between">
-          <div className="text-sm text-slate-400">
-            Showing {filteredTickers.length} results
+        <div className="p-6 border-t border-slate-800 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-slate-400">
+              Showing {filteredTickers.length} results
+            </div>
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-medium transition"
+            >
+              Close
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-medium transition"
-          >
-            Close
-          </button>
+
+          {/* Manual Ticker Entry */}
+          {tickers.length === 0 && (
+            <div className="border-t border-slate-700 pt-4">
+              <label className="block text-sm text-slate-400 mb-2">
+                Or enter ticker manually
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="e.g., AAPL"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.currentTarget.value.trim())) {
+                      onSelectTicker(e.currentTarget.value.toUpperCase(), undefined)
+                    }
+                  }}
+                  className="flex-1 px-4 py-2 bg-slate-800 border border-slate-700 rounded text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                />
+                <button
+                  onClick={() => {
+                    const ticker = (document.querySelector('[placeholder="e.g., AAPL"]') as HTMLInputElement)?.value.trim()
+                    if (ticker) {
+                      onSelectTicker(ticker.toUpperCase(), undefined)
+                    }
+                  }}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-medium transition"
+                >
+                  Buy
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
