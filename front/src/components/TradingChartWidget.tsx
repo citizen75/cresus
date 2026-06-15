@@ -3,8 +3,6 @@ import TradingChart from './TradingChart'
 import TradingChartControlsWidget from './TradingChartControlsWidget'
 import { useHistoricalDataLoader } from '@/hooks/useHistoricalDataLoader'
 import { api } from '@/services/api'
-
-import { logger } from '@/services/logger'
 interface TradingChartWidgetProps {
   ticker: string
   title?: string
@@ -57,7 +55,6 @@ export default function TradingChartWidget({
       }
 
       if (cachedData) {
-        logger.debug(`⚡ Using cached data for ${ticker}`)
         setChartData(cachedData)
         setIsLoading(false)
         fetchingTickerRef.current = null
@@ -67,7 +64,6 @@ export default function TradingChartWidget({
       try {
         setIsLoading(true)
         console.log(`[TradingChartWidget] Fetching data for ${ticker}...`)
-        logger.debug(`📡 Fetching data for ${ticker}...`)
         let response
         if (onGetHistoricalData) {
           // Custom fetch function - call with just ticker and days
@@ -86,11 +82,9 @@ export default function TradingChartWidget({
           } else if (cache && typeof cache === 'object' && 'current' in cache) {
             (cache as any).current[ticker] = response.data
           }
-          logger.debug(`✅ Setting chart data: ${response.data.length} rows for ${ticker}`)
           console.log(`[TradingChartWidget] Setting chartData for ${ticker}:`, response.data)
           setChartData(response.data)
         } else {
-          logger.warning(`No data in response for ${ticker}`)
           console.log(`[TradingChartWidget] No data in response:`, response)
           setChartData([])
         }
