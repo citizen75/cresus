@@ -10,9 +10,12 @@ interface TickerSearchDialogProps {
 }
 
 interface TickerData {
-  ticker: string
+  ticker?: string
+  symbol?: string
   company_name?: string
+  name?: string
   asset_type?: string
+  type?: string
   exchange?: string
   currency?: string
   sector?: string
@@ -62,10 +65,12 @@ export default function TickerSearchDialog({
         console.log('[TickerSearchDialog] Setting tickers:', tickersList.length)
         setTickers(tickersList)
 
-        // Extract unique exchanges and currencies
-        const exchanges = Array.from(new Set(tickersList.map((t: TickerData) => t.exchange).filter(Boolean))) as string[]
-        const currencies = Array.from(new Set(tickersList.map((t: TickerData) => t.currency).filter(Boolean))) as string[]
+        // Extract unique exchanges and currencies (handle both field name formats)
+        const exchanges = Array.from(new Set(tickersList.map((t: TickerData) => t.exchange || '').filter(Boolean))) as string[]
+        const currencies = Array.from(new Set(tickersList.map((t: TickerData) => t.currency || '').filter(Boolean))) as string[]
 
+        console.log('[TickerSearchDialog] Exchanges:', exchanges)
+        console.log('[TickerSearchDialog] Currencies:', currencies)
         setAvailableExchanges(exchanges)
         setAvailableCurrencies(currencies)
       }
@@ -77,19 +82,26 @@ export default function TickerSearchDialog({
   }
 
   const filteredTickers = tickers.filter((ticker) => {
+    // Handle different field names from API
+    const tickerSymbol = ticker.ticker || ticker.symbol || ''
+    const companyName = ticker.company_name || ticker.name || ''
+    const assetType = ticker.asset_type || ticker.type || ''
+    const exchange = ticker.exchange || ''
+    const currency = ticker.currency || ''
+
     const query = searchQuery.toLowerCase()
     const matchesSearch =
-      ticker.ticker.toLowerCase().includes(query) ||
-      (ticker.company_name && ticker.company_name.toLowerCase().includes(query))
+      tickerSymbol.toLowerCase().includes(query) ||
+      (companyName && companyName.toLowerCase().includes(query))
 
     const matchesAssetType =
-      assetTypeFilter === 'All' || ticker.asset_type === assetTypeFilter
+      assetTypeFilter === 'All' || assetType === assetTypeFilter
 
     const matchesExchange =
-      exchangeFilter === 'All' || ticker.exchange === exchangeFilter
+      exchangeFilter === 'All' || exchange === exchangeFilter
 
     const matchesCurrency =
-      currencyFilter === 'All' || ticker.currency === currencyFilter
+      currencyFilter === 'All' || currency === currencyFilter
 
     return matchesSearch && matchesAssetType && matchesExchange && matchesCurrency
   })
@@ -240,42 +252,47 @@ export default function TickerSearchDialog({
                 </tr>
               </thead>
               <tbody>
-                {filteredTickers.slice(0, 100).map((ticker) => (
-                  <tr
-                    key={ticker.ticker}
-                    className={`border-b border-slate-700 hover:bg-slate-800/50 transition ${
-                      selectedRow?.ticker === ticker.ticker ? 'bg-slate-800' : ''
-                    }`}
-                    onClick={() => setSelectedRow(ticker)}
-                  >
-                    <td className="px-6 py-3 text-white font-mono font-medium">
-                      {ticker.ticker}
-                    </td>
-                    <td className="px-6 py-3 text-slate-300">
-                      {ticker.company_name || '—'}
-                    </td>
-                    <td className="px-6 py-3 text-slate-400 text-sm">
-                      {ticker.asset_type || '—'}
-                    </td>
-                    <td className="px-6 py-3 text-slate-400 text-sm">
-                      {ticker.exchange || '—'}
-                    </td>
-                    <td className="px-6 py-3 text-slate-400 text-sm">
-                      {ticker.currency || '—'}
-                    </td>
-                    <td className="px-6 py-3 text-right">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onSelectTicker(ticker.ticker, ticker.company_name)
-                        }}
-                        className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm font-medium transition"
-                      >
-                        Buy
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {filteredTickers.slice(0, 100).map((ticker) => {
+                  const tickerSymbol = ticker.ticker || ticker.symbol || ''
+                  const companyName = ticker.company_name || ticker.name || ''
+
+                  return (
+                    <tr
+                      key={tickerSymbol}
+                      className={`border-b border-slate-700 hover:bg-slate-800/50 transition ${
+                        selectedRow?.ticker === tickerSymbol ? 'bg-slate-800' : ''
+                      }`}
+                      onClick={() => setSelectedRow(ticker)}
+                    >
+                      <td className="px-6 py-3 text-white font-mono font-medium">
+                        {tickerSymbol}
+                      </td>
+                      <td className="px-6 py-3 text-slate-300">
+                        {companyName || '—'}
+                      </td>
+                      <td className="px-6 py-3 text-slate-400 text-sm">
+                        {ticker.asset_type || ticker.type || '—'}
+                      </td>
+                      <td className="px-6 py-3 text-slate-400 text-sm">
+                        {ticker.exchange || '—'}
+                      </td>
+                      <td className="px-6 py-3 text-slate-400 text-sm">
+                        {ticker.currency || '—'}
+                      </td>
+                      <td className="px-6 py-3 text-right">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onSelectTicker(tickerSymbol, companyName)
+                          }}
+                          className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm font-medium transition"
+                        >
+                          Buy
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           )}
