@@ -829,8 +829,13 @@ async def get_all_tickers(limit: int = Query(5000, description="Max number of ti
         seen = set()
         unique_tickers = []
         for ticker_data in all_tickers:
-            ticker_sym = ticker_data.get('ticker') if isinstance(ticker_data, dict) else str(ticker_data)
-            if ticker_sym not in seen:
+            if isinstance(ticker_data, dict):
+                # Handle both 'ticker' and 'symbol' field names
+                ticker_sym = ticker_data.get('ticker') or ticker_data.get('symbol') or ''
+            else:
+                ticker_sym = str(ticker_data)
+
+            if ticker_sym and ticker_sym not in seen:
                 seen.add(ticker_sym)
                 unique_tickers.append(ticker_data)
 
