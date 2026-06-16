@@ -811,19 +811,24 @@ async def get_all_tickers(limit: int = Query(5000, description="Max number of ti
     try:
         all_tickers = []
         universes = Universe.list_universes()
+        logger.info(f"[GET_ALL_TICKERS] Found {len(universes)} universes: {universes}")
 
         for universe_id in universes:
             try:
                 uni = Universe(universe_id)
                 if not uni.exists():
+                    logger.info(f"[GET_ALL_TICKERS] Universe {universe_id} does not exist")
                     continue
 
                 tickers = uni.get_tickers_with_metadata()
+                logger.info(f"[GET_ALL_TICKERS] Universe {universe_id} has {len(tickers) if tickers else 0} tickers")
                 if tickers:
                     all_tickers.extend(tickers)
             except Exception as e:
-                logger.warning(f"Failed to load tickers from universe {universe_id}: {e}")
+                logger.warning(f"[GET_ALL_TICKERS] Failed to load tickers from universe {universe_id}: {e}")
                 continue
+
+        logger.info(f"[GET_ALL_TICKERS] Total tickers before dedup: {len(all_tickers)}")
 
         # Remove duplicates while preserving order
         seen = set()
