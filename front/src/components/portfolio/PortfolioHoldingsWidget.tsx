@@ -182,12 +182,42 @@ export default function PortfolioHoldingsWidget({
     setTradingDialogOpen(true)
   }
 
-  const handleSearchDialogSelectTicker = (ticker: string, company?: string) => {
+  const handleSearchDialogSelectTicker = async (ticker: string, company?: string) => {
     console.log('[PortfolioHoldingsWidget] Selected ticker from search:', ticker)
     setSearchDialogOpen(false)
     setTradingTicker(ticker)
     setTradingPosition(null) // No position data for new ticker
     setTradingMode('buy')
+
+    // Load ticker data before opening dialog
+    try {
+      console.log(`[PortfolioHoldingsWidget] Loading data for ${ticker}...`)
+      const [historyResponse, fundamentalResponse] = await Promise.all([
+        api.getHistoricalData(ticker, 730, { indicator: 'sha_10' }),
+        api.getFundamental(ticker)
+      ])
+
+      console.log(`[PortfolioHoldingsWidget] Loaded history:`, historyResponse?.data?.length, 'candles')
+      console.log(`[PortfolioHoldingsWidget] Loaded fundamental:`, fundamentalResponse?.data?.company?.name)
+
+      // Create position object with loaded data
+      if (historyResponse?.data && historyResponse.data.length > 0) {
+        const lastCandle = historyResponse.data[historyResponse.data.length - 1]
+        const position = {
+          ticker: ticker,
+          company_name: company || fundamentalResponse?.data?.company?.name || ticker,
+          current_price: parseFloat(lastCandle.close) || 0,
+          quantity: 0,
+          avg_entry_price: 0,
+          position_value: 0,
+          historical_data: historyResponse.data
+        }
+        setTradingPosition(position)
+      }
+    } catch (err) {
+      console.error('[PortfolioHoldingsWidget] Error loading ticker data:', err)
+    }
+
     setTradingDialogOpen(true)
   }
 
