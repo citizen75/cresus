@@ -145,10 +145,16 @@ export default function TickerSearchDialog({
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                console.log('[TickerSearchDialog] Search query changed:', e.target.value)
+                setSearchQuery(e.target.value)
+              }}
               placeholder="e.g., AAPL or Apple"
               className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
             />
+            <div className="text-xs text-slate-500 mt-1">
+              Search: "{searchQuery}" | Total tickers: {tickers.length} | Filtered: {filteredTickers.length}
+            </div>
           </div>
 
           {/* Filters */}
