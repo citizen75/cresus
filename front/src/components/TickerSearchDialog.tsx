@@ -96,8 +96,12 @@ export default function TickerSearchDialog({
   if (!isOpen) return null
 
   const dialogContent = (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
-      <div className="bg-slate-900 border-2 border-slate-700 rounded-lg w-[90vw] max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Overlay */}
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+
+      {/* Dialog */}
+      <div className="relative bg-slate-900 border-2 border-slate-700 rounded-lg w-[90vw] max-w-4xl max-h-[85vh] flex flex-col shadow-2xl z-10">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-800">
           <h2 className="text-xl font-bold text-white">Search Ticker</h2>
