@@ -183,6 +183,7 @@ export default function PortfolioHoldingsWidget({
   }
 
   const handleSearchDialogSelectTicker = (ticker: string, company?: string) => {
+    console.log('[PortfolioHoldingsWidget] Selected ticker from search:', ticker)
     setSearchDialogOpen(false)
     setTradingTicker(ticker)
     setTradingPosition(null) // No position data for new ticker
@@ -330,7 +331,10 @@ export default function PortfolioHoldingsWidget({
 
         {/* Buy New Ticker Button */}
         <button
-          onClick={() => setSearchDialogOpen(true)}
+          onClick={() => {
+            console.log('[PortfolioHoldingsWidget] Buy Ticker button clicked')
+            setSearchDialogOpen(true)
+          }}
           className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm rounded font-medium transition whitespace-nowrap"
         >
           + Buy Ticker

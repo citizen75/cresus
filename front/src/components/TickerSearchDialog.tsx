@@ -25,6 +25,7 @@ export default function TickerSearchDialog({
   onSelectTicker,
   portfolioName,
 }: TickerSearchDialogProps) {
+  console.log('[TickerSearchDialog] Rendering with isOpen:', isOpen)
   const [searchQuery, setSearchQuery] = useState('')
   const [assetTypeFilter, setAssetTypeFilter] = useState('All')
   const [exchangeFilter, setExchangeFilter] = useState('All')
@@ -93,15 +94,24 @@ export default function TickerSearchDialog({
     return matchesSearch && matchesAssetType && matchesExchange && matchesCurrency
   })
 
-  if (!isOpen) return null
+  if (!isOpen) {
+    console.log('[TickerSearchDialog] Not open, returning null')
+    return null
+  }
+
+  console.log('[TickerSearchDialog] Dialog is OPEN - rendering content')
 
   const dialogContent = (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'transparent' }}>
       {/* Overlay */}
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" style={{ zIndex: 1 }} />
 
       {/* Dialog */}
-      <div className="relative bg-slate-900 border-2 border-slate-700 rounded-lg w-[90vw] max-w-4xl max-h-[85vh] flex flex-col shadow-2xl z-10">
+      <div className="relative bg-slate-900 border-4 border-yellow-500 rounded-lg w-[90vw] max-w-4xl max-h-[85vh] flex flex-col shadow-2xl" style={{ zIndex: 2 }}>
+        {/* DEBUG INDICATOR */}
+        <div style={{ position: 'absolute', top: '10px', left: '10px', background: 'yellow', color: 'black', padding: '5px 10px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', zIndex: 10 }}>
+          DIALOG VISIBLE
+        </div>
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-800">
           <h2 className="text-xl font-bold text-white">Search Ticker</h2>
