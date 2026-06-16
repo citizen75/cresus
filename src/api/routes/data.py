@@ -804,38 +804,38 @@ async def batch_enrich_tickers(request: TickersRequest, use_cache: bool = Query(
 
 @router.get("/tickers/all")
 async def get_all_tickers(limit: int = Query(5000, description="Max number of tickers")):
-    """Get all available tickers from all universes with enriched metadata.
+    """Get all available tickers with enriched metadata.
 
-    Useful for ticker search dialogs without needing to specify universe.
+    Loads from available universes and returns up to limit tickers.
     """
     try:
         all_tickers = []
         universes = Universe.list_universes()
-        logger.info(f"[GET_ALL_TICKERS] Found {len(universes)} universes: {universes}")
 
+        # Try to load tickers from each universe until we have enough
         for universe_id in universes:
+            if len(all_tickers) >= limit:
+                break
+
             try:
                 uni = Universe(universe_id)
                 if not uni.exists():
-                    logger.info(f"[GET_ALL_TICKERS] Universe {universe_id} does not exist")
                     continue
 
                 tickers = uni.get_tickers_with_metadata()
-                logger.info(f"[GET_ALL_TICKERS] Universe {universe_id} has {len(tickers) if tickers else 0} tickers")
                 if tickers:
-                    all_tickers.extend(tickers)
+                    # Add as many as we need to reach limit
+                    remaining = limit - len(all_tickers)
+                    all_tickers.extend(tickers[:remaining])
             except Exception as e:
-                logger.warning(f"[GET_ALL_TICKERS] Failed to load tickers from universe {universe_id}: {e}")
+                # Silently skip universes with errors
                 continue
-
-        logger.info(f"[GET_ALL_TICKERS] Total tickers before dedup: {len(all_tickers)}")
 
         # Remove duplicates while preserving order
         seen = set()
         unique_tickers = []
         for ticker_data in all_tickers:
             if isinstance(ticker_data, dict):
-                # Handle both 'ticker' and 'symbol' field names
                 ticker_sym = ticker_data.get('ticker') or ticker_data.get('symbol') or ''
             else:
                 ticker_sym = str(ticker_data)
@@ -843,9 +843,6 @@ async def get_all_tickers(limit: int = Query(5000, description="Max number of ti
             if ticker_sym and ticker_sym not in seen:
                 seen.add(ticker_sym)
                 unique_tickers.append(ticker_data)
-
-        # Limit results
-        unique_tickers = unique_tickers[:limit]
 
         # Enrich with fundamentals
         if unique_tickers:
