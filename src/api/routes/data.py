@@ -812,7 +812,7 @@ async def get_all_tickers(limit: int = Query(5000, description="Max number of ti
         all_tickers = []
         universes = Universe.list_universes()
 
-        # Try to load tickers from each universe until we have enough
+        # Load tickers from multiple universes
         for universe_id in universes:
             if len(all_tickers) >= limit:
                 break
@@ -828,7 +828,7 @@ async def get_all_tickers(limit: int = Query(5000, description="Max number of ti
                     remaining = limit - len(all_tickers)
                     all_tickers.extend(tickers[:remaining])
             except Exception as e:
-                # Silently skip universes with errors
+                logger.debug(f"Skipped universe {universe_id}: {e}")
                 continue
 
         # Remove duplicates while preserving order
@@ -844,13 +844,14 @@ async def get_all_tickers(limit: int = Query(5000, description="Max number of ti
                 seen.add(ticker_sym)
                 unique_tickers.append(ticker_data)
 
-        # Enrich with fundamentals
-        if unique_tickers:
-            unique_tickers = TickerIntelligence.batch_enrich_flat(unique_tickers)
+        logger.info(f"[/tickers/all] Loaded {len(unique_tickers)} unique tickers from {len(universes)} universes")
+
+        # Only enrich if we have data and avoid batch enrichment that may fail
+        result_tickers = unique_tickers
 
         return {
-            "tickers": unique_tickers,
-            "count": len(unique_tickers),
+            "tickers": result_tickers,
+            "count": len(result_tickers),
             "universes": len(universes)
         }
     except Exception as e:
