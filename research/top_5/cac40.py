@@ -335,11 +335,18 @@ class CAC40MomentumBacktest:
                 # Calculate portfolio value from current holdings + cash
                 position_value = sum(current_holdings.get(t, 0) * current_data.get(t, 0) for t in current_holdings.keys() if t in current_data)
                 portfolio_value = cash + position_value
+
+                # Skip if portfolio value is invalid
+                if not (isinstance(portfolio_value, (int, float)) and portfolio_value > 0):
+                    continue
+
                 target_per_position = portfolio_value * 0.20
 
                 for ticker in to_open:
                     if ticker in current_data:
                         price = current_data[ticker]
+                        if price <= 0:
+                            continue
                         qty = int(target_per_position / (price * (1 + self.FEE_RATE)))
 
                         if qty > 0:
