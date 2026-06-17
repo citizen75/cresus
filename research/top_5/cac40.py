@@ -209,6 +209,10 @@ class CAC40MomentumBacktest:
             sorted_wl = watchlist.sort_values(['score', 'ticker'], ascending=[False, True])
             return sorted_wl['ticker'].tolist()
 
+        def watchlist_filter(ranked_tickers: list, top_n: int = 5) -> list:
+            """Filter to top N tickers from ranked list."""
+            return ranked_tickers[:top_n] if len(ranked_tickers) >= top_n else []
+
         # Create fresh portfolio in PortfolioManager
         portfolio_name = f"cac40_momentum_{self.start_date.strftime('%Y%m%d')}"
         self.pm = PortfolioManager(context={})
@@ -269,12 +273,12 @@ class CAC40MomentumBacktest:
                 continue
 
             t_top5_start = time.perf_counter()
-            # Get top 5 momentum tickers by scoring and ranking
+            # Get top 5 momentum tickers by scoring, ranking, and filtering
             watchlist = self.build_watchlist(date)
             if not watchlist.empty:
                 watchlist = watchlist_scoring(watchlist, date)
                 ranked_tickers = watchlist_ranking(watchlist)
-                top_5 = ranked_tickers[:5]
+                top_5 = watchlist_filter(ranked_tickers, top_n=5)
             else:
                 top_5 = []
             timings['top5_calc'] += time.perf_counter() - t_top5_start
