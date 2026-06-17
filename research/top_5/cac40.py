@@ -273,19 +273,19 @@ class CAC40MomentumBacktest:
                 continue
 
             t_top5_start = time.perf_counter()
-            # Get top 5 momentum tickers by scoring, ranking, and filtering
-            watchlist = self.build_watchlist(date)
-            if not watchlist.empty:
-                watchlist = watchlist_scoring(watchlist, date)
-                ranked_tickers = watchlist_ranking(watchlist)
-                top_5 = watchlist_filter(ranked_tickers, top_n=5)
+            # Get top 5 momentum tickers: score → rank → filter
+            watchlist_df = self.build_watchlist(date)
+            if not watchlist_df.empty:
+                watchlist_df = watchlist_scoring(watchlist_df, date)
+                ranked_tickers = watchlist_ranking(watchlist_df)
+                watchlist = watchlist_filter(ranked_tickers, top_n=5)
             else:
-                top_5 = []
+                watchlist = []
             timings['top5_calc'] += time.perf_counter() - t_top5_start
-            if len(top_5) < 5:
+            if len(watchlist) < 5:
                 continue  # Skip if insufficient data
 
-            top_5_set = set(top_5)
+            top_5_set = set(watchlist)
 
             # Get current holdings from PortfolioManager
             positions = self.pm.get_portfolio_positions(portfolio_name) or {}
