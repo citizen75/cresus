@@ -46,6 +46,17 @@ dev = [
     "mypy>=1.0.0",
 ]
 
+# Research & Backtesting
+research = [
+    "matplotlib>=3.4.0",
+    "seaborn>=0.11.0",
+    "plotly>=5.0.0",
+    "jupyter>=1.0.0",
+    "ipykernel>=6.0.0",
+    "ipywidgets>=7.6.0",
+    "numba>=0.54.0",
+]
+
 [project.scripts]
 cresus = "cli.main:main"
 cresus-api = "api.main:main"

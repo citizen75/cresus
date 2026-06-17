@@ -1,0 +1,42 @@
+# CAC40 Momentum Strategy Backtest Dependencies
+#
+# IMPORTANT: Dependencies are now managed in ~/dev/cresus/pyproject.toml
+#
+# Installation options:
+#
+# Option 1: Install from pyproject.toml (RECOMMENDED)
+#   cd ~/dev/cresus
+#   pip install -e ".[research]"
+#
+# Option 2: Virtual environment (BEST PRACTICE)
+#   cd ~/dev/cresus
+#   python3 -m venv venv
+#   source venv/bin/activate
+#   pip install -e ".[research]"
+#
+# Option 3: Install these packages individually
+#   pip install numpy pandas yfinance matplotlib seaborn plotly jupyter ipykernel ipywidgets numba
+#
+# ════════════════════════════════════════════════════════════════════════════════
+#
+# Dependencies from ~/dev/cresus/pyproject.toml [project.optional-dependencies.research]:
+#
+# Core Data Processing (already in main dependencies):
+#   - numpy>=1.24.0
+#   - pandas==3.0.3
+#   - yfinance>=0.2.0
+#
+# Visualization & Analysis:
+#   - matplotlib>=3.4.0
+#   - seaborn>=0.11.0
+#   - plotly>=5.0.0
+#
+# Jupyter & Interactive:
+#   - jupyter>=1.0.0
+#   - ipykernel>=6.0.0
+#   - ipywidgets>=7.6.0
+#
+# Performance:
+#   - numba>=0.54.0
+#
+# ════════════════════════════════════════════════════════════════════════════════

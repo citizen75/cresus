@@ -1,0 +1,53 @@
+CAC40 MOMENTUM STRATEGY BACKTEST RESULTS
+====================================================================================================
+
+Period: 2010-06-16 to 2026-06-16
+Trading Days: 4,097
+Stocks: 37
+
+ALL STRATEGIES:
+────────────────────────────────────────────────────────────────────────────────────────────────────
+         Strategy  Annual Return  Volatility   Sharpe    Max DD  Win Rate
+  Top 5 (1-month)       1.311920    0.222368 5.899778 -0.168862  0.668294
+ Top 10 (1-month)       1.010057    0.194344 5.197267 -0.214419  0.656090
+  Top 5 (3-month)       0.792600    0.208313 3.804860 -0.221340  0.602880
+ Top 10 (3-month)       0.625141    0.186162 3.358047 -0.235367  0.598487
+  Top 5 (6-month)       0.588213    0.209666 2.805468 -0.263456  0.572858
+ Top 10 (6-month)       0.469638    0.185872 2.526668 -0.268846  0.569197
+ Top 5 (12-month)       0.491599    0.211187 2.327788 -0.293953  0.548206
+Top 10 (12-month)       0.385697    0.184673 2.088543 -0.283018  0.545521
+
+MOMENTUM WINDOW COMPARISON:
+────────────────────────────────────────────────────────────────────────────────────────────────────
+
+1-Month:
+  Annual Return:  131.19%
+  Volatility:     22.24%
+  Sharpe Ratio:   5.90
+  Max Drawdown:   -16.89%
+  Win Rate:       66.8%
+  Cumulative:     116959053599.77%
+
+3-Month:
+  Annual Return:  79.26%
+  Volatility:     20.83%
+  Sharpe Ratio:   3.80
+  Max Drawdown:   -22.13%
+  Win Rate:       60.3%
+  Cumulative:     27311365.02%
+
+6-Month:
+  Annual Return:  58.82%
+  Volatility:     20.97%
+  Sharpe Ratio:   2.81
+  Max Drawdown:   -26.35%
+  Win Rate:       57.3%
+  Cumulative:     988701.53%
+
+12-Month:
+  Annual Return:  49.16%
+  Volatility:     21.12%
+  Sharpe Ratio:   2.33
+  Max Drawdown:   -29.40%
+  Win Rate:       54.8%
+  Cumulative:     204826.90%
