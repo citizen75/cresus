@@ -420,20 +420,15 @@ class CAC40MomentumBacktest:
         self.rebalance_count = rebalance_count
         self.final_holdings = current_holdings
         self.final_portfolio_value = portfolio_values[-1] if portfolio_values else self.initial_capital
-        self.cash = cash
         self.portfolio_values = pd.Series(portfolio_values, index=portfolio_dates)
 
-        # Get trades from PortfolioManager
+        # Get trades from PortfolioManager (authoritative source)
         transactions_data = self.pm.get_portfolio_transactions(portfolio_name)
         self.trade_count = len(transactions_data.get('transactions', []))
 
-        # Validate cash consistency between backtest and PortfolioManager
-        pm_cash = self.pm.get_portfolio_cash(portfolio_name)
-        cash_diff = abs(self.cash - pm_cash)
-        if cash_diff > 0.01:  # Allow 1 cent rounding difference
-            print(f"⚠️  Cash mismatch: Backtest={self.cash:.2f}, PortfolioManager={pm_cash:.2f}, diff={cash_diff:.2f}")
-        else:
-            print(f"✅ Cash verified: €{pm_cash:.2f}")
+        # Get authoritative cash from PortfolioManager (calculated from journal)
+        self.cash = self.pm.get_portfolio_cash(portfolio_name)
+        print(f"✅ Cash verified from journal: €{self.cash:.2f}")
 
         # Report timing breakdown
         total_time = sum(timings.values())
