@@ -469,12 +469,23 @@ class CAC40MomentumBacktest:
 
         print(f"\n📌 CURRENT HOLDINGS ({len(self.final_holdings)}/5):")
         if self.final_holdings:
+            # Get latest prices from data_history (indexed by date)
+            sorted_dates = sorted(self.data_history.keys())
+            latest_date = sorted_dates[-1] if sorted_dates else None
+            latest_prices = self.data_history.get(latest_date, {}) if latest_date else {}
+
             for i, (ticker, qty) in enumerate(sorted(self.final_holdings.items()), 1):
-                if ticker in self.price_data:
+                # Try to get price from latest_prices, fallback to price_data
+                latest_price = latest_prices.get(ticker)
+                if latest_price is None and ticker in self.price_data:
                     latest_price = self.price_data[ticker].iloc[-1]
+
+                if latest_price and latest_price > 0:
                     position_value = qty * latest_price
                     pct_of_portfolio = (position_value / self.final_portfolio_value * 100) if self.final_portfolio_value > 0 else 0
-                    print(f"  {i}. {ticker:8} {qty:6} shares @ €{latest_price:7.2f} = €{position_value:9,.2f} ({pct_of_portfolio:5.1f}%)")
+                    print(f"  {i}. {ticker:8} {qty:6.0f} shares @ €{latest_price:7.2f} = €{position_value:9,.2f} ({pct_of_portfolio:5.1f}%)")
+                else:
+                    print(f"  {i}. {ticker:8} {qty:6.0f} shares @ € price unavailable")
         else:
             print("  No open positions")
 
