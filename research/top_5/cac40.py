@@ -179,32 +179,6 @@ class CAC40MomentumBacktest:
         ]
         return pd.DataFrame(watchlist_data).reset_index(drop=True)
 
-    def _get_top_5_momentum(self, date: pd.Timestamp, watchlist_scoring_fn, watchlist_ranking_fn) -> list:
-        """
-        Get top 5 tickers by momentum on a specific date.
-
-        Args:
-            date: Current trading date
-            watchlist_scoring_fn: Function to add scores to watchlist
-            watchlist_ranking_fn: Function to rank tickers by score
-
-        Returns:
-            List of top 5 tickers, sorted by score (highest first)
-        """
-        # Build watchlist with current day data
-        watchlist = self.build_watchlist(date)
-
-        if watchlist.empty:
-            return []
-
-        # Add scores
-        watchlist = watchlist_scoring_fn(watchlist, date)
-
-        # Rank tickers
-        ranked_tickers = watchlist_ranking_fn(watchlist)
-
-        # Return top 5
-        return ranked_tickers[:5]
 
     def run_backtest(self):
         """Run daily backtest using PortfolioManager."""
@@ -295,8 +269,14 @@ class CAC40MomentumBacktest:
                 continue
 
             t_top5_start = time.perf_counter()
-            # Get top 5 momentum tickers
-            top_5 = self._get_top_5_momentum(date, watchlist_scoring, watchlist_ranking)
+            # Get top 5 momentum tickers by scoring and ranking
+            watchlist = self.build_watchlist(date)
+            if not watchlist.empty:
+                watchlist = watchlist_scoring(watchlist, date)
+                ranked_tickers = watchlist_ranking(watchlist)
+                top_5 = ranked_tickers[:5]
+            else:
+                top_5 = []
             timings['top5_calc'] += time.perf_counter() - t_top5_start
             if len(top_5) < 5:
                 continue  # Skip if insufficient data
