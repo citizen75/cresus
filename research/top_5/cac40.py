@@ -243,7 +243,6 @@ class CAC40MomentumBacktest:
 
         rebalance_count = 0
         last_rebalance_date = None
-        cash = self.initial_capital  # Track cash locally
         portfolio_values = []
         portfolio_dates = []
 
@@ -327,11 +326,12 @@ class CAC40MomentumBacktest:
                         created_at=date.isoformat()
                     )
 
-                    cash += proceeds
                     del current_holdings[ticker]
 
             # BUY positions entering top 5
             if to_open:
+                # Get cash from PortfolioManager (source of truth)
+                cash = self.pm.get_portfolio_cash(portfolio_name)
                 # Calculate portfolio value from current holdings + cash
                 position_value = sum(current_holdings.get(t, 0) * current_data.get(t, 0) for t in current_holdings.keys() if t in current_data)
                 portfolio_value = cash + position_value
@@ -361,12 +361,12 @@ class CAC40MomentumBacktest:
                                 )
 
                                 current_holdings[ticker] = qty
-                                cash -= cost
 
             timings['trade_exec'] += time.perf_counter() - t_trade_start
 
             t_portfolio_start = time.perf_counter()
-            # Track portfolio value
+            # Track portfolio value from PortfolioManager cash + current holdings
+            cash = self.pm.get_portfolio_cash(portfolio_name)
             position_value = sum(current_holdings.get(t, 0) * current_data.get(t, 0) for t in current_holdings.keys() if t in current_data)
             portfolio_value = cash + position_value
             portfolio_values.append(portfolio_value)
