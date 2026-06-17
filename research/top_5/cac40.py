@@ -179,56 +179,14 @@ class CAC40MomentumBacktest:
         ]
         return pd.DataFrame(watchlist_data).reset_index(drop=True)
 
-    def watchlist_scoring(self, watchlist: pd.DataFrame, date: pd.Timestamp) -> pd.DataFrame:
-        """
-        Callback to add score column to watchlist from precomputed momentum.
-
-        Args:
-            watchlist: DataFrame with ticker and OHLCV columns
-            date: Current trading date
-
-        Returns:
-            DataFrame with added 'score' column
-        """
-        if watchlist.empty:
-            return watchlist
-
-        scores = []
-
-        for _, row in watchlist.iterrows():
-            ticker = row['ticker']
-
-            # Get precomputed momentum score for this date
-            if ticker in self.momentum_data and date in self.momentum_data[ticker]:
-                score = self.momentum_data[ticker][date]
-            else:
-                score = 0.0
-
-            scores.append(score)
-
-        watchlist['score'] = scores
-        return watchlist
-
-    def watchlist_ranking(self, watchlist: pd.DataFrame) -> list:
-        """
-        Callback to rank tickers by score.
-
-        Args:
-            watchlist: DataFrame with 'ticker' and 'score' columns
-
-        Returns:
-            List of tickers sorted by score (highest first), with ticker as tiebreaker
-        """
-        if watchlist.empty or 'score' not in watchlist.columns:
-            return []
-
-        # Sort by score descending, then by ticker alphabetically (deterministic tiebreaker)
-        sorted_wl = watchlist.sort_values(['score', 'ticker'], ascending=[False, True])
-        return sorted_wl['ticker'].tolist()
-
-    def _get_top_5_momentum(self, date: pd.Timestamp) -> list:
+    def _get_top_5_momentum(self, date: pd.Timestamp, watchlist_scoring_fn, watchlist_ranking_fn) -> list:
         """
         Get top 5 tickers by momentum on a specific date.
+
+        Args:
+            date: Current trading date
+            watchlist_scoring_fn: Function to add scores to watchlist
+            watchlist_ranking_fn: Function to rank tickers by score
 
         Returns:
             List of top 5 tickers, sorted by score (highest first)
@@ -239,11 +197,11 @@ class CAC40MomentumBacktest:
         if watchlist.empty:
             return []
 
-        # Add scores using callback
-        watchlist = self.watchlist_scoring(watchlist, date)
+        # Add scores
+        watchlist = watchlist_scoring_fn(watchlist, date)
 
-        # Rank tickers using callback
-        ranked_tickers = self.watchlist_ranking(watchlist)
+        # Rank tickers
+        ranked_tickers = watchlist_ranking_fn(watchlist)
 
         # Return top 5
         return ranked_tickers[:5]
@@ -251,6 +209,31 @@ class CAC40MomentumBacktest:
     def run_backtest(self):
         """Run daily backtest using PortfolioManager."""
         print("\n📍 Running daily backtest with PortfolioManager...")
+
+        # Nested functions for watchlist processing
+        def watchlist_scoring(watchlist: pd.DataFrame, date: pd.Timestamp) -> pd.DataFrame:
+            """Add score column to watchlist from precomputed momentum."""
+            if watchlist.empty:
+                return watchlist
+
+            scores = []
+            for _, row in watchlist.iterrows():
+                ticker = row['ticker']
+                if ticker in self.momentum_data and date in self.momentum_data[ticker]:
+                    score = self.momentum_data[ticker][date]
+                else:
+                    score = 0.0
+                scores.append(score)
+
+            watchlist['score'] = scores
+            return watchlist
+
+        def watchlist_ranking(watchlist: pd.DataFrame) -> list:
+            """Rank tickers by score (highest first)."""
+            if watchlist.empty or 'score' not in watchlist.columns:
+                return []
+            sorted_wl = watchlist.sort_values(['score', 'ticker'], ascending=[False, True])
+            return sorted_wl['ticker'].tolist()
 
         # Create fresh portfolio in PortfolioManager
         portfolio_name = f"cac40_momentum_{self.start_date.strftime('%Y%m%d')}"
@@ -312,11 +295,8 @@ class CAC40MomentumBacktest:
                 continue
 
             t_top5_start = time.perf_counter()
-            # Build current day watchlist
-            watchlist = self.build_watchlist(date)
-
-            # Get top 5 momentum tickers from watchlist
-            top_5 = self._get_top_5_momentum(date)
+            # Get top 5 momentum tickers
+            top_5 = self._get_top_5_momentum(date, watchlist_scoring, watchlist_ranking)
             timings['top5_calc'] += time.perf_counter() - t_top5_start
             if len(top_5) < 5:
                 continue  # Skip if insufficient data
