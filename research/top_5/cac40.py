@@ -469,23 +469,25 @@ class CAC40MomentumBacktest:
 
         print(f"\n📌 CURRENT HOLDINGS ({len(self.final_holdings)}/5):")
         if self.final_holdings:
-            # Get latest prices from data_history (indexed by date)
-            sorted_dates = sorted(self.data_history.keys())
-            latest_date = sorted_dates[-1] if sorted_dates else None
-            latest_prices = self.data_history.get(latest_date, {}) if latest_date else {}
+            # Try to get latest prices from price_data
+            total_position_value = 0
+            for ticker in self.final_holdings:
+                if ticker in self.price_data and len(self.price_data[ticker]) > 0:
+                    price = self.price_data[ticker].iloc[-1]
+                    if pd.notna(price) and price > 0:
+                        total_position_value += self.final_holdings[ticker] * price
 
             for i, (ticker, qty) in enumerate(sorted(self.final_holdings.items()), 1):
-                # Try to get price from latest_prices, fallback to price_data
-                latest_price = latest_prices.get(ticker)
-                if latest_price is None and ticker in self.price_data:
+                if ticker in self.price_data and len(self.price_data[ticker]) > 0:
                     latest_price = self.price_data[ticker].iloc[-1]
-
-                if latest_price and latest_price > 0:
-                    position_value = qty * latest_price
-                    pct_of_portfolio = (position_value / self.final_portfolio_value * 100) if self.final_portfolio_value > 0 else 0
-                    print(f"  {i}. {ticker:8} {qty:6.0f} shares @ €{latest_price:7.2f} = €{position_value:9,.2f} ({pct_of_portfolio:5.1f}%)")
+                    if pd.notna(latest_price) and latest_price > 0:
+                        position_value = qty * latest_price
+                        pct_of_portfolio = (position_value / self.final_portfolio_value * 100) if self.final_portfolio_value > 0 else 0
+                        print(f"  {i}. {ticker:8} {qty:6.0f} shares @ €{latest_price:7.2f} = €{position_value:9,.2f} ({pct_of_portfolio:5.1f}%)")
+                    else:
+                        print(f"  {i}. {ticker:8} {qty:6.0f} shares @ € (price N/A)")
                 else:
-                    print(f"  {i}. {ticker:8} {qty:6.0f} shares @ € price unavailable")
+                    print(f"  {i}. {ticker:8} {qty:6.0f} shares @ € (no price data)")
         else:
             print("  No open positions")
 
@@ -531,7 +533,7 @@ def main():
     print(f"  Period: {summary['start_date']} to {summary['end_date']} ({summary['days']} days)")
     print(f"  Rebalances: {summary['rebalances']}")
     print(f"  Trades: {summary['trades']}")
-    print(f"  Data: {summary['data_sources']['tickers_loaded']}/{summary['data_sources']['tickers_loaded'] + summary['data_sources']['tickers_failed']} tickers loaded")
+    print(f"  Data: {summary['data_sources']['tickers_loaded']} tickers loaded")
 
     return backtest
 
