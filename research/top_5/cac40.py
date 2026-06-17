@@ -271,6 +271,10 @@ class CAC40MomentumBacktest:
             if not should_rebalance:
                 continue
 
+            # Get current holdings from PortfolioManager (source of truth)
+            positions = self.pm.get_portfolio_positions(portfolio_name) or {}
+            current_holdings = {p['ticker']: p['quantity'] for p in positions.get('positions', [])}
+
             t_top5_start = time.perf_counter()
             # Get top 5 momentum tickers: score → rank → filter
             watchlist_df = self.build_watchlist(date)
@@ -285,10 +289,6 @@ class CAC40MomentumBacktest:
                 continue  # Skip if insufficient data
 
             top_5_set = set(watchlist)
-
-            # Get current holdings from PortfolioManager
-            positions = self.pm.get_portfolio_positions(portfolio_name) or {}
-            current_holdings = {p['ticker']: p['quantity'] for p in positions.get('positions', [])}
 
             # Identify positions to close and open (sorted for deterministic order)
             to_close = sorted(set(current_holdings.keys()) - top_5_set)
