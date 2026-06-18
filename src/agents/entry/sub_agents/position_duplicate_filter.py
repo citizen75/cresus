@@ -35,6 +35,11 @@ class PositionDuplicateFilterAgent(Agent):
 			input_data = {}
 
 		watchlist = self.context.get("watchlist") or {}
+		entry_recommendations = self.context.get("entry_recommendations") or []
+
+		# Convert entry_recommendations to watchlist format if needed
+		if not watchlist and entry_recommendations:
+			watchlist = {r.get("ticker"): r for r in entry_recommendations if r.get("ticker")}
 
 		if not watchlist:
 			self.logger.debug("[ENTRY-DUP-FILTER] No tickers in watchlist to filter")
@@ -42,7 +47,7 @@ class PositionDuplicateFilterAgent(Agent):
 				"status": "success",
 				"input": input_data,
 				"output": {},
-				"message": "No watchlist tickers to filter"
+				"message": "No entry recommendations to filter"
 			}
 
 		# Get portfolio state
@@ -119,9 +124,14 @@ class PositionDuplicateFilterAgent(Agent):
 				filtered_watchlist[ticker] = ticker_data
 				self.logger.debug(f"[ENTRY-DUP-FILTER] {ticker}: PASSED (new position)")
 
-		# Update context with filtered watchlist
+		# Update context with filtered watchlist and entry_recommendations
 		self.context.set("watchlist", filtered_watchlist)
 		self.context.set("filtered_duplicate_items", filtered_items)
+
+		# Also update entry_recommendations if it exists (for backward compatibility)
+		if entry_recommendations:
+			remaining_entry_recs = [r for r in entry_recommendations if r.get("ticker") in filtered_watchlist]
+			self.context.set("entry_recommendations", remaining_entry_recs)
 
 		# Log summary
 		self.logger.info(f"[ENTRY-DUP-FILTER] Filtered {len(filtered_items)} duplicate positions: {len(watchlist)} → {len(filtered_watchlist)}")

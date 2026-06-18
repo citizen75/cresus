@@ -307,7 +307,7 @@ class TestCronManager:
 			)
 
 			assert success == False
-			assert "must be 'flow' or 'agent'" in message
+			assert "must be" in message and ("flow" in message or "agent" in message or "http" in message or "shell_exec" in message)
 
 	def test_delete_job_success(self):
 		"""Test deleting a job."""

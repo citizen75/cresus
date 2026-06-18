@@ -46,8 +46,20 @@ class TestWatchListAgent(unittest.TestCase):
 			})
 		}
 		self.context.set("data_history", mock_data)
+		self.context.set("tickers", ["AAPL", "GOOGL"])
+		# Set a minimal strategy config to avoid warnings
+		self.context.set("strategy_config", {
+			"watchlist": {
+				"parameters": {
+					"volume_enabled": False,
+					"trend_enabled": False,
+					"ranking_enabled": False,
+					"max_enabled": False,
+				}
+			}
+		})
 
-		result = self.agent.process({"tickers": ["AAPL", "GOOGL"]})
+		result = self.agent.process({})
 
 		assert result.get("status") == "success"
 		# Check that output contains watchlist data

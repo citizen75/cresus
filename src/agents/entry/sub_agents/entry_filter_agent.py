@@ -142,6 +142,12 @@ class EntryFilterAgent(Agent):
 			# Update context with filtered watchlist
 			self.context.set("watchlist", filtered_watchlist)
 
+			# Also filter entry_recommendations if it exists (for backward compatibility)
+			entry_recs = self.context.get("entry_recommendations")
+			if entry_recs:
+				filtered_recs = [r for r in entry_recs if r.get("ticker") in filtered_watchlist]
+				self.context.set("entry_recommendations", filtered_recs)
+
 			# Log summary
 			self.logger.info(f"[ENTRY-FILTER] Results: {len(passed_tickers)} passed, {blocked_count} blocked, {len(no_data_tickers)} no-data")
 			if passed_tickers:

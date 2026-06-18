@@ -271,16 +271,19 @@ class TestConversationManager:
 		manager = ConversationManager("json_test", db_path=temp_db_path)
 		manager.add_user_message("Test message")
 
-		history_file = temp_db_path / "portfolios" / "json_test" / "conversations" / "history.json"
+		# Note: Unified history is stored in conversations/history.json with portfolio metadata
+		history_file = temp_db_path / "conversations" / "history.json"
 		assert history_file.exists()
 
 		with open(history_file, "r") as f:
 			data = json.load(f)
 
 		assert isinstance(data, list)
-		assert len(data) == 1
-		assert data[0]["source"] == "user"
-		assert data[0]["content"] == "Test message"
+		assert len(data) >= 1
+		# Find the message we just added
+		test_msg = [m for m in data if m.get("content") == "Test message"]
+		assert len(test_msg) == 1
+		assert test_msg[0]["source"] == "user"
 
 	def test_corrupted_history_handling(self, temp_db_path):
 		"""Test graceful handling of corrupted history file."""

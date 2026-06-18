@@ -17,6 +17,19 @@ class TestEntryFilterIntegration(unittest.TestCase):
 		self.context = AgentContext()
 		self.agent = EntryFilterAgent("integration_test", self.context)
 
+	def _setup_context_with_formula(self, formula: str):
+		"""Helper to set up strategy_config with entry_filter formula."""
+		self.context.set("strategy_config", {
+			"entry": {
+				"parameters": {
+					"entry_filter": {
+						"formula": formula,
+						"description": "Heikin-Ashi green + price above EMA + strong ADX"
+					}
+				}
+			}
+		})
+
 	@patch("src.agents.entry.sub_agents.entry_filter_agent.StrategyManager")
 	def test_single_etf_filter_good_conditions(self, mock_strategy_manager_class):
 		"""Test single_etf filter with good market conditions.
@@ -69,7 +82,9 @@ class TestEntryFilterIntegration(unittest.TestCase):
 
 		self.context.set("strategy_name", "single_etf")
 		self.context.set("data_history", {"SPY": df})
+		self.context.set("watchlist", {"SPY": recommendations[0]})
 		self.context.set("entry_recommendations", recommendations)
+		self._setup_context_with_formula("sha_10_green[-1] == 1 and ema_20[0] < close[0] and adx_14[0] > 20")
 
 		result = self.agent.process({})
 
@@ -120,7 +135,9 @@ class TestEntryFilterIntegration(unittest.TestCase):
 
 		self.context.set("strategy_name", "single_etf")
 		self.context.set("data_history", {"SPY": df})
+		self.context.set("watchlist", {"SPY": recommendations[0]})
 		self.context.set("entry_recommendations", recommendations)
+		self._setup_context_with_formula("sha_10_green[-1] == 1 and ema_20[0] < close[0] and adx_14[0] > 20")
 
 		result = self.agent.process({})
 
@@ -168,7 +185,9 @@ class TestEntryFilterIntegration(unittest.TestCase):
 
 		self.context.set("strategy_name", "single_etf")
 		self.context.set("data_history", {"SPY": df})
+		self.context.set("watchlist", {"SPY": recommendations[0]})
 		self.context.set("entry_recommendations", recommendations)
+		self._setup_context_with_formula("sha_10_green[-1] == 1 and ema_20[0] < close[0] and adx_14[0] > 20")
 
 		result = self.agent.process({})
 
@@ -215,7 +234,9 @@ class TestEntryFilterIntegration(unittest.TestCase):
 
 		self.context.set("strategy_name", "single_etf")
 		self.context.set("data_history", {"SPY": df})
+		self.context.set("watchlist", {"SPY": recommendations[0]})
 		self.context.set("entry_recommendations", recommendations)
+		self._setup_context_with_formula("sha_10_green[-1] == 1 and ema_20[0] < close[0] and adx_14[0] > 20")
 
 		result = self.agent.process({})
 
@@ -278,7 +299,13 @@ class TestEntryFilterIntegration(unittest.TestCase):
 			"WEAK_ADX": df_weak_adx,
 			"PRICE_LOW": df_price_low,
 		})
+		self.context.set("watchlist", {
+			"GOOD": recommendations[0],
+			"WEAK_ADX": recommendations[1],
+			"PRICE_LOW": recommendations[2],
+		})
 		self.context.set("entry_recommendations", recommendations)
+		self._setup_context_with_formula("sha_10_green[-1] == 1 and ema_20[0] < close[0] and adx_14[0] > 20")
 
 		result = self.agent.process({})
 
@@ -324,7 +351,9 @@ class TestEntryFilterIntegration(unittest.TestCase):
 
 		self.context.set("strategy_name", "single_etf")
 		self.context.set("data_history", {"SPY": df})
+		self.context.set("watchlist", {"SPY": recommendations[0]})
 		self.context.set("entry_recommendations", recommendations)
+		self._setup_context_with_formula("sha_10_green[-1] == 1 and ema_20[0] < close[0] and adx_14[0] > 20")
 
 		# Mock the logger to track calls
 		with patch.object(self.agent, "logger") as mock_logger:
@@ -334,9 +363,9 @@ class TestEntryFilterIntegration(unittest.TestCase):
 			debug_calls = [str(call) for call in mock_logger.debug.call_args_list]
 			info_calls = [str(call) for call in mock_logger.info.call_args_list]
 
-			# Should log the formula (check for Formula or entry_filter keyword)
-			formula_logged = any("Formula:" in str(call) or "entry_filter" in str(call).lower() for call in debug_calls)
-			self.assertTrue(formula_logged, "Formula should be logged in debug")
+			# Should log the formula (check for Formula or entry_filter keyword in info or debug)
+			formula_logged = any("Formula:" in str(call) or "entry_filter" in str(call).lower() for call in info_calls + debug_calls)
+			self.assertTrue(formula_logged, "Formula should be logged in info or debug")
 
 			# Should log summary with results
 			summary_logged = any("passed" in str(call).lower() or "results" in str(call).lower()

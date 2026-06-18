@@ -36,11 +36,14 @@ class StrategyManager:
 		self.context = context
 		self.project_root = Path(project_root) if project_root else self._find_project_root()
 
-		# Always use ~/.cresus/db/strategies for strategy files (user data directory)
-		# regardless of project_root (which is for code, not data)
-		from utils.env import get_db_root
-		db_root = get_db_root()
-		self.strategies_dir = db_root / "strategies"
+		# Use project_root for strategies directory if explicitly provided (for testing)
+		# Otherwise use ~/.cresus/db/strategies for strategy files (user data directory)
+		if project_root:
+			self.strategies_dir = self.project_root / "db" / "local" / "strategies"
+		else:
+			from utils.env import get_db_root
+			db_root = get_db_root()
+			self.strategies_dir = db_root / "strategies"
 
 		self._ensure_strategies_dir()
 

@@ -490,6 +490,7 @@ async def export_conversation(
                 writer = csv.DictWriter(
                     output,
                     fieldnames=["source", "content", "datetime"],
+                    extrasaction="ignore",  # Ignore extra fields like id, portfolio, widget, data
                 )
                 writer.writeheader()
                 for msg in history:

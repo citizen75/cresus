@@ -19,16 +19,59 @@ def client():
 @pytest.fixture
 def cleanup():
     """Clean up test data before and after test."""
+    from tools.conversation import ConversationManager
+
     # Clean up BEFORE test (in case of leftover data)
+    # Clear the global cache first
+    ConversationManager._global_history = None
+    ConversationManager._cache_path = None
+
+    # Clean up old path structure if it exists
     test_dir = Path.home() / ".cresus" / "db" / "portfolios" / "test_portfolio"
     if test_dir.exists():
         shutil.rmtree(test_dir)
 
+    # Clean up unified history file and reload to get clean state
+    history_file = Path.home() / ".cresus" / "db" / "conversations" / "history.json"
+    if history_file.exists():
+        # Read history, filter out test_portfolio messages, write back
+        try:
+            with open(history_file, "r") as f:
+                all_messages = json.load(f)
+            # Keep only non-test_portfolio messages
+            filtered = [m for m in all_messages if m.get("portfolio") != "test_portfolio"]
+            if filtered != all_messages:
+                # Only write if we removed test messages
+                with open(history_file, "w") as f:
+                    json.dump(filtered, f, indent=2)
+                # Clear cache to reload
+                ConversationManager._global_history = None
+                ConversationManager._cache_path = None
+        except (json.JSONDecodeError, FileNotFoundError):
+            pass
+
     yield
 
-    # Clean up AFTER test
+    # Clean up AFTER test - same as before
+    ConversationManager._global_history = None
+    ConversationManager._cache_path = None
+
     if test_dir.exists():
         shutil.rmtree(test_dir)
+
+    # Clean up test messages from history file
+    if history_file.exists():
+        try:
+            with open(history_file, "r") as f:
+                all_messages = json.load(f)
+            filtered = [m for m in all_messages if m.get("portfolio") != "test_portfolio"]
+            if filtered != all_messages:
+                with open(history_file, "w") as f:
+                    json.dump(filtered, f, indent=2)
+                ConversationManager._global_history = None
+                ConversationManager._cache_path = None
+        except (json.JSONDecodeError, FileNotFoundError):
+            pass
 
 
 class TestConversationAPI:

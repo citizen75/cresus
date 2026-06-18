@@ -72,9 +72,25 @@ class EntryOrderAgent(Agent):
 			input_data = {}
 
 		# Read watchlist dict (contains entry_recommendations data)
+		# Fall back to entry_recommendations if watchlist doesn't exist
 		watchlist = self.context.get("watchlist") or {}
+		entry_recommendations = self.context.get("entry_recommendations") or []
+
+		if not watchlist and not entry_recommendations:
+			# No tickers to process
+			return {
+				"status": "error",
+				"input": input_data,
+				"output": {},
+				"message": "No entry recommendations or watchlist tickers to convert to orders"
+			}
+
+		if not watchlist and entry_recommendations:
+			# Convert entry_recommendations to watchlist format
+			watchlist = {r.get("ticker"): r for r in entry_recommendations if r.get("ticker")}
+
 		if not watchlist:
-			# Empty watchlist is valid (all tickers filtered out) - return empty orders
+			# Empty watchlist after conversion is valid (all tickers filtered out)
 			return {
 				"status": "success",
 				"input": input_data,

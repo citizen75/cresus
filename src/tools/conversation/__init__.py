@@ -110,6 +110,10 @@ class ConversationManager:
 		self.base_path = Path(db_path)
 		self.history_file = self.base_path / "conversations" / "history.json"
 
+		# Properties for backward compatibility
+		self.portfolio_path = self.base_path / "portfolios" / portfolio_name
+		self.conversations_dir = self.portfolio_path / "conversations"
+
 		# Load global history once per process
 		if ConversationManager._cache_path != self.history_file:
 			ConversationManager._global_history = None
@@ -161,11 +165,15 @@ class ConversationManager:
 		Args:
 			source: Message source
 			content: Message content
-			portfolio: Target portfolio (None = global)
+			portfolio: Target portfolio (None defaults to this manager's portfolio)
 			timestamp: Message timestamp (defaults to now)
 			widget: Widget type to display (e.g., 'results_widget')
 			data: Additional data for the widget
 		"""
+		# Default to this manager's portfolio if not specified
+		if portfolio is None:
+			portfolio = self.portfolio_name
+
 		with ConversationManager._lock:
 			message = ConversationMessage(source, content, portfolio, timestamp, widget=widget, data=data)
 			ConversationManager._global_history.append(message)
@@ -206,7 +214,7 @@ class ConversationManager:
 		Args:
 			limit: Maximum number of messages to return (None for all)
 			source_filter: Filter by message source (None for all)
-			portfolio_filter: Filter by portfolio (None for all, '_global' for global only)
+			portfolio_filter: Filter by portfolio (None defaults to this manager's portfolio, '_global' for all)
 
 		Returns:
 			List of conversation messages
@@ -214,11 +222,14 @@ class ConversationManager:
 		with ConversationManager._lock:
 			messages = ConversationManager._global_history[:]
 
-		# Filter by portfolio
+		# Filter by portfolio (default to this manager's portfolio)
 		if portfolio_filter == "_global":
 			# Global view shows ALL messages from all portfolios
 			pass  # Don't filter, show everything
-		elif portfolio_filter:
+		else:
+			# Default to this manager's portfolio if not specified
+			if portfolio_filter is None:
+				portfolio_filter = self.portfolio_name
 			# Specific portfolio view shows messages for that portfolio
 			messages = [m for m in messages if m.portfolio == portfolio_filter]
 
@@ -266,11 +277,14 @@ class ConversationManager:
 
 		Args:
 			source_filter: Filter by message source
-			portfolio_filter: Filter by portfolio
+			portfolio_filter: Filter by portfolio (defaults to this manager's portfolio)
 
 		Returns:
 			Number of messages
 		"""
+		# Default to filtering by this manager's portfolio
+		if portfolio_filter is None:
+			portfolio_filter = self.portfolio_name
 		messages = self.get_history(source_filter=source_filter, portfolio_filter=portfolio_filter)
 		return len(messages)
 
