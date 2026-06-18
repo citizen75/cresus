@@ -41,6 +41,28 @@ from .utils.constants import RETURN_DICT
 # Registry mapping indicator names to implementations
 _INDICATOR_REGISTRY: Dict[str, Callable] = {}
 
+# Documentation: Indicator Registry
+# ============================================================================
+# The indicator registry maps indicator names to their implementation functions.
+# Indicators are lazily loaded via register_indicators_for_formulas() which is
+# called when calculate() is invoked, avoiding unnecessary imports.
+#
+# Registration Workflow:
+#   1. User calls calculate(["rsi_14", "ema_20"], data)
+#   2. Formulas are parsed to extract indicator names ["rsi", "ema"]
+#   3. register_indicators_for_formulas() is called with these names
+#   4. _register_indicator_modules() imports and registers only needed indicators
+#   5. Each indicator's calculate() function is called with parsed parameters
+#
+# All indicator modules are in subdirectories:
+#   - momentum/: rsi.py, macd.py, roc.py
+#   - trend/: ema.py, sma.py, adx.py, hama.py, ema_chgpct.py
+#   - volatility/: atr.py, bb*.py, parkinson.py, rogers_satchell.py
+#   - volume/: ad.py, obv.py, mfi.py, cmf.py, vwap.py, volume_*.py
+#   - support/: levels.py, pivots.py, extremes.py
+#   - change/: change_pct.py, change_log.py
+#   - core/: heikin_ashi.py, sha_*.py
+
 
 def register_indicator(name: str, func: Callable) -> None:
     """
@@ -49,6 +71,10 @@ def register_indicator(name: str, func: Callable) -> None:
     Args:
         name: Indicator name (e.g., "rsi", "ema", "bb")
         func: Indicator function that takes (data, **params) -> Series or Dict[str, Series]
+
+    Usage:
+        >>> from .momentum import rsi
+        >>> register_indicator("rsi", rsi.calculate)
     """
     _INDICATOR_REGISTRY[name] = func
 
@@ -358,10 +384,12 @@ def _register_all_indicators():
 
     try:
         # Trend indicators
-        from .trend import ema, sma, adx
+        from .trend import ema, sma, adx, hama, ema_chgpct
         register_indicator("ema", ema.calculate)
         register_indicator("sma", sma.calculate)
         register_indicator("adx", adx.calculate)
+        register_indicator("hama", hama.calculate)
+        register_indicator("ema_chgpct", ema_chgpct.calculate)
     except ImportError:
         pass
 
@@ -408,6 +436,7 @@ def _register_all_indicators():
         # Change indicators
         from .change import change_pct, change_log
         register_indicator("chgpct", change_pct.calculate)
+        register_indicator("change_pct", change_pct.calculate)
         register_indicator("chglog", change_log.calculate)
     except ImportError:
         pass
@@ -474,9 +503,9 @@ def _register_indicator_modules(indicator_names: set) -> None:
 			pass
 	
 	# Trend indicators
-	if any(ind in indicator_names for ind in ["ema", "sma", "adx", "dmi", "hama"]):
+	if any(ind in indicator_names for ind in ["ema", "sma", "adx", "dmi", "hama", "ema_chgpct"]):
 		try:
-			from .trend import ema, sma, adx, hama
+			from .trend import ema, sma, adx, hama, ema_chgpct
 			if "ema" in indicator_names:
 				register_indicator("ema", ema.calculate)
 			if "sma" in indicator_names:
@@ -485,6 +514,8 @@ def _register_indicator_modules(indicator_names: set) -> None:
 				register_indicator("adx", adx.calculate)
 			if "hama" in indicator_names:
 				register_indicator("hama", hama.calculate)
+			if "ema_chgpct" in indicator_names:
+				register_indicator("ema_chgpct", ema_chgpct.calculate)
 		except ImportError:
 			pass
 	
@@ -550,11 +581,13 @@ def _register_indicator_modules(indicator_names: set) -> None:
 			pass
 	
 	# Change indicators
-	if any(ind in indicator_names for ind in ["chgpct", "chglog"]):
+	if any(ind in indicator_names for ind in ["chgpct", "change_pct", "chglog"]):
 		try:
 			from .change import change_pct, change_log
 			if "chgpct" in indicator_names:
 				register_indicator("chgpct", change_pct.calculate)
+			if "change_pct" in indicator_names:
+				register_indicator("change_pct", change_pct.calculate)
 			if "chglog" in indicator_names:
 				register_indicator("chglog", change_log.calculate)
 		except ImportError:

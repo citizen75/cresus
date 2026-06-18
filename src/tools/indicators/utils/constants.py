@@ -1,9 +1,49 @@
 """
 Constants for indicators DSL engine.
+
+Magic Numbers & Thresholds:
+  - ADX_STRONG_DOWN_THRESHOLD = 20: ADX below this indicates weak downtrend
+  - ADX_STRONG_UP_THRESHOLD = 25: ADX above this indicates strong uptrend
+  - SHA_WICK_TOLERANCE = 0.005: 0.5% of price for no-wick detection
+  - PARKINSON_CONSTANT = 1/(4*ln(2)) ≈ 0.3607: Mathematical constant in formula
+  - MFI_OVERBOUGHT = 80: MFI threshold for overbought condition
+  - MFI_OVERSOLD = 20: MFI threshold for oversold condition
+  - RSI_OVERBOUGHT = 70: RSI threshold for overbought condition
+  - RSI_OVERSOLD = 30: RSI threshold for oversold condition
 """
 
 # Supported OHLCV columns (normalized to uppercase)
 REQUIRED_COLUMNS = ["OPEN", "HIGH", "LOW", "CLOSE", "VOLUME"]
+
+# ============================================================================
+# ADX Thresholds (Average Directional Index)
+# ============================================================================
+ADX_WEAK_DOWN_THRESHOLD = 20     # ADX < 20: Weak downtrend
+ADX_STRONG_UP_THRESHOLD = 25     # ADX > 25: Strong uptrend
+
+# ============================================================================
+# SHA (Smooth Heikin Ashi) Wick Tolerance
+# ============================================================================
+SHA_WICK_TOLERANCE = 0.005       # 0.5% of price for detecting "no wick" condition
+
+# ============================================================================
+# Parkinson Volatility Constant
+# ============================================================================
+# c = 1 / (4 * ln(2)) ≈ 0.3607
+# Used in formula: Parkinson = sqrt(c / n * sum(ln(H/L)^2))
+PARKINSON_CONSTANT = 1 / (4 * __import__('math').log(2))
+
+# ============================================================================
+# RSI Thresholds (Relative Strength Index)
+# ============================================================================
+RSI_OVERBOUGHT = 70              # RSI > 70: Overbought condition
+RSI_OVERSOLD = 30                # RSI < 30: Oversold condition
+
+# ============================================================================
+# MFI Thresholds (Money Flow Index)
+# ============================================================================
+MFI_OVERBOUGHT = 80              # MFI > 80: Overbought condition
+MFI_OVERSOLD = 20                # MFI < 20: Oversold condition
 
 # Indicator categories and their parameters
 INDICATOR_PARAMS = {

@@ -55,6 +55,7 @@ research = [
     "ipykernel>=6.0.0",
     "ipywidgets>=7.6.0",
     "numba>=0.54.0",
+    "quantstats>=0.0.59",
 ]
 
 [project.scripts]

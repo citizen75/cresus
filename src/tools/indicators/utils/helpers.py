@@ -2,12 +2,31 @@
 Helper functions for indicator calculations.
 
 Provides convenient accessors for common column patterns and output validation.
+
+NaN HANDLING STRATEGY:
+  - Use bfill (backfill) then ffill (forward fill) for most indicators
+  - For cumulative indicators (A/D, OBV): maintain cumulative sum integrity
+  - For oscillators (RSI, MACD): fill initial NaN with mean or midpoint
+  - For volatility (ATR, BB): fill with SMA of available values
 """
 
 import pandas as pd
 import numpy as np
-from typing import Tuple, Dict
+from typing import Tuple, Dict, Union
 from .errors import ColumnError, IndicatorError
+
+# Indicator-specific validation ranges
+VALIDATION_RANGES = {
+    'rsi': (0, 100),
+    'mfi': (0, 100),
+    'adx': (0, 100),
+    'bb_upper': (None, None),  # No range - price-based
+    'bb_middle': (None, None),
+    'bb_lower': (None, None),
+    'atr': (0, None),  # Non-negative
+    'parkinson': (0, None),  # Non-negative
+    'rs': (0, None),  # Non-negative
+}
 
 
 def get_close(data: pd.DataFrame) -> pd.Series:
@@ -182,3 +201,92 @@ def safe_divide(numerator: pd.Series, denominator: pd.Series, fill_value: float 
 	valid_mask = denominator != 0
 	result[valid_mask] = numerator[valid_mask] / denominator[valid_mask]
 	return result
+
+
+def fill_nan_values(
+	series: pd.Series,
+	method: str = "bfill_ffill",
+	fill_value: Union[float, None] = None
+) -> pd.Series:
+	"""Fill NaN values in series using specified strategy.
+
+	Args:
+		series: Input series with potential NaN values
+		method: Fill strategy
+			- "bfill_ffill": Backfill then forward fill (default)
+			- "mean": Fill with series mean
+			- "midpoint": Fill with (min + max) / 2
+			- "forward_fill": Forward fill only
+			- "value": Fill with specific value (requires fill_value)
+		fill_value: Value to use with "value" method
+
+	Returns:
+		Series with NaN values filled
+	"""
+	if series.isna().sum() == 0:
+		return series.copy()
+
+	series = series.copy()
+
+	if method == "bfill_ffill":
+		return series.bfill().ffill()
+	elif method == "mean":
+		mean_val = series.mean()
+		return series.fillna(mean_val)
+	elif method == "midpoint":
+		min_val = series.min()
+		max_val = series.max()
+		mid_val = (min_val + max_val) / 2
+		return series.fillna(mid_val)
+	elif method == "forward_fill":
+		return series.ffill()
+	elif method == "value":
+		if fill_value is None:
+			raise ValueError("fill_value required for 'value' method")
+		return series.fillna(fill_value)
+	else:
+		raise ValueError(f"Unknown fill method: {method}")
+
+
+def validate_bounds(
+	series: pd.Series,
+	indicator_name: str,
+	min_value: float = None,
+	max_value: float = None,
+	allow_nan: bool = True
+) -> None:
+	"""Validate that series values are within bounds.
+
+	Args:
+		series: Series to validate
+		indicator_name: Name for error messages
+		min_value: Minimum allowed value
+		max_value: Maximum allowed value
+		allow_nan: Whether NaN values are acceptable
+
+	Raises:
+		IndicatorError: If validation fails
+	"""
+	if not allow_nan and series.isna().any():
+		raise IndicatorError(
+			f"{indicator_name}: Contains {series.isna().sum()} NaN values"
+		)
+
+	# Check infinity
+	if np.isinf(series.astype(float)).any():
+		raise IndicatorError(f"{indicator_name}: Contains infinity values")
+
+	# Check bounds
+	if min_value is not None:
+		if (series < min_value).any():
+			invalid_count = (series < min_value).sum()
+			raise IndicatorError(
+				f"{indicator_name}: {invalid_count} values below minimum {min_value}"
+			)
+
+	if max_value is not None:
+		if (series > max_value).any():
+			invalid_count = (series > max_value).sum()
+			raise IndicatorError(
+				f"{indicator_name}: {invalid_count} values above maximum {max_value}"
+			)

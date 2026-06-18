@@ -2,9 +2,10 @@
 
 import pandas as pd
 import numpy as np
+from typing import Optional
 
 
-def calculate(df: pd.DataFrame, **kwargs) -> pd.Series:
+def calculate(df: pd.DataFrame, history_df: Optional[pd.DataFrame] = None, **kwargs) -> pd.Series:
 	"""Calculate Accumulation/Distribution Line.
 
 	The A/D Line is a volume-weighted indicator that accumulates volume based on
@@ -18,22 +19,63 @@ def calculate(df: pd.DataFrame, **kwargs) -> pd.Series:
 
 	Args:
 		df: DataFrame with OHLCV data (must have high, low, close, volume columns)
+		history_df: Optional historical data for extended lookback
 
 	Returns:
 		Series with A/D values
-	"""
-	# Ensure required columns exist
-	for col in ['high', 'low', 'close', 'volume']:
-		if col.upper() in df.columns:
-			df = df.copy()
-			df[col] = df[col.upper()]
-		elif col not in df.columns:
-			raise ValueError(f"Missing required column: {col}")
 
-	high = df['high'].values if 'high' in df.columns else df['HIGH'].values
-	low = df['low'].values if 'low' in df.columns else df['LOW'].values
-	close = df['close'].values if 'close' in df.columns else df['CLOSE'].values
-	volume = df['volume'].values if 'volume' in df.columns else df['VOLUME'].values
+	Raises:
+		ValueError: If required OHLCV columns are not found
+	"""
+	# Helper to get column case-insensitively
+	def get_column(data, column_names):
+		"""Get first available column from list of names (case-insensitive)."""
+		for col_name in column_names:
+			# Check exact match
+			if col_name in data.columns:
+				return data[col_name].values
+			# Check case-insensitive match
+			for actual_col in data.columns:
+				if actual_col.lower() == col_name.lower():
+					return data[actual_col].values
+		raise ValueError(f"Missing required column: {column_names}")
+
+	# Get OHLCV columns with validation
+	try:
+		high = get_column(df, ['high', 'HIGH'])
+	except ValueError as e:
+		raise ValueError(f"AD Line calculation failed: {e}") from None
+
+	try:
+		low = get_column(df, ['low', 'LOW'])
+	except ValueError as e:
+		raise ValueError(f"AD Line calculation failed: {e}") from None
+
+	try:
+		close = get_column(df, ['close', 'CLOSE'])
+	except ValueError as e:
+		raise ValueError(f"AD Line calculation failed: {e}") from None
+
+	try:
+		volume = get_column(df, ['volume', 'VOLUME'])
+	except ValueError as e:
+		raise ValueError(f"AD Line calculation failed: {e}") from None
+
+	# Use history if provided for extended lookback
+	if history_df is not None:
+		try:
+			hist_high = get_column(history_df, ['high', 'HIGH'])
+			hist_low = get_column(history_df, ['low', 'LOW'])
+			hist_close = get_column(history_df, ['close', 'CLOSE'])
+			hist_volume = get_column(history_df, ['volume', 'VOLUME'])
+
+			high = np.concatenate([hist_high, high])
+			low = np.concatenate([hist_low, low])
+			close = np.concatenate([hist_close, close])
+			volume = np.concatenate([hist_volume, volume])
+		except (ValueError, KeyError):
+			# If history data doesn't have required columns, use only current data
+			pass
 
 	# Calculate the Money Flow Multiplier
 	hl_range = high - low
@@ -45,7 +87,11 @@ def calculate(df: pd.DataFrame, **kwargs) -> pd.Series:
 	# Calculate Money Flow Volume
 	mfv = mfm * volume
 
-	# Calculate cumulative A/D
+	# Calculate cumulative A/D from entire history
 	ad_line = np.cumsum(mfv)
+
+	# Extract only current period if history was used
+	result_len = len(df)
+	ad_line = ad_line[-result_len:]
 
 	return pd.Series(ad_line, index=df.index)

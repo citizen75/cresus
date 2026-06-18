@@ -2,11 +2,21 @@
 HAMA (Heikin-Ashi Moving Average) Indicator - NST Version
 
 Implements the North Star Day Trading HAMA Candles indicator.
+This is NOT standard Heikin-Ashi, but a custom moving average version
+used for trend analysis and entry/exit signals.
 
 Syntax: hama_<length_open>_<length_close>_<ema_line>
 Example: hama_25_20_55
 
-Returns: Dict with 'open', 'high', 'low', 'close', 'ma_line' Series
+Returns: Dict with 'ha_open', 'ha_high', 'ha_low', 'ha_close', 'ha_trend' Series
+
+Parameters:
+  - length_open: EMA period for open calculation (default: 25)
+  - length_close: EMA period for close calculation (default: 20)
+  - ema_line: WMA period for trend line (default: 55)
+
+Note: This indicator returns smoothed OHLC values, not the standard
+Heikin-Ashi candles. Use for trend following, not candle pattern analysis.
 """
 
 import pandas as pd

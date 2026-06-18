@@ -77,43 +77,92 @@ def _get_anchor_index(data: pd.DataFrame, anchor: Optional[Union[int, str]]) -> 
     Get the index where VWAP should be anchored.
 
     Args:
-        data: DataFrame
+        data: DataFrame with optional DATE/date/Date column for date anchoring
         anchor: Anchor specification (None, int, or date string)
+                - None or "start": VWAP from start (index 0)
+                - int: Bar index (0-indexed, e.g., 10 = 11th bar)
+                - str: Date string in format YYYY-MM-DD
 
     Returns:
-        Index to start VWAP calculation from
+        Index to start VWAP calculation from (0-indexed)
+
+    Raises:
+        ValueError: If anchor is invalid or out of range
+
+    Examples:
+        >>> _get_anchor_index(df, None)      # Returns 0 (start of data)
+        >>> _get_anchor_index(df, 10)        # Returns 10 (11th bar)
+        >>> _get_anchor_index(df, "2024-01-15")  # Returns index of 2024-01-15
     """
+    # Handle None or "start"
     if anchor is None or anchor == "start" or anchor == 0:
         return 0
 
+    # Handle integer anchor (bar index)
     if isinstance(anchor, int):
-        # Anchor at specific bar
         if anchor < 0 or anchor >= len(data):
-            raise ValueError(f"Anchor index {anchor} out of range [0, {len(data)-1}]")
+            raise ValueError(
+                f"Anchor bar index {anchor} out of range [0, {len(data)-1}]. "
+                f"Data has {len(data)} bars."
+            )
         return anchor
 
+    # Handle string anchor (date)
     if isinstance(anchor, str):
-        # Anchor at specific date
-        if "DATE" in data.columns:
-            date_col = "DATE"
-        elif "Date" in data.columns:
-            date_col = "Date"
-        elif "date" in data.columns:
-            date_col = "date"
-        else:
-            raise ValueError("Date column not found in DataFrame")
+        # Find date column (case-insensitive)
+        date_col = None
+        for col in data.columns:
+            if col.lower() == "date":
+                date_col = col
+                break
 
-        dates = pd.to_datetime(data[date_col])
-        anchor_date = pd.to_datetime(anchor)
+        if date_col is None:
+            raise ValueError(
+                f"Date column not found. VWAP date anchoring requires DATE/date/Date column. "
+                f"Available columns: {list(data.columns)}"
+            )
+
+        # Parse dates with error handling
+        try:
+            dates = pd.to_datetime(data[date_col])
+        except Exception as e:
+            raise ValueError(
+                f"Failed to parse dates in '{date_col}' column: {str(e)}"
+            ) from e
+
+        # Parse anchor date with error handling
+        try:
+            anchor_date = pd.to_datetime(anchor)
+        except Exception as e:
+            raise ValueError(
+                f"Invalid anchor date format '{anchor}'. Expected YYYY-MM-DD format. "
+                f"Example: '2024-01-15'"
+            ) from e
+
+        # Check that dates are sorted chronologically (for predictable anchoring)
+        if len(dates) > 1:
+            if (dates.iloc[1:].values < dates.iloc[:-1].values).any():
+                raise ValueError(
+                    "VWAP date anchoring requires dates to be sorted chronologically. "
+                    f"First date: {dates.iloc[0]}, Last date: {dates.iloc[-1]}"
+                )
 
         # Find index of first bar on or after anchor date
-        matching_idx = (dates >= anchor_date).idxmax()
-        if matching_idx == 0 and dates.iloc[0] > anchor_date:
-            raise ValueError(f"Anchor date {anchor} is before first data point")
+        matching_indices = (dates >= anchor_date).nonzero()[0]
 
-        return matching_idx
+        if len(matching_indices) == 0:
+            raise ValueError(
+                f"Anchor date {anchor} is before first data point ({dates.iloc[0]}). "
+                f"Valid range: {dates.iloc[0].date()} to {dates.iloc[-1].date()}"
+            )
 
-    raise ValueError(f"Invalid anchor type: {type(anchor)}")
+        return int(matching_indices[0])
+
+    raise ValueError(
+        f"Invalid anchor type: {type(anchor).__name__}. "
+        f"Expected None, int (bar index), or str (date 'YYYY-MM-DD'). "
+        f"Got: {repr(anchor)}"
+    )
 
 
 def _calculate_vwap(typical_price: pd.Series, volume: pd.Series) -> pd.Series:

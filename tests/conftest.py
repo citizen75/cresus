@@ -6,8 +6,16 @@ import pandas as pd
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+
+def pytest_configure(config):
+	"""Add src to path before any test collection."""
+	src_path = str(Path(__file__).parent.parent / "src")
+	if src_path not in sys.path:
+		sys.path.insert(0, src_path)
+
+
 # Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from core.context import AgentContext
 
@@ -76,3 +84,32 @@ def mock_data_history():
     with patch('tools.data.core.DataHistory.__init__', _mock_init):
         with patch('tools.data.core.DataHistory.get_all', _mock_get_all):
             yield
+
+
+@pytest.fixture
+def aapl_data(test_data_dir):
+    """Load AAPL.parquet real market data for indicator testing."""
+    fixture_path = test_data_dir / "AAPL.parquet"
+    if not fixture_path.exists():
+        pytest.skip(f"Test fixture not found: {fixture_path}")
+    df = pd.read_parquet(fixture_path)
+    # AAPL.parquet has columns: timestamp, open, high, low, close, volume, etc.
+    # Indicators expect lowercase: date/timestamp, open, high, low, close, volume
+    if 'timestamp' in df.columns and 'date' not in df.columns:
+        df = df.rename(columns={'timestamp': 'date'})
+    df.columns = [col.lower() for col in df.columns]
+    return df
+
+
+@pytest.fixture
+def sample_ohlcv_df():
+    """Create a sample OHLCV DataFrame for basic unit tests."""
+    dates = pd.date_range('2026-01-01', periods=100, freq='D')
+    return pd.DataFrame({
+        'date': dates,
+        'open': [100 + i*0.5 for i in range(100)],
+        'high': [102 + i*0.5 for i in range(100)],
+        'low': [99 + i*0.5 for i in range(100)],
+        'close': [101 + i*0.5 for i in range(100)],
+        'volume': [1000000] * 100,
+    })

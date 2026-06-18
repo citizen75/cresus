@@ -160,19 +160,34 @@ class PortfolioEngine:
         """
         day_trades = trades_df[trades_df['Date'] == date].copy()
 
-        for _, trade in day_trades.iterrows():
+        # First: execute ALL SELLS for this date (sell first, then buy)
+        for _, trade in day_trades[day_trades['Type'] == 'SELL'].iterrows():
             ticker = trade['Ticker']
-            trade_type = trade['Type']
+            price = float(trade['Price'].replace('€', '').strip())
+            quantity = int(trade['Quantity'])
+
+            if price <= 0:
+                continue
+
+            # Get current open quantity for this ticker
+            ticker_positions = [p for p in self.positions if p.ticker == ticker and not p.closed]
+            available_qty = sum(p.quantity for p in ticker_positions)
+
+            if available_qty > 0:
+                # IMPORTANT: Sell ALL shares in this ticker (even if more/less than expected)
+                # because this stock is exiting the top 5
+                success, pnl_list = self.sell(date, ticker, price, available_qty)
+
+        # Second: execute ALL BUYS for this date
+        for _, trade in day_trades[day_trades['Type'] == 'BUY'].iterrows():
+            ticker = trade['Ticker']
             price = float(trade['Price'].replace('€', '').strip())
             quantity = int(trade['Quantity'])
 
             if quantity <= 0 or price <= 0:
                 continue
 
-            if trade_type == 'BUY':
-                self.buy(date, ticker, price, quantity)
-            elif trade_type == 'SELL':
-                success, pnl_list = self.sell(date, ticker, price, quantity)
+            self.buy(date, ticker, price, quantity)
 
     def get_metrics(self) -> Dict:
         """Calculate portfolio metrics."""

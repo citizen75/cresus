@@ -1,10 +1,16 @@
-"""Portfolio metrics calculations."""
+"""Portfolio metrics calculations using QuantStats."""
 
 import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, Tuple
 from .manager import PortfolioManager
+
+try:
+    import quantstats as qs
+    HAS_QUANTSTATS = True
+except ImportError:
+    HAS_QUANTSTATS = False
 
 
 class PortfolioMetrics(PortfolioManager):
@@ -434,55 +440,79 @@ class PortfolioMetrics(PortfolioManager):
         return abs(max_dd), duration
 
     def _calculate_sharpe_ratio(self, daily_returns: np.ndarray, rf_rate: float = 0.02) -> float:
-        """Calculate Sharpe ratio."""
+        """Calculate Sharpe ratio using QuantStats if available."""
         if len(daily_returns) < 2 or np.std(daily_returns) == 0:
             return 0.0
-        
+
+        if HAS_QUANTSTATS:
+            try:
+                returns_series = pd.Series(daily_returns / 100)  # Convert from percentage
+                return float(qs.stats.sharpe(returns_series, rf=rf_rate))
+            except:
+                pass
+
+        # Fallback to manual calculation
         daily_rf = rf_rate / 252
         excess_returns = daily_returns - daily_rf
-        
+
         if np.std(excess_returns) == 0:
             return 0.0
-        
+
         return float((np.mean(excess_returns) / np.std(excess_returns)) * np.sqrt(252))
 
     def _calculate_sortino_ratio(self, daily_returns: np.ndarray, rf_rate: float = 0.02, target_return: float = 0.0) -> float:
-        """Calculate Sortino ratio."""
+        """Calculate Sortino ratio using QuantStats if available."""
         if len(daily_returns) < 2:
             return 0.0
-        
+
+        if HAS_QUANTSTATS:
+            try:
+                returns_series = pd.Series(daily_returns / 100)  # Convert from percentage
+                return float(qs.stats.sortino(returns_series, rf=rf_rate))
+            except:
+                pass
+
+        # Fallback to manual calculation
         daily_rf = rf_rate / 252
         excess_returns = daily_returns - daily_rf
-        
+
         downside_returns = excess_returns[excess_returns < target_return]
         downside_std = np.std(downside_returns) if len(downside_returns) > 0 else 0
-        
+
         if downside_std == 0 or len(downside_returns) == 0:
             return 0.0
-        
+
         return float((np.mean(excess_returns) / downside_std) * np.sqrt(252))
 
     def _calculate_calmar_ratio(self, total_return_pct: float, max_drawdown_pct: float) -> float:
         """Calculate Calmar ratio (return / max drawdown)."""
         if abs(max_drawdown_pct) < 0.01 or max_drawdown_pct == 0:
             return 0.0
-        
+
         return float(total_return_pct / abs(max_drawdown_pct))
 
     def _calculate_omega_ratio(self, daily_returns: np.ndarray, threshold: float = 0.0) -> float:
-        """Calculate Omega ratio."""
+        """Calculate Omega ratio using QuantStats if available."""
         if len(daily_returns) < 2:
             return 0.0
-        
+
+        if HAS_QUANTSTATS:
+            try:
+                returns_series = pd.Series(daily_returns / 100)  # Convert from percentage
+                return float(qs.stats.omega(returns_series, 0.0))
+            except:
+                pass
+
+        # Fallback to manual calculation
         gains = daily_returns[daily_returns > threshold] - threshold
         losses = threshold - daily_returns[daily_returns < threshold]
-        
+
         sum_gains = np.sum(gains) if len(gains) > 0 else 0
         sum_losses = np.sum(losses) if len(losses) > 0 else 0
-        
+
         if sum_losses <= 0:
             return 1.0 if sum_gains >= 0 else 0.0
-        
+
         return float(sum_gains / sum_losses) if sum_losses > 0 else 0.0
 
     def _calculate_max_exposure(self, trades: pd.DataFrame, history_df: pd.DataFrame, start_value: float) -> float:

@@ -33,6 +33,11 @@ warnings.filterwarnings("ignore", category=pd.errors.PerformanceWarning)
 warnings.filterwarnings("ignore", message=".*Timestamp.utcnow.*")
 warnings.filterwarnings("ignore", message=".*YF deprecation.*")
 
+# Disable loguru INFO logs
+logger.disable("tools.data.core")
+logger.disable("tools.portfolio.manager")
+logger.disable("tools.portfolio.cache")
+
 
 def _get_project_root() -> Path:
 	"""Get project root from CRESUS_PROJECT_ROOT env var or current working directory."""

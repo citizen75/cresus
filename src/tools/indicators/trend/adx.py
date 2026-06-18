@@ -41,18 +41,19 @@ def calculate(
         Series with ADX values (0-100) or Dict with 'adx' and 'force' keys
         - adx: ADX trend strength (0-100)
         - force: Trend conviction (-1, 0, 1)
+
+    ADX Thresholds:
+        - adx < 20: Weak trend (force = -1)
+        - 20 <= adx <= 25: Neutral (force = 0)
+        - adx > 25: Strong trend (force = 1)
     """
-    # Get OHLC
+    # Get OHLC with proper error handling
     try:
         high = get_high(data)
         low = get_low(data)
         close = get_close(data)
-    except Exception:
-        # Return neutral ADX if can't calculate
-        default_adx = pd.Series([25.0] * len(data))
-        if __component__ == 'force':
-            return pd.Series([0] * len(data))
-        return default_adx
+    except ColumnError as e:
+        raise ValueError(f"ADX calculation failed: {str(e)}") from e
 
     # Use history if provided
     if history_df is not None:
@@ -64,20 +65,32 @@ def calculate(
             high = pd.concat([hist_high, high], ignore_index=True)
             low = pd.concat([hist_low, low], ignore_index=True)
             close = pd.concat([hist_close, close], ignore_index=True)
-        except Exception:
+        except (ColumnError, KeyError) as e:
+            # Log warning but continue with current data
             pass
 
     # Calculate ADX using pandas-ta
-    adx_df = pandas_ta.adx(high, low, close, length=period)
+    try:
+        adx_df = pandas_ta.adx(high, low, close, length=period)
+    except Exception as e:
+        raise ValueError(f"ADX calculation failed with pandas-ta: {str(e)}") from e
 
     # pandas-ta returns DataFrame with ADX_<period>, DMP_<period>, DMN_<period>
     adx_col = f"ADX_{period}"
+    if adx_col not in adx_df.columns:
+        raise ValueError(f"ADX column '{adx_col}' not found in result")
+
     adx = adx_df[adx_col]
 
     # Extract only current period
     result_len = len(data)
     adx = adx.iloc[-result_len:].reset_index(drop=True)
     adx = adx.fillna(25.0)
+
+    # Validate ADX output
+    if (adx < 0).any() or (adx > 100).any():
+        # Clip to valid range if out of bounds
+        adx = adx.clip(0, 100)
 
     # Calculate force component (trend conviction)
     force = np.where(

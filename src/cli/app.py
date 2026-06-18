@@ -21,6 +21,7 @@ from cli.commands.scheduler import SchedulerCommands
 from cli.commands.info import InfoCommands
 from cli.commands.strategy import StrategyCommands
 from cli.commands.alerts import AlertCommands
+from cli.commands.indicators import IndicatorsCommands
 from tools.data.manager import DataManager
 
 console = Console()
@@ -49,6 +50,7 @@ class CresusCLI(cmd2.Cmd):
 		self.info_commands = InfoCommands()
 		self.strategy_commands = StrategyCommands(self.project_root)
 		self.alert_commands = AlertCommands()
+		self.indicators_commands = IndicatorsCommands()
 
 		self._setup_history()
 		self._setup_prompt()
@@ -80,6 +82,7 @@ class CresusCLI(cmd2.Cmd):
 		info_table.add_row("[bold]flow[/bold]", "Execute workflows (e.g., flow run watchlist)")
 		info_table.add_row("[bold]strategy[/bold]", "Validate strategies (e.g., strategy check single_etf --fix)")
 		info_table.add_row("[bold]data[/bold]", "Manage portfolio data and cache")
+		info_table.add_row("[bold]indicators[/bold]", "Technical indicators (e.g., indicators list|show ema_20|calc ema_20 AAPL)")
 		info_table.add_row("[bold]universe[/bold]", "Manage universes (e.g., universe list|info cac40)")
 		info_table.add_row("[bold]blacklist[/bold]", "Manage blacklist (e.g., blacklist list|add|del MOEX)")
 		info_table.add_row("[bold]watchlist[/bold]", "View strategy watchlist (e.g., watchlist show momentum_cac)")
@@ -667,6 +670,10 @@ class CresusCLI(cmd2.Cmd):
 	def do_data(self, args):
 		"""Manage historical and fundamental data: fetch|list|clear|stats|show [options]"""
 		self.data_commands.handle(args)
+
+	def do_indicators(self, args):
+		"""Manage technical indicators: list|show|calc [options]"""
+		self.indicators_commands.handle(args)
 
 	# ==================== Analysis Commands ====================
 	def do_analyze(self, args):

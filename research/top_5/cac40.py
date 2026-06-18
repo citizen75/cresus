@@ -65,89 +65,6 @@ class CAC40MomentumBacktest:
         print(f"   Initial Capital: €{initial_capital:,.0f}")
         print()
 
-        # Load universe and data
-        self._load_data()
-
-    def _load_data(self):
-        """Load CAC40 tickers and historical data using DataAgent."""
-        print("📍 Loading CAC40 universe...")
-
-        # Get tickers from universe
-        universe = Universe('cac40')
-        self.tickers = universe.get_tickers()
-        print(f"✅ Loaded {len(self.tickers)} CAC40 tickers")
-
-        # Use DataAgent to load price data
-        print("📍 Loading price data via DataAgent...")
-        context = AgentContext()
-        data_agent = DataAgent(name="data_loader", context=context)
-        result = data_agent.process(input_data={"tickers": self.tickers})
-
-        if result.get("status") == "error":
-            print(f"\n⚠️  ERROR: {result.get('message')}")
-            sys.exit(1)
-
-        # Extract price data from DataAgent result
-        self.price_data = {}  # {ticker: price_series}
-        data_history = data_agent.context.get("data_history") or {}
-
-        if data_history:
-            # Process all tickers at once
-            for ticker, df in data_history.items():
-                if df.empty or 'timestamp' not in df.columns or 'close' not in df.columns:
-                    continue
-
-                try:
-                    # DataAgent returns data in descending order (newest first)
-                    # Sort to ascending order for consistent momentum calculation
-                    df = df.sort_values('timestamp', ascending=True).reset_index(drop=True)
-                    df['timestamp'] = pd.to_datetime(df['timestamp'])
-
-                    # Extract price series and filter to backtest period
-                    prices = df.set_index('timestamp')['close']
-                    prices = prices[(prices.index >= self.start_date) & (prices.index <= self.end_date)]
-
-                    if len(prices) > 20:
-                        self.price_data[ticker] = prices
-                except Exception:
-                    continue
-
-        print(f"✅ Loaded price data for {len(self.price_data)} tickers")
-
-        if len(self.price_data) == 0:
-            print("\n⚠️  ERROR: No price data loaded!")
-            sys.exit(1)
-
-        print(f"✅ All price data kept in memory for fast backtest access")
-
-        # Build data_history indexed by date: {date: {ticker: price}}
-        print("📍 Building data history index...")
-        self.data_history = {}  # {date: {ticker: price}}
-
-        for ticker, prices in self.price_data.items():
-            for date in prices.index:
-                if date not in self.data_history:
-                    self.data_history[date] = {}
-                self.data_history[date][ticker] = prices[date]
-
-        print(f"✅ Indexed prices for {len(self.data_history)} dates")
-
-        # Precompute momentum scores for all tickers on all dates
-        print("📍 Precomputing momentum scores...")
-        self.momentum_data = {}  # {ticker: {date: momentum_score}}
-
-        for ticker, prices in self.price_data.items():
-            self.momentum_data[ticker] = {}
-            for date in prices.index:
-                historical_prices = prices[prices.index <= date]
-                if len(historical_prices) >= 22:  # Need at least 21 days + 1 reference
-                    current = historical_prices.iloc[-1]
-                    past = historical_prices.iloc[-22]
-                    if past != 0:
-                        momentum = ((current - past) / past) * 100
-                        self.momentum_data[ticker][date] = momentum
-
-        print(f"✅ Computed momentum for {len(self.momentum_data)} tickers")
 
     def _calculate_momentum(self, prices: pd.Series, lookback_days: int = 21) -> float:
         """
@@ -168,50 +85,91 @@ class CAC40MomentumBacktest:
         return ((current - past) / past) * 100
 
     def build_watchlist(self, date: pd.Timestamp) -> pd.DataFrame:
-        """Build watchlist with prices for current date."""
-        current_data = self.data_history.get(date, {})
-        if not current_data:
+        """Build watchlist with prices and chgpct_30 for current date."""
+        watchlist_data = []
+
+        for ticker, df in self.data_history_raw.items():
+            if df.empty or 'close' not in df.columns or 'timestamp' not in df.columns:
+                continue
+
+            # Find price for this date (DataAgent returns data descending order)
+            matching_rows = df[pd.to_datetime(df['timestamp']).dt.date == date.date()]
+            if not matching_rows.empty:
+                row = matching_rows.iloc[0]
+                price = row['close']
+                chgpct_30 = row.get('chgpct_30', 0.0) if 'chgpct_30' in row else 0.0
+                watchlist_data.append({
+                    'ticker': ticker,
+                    'close': price,
+                    'chgpct_30': chgpct_30
+                })
+
+        if not watchlist_data:
             return pd.DataFrame()
 
-        watchlist_data = [
-            {'ticker': ticker, 'close': price}
-            for ticker, price in current_data.items()
-        ]
         return pd.DataFrame(watchlist_data).reset_index(drop=True)
+
+    def watchlist_scoring(self, watchlist: pd.DataFrame, date: pd.Timestamp) -> pd.DataFrame:
+        """Add score column to watchlist from chgpct_30 indicator."""
+        if watchlist.empty:
+            return watchlist
+
+        scores = []
+        for _, row in watchlist.iterrows():
+            # Use chgpct_30 as the score if available, otherwise 0
+            score = row.get('chgpct_30', 0.0) if 'chgpct_30' in row else 0.0
+            scores.append(score)
+
+        watchlist['score'] = scores
+        return watchlist
+
+    def watchlist_ranking(self, watchlist: pd.DataFrame) -> list:
+        """Rank tickers by score (highest first)."""
+        if watchlist.empty or 'score' not in watchlist.columns:
+            return []
+        sorted_wl = watchlist.sort_values(['score', 'ticker'], ascending=[False, True])
+        return sorted_wl['ticker'].tolist()
+
+    def watchlist_filter(self, ranked_tickers: list, top_n: int = 5) -> list:
+        """Filter to top N tickers from ranked list."""
+        return ranked_tickers[:top_n] if len(ranked_tickers) >= top_n else []
 
 
     def run_backtest(self):
         """Run daily backtest using PortfolioManager."""
+        # Load universe and data via DataAgent
+        print("📍 Loading CAC40 universe...")
+        universe = Universe('cac40')
+        tickers = universe.get_tickers()
+        print(f"✅ Loaded {len(tickers)} CAC40 tickers")
+
+        # Use DataAgent to load price data with chgpct_30 indicator
+        print("📍 Loading price data via DataAgent...")
+        context = AgentContext()
+        data_agent = DataAgent(name="data_loader", context=context)
+        result = data_agent.process(input_data={
+            "tickers": tickers,
+            "indicators": ["chgpct_30"]
+        })
+
+        if result.get("status") == "error":
+            print(f"\n⚠️  ERROR: {result.get('message')}")
+            sys.exit(1)
+
+        # Extract data_history from DataAgent context
+        data_history_raw = data_agent.context.get("data_history") or {}
+
+        if not data_history_raw:
+            print("\n⚠️  ERROR: No price data loaded!")
+            sys.exit(1)
+
+        print(f"✅ Loaded price data for {len(data_history_raw)} tickers")
+
+        # Store data_history for use in backtest
+        self.data_history_raw = data_history_raw
+        print(f"✅ Data ready for backtest")
+
         print("\n📍 Running daily backtest with PortfolioManager...")
-
-        # Nested functions for watchlist processing
-        def watchlist_scoring(watchlist: pd.DataFrame, date: pd.Timestamp) -> pd.DataFrame:
-            """Add score column to watchlist from precomputed momentum."""
-            if watchlist.empty:
-                return watchlist
-
-            scores = []
-            for _, row in watchlist.iterrows():
-                ticker = row['ticker']
-                if ticker in self.momentum_data and date in self.momentum_data[ticker]:
-                    score = self.momentum_data[ticker][date]
-                else:
-                    score = 0.0
-                scores.append(score)
-
-            watchlist['score'] = scores
-            return watchlist
-
-        def watchlist_ranking(watchlist: pd.DataFrame) -> list:
-            """Rank tickers by score (highest first)."""
-            if watchlist.empty or 'score' not in watchlist.columns:
-                return []
-            sorted_wl = watchlist.sort_values(['score', 'ticker'], ascending=[False, True])
-            return sorted_wl['ticker'].tolist()
-
-        def watchlist_filter(ranked_tickers: list, top_n: int = 5) -> list:
-            """Filter to top N tickers from ranked list."""
-            return ranked_tickers[:top_n] if len(ranked_tickers) >= top_n else []
 
         # Create fresh portfolio in PortfolioManager
         portfolio_name = f"cac40_momentum_{self.start_date.strftime('%Y%m%d')}"
@@ -233,16 +191,21 @@ class CAC40MomentumBacktest:
         )
         print(f"📊 Created fresh portfolio: {portfolio_name}")
 
-        # Get unique dates from price data
+        # Get unique dates from data_history, filtered to backtest period
         all_dates = set()
-        for prices in self.price_data.values():
-            all_dates.update(prices.index)
+        for df in self.data_history_raw.values():
+            if not df.empty and 'timestamp' in df.columns:
+                dates = pd.to_datetime(df['timestamp']).dt.date
+                # Filter to backtest period
+                dates = [d for d in dates if self.start_date.date() <= d <= self.end_date.date()]
+                all_dates.update(dates)
 
-        sorted_dates = sorted(all_dates)
+        sorted_dates = sorted([pd.to_datetime(d) for d in all_dates])
         print(f"📊 Processing {len(sorted_dates)} trading days...")
 
         rebalance_count = 0
         last_rebalance_date = None
+        cash = self.initial_capital  # Efficient local tracking
         portfolio_values = []
         portfolio_dates = []
 
@@ -279,9 +242,9 @@ class CAC40MomentumBacktest:
             # Get top 5 momentum tickers: score → rank → filter
             watchlist_df = self.build_watchlist(date)
             if not watchlist_df.empty:
-                watchlist_df = watchlist_scoring(watchlist_df, date)
-                ranked_tickers = watchlist_ranking(watchlist_df)
-                watchlist = watchlist_filter(ranked_tickers, top_n=5)
+                watchlist_df = self.watchlist_scoring(watchlist_df, date)
+                ranked_tickers = self.watchlist_ranking(watchlist_df)
+                watchlist = self.watchlist_filter(ranked_tickers, top_n=5)
             else:
                 watchlist = []
             timings['top5_calc'] += time.perf_counter() - t_top5_start
@@ -299,9 +262,14 @@ class CAC40MomentumBacktest:
                 rebalance_count += 1
                 last_rebalance_date = date
 
-            # Get prices from data_history for current date
+            # Get prices from data_history_raw for current date
             t_price_start = time.perf_counter()
-            current_data = self.data_history.get(date, {})
+            current_data = {}
+            for ticker, df in self.data_history_raw.items():
+                if not df.empty and 'timestamp' in df.columns and 'close' in df.columns:
+                    matching_rows = df[pd.to_datetime(df['timestamp']).dt.date == date.date()]
+                    if not matching_rows.empty:
+                        current_data[ticker] = matching_rows.iloc[0]['close']
             timings['price_lookup'] += time.perf_counter() - t_price_start
 
             t_trade_start = time.perf_counter()
@@ -315,6 +283,8 @@ class CAC40MomentumBacktest:
 
                     if self.show_trades:
                         print(f"  {date.date()} SELL {ticker:8} {qty:6} @ €{price:8.2f} = €{qty * price:9.2f} - €{fees:7.2f} fees")
+
+                    cash += proceeds  # Restore cash from sale
 
                     self.pm.record_transaction(
                         portfolio_name=portfolio_name,
@@ -330,8 +300,6 @@ class CAC40MomentumBacktest:
 
             # BUY positions entering top 5
             if to_open:
-                # Get cash from PortfolioManager (authoritative source)
-                cash = self.pm.get_portfolio_cash(portfolio_name)
                 # Calculate portfolio value from current holdings + cash
                 position_value = sum(current_holdings.get(t, 0) * current_data.get(t, 0) for t in current_holdings.keys() if t in current_data)
                 portfolio_value = cash + position_value
@@ -357,6 +325,8 @@ class CAC40MomentumBacktest:
                                 if self.show_trades:
                                     print(f"  {date.date()} BUY  {ticker:8} {qty:6} @ €{price:8.2f} = €{qty * price:9.2f} + €{fees:7.2f} fees")
 
+                                cash -= cost  # Deduct cost from cash
+
                                 self.pm.record_transaction(
                                     portfolio_name=portfolio_name,
                                     operation="BUY",
@@ -372,8 +342,7 @@ class CAC40MomentumBacktest:
             timings['trade_exec'] += time.perf_counter() - t_trade_start
 
             t_portfolio_start = time.perf_counter()
-            # Track portfolio value from PortfolioManager (single source of truth)
-            cash = self.pm.get_portfolio_cash(portfolio_name)
+            # Track portfolio value using local cash and positions
             position_value = sum(current_holdings.get(t, 0) * current_data.get(t, 0) for t in current_holdings.keys() if t in current_data)
             portfolio_value = cash + position_value
             portfolio_values.append(portfolio_value)
@@ -397,9 +366,9 @@ class CAC40MomentumBacktest:
         transactions_data = self.pm.get_portfolio_transactions(portfolio_name)
         self.trade_count = len(transactions_data.get('transactions', []))
 
-        # Get authoritative cash from PortfolioManager (calculated from journal)
-        self.cash = self.pm.get_portfolio_cash(portfolio_name)
-        print(f"✅ Cash verified from journal: €{self.cash:.2f}")
+        # Store final cash from efficient local tracking
+        self.cash = cash
+        print(f"✅ Final cash: €{self.cash:.2f}")
 
         # Report timing breakdown
         total_time = sum(timings.values())

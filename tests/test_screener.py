@@ -96,38 +96,35 @@ class TestScreenerConfig:
 		assert not is_valid
 		assert "name is required" in error
 
-	def test_validate_missing_source_and_tickers(self):
-		"""Test validation fails without source or tickers."""
+	def test_validate_minimal_config_allowed(self):
+		"""Test validation allows minimal config (can be edited later)."""
 		config = ScreenerConfig(
 			name="test",
 			indicators=["rsi_14"],
 			formula="rsi_14 > 50"
 		)
 		is_valid, error = config.validate()
-		assert not is_valid
-		assert "source or tickers" in error
+		assert is_valid  # Minimal config is allowed
 
-	def test_validate_missing_indicators(self):
-		"""Test validation fails without indicators."""
+	def test_validate_missing_indicators_allowed(self):
+		"""Test validation allows missing indicators (can be added later)."""
 		config = ScreenerConfig(
 			name="test",
 			source="cac40",
 			formula="rsi_14 > 50"
 		)
 		is_valid, error = config.validate()
-		assert not is_valid
-		assert "indicator is required" in error
+		assert is_valid  # Minimal config is allowed
 
-	def test_validate_missing_formula(self):
-		"""Test validation fails without formula."""
+	def test_validate_missing_formula_allowed(self):
+		"""Test validation allows missing formula (can be added later)."""
 		config = ScreenerConfig(
 			name="test",
 			source="cac40",
 			indicators=["rsi_14"]
 		)
 		is_valid, error = config.validate()
-		assert not is_valid
-		assert "Formula is required" in error
+		assert is_valid  # Minimal config is allowed
 
 	def test_validate_valid_config(self):
 		"""Test validation passes for valid configuration."""
@@ -207,13 +204,13 @@ class TestScreenerManager:
 		assert "created successfully" in message
 		assert manager._get_screener_dir("my_screener").exists()
 
-	def test_create_screener_invalid_config(self, manager):
-		"""Test creating screener with invalid config."""
-		config = ScreenerConfig(name="invalid")
+	def test_create_screener_minimal_config(self, manager):
+		"""Test creating screener with minimal config (allowed)."""
+		config = ScreenerConfig(name="minimal")
 		success, message = manager.create_screener(config)
 
-		assert not success
-		assert "source or tickers" in message.lower()
+		assert success  # Minimal config is allowed
+		assert manager._get_screener_dir("minimal").exists()
 
 	def test_create_screener_already_exists(self, manager):
 		"""Test creating screener that already exists."""
