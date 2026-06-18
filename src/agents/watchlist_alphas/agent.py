@@ -94,30 +94,21 @@ class WatchlistAlphasAgent(Agent):
 				# Optimization 4: Cache pre-calculated indicators - check if already present
 				data_enriched = self._ensure_indicators_calculated(data, required_indicators, ticker)
 
-				# Collect calculated alphas to add all at once (avoid fragmentation)
-				alphas_to_add = {}
-
-				# Calculate each alpha for this ticker
+				# Calculate each alpha in order, immediately adding each result to
+				# data_enriched so later alphas can reference earlier ones
+				# (e.g. vp_volume_profile_ratio references vp_volume_at_low)
 				for alpha_name, alpha_formula in alpha_definitions.items():
 					try:
-						# Skip if alpha already exists in the data (cache)
 						if alpha_name in data_enriched.columns:
-							#self.logger.debug(f"[ALPHAS] Skipping {alpha_name} for {ticker} - already cached")
 							alphas_skipped += 1
 							continue
 
-						# Evaluate the formula with the enriched data
 						result = self._evaluate_formula(alpha_formula, data_enriched, ticker)
-						alphas_to_add[alpha_name] = result
+						data_enriched[alpha_name] = result.values
 						alphas_added += 1
 					except Exception as e:
 						errors.append(f"{alpha_name}: {str(e)}")
 						self.logger.debug(f"[ALPHAS] Error calculating {alpha_name} for {ticker}: {str(e)}")
-
-				# Add all alphas at once using pd.concat (avoid DataFrame fragmentation)
-				if alphas_to_add:
-					alpha_df = pd.DataFrame(alphas_to_add, index=data_enriched.index)
-					data_enriched = pd.concat([data_enriched, alpha_df], axis=1)
 
 				# Update the data_history with enriched data (includes calculated indicators and alphas)
 				data_history[ticker] = data_enriched
@@ -194,17 +185,28 @@ class WatchlistAlphasAgent(Agent):
 			self.logger.debug("[ALPHAS] No specific alpha references found, using all alphas")
 			return all_alphas
 
-		# Filter to only referenced alphas
-		used_alphas = {name: formula for name, formula in all_alphas.items()
-						if name in referenced_names}
+		# Seed with alphas directly referenced in signals/entry/exit
+		included = {name for name in all_alphas if name in referenced_names}
 
-		if used_alphas:
-			self.logger.info(f"[ALPHAS] Filtered to {len(used_alphas)} used alphas (from {len(all_alphas)} total)")
-			return used_alphas
-		else:
-			# If no alphas are directly referenced, use all (for feature engineering)
+		if not included:
 			self.logger.debug("[ALPHAS] No alphas directly referenced in signals, using all for features")
 			return all_alphas
+
+		# Transitively pull in alphas referenced by other included alphas
+		# (e.g. vp_volume_profile_ratio references vp_volume_at_low / vp_volume_at_high)
+		changed = True
+		while changed:
+			changed = False
+			for name in list(included):
+				formula = all_alphas[name]
+				for dep in self._extract_referenced_names(formula):
+					if dep in all_alphas and dep not in included:
+						included.add(dep)
+						changed = True
+
+		used_alphas = {name: formula for name, formula in all_alphas.items() if name in included}
+		self.logger.info(f"[ALPHAS] Filtered to {len(used_alphas)} used alphas (from {len(all_alphas)} total)")
+		return used_alphas
 
 	def _extract_referenced_names(self, formula: str) -> set:
 		"""Extract all identifier names from a formula.
@@ -307,15 +309,41 @@ class WatchlistAlphasAgent(Agent):
 		Returns:
 			Series of boolean values (0.0/1.0) for each row
 		"""
+		import re
 		from src.tools.formula.dsl_parser import evaluate_dsl_vectorized
+		from src.tools.indicators import calculate
 
 		try:
-			# Use vectorized evaluation from formula tools
 			return evaluate_dsl_vectorized(formula, data)
-		except Exception as e:
-			# Log as ERROR since vectorization failed (indicates formula issue or performance problem)
-			error_msg = str(e)
-			self.logger.error(f"[ALPHAS] Vectorized eval failed for '{formula}', using row-by-row: {error_msg}")
+		except Exception as first_err:
+			# Vectorized eval failed — maybe an indicator referenced in the formula wasn't
+			# pre-calculated.  Extract ALL referenced names and try to fill every gap before
+			# retrying.  Each indicator is calculated independently so one failure (e.g. vwap
+			# on a ticker without volume) never blocks the others.
+			_SKIP = {'and', 'or', 'not', 'true', 'false',
+					 'close', 'open', 'high', 'low', 'volume', 'abs', 'max', 'min'}
+			names = re.findall(r'\b([a-z_][a-z0-9_]*)\b', formula)
+			missing = [n for n in dict.fromkeys(names)  # preserve order, deduplicate
+					   if n not in _SKIP and n not in data.columns]
+
+			for name in missing:
+				try:
+					result = calculate([name], data)
+					for ind_name, ind_series in result.items():
+						data[ind_name] = ind_series.values  # in-place: future alphas benefit too
+				except Exception:
+					pass
+
+			# Always retry vectorized after filling gaps — even if some indicators
+			# couldn't be calculated, others may have been added and the formula may still work.
+			try:
+				return evaluate_dsl_vectorized(formula, data)
+			except Exception:
+				pass  # fall through to row-by-row with best-effort enriched data
+
+			self.logger.error(
+				f"[ALPHAS] Vectorized eval failed for '{formula}', using row-by-row: {str(first_err)}"
+			)
 			return self._evaluate_dsl_formula_rowwise(formula, data, ticker)
 
 
@@ -385,9 +413,9 @@ class WatchlistAlphasAgent(Agent):
 		from src.tools.indicators import calculate
 		import re
 
-		# Extract indicator references from the formula
-		# Match patterns like "roc_20", "ema_10", "close[0]", etc.
-		pattern = r'([a-z_]+(?:_\d+)?(?:\[\d+\])?)'
+		# Extract indicator references from the formula (e.g., "ema_10", "roc_250", "dv_up_volume")
+		# Use [a-z_][a-z0-9_]* so digits inside names are captured correctly
+		pattern = r'([a-z_][a-z0-9_]*)'
 		matches = set(re.findall(pattern, formula, re.IGNORECASE))
 
 		# Calculate each indicator
@@ -444,14 +472,25 @@ class WatchlistAlphasAgent(Agent):
 		missing_indicators = [ind for ind in required_indicators if ind not in data_enriched.columns]
 
 		if missing_indicators:
+			# Try batch calculation first (efficient)
 			try:
 				calculated = calculate(missing_indicators, data_enriched)
 				for ind_name, ind_series in calculated.items():
 					data_enriched[ind_name] = ind_series.values
 				self.logger.debug(f"[ALPHAS] Calculated {len(calculated)} indicators for {ticker}")
-			except Exception as e:
-				self.logger.warning(f"[ALPHAS] Failed to calculate some indicators for {ticker}: {str(e)}")
-				# Continue anyway - some indicators may not be available
+			except Exception as batch_err:
+				# Batch failed - fall back to individual calculations so one bad indicator
+				# doesn't block all others (e.g. bb_20_lower shouldn't fail because vwap failed)
+				self.logger.warning(f"[ALPHAS] Batch indicator calculation failed for {ticker}, falling back to individual: {str(batch_err)}")
+				for ind in missing_indicators:
+					if ind in data_enriched.columns:
+						continue
+					try:
+						result = calculate([ind], data_enriched)
+						for ind_name, ind_series in result.items():
+							data_enriched[ind_name] = ind_series.values
+					except Exception as e:
+						self.logger.warning(f"[ALPHAS] Skipping indicator '{ind}' for {ticker}: {str(e)}")
 
 		return data_enriched
 

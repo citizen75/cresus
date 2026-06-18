@@ -14,7 +14,6 @@ Formula:
 """
 
 import pandas as pd
-import pandas_ta_classic as pandas_ta
 from typing import Optional
 from ..utils.helpers import get_close
 
@@ -38,24 +37,20 @@ def calculate(
     Returns:
         Series with percentage change of EMA values
     """
-    # Get close prices
     close = get_close(data)
 
-    # Use history if provided
     if history_df is not None:
         hist_close = get_close(history_df)
         combined = pd.concat([hist_close, close], ignore_index=True)
     else:
         combined = close
 
-    # Calculate EMA using pandas-ta
-    ema = pandas_ta.ema(combined, length=ema_period)
+    # Native pandas EMA — equivalent to pandas_ta/pandas_ta_classic ema() with adjust=False
+    ema = combined.ewm(span=ema_period, adjust=False).mean()
 
-    # Calculate percentage change of EMA over change_period
     ema_chgpct = ((ema - ema.shift(change_period)) / ema.shift(change_period) * 100)
 
-    # Extract only current period
     result_len = len(data)
     ema_chgpct = ema_chgpct.iloc[-result_len:].reset_index(drop=True)
 
-    return ema_chgpct.fillna(0.0)
+    return ema_chgpct

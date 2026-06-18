@@ -3,117 +3,72 @@
 from typing import Any, Dict, Optional
 from core.agent import Agent
 from core.flow import Flow
-from agents.data.agent import DataAgent
-from agents.watchlist.sub_agents import MaxTickersAgent, FilterVolumeAgent, RankTickersAgent, FilterAgent, VolatilityAgent, FilterStaleDataAgent, FilterOpenPositionsAgent
+from agents.watchlist.sub_agents import (
+	FilterStaleDataAgent,
+	FilterAgent,
+	FilterOpenPositionsAgent,
+	RankTickersAgent,
+)
 
 
 class WatchListAgent(Agent):
-	"""Agent for managing a watchlist of stocks.
+	"""Orchestrate the watchlist pipeline: filter then rank.
 
-	Orchestrates a multi-step watchlist processing flow using sub-agents.
-	Each step reads/modifies the shared context to build the final watchlist.
+	Pipeline:
+	  1. Initialise watchlist from universe tickers
+	  2. FilterStaleDataAgent     — drop stale tickers (if enabled)
+	  3. FilterAgent              — apply formula filter (if configured)
+	  4. FilterOpenPositionsAgent — exclude open positions (if enabled)
+	  5. RankTickersAgent         — sort by ranking metric (if configured)
+
+	Count-capping (max_count) is intentionally excluded here so that ranking
+	always sees the full filtered set. WatchlistFilterAgent handles the cap
+	after ranking in the outer pipeline.
 	"""
 
 	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-		"""Process watchlist through a series of filtering and ranking steps.
-
-		Creates a Flow with sub-agents that:
-		1. Filter out tickers with stale trading data
-		2. Filter by trading volume (from strategy config)
-		3. Filter by trend
-		4. Filter by volatility
-		5. Rank by metric (from strategy config)
-		6. Limit to maximum count (from strategy config)
-
-		Args:
-			input_data: Input data (optional, uses context for tickers)
-
-		Returns:
-			Response dictionary with final watchlist
-		"""
 		if input_data is None:
 			input_data = {}
 
-		# Clear watchlist at start of processing to avoid stale data from previous days
-		self.context.set("watchlist", {})
-		self.logger.debug("Cleared watchlist at start of process")
-
-		# Verify data is already loaded by upstream DataAgent
 		if not self.context.get("data_history"):
 			return {
-				'status': 'error',
-				'input': input_data,
-				'output': {'watchlist': [], 'count': 0},
-				'message': "No data_history in context (DataAgent must run first)"
+				"status": "error",
+				"input": input_data,
+				"output": {"watchlist": [], "count": 0},
+				"message": "No data_history in context (DataAgent must run first)",
 			}
 
-		# Get watchlist parameters from context strategy config
-		watchlist_params = self._get_watchlist_parameters()
-
-		# Step 3: Initialize watchlist from tickers
 		tickers = self.context.get("tickers") or []
 		self.context.set("watchlist", {t: {} for t in tickers})
-		self.logger.debug(f"Initialized watchlist with {len(tickers)} tickers from universe")
+		self.logger.debug(f"Initialised watchlist with {len(tickers)} tickers")
 
-		# Step 4: Create a watchlist processing flow with sub-agents
-		# The flow uses the same context as this agent
-		watchlist_flow = Flow("WatchlistProcessingFlow", context=self.context)
+		params = self._watchlist_params()
+		flow = Flow("WatchlistFlow", context=self.context)
 
-		# Add processing steps with parameters from strategy
-		# First step: filter out tickers with stale data (optional for ETF data)
-		if watchlist_params.get("stale_data_enabled", False):
-			watchlist_flow.add_step(
-				FilterStaleDataAgent("FilterStaleDataStep"),
-				required=False
-			)
+		if params["stale_data_enabled"]:
+			flow.add_step(FilterStaleDataAgent("FilterStaleData"), required=False)
 
-		if watchlist_params.get("volume_enabled", True):
-			watchlist_flow.add_step(
-				FilterVolumeAgent("FilterVolumeStep"),
-				required=False
-			)
+		if params["trend_enabled"]:
+			flow.add_step(FilterAgent("FilterFormula"), required=True)
 
-		if watchlist_params.get("trend_enabled", True):
-			watchlist_flow.add_step(
-				FilterAgent(
-					"FilterStep"
-				),
-				required=True
-			)
+		if params["open_positions_enabled"]:
+			flow.add_step(FilterOpenPositionsAgent("FilterOpenPositions"), required=False)
 
-		if watchlist_params.get("ranking_enabled", True):
-			watchlist_flow.add_step(
-				RankTickersAgent(
-					"RankStep",
-					metric=watchlist_params.get("metric", "score")
-				),
-				required=False
-			)
+		if params["ranking_enabled"]:
+			flow.add_step(RankTickersAgent("RankTickers", metric=params["metric"]), required=False)
 
-		if watchlist_params.get("max_enabled", True):
-			watchlist_flow.add_step(
-				MaxTickersAgent(
-					"MaxTickersStep",
-					max_tickers=int(watchlist_params.get("max_count", 50))
-				),
-				required=False
-			)
+		flow_result = flow.process(input_data)
 
-		# Execute the flow
-		flow_result = watchlist_flow.process(input_data)
-
-		# Check flow execution
 		if flow_result.get("status") != "success":
 			return {
-				'status': 'error',
-				'input': input_data,
-				'output': {'watchlist': [], 'count': 0},
-				'message': f"Watchlist flow failed: {flow_result.get('message', 'Unknown error')}"
+				"status": "error",
+				"input": input_data,
+				"output": {"watchlist": [], "count": 0},
+				"message": f"Watchlist flow failed: {flow_result.get('message', 'unknown error')}",
 			}
 
-		# Get final watchlist from context
-		watchlist = self.context.get("watchlist") or []
-		self.logger.info(f"[WATCHLIST] Final watchlist {watchlist} (count: {len(watchlist)})")
+		watchlist = self.context.get("watchlist") or {}
+		self.logger.info(f"[WATCHLIST] {len(watchlist)} tickers after filter+rank")
 
 		return {
 			"status": "success",
@@ -122,64 +77,28 @@ class WatchListAgent(Agent):
 				"watchlist": watchlist,
 				"count": len(watchlist),
 				"flow_steps": flow_result.get("steps_completed", 0),
-				"parameters": watchlist_params,
+				"parameters": params,
 			},
 			"execution_history": flow_result.get("execution_history", []),
 		}
 
-	def _get_watchlist_parameters(self) -> Dict[str, Any]:
-		"""Get watchlist parameters from context strategy configuration.
-
-		Reads watchlist parameters from context.strategy_config which is
-		loaded by WatchlistFlow, with sensible defaults if not specified.
-
-		Returns:
-			Dictionary with watchlist parameters
-		"""
-		# Default parameters
+	def _watchlist_params(self) -> Dict[str, Any]:
 		defaults = {
-			"volume_enabled": True,
-			"trend_enabled": True,
-			"volatility_enabled": True,
-			"ranking_enabled": True,
+			"stale_data_enabled": False,
+			"trend_enabled": False,
+			"open_positions_enabled": False,
+			"ranking_enabled": False,
 			"metric": "score",
-			"max_enabled": True,
-			"max_count": 50,
 		}
 
-		# Get strategy config from context (loaded by WatchlistFlow)
-		strategy_config = self.context.get("strategy_config")
-		if not strategy_config:
-			self.logger.warning("Strategy config not found in context")
-			return defaults
+		strategy_config = self.context.get("strategy_config") or {}
+		p = strategy_config.get("watchlist", {}).get("parameters", {})
 
-		watchlist_config = strategy_config.get("watchlist", {})
-
-		if not watchlist_config.get("enabled", True):
-			# Watchlist is disabled in strategy
-			return {**defaults, "volume_enabled": False, "trend_enabled": False, "ranking_enabled": False, "max_enabled": False}
-
-		# Extract parameters from strategy config
-		params = watchlist_config.get("parameters", {})
-
-		# Check which filters are actually defined in the strategy config
-		has_filter = "filter" in params
-		has_volatility = "volatility" in params
-		has_ranking = "ranking" in params
-
-		# Extract max_count and ensure it's an integer
-		max_count = params.get("tickers", {}).get("max_count", defaults["max_count"])
-		try:
-			max_count = int(max_count)
-		except (ValueError, TypeError):
-			max_count = defaults["max_count"]
-
+		has_ranking = "ranking" in p
 		return {
-			"volume_enabled": "volume" in params,
-			"trend_enabled": has_filter,
-			"volatility_enabled": has_volatility,
+			"stale_data_enabled": p.get("stale_data_enabled", defaults["stale_data_enabled"]),
+			"trend_enabled": "filter" in p,
+			"open_positions_enabled": p.get("open_positions_enabled", defaults["open_positions_enabled"]),
 			"ranking_enabled": has_ranking,
-			"metric": params.get("ranking", {}).get("metric", defaults["metric"]) if has_ranking else defaults["metric"],
-			"max_enabled": True,
-			"max_count": max_count,
+			"metric": p.get("ranking", {}).get("metric", defaults["metric"]) if has_ranking else defaults["metric"],
 		}

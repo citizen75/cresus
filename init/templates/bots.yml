@@ -1,0 +1,83 @@
+# Bot Configuration Template
+# This template is used as default configuration when creating a new bot
+
+# Bot metadata
+name: "bot_name"
+description: "Bot description"
+created_at: null
+activated_at: null
+deactivated_at: null
+
+# Bot state: active | inactive
+state: "inactive"
+
+# Strategy reference
+strategy: ""  # Name of the strategy (copied to bot folder as strategy.yml)
+
+# Portfolio configuration
+portfolio:
+  initial_capital: 100000
+  risk_per_trade: 0.02          # Risk 2% of capital per trade
+  max_drawdown: 0.20            # Max allowed drawdown
+  position_sizing: "fixed"      # fixed|dynamic|kelly
+  fixed_position_size: 5000     # For fixed position sizing
+
+# Trading parameters
+trading:
+  # Market hours (24-hour format)
+  market_open: "09:00"
+  market_close: "17:30"
+
+  # Entry parameters
+  entry:
+    signal_strength_min: 0.7    # Minimum signal strength to enter
+    max_positions: 10           # Maximum concurrent positions
+
+  # Exit parameters
+  exit:
+    stop_loss: 0.05             # 5% stop loss
+    take_profit: 0.10           # 10% take profit
+    trailing_stop: false
+    time_based_exit: 20         # Days to hold position
+
+# Risk management
+risk_management:
+  max_daily_loss: 0.05          # Max loss per day (% of capital)
+  max_correlation: 0.7          # Max correlation between positions
+  sector_limit: 0.30            # Max % of capital in one sector
+  single_stock_limit: 0.10      # Max % of capital in one stock
+
+# Notifications
+notifications:
+  enabled: true
+  channels:
+    - log                       # log, slack, email, telegram
+  on_events:
+    - entry
+    - exit
+    - stop_loss
+    - take_profit
+    - daily_summary
+
+# Performance tracking
+performance:
+  track_metrics: true
+  daily_reporting: true
+  weekly_reporting: false
+  monthly_reporting: true
+
+# Watchlist
+watchlist: []  # List of tickers to monitor
+
+# Features
+features:
+  paper_trading: false          # Simulate without real execution
+  logging: true
+  backtesting: false
+  optimization: false
+
+# Advanced parameters
+advanced:
+  slippage: 0.001              # 0.1% slippage assumption
+  commissions: 0.002           # 0.2% commission per trade
+  rebalance_frequency: "daily"  # daily|weekly|monthly

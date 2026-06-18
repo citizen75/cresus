@@ -67,9 +67,6 @@ INDICATOR_PARAMS = {
     # Volatility indicators
     "atr": {"params": ["period"], "defaults": {"period": 14}},
     "bb": {"params": ["period", "std_dev"], "defaults": {"period": 20, "std_dev": 2}},
-    "bb_lower": {"params": ["period"], "defaults": {"period": 20}},
-    "bb_middle": {"params": ["period"], "defaults": {"period": 20}},
-    "bb_upper": {"params": ["period"], "defaults": {"period": 20}},
     "bollinger_bands": {"params": ["period", "std_dev"], "defaults": {"period": 20, "std_dev": 2}},
     "parkinson": {"params": ["period"], "defaults": {"period": 14}},
     "garman_klass": {"params": ["period"], "defaults": {"period": 14}},
@@ -82,6 +79,10 @@ INDICATOR_PARAMS = {
     "vratio": {"params": ["period"], "defaults": {"period": 20}},
     "pvt": {"params": [], "defaults": {}},  # Price-Volume Trend
     "vwap": {"params": ["anchor"], "defaults": {"anchor": None}},  # Volume Weighted Average Price
+    "dv_up_volume": {"params": [], "defaults": {}},  # Directional volume - up days
+    "dv_down_volume": {"params": [], "defaults": {}},  # Directional volume - down days
+    "volume_sma_20": {"params": [], "defaults": {}},  # Volume SMA (20-period hardcoded alias)
+    "volume_20ma": {"params": [], "defaults": {}},  # Volume 20-period MA (alias)
 
     # Support/Resistance
     "support": {"params": ["period"], "defaults": {"period": 14}},
@@ -93,6 +94,9 @@ INDICATOR_PARAMS = {
     # Change indicators
     "chgpct": {"params": ["period"], "defaults": {"period": 1}},
     "chglog": {"params": ["period"], "defaults": {"period": 1}},
+
+    # Compound trend-change indicators
+    "ema_chgpct": {"params": ["ema_period", "change_period"], "defaults": {"ema_period": 20, "change_period": 5}},
 
     # Core indicators
     "ha": {"params": [], "defaults": {}},  # Heikin Ashi

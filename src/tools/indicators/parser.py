@@ -125,6 +125,17 @@ class FormulaParser:
                     remaining_params = '_'.join(parts[i+1:]) if i+1 < len(parts) else None
                     return potential_name, remaining_params
 
+            # Compound indicator: word parts may be interleaved with numeric params.
+            # E.g. "ema_20_chgpct_10" → indicator_guess="ema", parts=["20","chgpct","10"]
+            # → non-numeric=["chgpct"] → try "ema_chgpct" → numeric params become "20_10"
+            non_numeric = [p for p in parts if not p.replace('.', '', 1).isdigit()]
+            if non_numeric:
+                potential_name = indicator_guess + '_' + '_'.join(non_numeric)
+                if potential_name in INDICATOR_PARAMS:
+                    numeric_parts = [p for p in parts if p.replace('.', '', 1).isdigit()]
+                    remaining_params = '_'.join(numeric_parts) if numeric_parts else None
+                    return potential_name, remaining_params
+
         # Then try the guess directly (shorter matches last)
         if indicator_guess in INDICATOR_PARAMS:
             return indicator_guess, param_str

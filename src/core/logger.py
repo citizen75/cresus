@@ -169,3 +169,7 @@ class AgentLogger:
 			print(f"EXCEPTION: {formatted_msg}")
 		if self.file_logger:
 			self.file_logger.error(message)
+
+	def enable_debug(self):
+		"""Enable debug logging output."""
+		enable_debug_mode()

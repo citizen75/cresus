@@ -22,6 +22,8 @@ from cli.commands.info import InfoCommands
 from cli.commands.strategy import StrategyCommands
 from cli.commands.alerts import AlertCommands
 from cli.commands.indicators import IndicatorsCommands
+from cli.commands.jobs import JobsCommands
+from cli.commands.bots import BotsCommands
 from tools.data.manager import DataManager
 
 console = Console()
@@ -51,6 +53,8 @@ class CresusCLI(cmd2.Cmd):
 		self.strategy_commands = StrategyCommands(self.project_root)
 		self.alert_commands = AlertCommands()
 		self.indicators_commands = IndicatorsCommands()
+		self.jobs_commands = JobsCommands()
+		self.bots_commands = BotsCommands()
 
 		self._setup_history()
 		self._setup_prompt()
@@ -88,6 +92,8 @@ class CresusCLI(cmd2.Cmd):
 		info_table.add_row("[bold]watchlist[/bold]", "View strategy watchlist (e.g., watchlist show momentum_cac)")
 		info_table.add_row("[bold]orders[/bold]", "View pending/executed orders (e.g., orders list momentum_cac)")
 		info_table.add_row("[bold]cron[/bold]", "View scheduled cron jobs and next run times")
+		info_table.add_row("[bold]jobs[/bold]", "Manage long-running jobs (e.g., jobs list|create|info|start|complete)")
+		info_table.add_row("[bold]bot[/bold]", "Manage trading bots (e.g., bot list|create|activate|deactivate|info)")
 		info_table.add_row("[bold]alerts[/bold]", "Manage and run alerts (e.g., alerts create --name rsi_low --source all_portfolios --formula 'rsi_14[0]<50')")
 		info_table.add_row("[bold]status[/bold]", "Show system status")
 		info_table.add_row("[bold]update[/bold]", "Update cresus from git")
@@ -994,6 +1000,69 @@ class CresusCLI(cmd2.Cmd):
 	def do_cron(self, args):
 		"""Manage cron jobs: list"""
 		self.scheduler_commands.handle(args)
+
+	# ==================== Job Management Commands ====================
+	def do_jobs(self, args):
+		"""Manage long-running jobs.
+
+		Usage:
+		  jobs list [status]              List all jobs (optionally filter by status)
+		  jobs summary                    Show summary of jobs by status
+		  jobs create <name>              Create a new job
+		  jobs info <name>                Show job details and metadata
+		  jobs start <name>               Mark job as running
+		  jobs complete <name>            Mark job as completed successfully
+		  jobs fail <name> <error>        Mark job as failed with error
+		  jobs delete <name>              Delete a job and all its data
+		  jobs config <name> [show|save|load]  Manage job configuration
+		  jobs results <name> [key]       Show job results
+		  jobs logs <name> [log_name]     Show job logs
+		  jobs cleanup [--keep N] [--status]  Clean up old jobs
+
+		Examples:
+		  jobs list                       # List all jobs
+		  jobs list success               # List successful jobs only
+		  jobs summary                    # Show job counts by status
+		  jobs create my_backtest         # Create a new job
+		  jobs info my_backtest           # Show job details
+		  jobs start my_backtest          # Mark job as running
+		  jobs complete my_backtest       # Mark as completed
+		  jobs results my_backtest        # Show job results
+		  jobs cleanup --keep 10          # Keep only 10 most recent jobs
+		"""
+		self.jobs_commands.handle(args)
+
+	def do_bot(self, args):
+		"""Manage trading bots with strategies and portfolios.
+
+		Usage:
+		  bot list [state]                List all bots (optionally filter by state: active|inactive)
+		  bot create <name> <strategy>    Create new bot with strategy from file
+		  bot info <name>                 Show bot details, portfolio, and watchlist
+		  bot run <name> [params]         Run bot execution cycle (must be active)
+		  bot activate <name>             Activate a bot for trading
+		  bot deactivate <name>           Deactivate a bot (stop trading)
+		  bot delete <name>               Delete a bot and all its data
+		  bot config <name> [show|load|save]  Manage bot configuration
+		  bot watchlist <name> [show|add|remove]  Manage bot watchlist
+		  bot portfolio <name>            Show bot portfolio and positions
+		  bot summary                     Show summary of bots by state
+
+		Examples:
+		  bot list                        # List all bots
+		  bot list active                 # List active bots only
+		  bot create momentum_cac40 cac_momentum  # Create bot with strategy
+		  bot info momentum_cac40         # Show all bot details
+		  bot activate momentum_cac40     # Activate bot for trading
+		  bot run momentum_cac40          # Run bot execution cycle
+		  bot run momentum_cac40 '{"market":"cac40","capital":100000}'  # Run with params
+		  bot watchlist momentum_cac40 show  # Show bot watchlist
+		  bot watchlist momentum_cac40 add AC.PA  # Add ticker to watchlist
+		  bot portfolio momentum_cac40    # Show bot portfolio
+		  bot deactivate momentum_cac40   # Stop bot trading
+		  bot delete momentum_cac40       # Delete bot
+		"""
+		self.bots_commands.handle(args)
 
 	# ==================== Strategy Commands ====================
 	def do_strategy(self, args):

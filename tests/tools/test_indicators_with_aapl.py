@@ -97,8 +97,8 @@ class TestIndicatorsWithAAPL:
         """Test Bollinger Bands calculation with real AAPL data."""
         result = calculate(['bb_20_2'], aapl_data)
 
-        # BB returns components: bb_upper, bb_middle, bb_lower (without period suffix)
-        expected_components = ['bb_upper', 'bb_middle', 'bb_lower']
+        # BB returns components with period suffix: bb_20_upper, bb_20_middle, bb_20_lower
+        expected_components = ['bb_20_upper', 'bb_20_middle', 'bb_20_lower']
 
         for component in expected_components:
             assert component in result, f"Missing BB component: {component}, got: {list(result.keys())}"
@@ -154,7 +154,7 @@ class TestIndicatorsWithAAPL:
         assert 'ema_20' in result
         assert 'sma_50' in result
         assert 'atr_14' in result
-        assert 'bb_upper' in result  # BB returns components without period suffix
+        assert 'bb_20_upper' in result  # BB returns components with period suffix
         assert 'adx_14' in result
         assert 'macd_line' in result  # MACD returns line, signal, histogram
         assert 'chgpct_5' in result

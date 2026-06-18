@@ -1,0 +1,57 @@
+# Job Configuration Template
+# This template is used as default configuration when creating a new job
+
+# Job metadata
+description: "Job description"
+tags: []
+
+# Execution parameters
+parameters:
+  market: "cac40"
+  strategy: ""
+  initial_capital: 100000
+
+# Agents to execute (in order)
+agents:
+  - name: "DataAgent"
+    params:
+      universe: "cac40"
+  - name: "IndicatorAgent"
+    params:
+      indicators: []
+  - name: "AnalysisAgent"
+    params:
+      output_service: "file"
+
+# Configuration for services (logging, output, etc)
+services:
+  logging:
+    level: "INFO"
+    format: "json"
+
+  output:
+    type: "file"
+    format: "json"
+
+# Job timeouts and limits
+limits:
+  timeout_seconds: 3600
+  max_memory_mb: 4096
+
+# Scheduling (optional - used if running as cron job)
+schedule:
+  enabled: false
+  cron: "0 9 * * 1-5"  # 9 AM on weekdays
+
+# Notifications (optional)
+notifications:
+  on_start: false
+  on_success: false
+  on_failure: true
+  channels: ["log"]  # log, slack, email, etc
+
+# Custom fields (for user-specific data)
+custom:
+  version: "1.0"
+  author: ""
+  environment: "development"

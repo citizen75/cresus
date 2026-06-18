@@ -255,14 +255,17 @@ def calculate(
             # If component specified, use it to select from dict
             if component:
                 # Try to find matching key: component, indicator_component, indicator_params_component
+                period = params.get("period", "")
                 possible_keys = [
                     component,
+                    f"{indicator_name}_{period}_{component}" if period else None,
                     f"{indicator_name}_{component}",
-                    f"bb_{component}",  # For Bollinger Bands
+                    f"bb_{period}_{component}" if period else None,  # For Bollinger Bands with period
                     f"macd_{component}",  # For MACD
                     f"ha_{component}",  # For Heikin Ashi
                     f"sha_{component}",  # For Smooth Heikin Ashi
                 ]
+                possible_keys = [k for k in possible_keys if k]
                 found = False
                 for key in possible_keys:
                     if key in calc_result:
@@ -395,12 +398,9 @@ def _register_all_indicators():
 
     try:
         # Volatility indicators
-        from .volatility import atr, bb, bb_lower, bb_middle, bb_upper, parkinson, rogers_satchell
+        from .volatility import atr, bb, parkinson, rogers_satchell
         register_indicator("atr", atr.calculate)
         register_indicator("bb", bb.calculate)
-        register_indicator("bb_lower", bb_lower.calculate)
-        register_indicator("bb_middle", bb_middle.calculate)
-        register_indicator("bb_upper", bb_upper.calculate)
         register_indicator("bollinger_bands", bb.calculate)
         register_indicator("parkinson", parkinson.calculate)
         register_indicator("rs", rogers_satchell.calculate)
@@ -409,7 +409,7 @@ def _register_all_indicators():
 
     try:
         # Volume indicators
-        from .volume import ad, obv, mfi, cmf, volume_ratio, vwap, volume_ma
+        from .volume import ad, obv, mfi, cmf, volume_ratio, vwap, volume_ma, dv_up_volume, dv_down_volume
         register_indicator("ad", ad.calculate)
         register_indicator("obv", obv.calculate)
         register_indicator("mfi", mfi.calculate)
@@ -417,6 +417,8 @@ def _register_all_indicators():
         register_indicator("vratio", volume_ratio.calculate)
         register_indicator("vwap", vwap.calculate)
         register_indicator("volume_sma_20", lambda df: volume_ma.calculate(df, period=20))
+        register_indicator("dv_up_volume", dv_up_volume.calculate)
+        register_indicator("dv_down_volume", dv_down_volume.calculate)
 
     except ImportError:
         pass
@@ -520,20 +522,14 @@ def _register_indicator_modules(indicator_names: set) -> None:
 			pass
 	
 	# Volatility indicators
-	if any(ind in indicator_names for ind in ["atr", "bb", "bollinger_bands", "bb_lower", "bb_middle", "bb_upper", "parkinson", "rs"]):
+	if any(ind in indicator_names for ind in ["atr", "bb", "bollinger_bands", "parkinson", "rs"]):
 		try:
-			from .volatility import atr, bb, bb_lower, bb_middle, bb_upper, parkinson, rogers_satchell
+			from .volatility import atr, bb, parkinson, rogers_satchell
 			if "atr" in indicator_names:
 				register_indicator("atr", atr.calculate)
 			if "bb" in indicator_names or "bollinger_bands" in indicator_names:
 				register_indicator("bb", bb.calculate)
 				register_indicator("bollinger_bands", bb.calculate)
-			if "bb_lower" in indicator_names:
-				register_indicator("bb_lower", bb_lower.calculate)
-			if "bb_middle" in indicator_names:
-				register_indicator("bb_middle", bb_middle.calculate)
-			if "bb_upper" in indicator_names:
-				register_indicator("bb_upper", bb_upper.calculate)
 			if "parkinson" in indicator_names:
 				register_indicator("parkinson", parkinson.calculate)
 			if "rs" in indicator_names:
@@ -542,9 +538,9 @@ def _register_indicator_modules(indicator_names: set) -> None:
 			pass
 	
 	# Volume indicators
-	if any(ind in indicator_names for ind in ["ad", "obv", "mfi", "cmf", "vratio", "vwap", "volume_sma"]):
+	if any(ind in indicator_names for ind in ["ad", "obv", "mfi", "cmf", "vratio", "vwap", "volume_sma", "dv_up_volume", "dv_down_volume"]):
 		try:
-			from .volume import ad, obv, mfi, cmf, volume_ratio, vwap, volume_ma
+			from .volume import ad, obv, mfi, cmf, volume_ratio, vwap, volume_ma, dv_up_volume, dv_down_volume
 			if "ad" in indicator_names:
 				register_indicator("ad", ad.calculate)
 			if "obv" in indicator_names:
@@ -560,6 +556,10 @@ def _register_indicator_modules(indicator_names: set) -> None:
 			if any(ind in indicator_names for ind in ["volume_sma_20", "volume_20ma"]):
 				register_indicator("volume_sma_20", lambda df: volume_ma.calculate(df, period=20))
 				register_indicator("volume_20ma", lambda df: volume_ma.calculate(df, period=20))
+			if "dv_up_volume" in indicator_names:
+				register_indicator("dv_up_volume", dv_up_volume.calculate)
+			if "dv_down_volume" in indicator_names:
+				register_indicator("dv_down_volume", dv_down_volume.calculate)
 		except ImportError:
 			pass
 	

@@ -188,6 +188,24 @@ INDICATOR_META: Dict[str, Dict[str, Any]] = {
         "description": "Volume Weighted Average Price - Intraday fair value",
         "examples": ["vwap", "vwap_10", "vwap_2024-01-15"],
     },
+    "dv_up_volume": {
+        "category": "volume",
+        "returns": "Series",
+        "params": [],
+        "defaults": {},
+        "range": (0, None),
+        "description": "Directional Volume Up - Volume on days where Close > Open",
+        "examples": ["dv_up_volume"],
+    },
+    "dv_down_volume": {
+        "category": "volume",
+        "returns": "Series",
+        "params": [],
+        "defaults": {},
+        "range": (0, None),
+        "description": "Directional Volume Down - Volume on days where Close < Open",
+        "examples": ["dv_down_volume"],
+    },
 
     # ========================================================================
     # CORE INDICATORS

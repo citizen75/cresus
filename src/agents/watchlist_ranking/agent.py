@@ -174,8 +174,8 @@ class WatchlistRankingAgent(Agent):
 	def _merge_ranking_into_scores(self, ranking_scores: Dict[str, float]) -> None:
 		"""Merge LGBM ranking scores into ticker_scores while preserving signal metadata.
 
-		Adds ranking_model_score to each ticker's score info, allowing downstream
-		processors to use both signal scores and model predictions.
+		Writes rank (LGBM prediction) into ticker_scores, kept separate from
+		score (formula) so the two values don't overwrite each other.
 
 		Args:
 			ranking_scores: Dict of ticker -> ranking score from LGBM model
@@ -183,34 +183,19 @@ class WatchlistRankingAgent(Agent):
 		ticker_scores = self.context.get("ticker_scores") or {}
 
 		if not ticker_scores:
-			# If no signal scores yet, create structure with just ranking scores
 			ticker_scores = {
 				ticker: {
-					"ranking_model_score": float(score),
-					"score": float(score),  # Use ranking score as primary
-					"raw_score": float(score),
+					"rank": float(score),
 					"triggered_signals": [],
 					"signal_count": 0,
 				}
 				for ticker, score in ranking_scores.items()
 			}
 		else:
-			# Merge ranking scores into existing signal scores
 			for ticker, score in ranking_scores.items():
-				if ticker in ticker_scores:
-					# Preserve existing signal data, add ranking score
-					ticker_scores[ticker]["ranking_model_score"] = float(score)
-					# Use ranking score as primary score for entry decisions
-					ticker_scores[ticker]["score"] = float(score)
-				else:
-					# Ticker has ranking score but no signals, create entry
-					ticker_scores[ticker] = {
-						"ranking_model_score": float(score),
-						"score": float(score),
-						"raw_score": float(score),
-						"triggered_signals": [],
-						"signal_count": 0,
-					}
+				if ticker not in ticker_scores:
+					ticker_scores[ticker] = {"triggered_signals": [], "signal_count": 0}
+				ticker_scores[ticker]["rank"] = float(score)
 
 		self.context.set("ticker_scores", ticker_scores)
 		self.logger.info(f"[WATCHLIST-RANKING] Merged ranking scores into ticker_scores for {len(ticker_scores)} tickers")

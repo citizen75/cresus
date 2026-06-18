@@ -33,6 +33,8 @@ indicators:
   - bb_20_upper
   - bb_20_lower
   - volume_sma_20
+  - dv_up_volume
+  - dv_down_volume
 
 # Watchlist configuration - which tickers to trade
 watchlist:

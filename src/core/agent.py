@@ -36,6 +36,17 @@ class Agent:
 			self.context.set("logger", AgentLogger(name))
 		self.logger = self.context.get("logger")
 
+	def _format_log_message(self, message: str) -> str:
+		"""Format a log message with agent name prefix.
+
+		Args:
+			message: The message to format
+
+		Returns:
+			Formatted message in the pattern "[{agent_name}] {message}"
+		"""
+		return f"[{self.name}] {message}"
+
 
 	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
 		"""Process input data and return output.
@@ -93,7 +104,7 @@ class Agent:
 		if input_data is None:
 			input_data = {}
 		elif not isinstance(input_data, dict):
-			self.logger.error(f"Invalid input type: {type(input_data).__name__}, expected dict")
+			self.logger.error(self._format_log_message(f"Invalid input type: {type(input_data).__name__}, expected dict"))
 			return {
 				"status": STATUS_ERROR,
 				"input": {},
@@ -104,13 +115,13 @@ class Agent:
 		start_time = time.time()
 		response = None
 		try:
-			self.logger.debug(f"Starting {self.name} with input keys: {list(input_data.keys())}")
+			self.logger.debug(self._format_log_message(f"Starting with input keys: {list(input_data.keys())}"))
 			response = self.process(input_data)
-			self.logger.debug(f"Completed {self.name} with status: {response.get('status')}")
+			self.logger.debug(self._format_log_message(f"Completed with status: {response.get('status')}"))
 			return response
 		except Exception as e:
 			error_msg = str(e)
-			self.logger.error(f"Failed {self.name}: {error_msg}")
+			self.logger.error(self._format_log_message(f"Failed: {error_msg}"))
 			response = {
 				"status": STATUS_ERROR,
 				"input": input_data,

@@ -71,12 +71,27 @@ def calculate(
     except Exception as e:
         raise ValueError(f"RSI calculation failed with pandas-ta: {str(e)}") from e
 
+    if rsi is None:
+        # pandas_ta returned None (insufficient data or all-constant prices).
+        # Fall back to pure-pandas Wilder RSI.
+        delta = combined.diff()
+        gain = delta.clip(lower=0)
+        loss = (-delta).clip(lower=0)
+        avg_gain = gain.ewm(alpha=1 / period, min_periods=period, adjust=False).mean()
+        avg_loss = loss.ewm(alpha=1 / period, min_periods=period, adjust=False).mean()
+        rs = avg_gain / avg_loss.where(avg_loss != 0, float("nan"))
+        rsi = pd.Series(100 - (100 / (1 + rs)), name=f"RSI_{period}")
+
     # Extract only current period
     result_len = len(data)
     rsi = rsi.iloc[-result_len:].reset_index(drop=True)
 
     # Fill NaN with 50 (neutral)
     rsi = rsi.fillna(50)
+
+    # Clip to valid range — floating-point edge cases can produce values
+    # marginally outside [0, 100] (e.g., on all-gain / all-loss streaks).
+    rsi = rsi.clip(0, 100)
 
     # Validate output
     try:

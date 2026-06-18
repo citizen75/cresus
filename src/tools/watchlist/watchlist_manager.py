@@ -26,13 +26,14 @@ class WatchlistManager:
 	Files are stored as CSV in db/local/watchlist/<strategy_name>.csv
 	"""
 
-	def __init__(self, strategy_name: str, backtest_dir: Optional[str] = None, portfolio_name: Optional[str] = None):
+	def __init__(self, strategy_name: str, backtest_dir: Optional[str] = None, portfolio_name: Optional[str] = None, bot_dir: Optional[str] = None):
 		"""Initialize watchlist manager for a strategy.
 
 		Args:
 			strategy_name: Name of the strategy
 			backtest_dir: Optional backtest directory for sandboxed backtesting
 			portfolio_name: Optional portfolio name to save in portfolio directory
+			bot_dir: Optional bot directory; saves directly as bot_dir/watchlist.csv
 		"""
 		from utils.env import get_db_root
 
@@ -40,7 +41,10 @@ class WatchlistManager:
 		self.portfolio_name = portfolio_name
 		db_root = get_db_root()
 
-		if backtest_dir:
+		if bot_dir:
+			self.watchlist_dir = Path(bot_dir)
+			self.filepath = self.watchlist_dir / "watchlist.csv"
+		elif backtest_dir:
 			# Use sandboxed backtest directory
 			self.watchlist_dir = Path(backtest_dir) / "watchlist"
 			self.filepath = self.watchlist_dir / f"{strategy_name}.csv"

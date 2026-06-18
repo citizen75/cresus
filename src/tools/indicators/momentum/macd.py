@@ -53,6 +53,22 @@ def calculate(
     # pandas-ta returns a DataFrame with MACD_12_26_9, MACDh_12_26_9, MACDs_12_26_9 columns
     macd_df = pandas_ta.macd(combined, fast=fast, slow=slow, signal=signal)
 
+    if macd_df is None:
+        # Insufficient data or all-constant prices — fall back to pure-pandas MACD.
+        fast_ema = combined.ewm(span=fast, adjust=False).mean()
+        slow_ema = combined.ewm(span=slow, adjust=False).mean()
+        macd_raw = fast_ema - slow_ema
+        signal_raw = macd_raw.ewm(span=signal, adjust=False).mean()
+        hist_raw = macd_raw - signal_raw
+        macd_col_name = f"MACD_{fast}_{slow}_{signal}"
+        signal_col_name = f"MACDs_{fast}_{slow}_{signal}"
+        hist_col_name = f"MACDh_{fast}_{slow}_{signal}"
+        macd_df = pd.DataFrame({
+            macd_col_name: macd_raw,
+            signal_col_name: signal_raw,
+            hist_col_name: hist_raw,
+        })
+
     # Extract only the current period data
     result_len = len(data)
 
