@@ -18,10 +18,15 @@ def client():
 
 @pytest.fixture
 def cleanup():
-    """Clean up test data."""
-    yield
-    # Clean up test conversation files
+    """Clean up test data before and after test."""
+    # Clean up BEFORE test (in case of leftover data)
     test_dir = Path.home() / ".cresus" / "db" / "portfolios" / "test_portfolio"
+    if test_dir.exists():
+        shutil.rmtree(test_dir)
+
+    yield
+
+    # Clean up AFTER test
     if test_dir.exists():
         shutil.rmtree(test_dir)
 
