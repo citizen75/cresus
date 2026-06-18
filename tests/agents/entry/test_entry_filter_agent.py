@@ -149,24 +149,8 @@ class TestEntryFilterAgent(unittest.TestCase):
 		self.assertEqual(result["output"]["passed_count"], 2)
 		self.assertEqual(result["output"]["filtered_count"], 0)
 
-	@patch("src.agents.entry.sub_agents.entry_filter_agent.StrategyManager")
-	def test_process_filter_some_recommendations(self, mock_strategy_manager_class):
+	def test_process_filter_some_recommendations(self):
 		"""Test filtering when some recommendations are blocked."""
-		mock_manager = MagicMock()
-		mock_manager.load_strategy.return_value = {
-			"status": "success",
-			"data": {
-				"entry": {
-					"parameters": {
-						"entry_filter": {
-							"formula": "close[0] > 101"
-						}
-					}
-				}
-			}
-		}
-		mock_strategy_manager_class.return_value = mock_manager
-
 		# Create test data
 		df_pass = pd.DataFrame({
 			"close": [104, 103, 102, 101, 100],  # Most recent is 104
@@ -180,10 +164,19 @@ class TestEntryFilterAgent(unittest.TestCase):
 			"PASS": df_pass,
 			"FAIL": df_fail,
 		})
-		self.context.set("watchlist", [
-			{"ticker": "PASS", "score": 80},
-			{"ticker": "FAIL", "score": 75},
-		])
+		self.context.set("watchlist", {
+    "PASS": {"score": 80},
+    "FAIL": {"score": 75},
+        })
+		self.context.set("strategy_config", {
+			"entry": {
+				"parameters": {
+					"entry_filter": {
+						"formula": "close[0] > 101"
+					}
+				}
+			}
+		})
 
 		result = self.agent.process({})
 
@@ -194,7 +187,7 @@ class TestEntryFilterAgent(unittest.TestCase):
 		# Verify context was updated
 		filtered_recs = self.context.get("watchlist")
 		self.assertEqual(len(filtered_recs), 1)
-		self.assertEqual(filtered_recs[0]["ticker"], "PASS")
+		self.assertIn("PASS", filtered_recs)
 
 	@patch("src.agents.entry.sub_agents.entry_filter_agent.StrategyManager")
 	def test_process_no_data_for_ticker(self, mock_strategy_manager_class):
@@ -216,9 +209,9 @@ class TestEntryFilterAgent(unittest.TestCase):
 
 		self.context.set("strategy_name", "test_strategy")
 		self.context.set("data_history", {})  # No data
-		self.context.set("watchlist", [
-			{"ticker": "TEST", "score": 80},
-		])
+		self.context.set("watchlist", {
+    "TEST": {"score": 80},
+        })
 
 		result = self.agent.process({})
 
@@ -252,9 +245,9 @@ class TestEntryFilterAgent(unittest.TestCase):
 		self.context.set("data_history", {
 			"TEST": empty_df,
 		})
-		self.context.set("watchlist", [
-			{"ticker": "TEST", "score": 80},
-		])
+		self.context.set("watchlist", {
+    "TEST": {"score": 80},
+        })
 
 		result = self.agent.process({})
 
@@ -292,9 +285,9 @@ class TestEntryFilterAgent(unittest.TestCase):
 		self.context.set("data_history", {
 			"TEST": df,
 		})
-		self.context.set("watchlist", [
-			{"ticker": "TEST", "score": 80},
-		])
+		self.context.set("watchlist", {
+    "TEST": {"score": 80},
+        })
 
 		result = self.agent.process({})
 
@@ -421,9 +414,9 @@ class TestEntryFilterAgent(unittest.TestCase):
 		self.context.set("data_history", {
 			"TEST": df,
 		})
-		self.context.set("watchlist", [
-			{"ticker": "TEST", "score": 80},
-		])
+		self.context.set("watchlist", {
+    "TEST": {"score": 80},
+        })
 
 		result = self.agent.process({})
 
@@ -458,9 +451,9 @@ class TestEntryFilterAgent(unittest.TestCase):
 		self.context.set("data_history", {
 			"TEST": df,
 		})
-		self.context.set("watchlist", [
-			{"ticker": "TEST", "score": 80},
-		])
+		self.context.set("watchlist", {
+    "TEST": {"score": 80},
+        })
 
 		result = self.agent.process({})
 
@@ -500,11 +493,11 @@ class TestEntryFilterAgent(unittest.TestCase):
 			"FAIL": df_fail,
 			"NO_DATA": df_no_data,
 		})
-		self.context.set("watchlist", [
-			{"ticker": "PASS", "score": 80},
-			{"ticker": "FAIL", "score": 75},
-			{"ticker": "NO_DATA", "score": 70},
-		])
+		self.context.set("watchlist", {
+    "PASS": {"score": 80},
+    "FAIL": {"score": 75},
+    "NO_DATA": {"score": 70},
+        })
 
 		result = self.agent.process({})
 
@@ -560,9 +553,9 @@ class TestEntryFilterAgentWithSingleEtf(unittest.TestCase):
 		self.context.set("data_history", {
 			"SPY": df,
 		})
-		self.context.set("watchlist", [
-			{"ticker": "SPY", "composite_score": 85},
-		])
+		self.context.set("watchlist", {
+    "SPY": {"composite_score": 85},
+        })
 
 		result = self.agent.process({})
 
@@ -603,9 +596,9 @@ class TestEntryFilterAgentWithSingleEtf(unittest.TestCase):
 		self.context.set("data_history", {
 			"SPY": df,
 		})
-		self.context.set("watchlist", [
-			{"ticker": "SPY", "composite_score": 85},
-		])
+		self.context.set("watchlist", {
+    "SPY": {"composite_score": 85},
+        })
 
 		result = self.agent.process({})
 
