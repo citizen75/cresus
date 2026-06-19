@@ -356,6 +356,7 @@ class BotsCommands:
 				return
 
 			table = Table(title=f"Watchlist: {name} ({len(df)} tickers)")
+			table.add_column("Rank", justify="right", style="dim")
 			table.add_column("Ticker", style="cyan")
 			table.add_column("Close", justify="right")
 			table.add_column("Score", justify="right", style="green")
@@ -367,7 +368,9 @@ class BotsCommands:
 				score = f"{score_val:.4f}" if score_val is not None and str(score_val) != "nan" else "-"
 				sig_raw = row.get("signals", "")
 				signals = str(sig_raw) if sig_raw and str(sig_raw) != "nan" else "-"
-				table.add_row(str(row["ticker"]), close, score, signals)
+				rank_val = row.get("rank")
+				rank = str(int(rank_val)) if rank_val is not None and str(rank_val) != "nan" else "-"
+				table.add_row(rank, str(row["ticker"]), close, score, signals)
 
 			self.console.print(table)
 
@@ -557,6 +560,7 @@ class BotsCommands:
 
 				elif step == "in_market":
 					result_table.add_row("Trades Executed", str(output.get("trades_executed", 0)))
+					result_table.add_row("Pending Orders", str(output.get("pending_orders", 0)))
 					result_table.add_row("P&L", f"${output.get('pnl', 0):,.2f}")
 					result_table.add_row("Open Positions", str(output.get("positions", 0)))
 
@@ -577,26 +581,28 @@ class BotsCommands:
 						for i, agent in enumerate(agents_list, 1):
 							self.console.print(f"  {i}. {agent}")
 
-					# Show watchlist if available
-					watchlist = output.get("watchlist", [])
-					if watchlist:
-						from tools.watchlist import WatchlistManager
-						wm = WatchlistManager(name, bot_dir=str(bot_dir))
-						wl_df = wm.load()
-						if wl_df is not None and not wl_df.empty:
-							table = Table(title=f"Watchlist: {name} ({len(wl_df)} tickers)")
-							table.add_column("Ticker", style="cyan")
-							table.add_column("Close", justify="right")
-							table.add_column("Score", justify="right", style="green")
-							table.add_column("Signals", style="dim")
-							for _, row in wl_df.iterrows():
-								close = f"{row['close']:.2f}" if row.get("close") is not None else "-"
-								score_val = row.get("score", row.get("signal_score"))
-								score = f"{score_val:.4f}" if score_val is not None and str(score_val) != "nan" else "-"
-								sig_raw = row.get("signals", "")
-								signals = str(sig_raw) if sig_raw and str(sig_raw) != "nan" else "-"
-								table.add_row(str(row["ticker"]), close, score, signals)
-							self.console.print(table)
+					# Show watchlist from saved CSV (saved before EntryAgent, always has the full list)
+					from tools.watchlist import WatchlistManager
+					wm = WatchlistManager(name, bot_dir=str(bot_dir))
+					wl_df = wm.load()
+					if wl_df is not None and not wl_df.empty:
+						self.console.print(f"\n[cyan]Watchlist:[/cyan]")
+						table = Table(title=f"Watchlist: {name} ({len(wl_df)} tickers)")
+						table.add_column("Ticker", style="cyan")
+						table.add_column("Close", justify="right")
+						table.add_column("Score", justify="right", style="green")
+						table.add_column("Rank", justify="right", style="dim")
+						table.add_column("Signals", style="dim")
+						for _, row in wl_df.head(5).iterrows():
+							close = f"{row['close']:.2f}" if row.get("close") is not None else "-"
+							score_val = row.get("score", row.get("signal_score"))
+							score = f"{score_val:.4f}" if score_val is not None and str(score_val) != "nan" else "-"
+							sig_raw = row.get("signals", "")
+							signals = str(sig_raw) if sig_raw and str(sig_raw) != "nan" else "-"
+							rank_val = row.get("rank")
+							rank = str(int(rank_val)) if rank_val is not None and str(rank_val) != "nan" else "-"
+							table.add_row(str(row["ticker"]), close, score, rank,signals)
+						self.console.print(table)
 
 					# Show alphas summary if available
 					alphas = output.get("alphas", {})
@@ -609,6 +615,42 @@ class BotsCommands:
 							preview = ", ".join(alpha_names[:5])
 							suffix = f" (+{len(alpha_names)-5} more)" if len(alpha_names) > 5 else ""
 							self.console.print(f"  {preview}{suffix}")
+
+					# Show entry orders if available
+					orders = output.get("orders", [])
+					if orders:
+						table = Table(title=f"Entry Orders ({len(orders)})")
+						table.add_column("Ticker", style="cyan")
+						table.add_column("Shares", justify="right")
+						table.add_column("Entry", justify="right")
+						table.add_column("Stop", justify="right", style="red")
+						table.add_column("Target", justify="right", style="green")
+						table.add_column("Method", style="dim")
+						for order in orders:
+							shares = str(order.get("shares", "-"))
+							entry = f"{order['entry_price']:.2f}" if order.get("entry_price") else "-"
+							stop = f"{order['stop_loss']:.2f}" if order.get("stop_loss") else "-"
+							target = f"{order['take_profit']:.2f}" if order.get("take_profit") else "-"
+							method = order.get("execution_method", "-")
+							table.add_row(str(order.get("ticker", "-")), shares, entry, stop, target, method)
+						self.console.print(table)
+
+					# Show exit orders if available
+					exit_orders = output.get("exit_orders", [])
+					if exit_orders:
+						table = Table(title=f"Exit Orders ({len(exit_orders)})")
+						table.add_column("Ticker", style="cyan")
+						table.add_column("Qty", justify="right")
+						table.add_column("Price", justify="right", style="yellow")
+						table.add_column("Type", style="red")
+						table.add_column("Method", style="dim")
+						for order in exit_orders:
+							qty = str(int(order.get("quantity", 0)))
+							price = f"{order['exit_price']:.2f}" if order.get("exit_price") else "-"
+							exit_type = order.get("exit_type", "-")
+							method = order.get("execution_method", "market")
+							table.add_row(str(order.get("ticker", "-")), qty, price, exit_type, method)
+						self.console.print(table)
 
 			else:
 				error_msg = result.get("message", "Unknown error")

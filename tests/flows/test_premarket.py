@@ -29,7 +29,7 @@ class TestPreMarketFlowInitialization:
         """Test that all required steps are created during initialization."""
         flow = PreMarketFlow("test_strategy")
 
-        # Should have 10 steps: strategy, data, alphas, watchlist, signals, ranking, entry, entry_order, save_watchlist, exit
+        # Should have 10 steps: strategy, data, alphas, watchlist, signals, ranking, entry, orders_entry, save_watchlist, exit
         assert len(flow.steps) >= 9, f"Expected at least 9 steps, got {len(flow.steps)}"
 
         step_names = [step["name"] for step in flow.steps]
@@ -41,7 +41,7 @@ class TestPreMarketFlowInitialization:
             "signals",
             "ranking",
             "entry",
-            "entry_order",
+            "orders_entry",
             "save_watchlist",
             "exit"
         ]
@@ -99,18 +99,18 @@ class TestPreMarketFlowProcess:
     @patch('agents.signals.agent.SignalsAgent')
     @patch('agents.watchlist_ranking.agent.WatchlistRankingAgent')
     @patch('agents.entry.agent.EntryAgent')
-    @patch('agents.entry_order.agent.EntryOrderAgent')
+    @patch('agents.orders_entry.agent.OrdersEntryAgent')
     @patch('agents.watchlist.save_agent.SaveWatchlistAgent')
-    @patch('agents.exit.agent.ExitAgent')
+    @patch('agents.orders_exit.agent.OrdersExitAgent')
     def test_process_with_valid_input(
-        self, mock_exit, mock_save, mock_entry_order, mock_entry,
+        self, mock_exit, mock_save, mock_orders_entry, mock_entry,
         mock_ranking, mock_signals, mock_watchlist, mock_alphas,
         mock_data, mock_strategy
     ):
         """Test that process returns success with valid input."""
         # Setup mocks to succeed
         for mock_obj in [mock_strategy, mock_data, mock_alphas, mock_watchlist,
-                        mock_signals, mock_ranking, mock_entry, mock_entry_order,
+                        mock_signals, mock_ranking, mock_entry, mock_orders_entry,
                         mock_save, mock_exit]:
             instance = MagicMock()
             instance.process.return_value = {"status": "success"}
@@ -220,11 +220,11 @@ class TestPreMarketFlowProcess:
 
             result = flow.process({})
 
-            # Result should have orders key initialized (empty list if no entry_order step result)
-            # or orders is added only if entry_order step produces results
+            # Result should have orders key initialized (empty list if no orders_entry step result)
+            # or orders is added only if orders_entry step produces results
             assert "status" in result
             assert result["status"] == "success"
-            # When mocking parent process, entry_order step won't execute, so orders may not be set
+            # When mocking parent process, orders_entry step won't execute, so orders may not be set
             if "orders" in result:
                 assert isinstance(result["orders"], list)
                 assert "orders_count" in result

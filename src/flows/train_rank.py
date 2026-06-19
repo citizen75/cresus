@@ -21,8 +21,8 @@ from agents.data.agent import DataAgent
 from agents.signals.agent import SignalsAgent
 from agents.watchlist_ranking.agent import WatchlistRankingAgent
 from agents.entry.agent import EntryAgent
-from agents.entry_order.agent import EntryOrderAgent
-from agents.exit.agent import ExitAgent
+from agents.orders_entry.agent import OrdersEntryAgent
+from agents.orders_exit.agent import OrdersExitAgent
 
 
 class TrainRankFlow(Flow):

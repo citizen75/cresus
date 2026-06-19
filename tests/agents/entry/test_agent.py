@@ -86,7 +86,7 @@ class TestEntryScoreAgent(unittest.TestCase):
 			"TICKER2": df.copy(),
 		}
 
-		self.context.set("watchlist", watchlist)
+		self.context.set("entries", watchlist)
 		self.context.set("data_history", data_history)
 
 		result = self.agent.process({})
@@ -195,10 +195,10 @@ class TestEntryRRAgent(unittest.TestCase):
 			"low": [98, 99, 100, 101, 102, 103, 102, 101, 100, 99, 98, 97],
 		})
 
-		watchlist = ["TICKER1"]
+		watchlist = {"TICKER1": {"price": 100}}
 		data_history = {"TICKER1": df.copy()}
 
-		self.context.set("watchlist", watchlist)
+		self.context.set("entries", watchlist)
 		self.context.set("data_history", data_history)
 
 		result = self.agent.process({})

@@ -91,6 +91,8 @@ class CronScheduler:
 					self._call_flow(job_config.target, job_config.params)
 				elif job_config.type == "agent":
 					self._call_agent(job_config.target, job_config.params)
+				elif job_config.type == "job":
+					self._call_job(job_config.target, job_config.params)
 				else:
 					raise ValueError(f"Unknown job type: {job_config.type}")
 
@@ -177,6 +179,30 @@ class CronScheduler:
 		# Execute agent
 		result = agent.process(params)
 		logger.info(f"Agent '{agent_name}' result: {result.get('status', 'unknown')}")
+
+	def _call_job(self, job_name: str, params: dict) -> None:
+		"""Call a Job (long-running task with its own job_dir/lifecycle tracking).
+
+		Args:
+			job_name: Name of the job
+			params: Job parameters
+		"""
+		from jobs.job_intraday import JobIntraday
+
+		# Map job names to job classes
+		job_classes = {
+			"intraday": JobIntraday,
+		}
+
+		if job_name not in job_classes:
+			raise ValueError(f"Unknown job: {job_name}")
+
+		job_class = job_classes[job_name]
+		job = job_class()
+
+		# Execute job (run() handles start/complete/fail lifecycle and metadata persistence)
+		result = job.run(params)
+		logger.info(f"Job '{job_name}' result: {result.get('status', 'unknown')}")
 
 	def _call_http(self, url: str, params: dict) -> None:
 		"""Make an HTTP request.

@@ -23,9 +23,11 @@ interface TradingChartProps {
   dailyChange?: number
   dailyChangePercent?: number
   isLoading?: boolean
+  controlsVisible?: boolean
+  onToggleControls?: () => void
 }
 
-export default function TradingChart({ timeframe, title = 'Price Chart', ticker, companyName: propsCompanyName, entryDate, exitDate, positions, selectedIndicators = new Set(), chartData: externalChartData, visibleWindow = '1Y', onCursorMove, currentPrice: propsCurrentPrice, dailyChange: propsDailyChange, dailyChangePercent: propsDailyChangePercent, isLoading = false }: TradingChartProps) {
+export default function TradingChart({ timeframe, title = 'Price Chart', ticker, companyName: propsCompanyName, entryDate, exitDate, positions, selectedIndicators = new Set(), chartData: externalChartData, visibleWindow = '1Y', onCursorMove, currentPrice: propsCurrentPrice, dailyChange: propsDailyChange, dailyChangePercent: propsDailyChangePercent, isLoading = false, controlsVisible, onToggleControls }: TradingChartProps) {
   const [chartData, setChartData] = useState<any[]>([])
   const [shaCandles, setShaCandles] = useState<any[]>([])
   const [showSHA10, setShowSHA10] = useState(true)
@@ -226,7 +228,7 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
   useEffect(() => {
     if (!containerRef.current) return
 
-    let resizeHandler: (() => void) | null = null
+    let resizeObserver: ResizeObserver | null = null
     let isMounted = true
 
     const setupChart = async () => {
@@ -646,16 +648,15 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
           }
         })
 
-        resizeHandler = () => {
+        resizeObserver = new ResizeObserver(() => {
           if (containerRef.current && chartRef.current) {
             chartRef.current.applyOptions({
               width: containerRef.current.clientWidth,
               height: containerRef.current.clientHeight,
             })
           }
-        }
-
-        window.addEventListener('resize', resizeHandler)
+        })
+        resizeObserver.observe(containerRef.current)
 
         // Store unsubscribe function for cleanup
         if (!chartRef.current) chartRef.current = {}
@@ -668,8 +669,8 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
 
     return () => {
       isMounted = false
-      if (resizeHandler) {
-        window.removeEventListener('resize', resizeHandler)
+      if (resizeObserver) {
+        resizeObserver.disconnect()
       }
       if (chartRef.current) {
         try {
@@ -795,12 +796,24 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
       {ticker && tickerData && (
         <div className="bg-slate-900 border-b border-slate-800 px-4 py-3">
           {/* Ticker and Company Name - Inline */}
-          <div className="mb-2 flex items-center gap-2">
-            <h2 className="text-lg font-bold text-white">
-              {ticker}
-            </h2>
-            {companyName && companyName !== ticker && (
-              <span className="text-sm text-slate-400">{companyName}</span>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-bold text-white">
+                {ticker}
+              </h2>
+              {companyName && companyName !== ticker && (
+                <span className="text-sm text-slate-400">{companyName}</span>
+              )}
+            </div>
+            {onToggleControls && (
+              <button
+                onClick={onToggleControls}
+                title={controlsVisible ? 'Hide controls' : 'Show controls'}
+                className="px-2 py-1 rounded text-xs font-medium bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white transition flex items-center gap-1 flex-shrink-0"
+              >
+                <span>⚙</span>
+                <span>{controlsVisible ? '▸' : '◂'}</span>
+              </button>
             )}
           </div>
           {/* OHLCV Data Line - Shows hover data if cursor is over chart, otherwise daily data */}
@@ -838,21 +851,33 @@ export default function TradingChart({ timeframe, title = 'Price Chart', ticker,
       {/* Fallback header if no tickerData */}
       {ticker && !tickerData && (
         <div className="bg-slate-900 border-b border-slate-800 px-4 py-3">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center gap-2">
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-bold text-white">
                 {companyName || ticker}
               </h2>
               <span className="text-sm text-slate-400">{ticker}</span>
             </div>
-            <div className="text-right">
-              <div className="text-sm text-white">
-                {currentPrice ? `${currentPrice.toFixed(3)}` : 'N/A'}
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <div className="text-sm text-white">
+                  {currentPrice ? `${currentPrice.toFixed(3)}` : 'N/A'}
+                </div>
+                <div className={`text-sm ${dailyChangePercent !== undefined && dailyChangePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {dailyChange !== undefined ? `${dailyChange >= 0 ? '+' : ''}${dailyChange.toFixed(3)}` : 'N/A'}
+                  {dailyChangePercent !== undefined ? ` ${dailyChangePercent >= 0 ? '+' : ''}${dailyChangePercent.toFixed(2)}%` : ''}
+                </div>
               </div>
-              <div className={`text-sm ${dailyChangePercent !== undefined && dailyChangePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {dailyChange !== undefined ? `${dailyChange >= 0 ? '+' : ''}${dailyChange.toFixed(3)}` : 'N/A'}
-                {dailyChangePercent !== undefined ? ` ${dailyChangePercent >= 0 ? '+' : ''}${dailyChangePercent.toFixed(2)}%` : ''}
-              </div>
+              {onToggleControls && (
+                <button
+                  onClick={onToggleControls}
+                  title={controlsVisible ? 'Hide controls' : 'Show controls'}
+                  className="px-2 py-1 rounded text-xs font-medium bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white transition flex items-center gap-1 flex-shrink-0"
+                >
+                  <span>⚙</span>
+                  <span>{controlsVisible ? '▸' : '◂'}</span>
+                </button>
+              )}
             </div>
           </div>
         </div>

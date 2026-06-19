@@ -667,12 +667,19 @@ class PortfolioManager:
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
-    def get_portfolio_orders(self, portfolio_name: str) -> Dict[str, Any]:
-        """Get pending and executed orders for a portfolio."""
+    def get_portfolio_orders(self, portfolio_name: str, bot_dir: Optional[str] = None) -> Dict[str, Any]:
+        """Get pending and executed orders for a portfolio.
+
+        Args:
+            portfolio_name: Portfolio (or bot) name
+            bot_dir: When set, load orders.csv from this bot directory instead of
+                the default db/local/orders/ store (mirrors Orders' own bot_dir handling)
+        """
         from tools.portfolio.orders import Orders
 
         try:
-            orders_mgr = Orders(portfolio_name)
+            context = {"bot_dir": bot_dir} if bot_dir else None
+            orders_mgr = Orders(portfolio_name, context=context)
             all_orders = orders_mgr.to_orders()
 
             if not all_orders:
@@ -684,6 +691,7 @@ class PortfolioManager:
                 api_order = {
                     "id": order["id"][:8],
                     "ticker": order["ticker"],
+                    "operation": order["operation"],
                     "shares": order["quantity"],
                     "entryPrice": order["entry_price"],
                     "executionMethod": order["execution_method"],

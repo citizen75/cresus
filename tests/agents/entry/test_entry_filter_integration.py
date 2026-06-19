@@ -82,7 +82,7 @@ class TestEntryFilterIntegration(unittest.TestCase):
 
 		self.context.set("strategy_name", "single_etf")
 		self.context.set("data_history", {"SPY": df})
-		self.context.set("watchlist", {"SPY": recommendations[0]})
+		self.context.set("entries", {"SPY": recommendations[0]})
 		self.context.set("entry_recommendations", recommendations)
 		self._setup_context_with_formula("sha_10_green[-1] == 1 and ema_20[0] < close[0] and adx_14[0] > 20")
 
@@ -135,7 +135,7 @@ class TestEntryFilterIntegration(unittest.TestCase):
 
 		self.context.set("strategy_name", "single_etf")
 		self.context.set("data_history", {"SPY": df})
-		self.context.set("watchlist", {"SPY": recommendations[0]})
+		self.context.set("entries", {"SPY": recommendations[0]})
 		self.context.set("entry_recommendations", recommendations)
 		self._setup_context_with_formula("sha_10_green[-1] == 1 and ema_20[0] < close[0] and adx_14[0] > 20")
 
@@ -185,7 +185,7 @@ class TestEntryFilterIntegration(unittest.TestCase):
 
 		self.context.set("strategy_name", "single_etf")
 		self.context.set("data_history", {"SPY": df})
-		self.context.set("watchlist", {"SPY": recommendations[0]})
+		self.context.set("entries", {"SPY": recommendations[0]})
 		self.context.set("entry_recommendations", recommendations)
 		self._setup_context_with_formula("sha_10_green[-1] == 1 and ema_20[0] < close[0] and adx_14[0] > 20")
 
@@ -234,7 +234,7 @@ class TestEntryFilterIntegration(unittest.TestCase):
 
 		self.context.set("strategy_name", "single_etf")
 		self.context.set("data_history", {"SPY": df})
-		self.context.set("watchlist", {"SPY": recommendations[0]})
+		self.context.set("entries", {"SPY": recommendations[0]})
 		self.context.set("entry_recommendations", recommendations)
 		self._setup_context_with_formula("sha_10_green[-1] == 1 and ema_20[0] < close[0] and adx_14[0] > 20")
 
@@ -299,7 +299,7 @@ class TestEntryFilterIntegration(unittest.TestCase):
 			"WEAK_ADX": df_weak_adx,
 			"PRICE_LOW": df_price_low,
 		})
-		self.context.set("watchlist", {
+		self.context.set("entries", {
 			"GOOD": recommendations[0],
 			"WEAK_ADX": recommendations[1],
 			"PRICE_LOW": recommendations[2],
@@ -351,7 +351,7 @@ class TestEntryFilterIntegration(unittest.TestCase):
 
 		self.context.set("strategy_name", "single_etf")
 		self.context.set("data_history", {"SPY": df})
-		self.context.set("watchlist", {"SPY": recommendations[0]})
+		self.context.set("entries", {"SPY": recommendations[0]})
 		self.context.set("entry_recommendations", recommendations)
 		self._setup_context_with_formula("sha_10_green[-1] == 1 and ema_20[0] < close[0] and adx_14[0] > 20")
 

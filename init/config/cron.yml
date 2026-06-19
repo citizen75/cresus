@@ -70,3 +70,12 @@ jobs:
     target: "http://localhost:8000/api/alerts/sha_red/run"
     params:
       method: POST
+
+  # Run in_market step for every active bot
+  - name: intraday
+    description: "Run BotFinance in_market step for all active bots (executes pending orders, manages exits)"
+    enabled: true
+    schedule: "*/35 9-18 * * 1-5"  # Every 35 minutes, 9:00-18:00, Monday-Friday
+    type: job
+    target: "intraday"
+    params: {}

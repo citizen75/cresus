@@ -45,7 +45,7 @@ class TestFormulaChanges(unittest.TestCase):
 
 		self.context.set("strategy_name", "test_strategy")
 		self.context.set("data_history", {"TEST": df})
-		self.context.set("watchlist", {"TEST": {"ticker": "TEST"}})
+		self.context.set("entries", {"TEST": {"ticker": "TEST"}})
 		self.context.set("entry_recommendations", [{"ticker": "TEST"}])
 		self.context.set("strategy_config", {
 			"entry": {
@@ -79,7 +79,7 @@ class TestFormulaChanges(unittest.TestCase):
 		}
 
 		# Reset context but keep data
-		self.context.set("watchlist", {"TEST": {"ticker": "TEST"}})
+		self.context.set("entries", {"TEST": {"ticker": "TEST"}})
 		self.context.set("entry_recommendations", [{"ticker": "TEST"}])
 		self.context.set("strategy_config", {
 			"entry": {
@@ -123,7 +123,7 @@ class TestFormulaChanges(unittest.TestCase):
 
 		self.context.set("strategy_name", "test_strategy")
 		self.context.set("data_history", {"TEST": df})
-		self.context.set("watchlist", {"TEST": {"ticker": "TEST"}})
+		self.context.set("entries", {"TEST": {"ticker": "TEST"}})
 		self.context.set("entry_recommendations", [{"ticker": "TEST"}])
 		self.context.set("strategy_config", {
 			"entry": {
@@ -152,7 +152,7 @@ class TestFormulaChanges(unittest.TestCase):
 			}
 		}
 
-		self.context.set("watchlist", {"TEST": {"ticker": "TEST"}})
+		self.context.set("entries", {"TEST": {"ticker": "TEST"}})
 		self.context.set("entry_recommendations", [{"ticker": "TEST"}])
 		self.context.set("strategy_config", {
 			"entry": {
@@ -180,7 +180,7 @@ class TestFormulaChanges(unittest.TestCase):
 			}
 		}
 
-		self.context.set("watchlist", {"TEST": {"ticker": "TEST"}})
+		self.context.set("entries", {"TEST": {"ticker": "TEST"}})
 		self.context.set("entry_recommendations", [{"ticker": "TEST"}])
 		self.context.set("strategy_config", {
 			"entry": {

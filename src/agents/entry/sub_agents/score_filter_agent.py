@@ -44,7 +44,7 @@ class ScoreFilterAgent(Agent):
 			}
 
 		# Get data from context
-		watchlist = self.context.get("watchlist") or {}
+		watchlist = self.context.get("entries") or {}
 		entry_scores = self.context.get("entry_scores") or {}
 
 		if not watchlist:
@@ -74,7 +74,7 @@ class ScoreFilterAgent(Agent):
 				self.logger.debug(f"[SCORE-FILTER] {ticker}: BLOCKED (score {score:.2f} < min {min_score})")
 
 		# Update context with filtered watchlist
-		self.context.set("watchlist", filtered_watchlist)
+		self.context.set("entries", filtered_watchlist)
 
 		# Log summary
 		self.logger.info(f"[SCORE-FILTER] Results: {len(filtered_watchlist)} passed, {blocked_count} blocked")

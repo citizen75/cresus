@@ -24,6 +24,7 @@ interface ResultsWidgetProps {
   onBuy?: (ticker: string) => void // Buy button callback
   onDeleteRow?: (ticker: string) => Promise<void>
   watchlistName?: string
+  onSelectTicker?: (ticker: string) => void // When provided, row/card clicks call this instead of opening the internal chart modal
 }
 
 // Persistent cache across component remounts
@@ -53,9 +54,18 @@ export default function ResultsWidget({
   onBuy,
   onDeleteRow,
   watchlistName,
+  onSelectTicker,
 }: ResultsWidgetProps) {
   const [viewMode, setViewMode] = useState<'table' | 'charts'>(externalViewMode || 'table')
   const [selectedTickerForChart, setSelectedTickerForChart] = useState<string | null>(null)
+
+  const handleSelectTicker = (ticker: string) => {
+    if (onSelectTicker) {
+      onSelectTicker(ticker)
+    } else {
+      setSelectedTickerForChart(ticker)
+    }
+  }
   const [addingToWatchlist, setAddingToWatchlist] = useState<Set<string>>(new Set())
   const [deletingTicker, setDeletingTicker] = useState<string | null>(null)
 
@@ -337,7 +347,7 @@ export default function ResultsWidget({
               {sortedData.map((row, idx) => (
                 <tr
                   key={idx}
-                  onClick={() => setSelectedTickerForChart(row.ticker)}
+                  onClick={() => handleSelectTicker(row.ticker)}
                   className="hover:bg-slate-800/50 cursor-pointer transition"
                 >
                   {columns.map((col) => {
@@ -471,7 +481,7 @@ export default function ResultsWidget({
                       e.preventDefault()
                       e.stopPropagation()
                       logger.debug(`[ResultsWidget] Chart clicked: ${ticker}`)
-                      setSelectedTickerForChart(ticker)
+                      handleSelectTicker(ticker)
                     }}
                     className="bg-slate-800 rounded-lg overflow-hidden border border-slate-700 flex flex-col h-full cursor-pointer hover:border-slate-600 transition"
                   >

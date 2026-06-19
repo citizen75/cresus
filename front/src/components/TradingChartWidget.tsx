@@ -23,6 +23,7 @@ export default function TradingChartWidget({
   const [selectedIndicators, setSelectedIndicators] = useState<Set<string>>(new Set(['RSI 14', 'MACD']))
   const [chartType, setChartType] = useState('Candlestick')
   const [hoverData, setHoverData] = useState<any>(null)
+  const [controlsVisible, setControlsVisible] = useState(false)
 
   // Use centralized data loader
   const { loadData } = useHistoricalDataLoader()
@@ -37,6 +38,11 @@ export default function TradingChartWidget({
 
   // Load chart data on mount or when ticker changes
   useEffect(() => {
+    if (!ticker) {
+      setChartData([])
+      return
+    }
+
     // Skip if we're already fetching this ticker
     if (fetchingTickerRef.current === ticker) return
 
@@ -119,12 +125,14 @@ export default function TradingChartWidget({
             onCursorMove={setHoverData}
             chartData={chartData}
             isLoading={isLoading}
+            controlsVisible={showControls ? controlsVisible : undefined}
+            onToggleControls={showControls ? () => setControlsVisible(!controlsVisible) : undefined}
           />
         </div>
       </div>
 
-      {/* Right - Controls */}
-      {showControls && (
+      {/* Right - Controls (Timeframe, Window, Indicators) */}
+      {showControls && controlsVisible && (
         <TradingChartControlsWidget
           timeframe={timeframe}
           onTimeframeChange={setTimeframe}

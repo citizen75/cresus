@@ -143,9 +143,12 @@ class WatchlistRankingAgent(Agent):
 					first_data = watchlist[first_ticker]
 					self.logger.info(f"[WATCHLIST-RANKING] First ticker '{first_ticker}' data keys: {list(first_data.keys())}")
 
-				# Sort dict by ranking_score descending (convert to ordered dict-like structure)
+				# Sort dict by ranking_score descending, then stamp rank position
 				sorted_items = sorted(watchlist.items(), key=lambda x: x[1].get("ranking_score", 0) if isinstance(x[1], dict) else 0, reverse=True)
-				sorted_watchlist = {ticker: data for ticker, data in sorted_items}
+				sorted_watchlist = {}
+				for rank, (ticker, data) in enumerate(sorted_items, start=1):
+					data["rank"] = rank
+					sorted_watchlist[ticker] = data
 				self.context.set("watchlist", sorted_watchlist)
 				self.logger.info(f"[WATCHLIST-RANKING] Updated watchlist: {len(sorted_watchlist)} tickers ranked by LGBM scores")
 
@@ -159,8 +162,11 @@ class WatchlistRankingAgent(Agent):
 						score = scores.get(ticker, 0)
 						item["ranking_score"] = float(score) if score is not None else 0
 
-				# Sort list by ranking_score descending
+				# Sort list by ranking_score descending, then stamp rank position
 				sorted_watchlist = sorted(watchlist, key=lambda x: x.get("ranking_score", 0) if isinstance(x, dict) else 0, reverse=True)
+				for rank, item in enumerate(sorted_watchlist, start=1):
+					if isinstance(item, dict):
+						item["rank"] = rank
 				self.context.set("watchlist", sorted_watchlist)
 				self.logger.info(f"[WATCHLIST-RANKING] Updated watchlist: {len(sorted_watchlist)} tickers ranked by LGBM scores")
 

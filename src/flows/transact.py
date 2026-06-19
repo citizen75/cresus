@@ -11,7 +11,7 @@ if str(src_path) not in sys.path:
 	sys.path.insert(0, str(src_path))
 
 from core.flow import Flow
-from agents.transact.agent import TransactAgent
+from agents.trading_broker.agent import TradingBroker
 from tools.portfolio.orders import Orders
 
 
@@ -69,7 +69,7 @@ class TransactFlow(Flow):
 		self.context.set("date", trading_date)
 		self.context.set("portfolio_name", portfolio_name)
 
-		# Set strategy_name in context if provided (needed by TransactAgent for take_profit check)
+		# Set strategy_name in context if provided (needed by TradingBroker for take_profit check)
 		if strategy_name:
 			self.context.set("strategy_name", strategy_name)
 			# Load and set strategy_config for exit agents (especially ExitConditionAgent)
@@ -92,14 +92,14 @@ class TransactFlow(Flow):
 		# If day data not available (not in backtest), construct minimal day_data
 		# This allows TransactFlow to work both in backtest and live scenarios
 		if not next_day_data:
-			self.logger.warning(f"No pre-loaded day data for {trading_date} - TransactAgent will use available data")
+			self.logger.warning(f"No pre-loaded day data for {trading_date} - TradingBroker will use available data")
 
-		# Store day data in context for TransactAgent
+		# Store day data in context for TradingBroker
 		self.context.set("day_data", next_day_data)
 
 		# Step 3: Execute pending orders and exits with day data
-		# NOTE: Always run TransactAgent to check for exits, even without pending buy orders
-		transact_agent = TransactAgent("TransactAgent", self.context)
-		result = transact_agent.process(flow_input)
+		# NOTE: Always run TradingBroker to check for exits, even without pending buy orders
+		trading_broker = TradingBroker("TradingBroker", self.context)
+		result = trading_broker.process(flow_input)
 
 		return result

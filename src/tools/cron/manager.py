@@ -69,8 +69,8 @@ class CronManager:
 		if not name or not schedule or not target:
 			return False, "name, schedule, and target are required"
 
-		if job_type not in ("http", "shell_exec", "flow", "agent"):
-			return False, "job_type must be 'http', 'shell_exec', 'flow', or 'agent'"
+		if job_type not in ("http", "shell_exec", "flow", "agent", "job"):
+			return False, "job_type must be 'http', 'shell_exec', 'flow', 'agent', or 'job'"
 
 		if self.get_job(name):
 			return False, f"Job '{name}' already exists"
@@ -166,8 +166,8 @@ class CronManager:
 				return False, f"Invalid cron schedule: {e}"
 
 		# Validate type if provided
-		if job_type and job_type not in ("http", "shell_exec", "flow", "agent"):
-			return False, "job_type must be 'http', 'shell_exec', 'flow', or 'agent'"
+		if job_type and job_type not in ("http", "shell_exec", "flow", "agent", "job"):
+			return False, "job_type must be 'http', 'shell_exec', 'flow', 'agent', or 'job'"
 
 		# Update fields
 		if schedule is not None:

@@ -121,13 +121,12 @@ class WatchlistScoringAgent(Agent):
     def _evaluate_formula(self, formula: str, df: pd.DataFrame, ticker: str = "") -> float:
         """Evaluate scoring formula against a ticker's full DataFrame.
 
-        Uses evaluate_dsl_vectorized so DSL shift notation (e.g. chgpct_20[0])
-        is handled correctly.  Falls back to calculating missing indicators on
-        the fly before retrying (same pattern as WatchlistAlphasAgent).
+        Uses evaluate_dsl_vectorized (which normalises sort order internally) so
+        DSL shift notation and missing-indicator recovery both work correctly.
 
         Args:
             formula: DSL or arithmetic expression referencing column / alpha names
-            df: Full data_history DataFrame for the ticker
+            df: Full data_history DataFrame for the ticker (any sort order)
             ticker: Ticker symbol for error context
 
         Returns:
@@ -135,13 +134,6 @@ class WatchlistScoringAgent(Agent):
         """
         from src.tools.formula.dsl_parser import evaluate_dsl_vectorized
         from src.tools.indicators import calculate
-
-        # data_history is newest-first; normalise to ascending so _latest
-        # (which uses iloc[-1]) always returns the most recent bar.
-        date_col = next((c for c in df.columns if c.lower() in ("date", "timestamp")), None)
-        if date_col and len(df) > 1:
-            if pd.to_datetime(df[date_col].iloc[0]) > pd.to_datetime(df[date_col].iloc[-1]):
-                df = df.iloc[::-1].reset_index(drop=True)
 
         def _latest(series: pd.Series) -> float:
             valid = series.dropna()
@@ -170,3 +162,5 @@ class WatchlistScoringAgent(Agent):
 
         # Retry after recovery
         return _latest(evaluate_dsl_vectorized(formula, df))
+
+

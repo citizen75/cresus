@@ -14,6 +14,7 @@ interface PortfolioHoldingsWidgetProps {
   filterTickers?: string[] // Only show these tickers
   initialResults?: any[] // Pre-loaded results from message
   onGetHistoricalData?: (ticker: string, days: number) => Promise<any>
+  onSelectTicker?: (ticker: string) => void // When provided, row clicks call this instead of opening the internal chart modal
 }
 
 export default function PortfolioHoldingsWidget({
@@ -22,6 +23,7 @@ export default function PortfolioHoldingsWidget({
   filterTickers,
   initialResults,
   onGetHistoricalData,
+  onSelectTicker,
 }: PortfolioHoldingsWidgetProps) {
   // Debug props
   console.log(`[PortfolioHoldingsWidget] Props:`, {
@@ -441,7 +443,11 @@ export default function PortfolioHoldingsWidget({
             selectedPosition={selectedPosition}
             onSelectPosition={(ticker) => {
               setSelectedPosition(ticker)
-              setChartModalTicker(ticker)
+              if (onSelectTicker) {
+                onSelectTicker(ticker)
+              } else {
+                setChartModalTicker(ticker)
+              }
             }}
             onBuy={handleBuy}
             onSell={handleSell}

@@ -21,8 +21,8 @@ from agents.data.agent import DataAgent
 from agents.signals.agent import SignalsAgent
 from agents.watchlist_ranking.agent import WatchlistRankingAgent
 from agents.entry.agent import EntryAgent
-from agents.entry_order.agent import EntryOrderAgent
-from agents.exit.agent import ExitAgent
+from agents.orders_entry.agent import OrdersEntryAgent
+from agents.orders_exit.agent import OrdersExitAgent
 
 
 class WatchlistFlow(Flow):
@@ -111,7 +111,7 @@ class WatchlistFlow(Flow):
 		flow_input["save_enabled"] = save
 
 		# Set portfolio name from strategy if not already set
-		# This allows EntryOrderAgent to execute orders in the correct portfolio
+		# This allows OrdersEntryAgent to execute orders in the correct portfolio
 		if "portfolio_name" not in flow_input:
 			# Transform strategy name to portfolio name format (e.g., momentum_cac → Momentum cac)
 			portfolio_name = self._strategy_to_portfolio_name(self.strategy_name)

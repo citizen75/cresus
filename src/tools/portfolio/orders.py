@@ -33,11 +33,13 @@ class Orders:
         if context:
             backtest_dir = context.get("backtest_dir")
 
+        bot_dir = context.get("bot_dir") if context else None
+
         if backtest_dir:
-            # Use sandboxed backtest directory
             self.filepath = Path(backtest_dir) / "orders" / f"{normalized_name}_orders.csv"
+        elif bot_dir:
+            self.filepath = Path(bot_dir) / "orders.csv"
         else:
-            # Use normal directory
             self.filepath = project_root / "db" / "local" / "orders" / f"{normalized_name}_orders.csv"
 
         self.filepath.parent.mkdir(parents=True, exist_ok=True)
@@ -320,6 +322,30 @@ class Orders:
         self.save(df)
         return True
 
+    def mark_executed_for_ticker(self, ticker: str) -> int:
+        """Mark all pending orders for a ticker as executed.
+
+        Used by exit agents (target, time_limit) after recording a SELL
+        transaction directly in the journal, to keep the orders queue in sync.
+
+        Args:
+            ticker: Ticker symbol
+
+        Returns:
+            Number of orders marked as executed
+        """
+        pending = self.get_pending_orders()
+        if pending.empty:
+            return 0
+
+        count = 0
+        for _, order in pending.iterrows():
+            if str(order.get("ticker", "")).upper() == ticker.upper():
+                order_id = str(order.get("id", ""))
+                self.update_order_status(order_id, "executed")
+                count += 1
+        return count
+
     def remove_order(self, order_id: str) -> bool:
         """Remove an order (typically pending orders that are cancelled).
 
@@ -339,6 +365,55 @@ class Orders:
         df = df[df["id"] != order_id]
         self.save(df)
         return True
+
+    def parse_order_row(self, row: Any) -> Dict[str, Any]:
+        """Parse a single raw order row into typed fields.
+
+        load_df() reads the CSV with dtype=object so every value is a string
+        (e.g. quantity comes back as "213.0"). Casting these ad hoc with
+        int(value) at each call site breaks on the decimal point
+        (int("213.0") raises ValueError) - this is the single place that
+        does it correctly, for callers iterating over get_pending_orders()/
+        get_active_orders() rows during order execution.
+
+        Args:
+            row: A row from load_df()/get_pending_orders()/get_active_orders()
+
+        Returns:
+            Dict with id, ticker (upper), quantity (int), entry_price (float),
+            limit_price/stop_loss/take_profit/trailing_stop_distance (float or
+            None), execution_method (lower), operation (upper), and metadata
+            (parsed dict, {} if absent/invalid).
+        """
+        def _to_float(value: Any) -> Optional[float]:
+            if value in (None, "") or (isinstance(value, float) and pd.isna(value)):
+                return None
+            try:
+                return float(value)
+            except (ValueError, TypeError):
+                return None
+
+        metadata: Dict[str, Any] = {}
+        metadata_val = row.get("metadata", "")
+        if metadata_val and pd.notna(metadata_val):
+            try:
+                metadata = json.loads(metadata_val) if isinstance(metadata_val, str) else dict(metadata_val)
+            except (json.JSONDecodeError, TypeError):
+                metadata = {}
+
+        return {
+            "id": str(row.get("id", "")),
+            "ticker": str(row.get("ticker", "")).upper(),
+            "quantity": int(_to_float(row.get("quantity")) or 0),
+            "entry_price": _to_float(row.get("entry_price")) or 0.0,
+            "limit_price": _to_float(row.get("limit_price")),
+            "stop_loss": _to_float(row.get("stop_loss")),
+            "take_profit": _to_float(row.get("take_profit")),
+            "trailing_stop_distance": _to_float(row.get("trailing_stop_distance")),
+            "execution_method": str(row.get("execution_method", "market")).lower(),
+            "operation": str(row.get("operation", "BUY")).upper(),
+            "metadata": metadata,
+        }
 
     def to_orders(self) -> List[Dict[str, Any]]:
         """Return all orders as list of dicts."""

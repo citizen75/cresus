@@ -34,7 +34,7 @@ class EntryFilterAgent(Agent):
 			return validation_result
 
 		# Get watchlist and data from context
-		watchlist = self.context.get("watchlist") or {}
+		watchlist = self.context.get("entries") or {}
 		data_history = self.context.get("data_history") or {}
 		strategy_name = self.context.get("strategy_name")
 
@@ -140,7 +140,7 @@ class EntryFilterAgent(Agent):
 						blocked_count += 1
 
 			# Update context with filtered watchlist
-			self.context.set("watchlist", filtered_watchlist)
+			self.context.set("entries", filtered_watchlist)
 
 			# Also filter entry_recommendations if it exists (for backward compatibility)
 			entry_recs = self.context.get("entry_recommendations")
@@ -192,7 +192,7 @@ class EntryFilterAgent(Agent):
 			}
 
 		# Check if watchlist exists (can be empty dict but must exist)
-		if self.context.get("watchlist") is None:
+		if self.context.get("entries") is None:
 			self.logger.warning("watchlist not found in context")
 			return {
 				"status": "error",

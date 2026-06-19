@@ -28,7 +28,7 @@ class EntryScoreAgent(Agent):
 			input_data = {}
 
 		# Get watchlist and data history from context
-		watchlist = self.context.get("watchlist")
+		watchlist = self.context.get("entries")
 		data_history = self.context.get("data_history") or {}
 
 		if not watchlist:

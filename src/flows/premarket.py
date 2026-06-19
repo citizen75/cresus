@@ -21,8 +21,8 @@ from agents.data.agent import DataAgent
 from agents.signals.agent import SignalsAgent
 from agents.watchlist_ranking.agent import WatchlistRankingAgent
 from agents.entry.agent import EntryAgent
-from agents.entry_order.agent import EntryOrderAgent
-from agents.exit.agent import ExitAgent
+from agents.orders_entry.agent import OrdersEntryAgent
+from agents.orders_exit.agent import OrdersExitAgent
 
 
 class PreMarketFlow(Flow):
@@ -104,8 +104,8 @@ class PreMarketFlow(Flow):
 		self.add_step(entry_agent, step_name="entry", required=True)
 
 		# Entry order step - convert entry signals to executable orders
-		entry_order_agent = EntryOrderAgent("EntryOrderAgent", self.context)
-		self.add_step(entry_order_agent, step_name="entry_order", required=True)
+		orders_entry_agent = OrdersEntryAgent("OrdersEntryAgent", self.context)
+		self.add_step(orders_entry_agent, step_name="orders_entry", required=True)
 
 		# Save watchlist step - persist watchlist to disk with OHLCV and signal data
 		save_agent = SaveWatchlistAgent("SaveWatchlistAgent", self.strategy_name, context=self.context)
@@ -113,7 +113,7 @@ class PreMarketFlow(Flow):
 
 		# Exit analysis step - evaluate exit conditions and generate SELL orders
 		# Runs after entry orders are created
-		exit_agent = ExitAgent("ExitAgent", self.context)
+		exit_agent = OrdersExitAgent("OrdersExitAgent", self.context)
 		self.add_step(exit_agent, step_name="exit", required=True)
 
 	def process(self, input_data: Optional[Dict[str, Any]] = None, save: bool = True) -> Dict[str, Any]:
@@ -134,7 +134,7 @@ class PreMarketFlow(Flow):
 		flow_input["save_enabled"] = save
 
 		# Set portfolio name from strategy if not already set
-		# This allows EntryOrderAgent to execute orders in the correct portfolio
+		# This allows OrdersEntryAgent to execute orders in the correct portfolio
 		if "portfolio_name" not in flow_input:
 			# Transform strategy name to portfolio name format (e.g., momentum_cac → Momentum cac)
 			portfolio_name = self._strategy_to_portfolio_name(self.strategy_name)
@@ -201,11 +201,11 @@ class PreMarketFlow(Flow):
 			result["target_date"] = target_date
 
 		# Extract final orders - renamed from executable_orders for clarity
-		entry_order_step = self.get_step("entry_order")
-		if entry_order_step:
-			entry_order_result = entry_order_step.get("result")
-			if entry_order_result and entry_order_result.get("status") == "success":
-				output = entry_order_result.get("output", {})
+		orders_entry_step = self.get_step("orders_entry")
+		if orders_entry_step:
+			orders_entry_result = orders_entry_step.get("result")
+			if orders_entry_result and orders_entry_result.get("status") == "success":
+				output = orders_entry_result.get("output", {})
 				orders = output.get("orders") or []
 				result["orders"] = orders
 				# Also keep executable_orders for backward compatibility with CLI

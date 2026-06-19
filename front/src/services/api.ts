@@ -494,6 +494,51 @@ class CresusAPI {
   async getWatchlistTickers(watchlistName: string) {
     return (await this.client.get(`/watchlists/${watchlistName}/tickers`)).data
   }
+
+  // Bot management
+  async listBots(state?: 'active' | 'inactive') {
+    return (await this.client.get('/bots', { params: state ? { state } : {} })).data
+  }
+
+  async getBotsSummary() {
+    return (await this.client.get('/bots/summary')).data
+  }
+
+  async createBot(data: { name: string; strategy: string }) {
+    return (await this.client.post('/bots', data)).data
+  }
+
+  async getBot(name: string) {
+    return (await this.client.get(`/bots/${name}`)).data
+  }
+
+  async deleteBot(name: string) {
+    return (await this.client.delete(`/bots/${name}`)).data
+  }
+
+  async activateBot(name: string) {
+    return (await this.client.post(`/bots/${name}/activate`)).data
+  }
+
+  async deactivateBot(name: string) {
+    return (await this.client.post(`/bots/${name}/deactivate`)).data
+  }
+
+  async runBot(name: string, params?: Record<string, any>) {
+    return (await this.longTimeoutClient.post(`/bots/${name}/run`, params || {})).data
+  }
+
+  async getBotWatchlist(name: string, limit?: number) {
+    return (await this.client.get(`/bots/${name}/watchlist`, { params: limit ? { limit } : {} })).data
+  }
+
+  async getBotPositions(name: string) {
+    return (await this.client.get(`/bots/${name}/positions`)).data
+  }
+
+  async getBotOrders(name: string) {
+    return (await this.client.get(`/bots/${name}/orders`)).data
+  }
 }
 
 export const api = new CresusAPI()

@@ -468,13 +468,15 @@ def evaluate_dsl_vectorized(formula: str, data: pd.DataFrame) -> pd.Series:
 	"""Vectorized DSL evaluation using pandas operations.
 
 	Pre-creates shifted columns and evaluates formula on entire DataFrame using pd.eval.
+	Accepts data in any sort order; normalises to ascending internally so shift logic
+	and callers that use iloc[-1] for the latest bar work correctly.
 
 	Args:
 		formula: DSL formula string (e.g., "close[0] > ema_5[0]")
-		data: DataFrame sorted ascending by date (newest last)
+		data: DataFrame (any sort order — auto-normalised to ascending)
 
 	Returns:
-		pd.Series of boolean/numeric results for each row
+		pd.Series of boolean/numeric results for each row, sorted ascending
 
 	Raises:
 		ValueError: If vectorized evaluation fails
@@ -484,6 +486,16 @@ def evaluate_dsl_vectorized(formula: str, data: pd.DataFrame) -> pd.Series:
 
 	if not isinstance(data, pd.DataFrame) or data.empty:
 		raise ValueError("Data must be a non-empty DataFrame")
+
+	# Normalise to ascending (oldest first, newest last) so shift logic and
+	# _latest(series.iloc[-1]) both return the correct most-recent value.
+	date_col = next(
+		(c for c in data.columns if str(c).lower() in ('timestamp', 'date', 'datetime')),
+		None,
+	)
+	if date_col and len(data) > 1:
+		if pd.to_datetime(data[date_col].iloc[0]) > pd.to_datetime(data[date_col].iloc[-1]):
+			data = data.iloc[::-1].reset_index(drop=True)
 
 	# Create working copy with lowercase column names
 	data_work = data.copy()

@@ -34,7 +34,7 @@ class PositionDuplicateFilterAgent(Agent):
 		if input_data is None:
 			input_data = {}
 
-		watchlist = self.context.get("watchlist") or {}
+		watchlist = self.context.get("entries") or {}
 		entry_recommendations = self.context.get("entry_recommendations") or []
 
 		# Convert entry_recommendations to watchlist format if needed
@@ -125,7 +125,7 @@ class PositionDuplicateFilterAgent(Agent):
 				self.logger.debug(f"[ENTRY-DUP-FILTER] {ticker}: PASSED (new position)")
 
 		# Update context with filtered watchlist and entry_recommendations
-		self.context.set("watchlist", filtered_watchlist)
+		self.context.set("entries", filtered_watchlist)
 		self.context.set("filtered_duplicate_items", filtered_items)
 
 		# Also update entry_recommendations if it exists (for backward compatibility)

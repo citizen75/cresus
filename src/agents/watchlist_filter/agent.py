@@ -50,16 +50,7 @@ class WatchlistFilterAgent(Agent):
 			filter_flow.add_step(FilterOpenPositionsAgent("FilterOpenPositions"), required=False)
 		filter_flow.process(input_data)
 
-		# Sort by current ticker_scores["score"] so MaxTickersAgent
-		# keeps the top-N by formula score, not by prior LGBM ranking order.
-		self._sort_by_score()
 
-		# Cap to max_count
-		MaxTickersAgent(
-			"MaxTickers",
-			max_tickers=params["max_count"],
-			context=self.context,
-		).run(input_data={})
 
 		watchlist = self.context.get("watchlist") or {}
 		self.logger.info(f"[FILTER] {len(watchlist)} tickers (max={params['max_count']})")

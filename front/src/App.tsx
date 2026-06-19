@@ -8,6 +8,8 @@ import Layout from '@/components/Layout'
 import Dashboard from '@/pages/Dashboard'
 import Portfolios from '@/pages/Portfolios'
 import PortfolioDetail from '@/pages/PortfolioDetail'
+import Bots from '@/pages/Bots'
+import BotDetail from '@/pages/BotDetail'
 import HoldingsPage from '@/pages/HoldingsPage'
 import TransactionsPage from '@/pages/TransactionsPage'
 import StrategiesList from '@/pages/StrategiesList'
@@ -48,6 +50,8 @@ export default function App() {
           <Route path="/portfolios/:name/holdings" element={<Layout><HoldingsPage /></Layout>} />
           <Route path="/portfolios/:name/holdings/transactions" element={<Layout><TransactionsPage /></Layout>} />
           <Route path="/portfolios/:name/transactions" element={<Layout><TransactionsPage /></Layout>} />
+          <Route path="/bots" element={<Layout><Bots /></Layout>} />
+          <Route path="/bots/:name" element={<Layout><BotDetail /></Layout>} />
           <Route path="/strategies" element={<Layout><StrategiesList /></Layout>} />
           <Route path="/strategies/:name" element={<Layout><StrategyDetail /></Layout>} />
           <Route path="/strategies/:name/backtests" element={<Layout><StrategyBacktests /></Layout>} />

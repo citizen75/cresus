@@ -8,6 +8,7 @@ const menuItems = [
   { icon: '🏠', label: 'Home', path: '/' },
   { icon: '✅', label: 'Tasks', path: '/tasks' },
   { icon: '💼', label: 'Portfolios', path: '/portfolios' },
+  { icon: '🤖', label: 'Bots', path: '/bots' },
   { icon: '🎯', label: 'Strategies', path: '/strategies' },
   { icon: '📊', label: 'Insights', path: '/insights' },
   { icon: '🔍', label: 'Screener', path: '/screener' },

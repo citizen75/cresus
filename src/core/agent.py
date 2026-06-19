@@ -1,7 +1,7 @@
 """Agent base class for Cresus."""
 
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from .context import AgentContext
 from .logger import AgentLogger
 
@@ -35,6 +35,7 @@ class Agent:
 		if not self.context.get("logger"):
 			self.context.set("logger", AgentLogger(name))
 		self.logger = self.context.get("logger")
+		self.agents_executed: List[str] = []
 
 	def _format_log_message(self, message: str) -> str:
 		"""Format a log message with agent name prefix.
@@ -112,6 +113,7 @@ class Agent:
 				"message": "Input data must be a dictionary",
 			}
 
+		self.agents_executed = []
 		start_time = time.time()
 		response = None
 		try:
@@ -173,3 +175,42 @@ class Agent:
 			if ticker_count > 0:
 				metric_entry["ticker_count"] = ticker_count
 			metadata["agent_metrics"].append(metric_entry)
+
+	def _run_sub_agent(
+		self,
+		agent: "Agent",
+		input_data: Optional[Dict[str, Any]] = None,
+		*,
+		fatal: bool = True,
+	) -> Dict[str, Any]:
+		"""Run a sub-agent sharing this agent's context.
+
+		Injects the current context, records execution in agents_executed,
+		and handles errors according to the fatal flag.
+
+		Args:
+			agent: Sub-agent to run (context will be injected before run)
+			input_data: Optional input dict; sub-agents typically read from context
+			fatal: If True, raise RuntimeError on failure so the pipeline aborts.
+			       If False, log a warning and continue.
+
+		Returns:
+			Sub-agent response dict
+		"""
+		agent.context = self.context
+		name = agent.name
+		try:
+			self.logger.debug(f"[{name}] starting")
+			response = agent.run(input_data or {})
+			self.agents_executed.append(name)
+			if response.get("status") != STATUS_SUCCESS and fatal:
+				raise RuntimeError(response.get("message", f"{name} returned non-success"))
+			return response
+		except RuntimeError:
+			raise
+		except Exception as e:
+			self.agents_executed.append(name)
+			if fatal:
+				raise RuntimeError(f"{name} failed: {e}") from e
+			self.logger.warning(f"[{name}] non-fatal error: {e}")
+			return {"status": STATUS_ERROR, "message": str(e), "output": {}}

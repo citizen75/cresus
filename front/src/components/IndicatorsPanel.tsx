@@ -12,6 +12,8 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
   const macdContainerRef = useRef<HTMLDivElement>(null)
   const rsiChartRef = useRef<any>(null)
   const macdChartRef = useRef<any>(null)
+  const rsiResizeObserverRef = useRef<ResizeObserver | null>(null)
+  const macdResizeObserverRef = useRef<ResizeObserver | null>(null)
 
   const calculateRSI = (data: any[], period: number = 14): (number | null)[] => {
     const rsi: (number | null)[] = new Array(data.length).fill(null)
@@ -125,6 +127,10 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
         if (rsiChartRef.current) {
           rsiChartRef.current.remove()
         }
+        if (rsiResizeObserverRef.current) {
+          rsiResizeObserverRef.current.disconnect()
+          rsiResizeObserverRef.current = null
+        }
 
         const rsi = calculateRSI(chartData, 14)
         const rsiData = chartData
@@ -147,6 +153,14 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
         rsiChartRef.current = chart
         const series = chart.addSeries(LineSeries, { color: '#7c3aed', lastValueVisible: false })
         series.setData(rsiData)
+
+        const rsiResizeObserver = new ResizeObserver(() => {
+          if (rsiContainerRef.current && rsiChartRef.current) {
+            rsiChartRef.current.applyOptions({ width: rsiContainerRef.current.clientWidth })
+          }
+        })
+        rsiResizeObserver.observe(rsiContainerRef.current)
+        rsiResizeObserverRef.current = rsiResizeObserver
 
         // Store chart and series reference for crosshair syncing
         if (chartsRef) {
@@ -189,6 +203,10 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
         if (macdChartRef.current) {
           macdChartRef.current.remove()
         }
+        if (macdResizeObserverRef.current) {
+          macdResizeObserverRef.current.disconnect()
+          macdResizeObserverRef.current = null
+        }
 
         const macd = calculateMACD(chartData)
         const macdData = chartData
@@ -211,6 +229,14 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
         macdChartRef.current = chart
         const series = chart.addSeries(HistogramSeries, { color: '#8b5cf6', lastValueVisible: false })
         series.setData(macdData)
+
+        const macdResizeObserver = new ResizeObserver(() => {
+          if (macdContainerRef.current && macdChartRef.current) {
+            macdChartRef.current.applyOptions({ width: macdContainerRef.current.clientWidth })
+          }
+        })
+        macdResizeObserver.observe(macdContainerRef.current)
+        macdResizeObserverRef.current = macdResizeObserver
 
         // Store chart and series reference for crosshair syncing
         if (chartsRef) {
@@ -244,6 +270,17 @@ export default function IndicatorsPanel({ chartData, selectedIndicators, visible
 
     setupRSI()
     setupMACD()
+
+    return () => {
+      if (rsiResizeObserverRef.current) {
+        rsiResizeObserverRef.current.disconnect()
+        rsiResizeObserverRef.current = null
+      }
+      if (macdResizeObserverRef.current) {
+        macdResizeObserverRef.current.disconnect()
+        macdResizeObserverRef.current = null
+      }
+    }
   }, [chartData, selectedIndicators])
 
   useEffect(() => {

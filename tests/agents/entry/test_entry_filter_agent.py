@@ -27,7 +27,7 @@ class TestEntryFilterAgent(unittest.TestCase):
 		"""Test process with no recommendations."""
 		self.context.set("strategy_name", "test_strategy")
 		self.context.set("data_history", {})
-		self.context.set("watchlist", {})
+		self.context.set("entries", {})
 
 		result = self.agent.process({})
 
@@ -38,7 +38,7 @@ class TestEntryFilterAgent(unittest.TestCase):
 	def test_process_missing_strategy_name(self):
 		"""Test process with missing strategy_name in context."""
 		self.context.set("data_history", {})
-		self.context.set("watchlist", {"TEST": {}})
+		self.context.set("entries", {"TEST": {}})
 
 		result = self.agent.process({})
 
@@ -50,7 +50,7 @@ class TestEntryFilterAgent(unittest.TestCase):
 	def test_process_missing_data_history(self):
 		"""Test process with missing data_history in context."""
 		self.context.set("strategy_name", "test_strategy")
-		self.context.set("watchlist", {"TEST": {}})
+		self.context.set("entries", {"TEST": {}})
 
 		result = self.agent.process({})
 
@@ -79,7 +79,7 @@ class TestEntryFilterAgent(unittest.TestCase):
 
 		self.context.set("strategy_name", "nonexistent_strategy")
 		self.context.set("data_history", {})
-		self.context.set("watchlist", {"TEST": {}})
+		self.context.set("entries", {"TEST": {}})
 
 		result = self.agent.process({})
 
@@ -103,7 +103,7 @@ class TestEntryFilterAgent(unittest.TestCase):
 
 		self.context.set("strategy_name", "test_strategy")
 		self.context.set("data_history", {})
-		self.context.set("watchlist", {"TEST": {}})
+		self.context.set("entries", {"TEST": {}})
 
 		result = self.agent.process({})
 
@@ -139,7 +139,7 @@ class TestEntryFilterAgent(unittest.TestCase):
 			"TEST1": df.copy(),
 			"TEST2": df.copy(),
 		})
-		self.context.set("watchlist", {
+		self.context.set("entries", {
 			"TEST1": {"score": 80},
 			"TEST2": {"score": 75},
 		})
@@ -165,7 +165,7 @@ class TestEntryFilterAgent(unittest.TestCase):
 			"PASS": df_pass,
 			"FAIL": df_fail,
 		})
-		self.context.set("watchlist", {
+		self.context.set("entries", {
     "PASS": {"score": 80},
     "FAIL": {"score": 75},
         })
@@ -186,7 +186,7 @@ class TestEntryFilterAgent(unittest.TestCase):
 		self.assertEqual(result["output"]["filtered_count"], 1)
 
 		# Verify context was updated
-		filtered_recs = self.context.get("watchlist")
+		filtered_recs = self.context.get("entries")
 		self.assertEqual(len(filtered_recs), 1)
 		self.assertIn("PASS", filtered_recs)
 
@@ -210,7 +210,7 @@ class TestEntryFilterAgent(unittest.TestCase):
 
 		self.context.set("strategy_name", "test_strategy")
 		self.context.set("data_history", {})  # No data
-		self.context.set("watchlist", {
+		self.context.set("entries", {
     "TEST": {"score": 80},
         })
 
@@ -246,7 +246,7 @@ class TestEntryFilterAgent(unittest.TestCase):
 		self.context.set("data_history", {
 			"TEST": empty_df,
 		})
-		self.context.set("watchlist", {
+		self.context.set("entries", {
     "TEST": {"score": 80},
         })
 
@@ -287,7 +287,7 @@ class TestEntryFilterAgent(unittest.TestCase):
 		self.context.set("data_history", {
 			"TEST": df,
 		})
-		self.context.set("watchlist", {
+		self.context.set("entries", {
     "TEST": {"score": 80},
         })
 
@@ -332,7 +332,7 @@ class TestEntryFilterAgent(unittest.TestCase):
 
 		self.context.set("strategy_name", "test_strategy")
 		self.context.set("data_history", {"TEST": df})
-		self.context.set("watchlist", {"TEST": {}})
+		self.context.set("entries", {"TEST": {}})
 
 		result = self.agent.process({})
 
@@ -375,7 +375,7 @@ class TestEntryFilterAgent(unittest.TestCase):
 
 		self.context.set("strategy_name", "test_strategy")
 		self.context.set("data_history", {"TEST": df})
-		self.context.set("watchlist", {"TEST": {}})
+		self.context.set("entries", {"TEST": {}})
 
 		result = self.agent.process({})
 
@@ -418,7 +418,7 @@ class TestEntryFilterAgent(unittest.TestCase):
 		self.context.set("data_history", {
 			"TEST": df,
 		})
-		self.context.set("watchlist", {
+		self.context.set("entries", {
     "TEST": {"score": 80},
         })
 
@@ -455,7 +455,7 @@ class TestEntryFilterAgent(unittest.TestCase):
 		self.context.set("data_history", {
 			"TEST": df,
 		})
-		self.context.set("watchlist", {
+		self.context.set("entries", {
     "TEST": {"score": 80},
         })
 
@@ -498,7 +498,7 @@ class TestEntryFilterAgent(unittest.TestCase):
 			"FAIL": df_fail,
 			"NO_DATA": df_no_data,
 		})
-		self.context.set("watchlist", {
+		self.context.set("entries", {
     "PASS": {"score": 80},
     "FAIL": {"score": 75},
     "NO_DATA": {"score": 70},
@@ -558,7 +558,7 @@ class TestEntryFilterAgentWithSingleEtf(unittest.TestCase):
 		self.context.set("data_history", {
 			"SPY": df,
 		})
-		self.context.set("watchlist", {
+		self.context.set("entries", {
     "SPY": {"composite_score": 85},
         })
 
@@ -602,7 +602,7 @@ class TestEntryFilterAgentWithSingleEtf(unittest.TestCase):
 		self.context.set("data_history", {
 			"SPY": df,
 		})
-		self.context.set("watchlist", {
+		self.context.set("entries", {
     "SPY": {"composite_score": 85},
         })
 

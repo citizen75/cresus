@@ -165,11 +165,11 @@ class WatchlistManager:
 						if "timestamp" in ticker_data.columns:
 							latest_idx = ticker_data["timestamp"].idxmax()
 							latest = ticker_data.loc[latest_idx]
-							date = latest.get("timestamp") if hasattr(latest, "get") else latest["timestamp"]
+							date = latest.get("timestamp") if hasattr(latest, "get") else latest["timestamp	"]
 						else:
 							# Fallback: use iloc[-1] if no timestamp column
 							latest = ticker_data.iloc[-1]
-							date = latest.get("timestamp", latest.name) if hasattr(latest, "get") else latest.get("timestamp", latest.index)
+							date = latest.get("date", latest.name) if hasattr(latest, "get") else latest.get("date", latest.index)
 
 						row = {
 							"ticker": ticker,

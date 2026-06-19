@@ -105,6 +105,7 @@ def create_app() -> FastAPI:
     from api.routes.screener import router as screener_router
     from api.routes.alerts import router as alerts_router
     from api.routes.tasks import router as tasks_router
+    from api.routes.bots import router as bots_router
     from gateway.websockets.routes import router as websocket_router
 
     app.include_router(health_router, prefix="/api/v1")
@@ -119,6 +120,7 @@ def create_app() -> FastAPI:
     app.include_router(screener_router, prefix="/api/v1")
     app.include_router(alerts_router, prefix="/api/v1")
     app.include_router(tasks_router, prefix="/api/v1")
+    app.include_router(bots_router, prefix="/api/v1")
     app.include_router(websocket_router, prefix="/api/v1")
 
     # Setup background scheduler for data fetching
