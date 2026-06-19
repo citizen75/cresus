@@ -188,10 +188,12 @@ class CronScheduler:
 			params: Job parameters
 		"""
 		from jobs.job_intraday import JobIntraday
+		from jobs.job_pre_market import JobPreMarket
 
 		# Map job names to job classes
 		job_classes = {
 			"intraday": JobIntraday,
+			"pre_market": JobPreMarket,
 		}
 
 		if job_name not in job_classes:

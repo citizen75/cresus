@@ -1,445 +1,421 @@
-# Strategy Configuration Template
-# All strategies must follow this structure
-
-name: strategy_name
-universe: cac40  # Data source: cac40, srd, enx_large, nasdaq_100, etf_pea, etc.
+name: cac_top_5
 description: Brief description of strategy objectives and logic
+universe: cac40
 
-# Technical indicators to calculate and make available to formulas
-indicators:
-  - atr_14
-  - rsi_9
-  - ema_10
-  - ema_20
-  - adx_14
-  - adx_20
-  - macd_12_26
-  - obv
-  - obv_ema_10
-  - vwap
-  - mfi_14
-  - cmf
-  - ad
-  - roc_5
-  - roc_10
-  - roc_20
-  - roc_60
-  - roc_120
-  - roc_250
-  - rsi_14
-  - sma_20
-  - sma_50
-  - sma_200
-  - bb_20_upper
-  - bb_20_lower
-  - volume_sma_20
-  - dv_up_volume
-  - dv_down_volume
-
-# Watchlist configuration - which tickers to trade
 watchlist:
   enabled: true
   parameters:
-    tickers:
-      max_count: 15
-      description: Maximum number of tickers in the watchlist
-    volume:
-      min_volume: 500000
-      description: Minimum daily trading volume for inclusion
-    ranking:
-      metric: score
-      description: Metric to rank tickers (score, gain, etc.)
     filter:
-      formula: close[0] > ema_10[0] && ema_10[0] > ema_20[0]
       description: Formula to filter tickers - include only if True
+      formula: volume[0] > 100000 
+    scoring:
+      description: Composite score formula evaluated on latest data row (alpha + indicator columns)
+      formula: ema_20_chgpct_5
+    ranking:
+      description: Metric to rank tickers (score, gain, etc.)
+      metric: rank
+    sorting:
+      description: Sort order for ranking (asc or desc)
+      order: desc
+      column: score
 
 
-features:
-  enabled: true
-  # Feature engineering configuration - which features to calculate for entry model
-
-  alphas:
-    # Momentum alphas - capture trend strength
-    momentum:
-      - name: mom_roc5
-        formula: roc_5
-        description: 5-day rate of change %
-      - name: mom_roc10
-        formula: roc_10
-        description: 10-day rate of change %
-      - name: mom_roc20
-        formula: roc_20
-        description: 20-day momentum
-      - name: mom_roc60
-        formula: roc_60
-        description: 60-day momentum
-      - name: mom_roc120
-        formula: roc_120
-        description: 120-day momentum
-      - name: mom_roc250
-        formula: roc_250
-        description: 250-day momentum (annual)
-      - name: mom_roc_spread
-        formula: roc_20 - roc_250
-        description: Medium-term vs long-term momentum spread
-      - name: mom_ema_spread
-        formula: ema_10 - ema_20
-        description: EMA momentum spread
-      - name: mom_macd
-        formula: macd_12_26_cross
-        description: MACD crossover signal
-      - name: mom_rsi14
-        formula: rsi_14
-        description: Relative strength index (14 period)
-      - name: mom_price_above_ema10
-        formula: close[0] > ema_10[0]
-        description: Price above short EMA (10-day)
-      - name: mom_price_above_ema20
-        formula: close[0] > ema_20[0]
-        description: Price above medium EMA (20-day)
-      - name: mom_ema_uptrend
-        formula: ema_10[0] > ema_20[0]
-        description: Short EMA above medium EMA
-
-    # Mean reversion alphas - capture overbought/oversold conditions
-    mean_reversion:
-      - name: mr_roc_reversal1
-        formula: -1*roc_1
-        description: Reversal from 1-day move
-      - name: mr_roc_reversal5
-        formula: -1*roc_5
-        description: Reversal from 5-day move
-      - name: mr_roc_reversal10
-        formula: -1*roc_10
-        description: Reversal from 10-day move
-      - name: mr_rsi_oversold
-        formula: rsi_14 < 30
-        description: RSI oversold condition
-      - name: mr_rsi_overbought
-        formula: rsi_14 > 70
-        description: RSI overbought condition
-      - name: mr_price_below_ema20
-        formula: close[0] < ema_20[0]
-        description: Price below medium EMA (mean reversion)
-
-    # Volatility alphas - capture volatility expansion/contraction
-    volatility:
-      - name: vol_atr14
-        formula: atr_14
-        description: Average true range (14 period)
-      - name: vol_atr_pct
-        formula: atr_14 / close[0]
-        description: Volatility as % of price
-      - name: vol_expansion
-        formula: volume[0] / volume_sma_20[0]
-        description: Volume expansion ratio
-      - name: vol_bb_width
-        formula: bb_20_upper[0] - bb_20_lower[0]
-        description: Bollinger band width
-      - name: vol_bb_percent
-        formula: (close[0] - bb_20_lower[0]) / (bb_20_upper[0] - bb_20_lower[0])
-        description: "%B Bollinger band position (0-1)"
-
-    # Trend quality alphas - capture trend strength and direction
-    trend:
-      - name: trend_adx14
-        formula: adx_14
-        description: ADX trend strength (14 period)
-      - name: trend_adx20
-        formula: adx_20
-        description: ADX-20 trend strength
-      - name: trend_price_sma50
-        formula: close[0] - sma_50[0]
-        description: Price vs 50-day moving average
-      - name: trend_price_deviation
-        formula: (close[0] - sma_200[0]) / close[0]
-        description: Price deviation from 200-day MA
-      - name: trend_ema_slope
-        formula: sma_20[0] - sma_50[0]
-        description: Short MA vs medium MA slope
-
-    # Volume analysis alphas - capture volume patterns and price-volume relationships
-    volume:
-      - name: vol_obv
-        formula: obv
-        description: On-Balance Volume - cumulative volume flow indicator
-      - name: vol_obv_ema10
-        formula: obv_ema_10
-        description: OBV smoothed with 10-day EMA for trend confirmation
-      - name: vol_vwap
-        formula: vwap
-        description: Volume Weighted Average Price - volume-weighted price level
-      - name: vol_vwap_deviation
-        formula: (close[0] - vwap[0]) / vwap[0]
-        description: Price deviation from VWAP as percentage
-      - name: vol_price_above_vwap
-        formula: close[0] > vwap[0]
-        description: Price trading above VWAP (bullish volume signal)
-      - name: vol_mfi14
-        formula: mfi_14
-        description: Money Flow Index - RSI weighted by volume
-
-    # Volume profile alphas - capture volume concentration and distribution patterns
-    volume_profile:
-      - name: vp_cmf
-        formula: cmf
-        description: Chaikin Money Flow - volume-weighted momentum accumulation
-      - name: vp_cmf_signal
-        formula: cmf > 0
-        description: Bullish CMF signal (positive money flow)
-      - name: vp_ad
-        formula: ad
-        description: Accumulation/Distribution Line - cumulative money flow
-      - name: vp_volume_at_high
-        formula: volume[0] * (high[0] - close[0]) / (high[0] - low[0])
-        description: Volume concentration at daily highs (supply)
-      - name: vp_volume_at_low
-        formula: volume[0] * (close[0] - low[0]) / (high[0] - low[0])
-        description: Volume concentration at daily lows (demand)
-      - name: vp_volume_profile_ratio
-        formula: vp_volume_at_low[0] / (vp_volume_at_high[0] + 0.001)
-        description: Demand/Supply ratio from volume distribution
-      - name: vp_price_volume_correlation
-        formula: (close[0] - close[-5]) * volume[0] / close[0]
-        description: Price-volume correlation strength over 5 days
-      - name: vp_volume_cluster
-        formula: (volume[0] + volume[-1] + volume[-2]) / 3 / volume_sma_20[0]
-        description: Volume clustering ratio (recent vol vs average)
-
-    # Point of Control (POC) alphas - identify volume-weighted price levels and support/resistance
-    point_of_control:
-      - name: poc_vwap_distance
-        formula: abs(close[0] - vwap[0]) / vwap[0]
-        description: Distance from Point of Control (VWAP) as percentage
-      - name: poc_vwap_support
-        formula: close[0] > vwap[0] - atr_14[0] * 0.5
-        description: Price near VWAP support (within 0.5 ATR below)
-      - name: poc_vwap_resistance
-        formula: close[0] < vwap[0] + atr_14[0] * 0.5
-        description: Price near VWAP resistance (within 0.5 ATR above)
-      - name: poc_price_acceptance
-        formula: (close[0] - low[0]) / (high[0] - low[0])
-        description: Price acceptance at current level (0=low, 1=high)
-      - name: poc_volume_profile_shift
-        formula: vwap[0] - vwap[-10]
-        description: POC shift over 10 days (positive = uptrend in volume)
-      - name: poc_value_area_width
-        formula: (sma_20[0] - sma_50[0]) / sma_50[0]
-        description: Value area width (price range where volume concentrates)
-      - name: poc_institutional_level
-        formula: (close[0] - (high[-20] + low[-20]) / 2) / atr_14[0]
-        description: Price distance from 20-day institutional entry level
-      - name: poc_volume_weighted_midpoint
-        formula: (vwap[0] + close[0]) / 2
-        description: Volume-weighted midpoint between VWAP and close
-      - name: poc_single_print
-        formula: volume[0] > volume_sma_20[0] * 1.5 && (high[0] - low[0]) < atr_14[0] * 0.5
-        description: Single print setup (high volume, small range at POC)
-
-    # Delta Volume alphas - measure buying vs selling pressure
-    delta_volume:
-      - name: dv_up_volume
-        formula: volume[0] * (close[0] - open[0]) / (high[0] - low[0] + 0.001)
-        description: Estimated up-volume (buying pressure)
-      - name: dv_down_volume
-        formula: volume[0] * (open[0] - close[0]) / (high[0] - low[0] + 0.001)
-        description: Estimated down-volume (selling pressure)
-      - name: dv_delta
-        formula: dv_up_volume[0] - dv_down_volume[0]
-        description: Delta volume (net buying/selling pressure)
-      - name: dv_delta_ratio
-        formula: dv_up_volume[0] / (dv_down_volume[0] + 1)
-        description: Buying pressure ratio (>1 = more buying)
-      - name: dv_cumulative_delta
-        formula: ad
-        description: Cumulative delta (A/D line momentum)
-      - name: dv_close_position
-        formula: (close[0] - low[0]) / (high[0] - low[0])
-        description: Close position in range (0=low, 1=high, >0.5 = bullish)
-      - name: dv_volume_weighted_return
-        formula: (close[0] - close[-5]) * (volume[0] + volume[-1] + volume[-2] + volume[-3] + volume[-4]) / 5 / close[0]
-        description: 5-day return weighted by volume
-
-    # Volume Bubbles alphas - identify volume spikes and institutional activity
-    volume_bubbles:
-      - name: vb_volume_expansion
-        formula: volume[0] / volume_sma_20[0]
-        description: Current volume relative to 20-day average
-      - name: vb_bubble_strength
-        formula: (volume[0] - volume_sma_20[0]) / volume_sma_20[0]
-        description: Bubble intensity (>0.5 = strong spike)
-      - name: vb_bubble_confirmation
-        formula: volume[0] > volume_sma_20[0] * 1.5 && (close[0] > open[0] || close[0] > close[-1])
-        description: Volume bubble with price confirmation (bullish)
-      - name: vb_reversal_bubble
-        formula: volume[0] > volume_sma_20[0] * 1.5 && (close[0] < open[0] || close[0] < close[-1])
-        description: Volume bubble with price reversal (bearish reversal)
-      - name: vb_volume_cluster
-        formula: (volume[0] + volume[-1] + volume[-2]) / 3 > volume_sma_20[0] * 1.3
-        description: Volume clustering (multiple high-volume bars)
-      - name: vb_climax_volume
-        formula: volume[0] > volume_sma_20[0] * 2
-        description: Climax volume (extreme spike >2x average)
-      - name: vb_volume_thrust
-        formula: (volume[0] - volume[-1]) / volume[-1]
-        description: Volume acceleration (spike momentum)
-      - name: vb_bubble_fade
-        formula: volume[0] < volume[-1] && volume[-1] > volume_sma_20[0] * 1.5
-        description: Bubble fading (high volume declining)
-      - name: vb_absorption
-        formula: volume[0] > volume_sma_20[0] && (high[0] - close[0]) < atr_14[0] * 0.3
-        description: Volume absorption (high volume absorbed with small wick)
-
-    # Bollinger Bands alphas - band distance, squeeze/expansion, and breakout signals
-    bollinger_bands:
-      - name: bb_distance_upper
-        formula: (bb_20_upper[0] - close[0]) / close[0]
-        description: Distance to upper band as percentage (positive = below band)
-      - name: bb_distance_lower
-        formula: (close[0] - bb_20_lower[0]) / close[0]
-        description: Distance to lower band as percentage (positive = above band)
-      - name: bb_percent_b
-        formula: (close[0] - bb_20_lower[0]) / (bb_20_upper[0] - bb_20_lower[0])
-        description: "%B: price position within bands (0=lower, 0.5=middle, 1=upper)"
-      - name: bb_width
-        formula: bb_20_upper[0] - bb_20_lower[0]
-        description: Bollinger Band width (volatility expansion measure)
-      - name: bb_width_ratio
-        formula: (bb_20_upper[0] - bb_20_lower[0]) / atr_14[0]
-        description: Band width relative to ATR (normalized volatility)
-      - name: bb_width_pct
-        formula: (bb_20_upper[0] - bb_20_lower[0]) / bb_20_middle[0]
-        description: Band width as percentage of middle band (SMA)
-      - name: bb_squeeze
-        formula: (bb_20_upper[0] - bb_20_lower[0]) < (sma_20[0] * 0.05)
-        description: Band squeeze (tight bands, low volatility <5% of price)
-      - name: bb_expansion
-        formula: (bb_20_upper[0] - bb_20_lower[0]) > (sma_20[0] * 0.15)
-        description: Band expansion (wide bands, high volatility >15% of price)
-      - name: bb_upper_touch
-        formula: close[0] > (bb_20_upper[0] - (bb_20_upper[0] - bb_20_middle[0]) * 0.1)
-        description: Price touching/near upper band (within 10% of band width)
-      - name: bb_lower_touch
-        formula: close[0] < (bb_20_lower[0] + (bb_20_middle[0] - bb_20_lower[0]) * 0.1)
-        description: Price touching/near lower band (within 10% of band width)
-      - name: bb_breakout_above
-        formula: close[0] > bb_20_upper[0] && close[-1] <= bb_20_upper[-1]
-        description: Price breakout above upper band (bullish signal)
-      - name: bb_breakout_below
-        formula: close[0] < bb_20_lower[0] && close[-1] >= bb_20_lower[-1]
-        description: Price breakout below lower band (bearish signal)
-      - name: bb_mean_reversion_upper
-        formula: close[0] > bb_20_upper[0] && close[0] < close[-1]
-        description: Price above band but declining (mean reversion setup)
-      - name: bb_mean_reversion_lower
-        formula: close[0] < bb_20_lower[0] && close[0] > close[-1]
-        description: Price below band but rising (mean reversion setup)
-      - name: bb_volatility_contraction
-        formula: (bb_20_upper[0] - bb_20_lower[0]) < ((bb_20_upper[-5] - bb_20_lower[-5]))
-        description: Band contraction over 5 days (compression before breakout)
-
-    # Cross-asset correlation alphas
-    correlations:
-      - name: corr_volume_trend
-        formula: volume[0] / volume[-20]
-        description: Volume trend ratio
-      - name: corr_intrabar_range
-        formula: high[0] - low[0]
-        description: Intrabar price range
-      - name: corr_wick_upper
-        formula: (high[0] - close[0]) / (high[0] - low[0])
-        description: Upper wick size
-      - name: corr_wick_lower
-        formula: (close[0] - low[0]) / (high[0] - low[0])
-        description: Lower wick size
-
-# Signal generation configuration
-signals:
-  enabled: true
-  weights:
-    momentum: 0.5
-    trend: 0.35
-    volume_anomaly: 0.15
-    mean_reversion: 0.0
-  parameters:
-    momentum:
-      formula: macd_12_26[0] > 0.5
-      description: Momentum signal formula
-    trend:
-      formula: close[0] > ema_10[0] && ema_10[0] > ema_20[0]
-      description: Trend signal formula
-    mean_reversion:
-      formula: 'False'  # Set to 'False' to disable signal
-      description: Mean reversion signal formula
-    volume_anomaly:
-      formula: volume[0] > 1000000
-      description: Volume anomaly signal formula
-
-# Entry configuration - when and how to enter trades
 entry:
   enabled: true
   parameters:
-    max_daily_orders:
-      formula: 2
-      description: Maximum buy orders allowed per day
-    position_size:
-      formula: 1000 / close[0]
-      description: Number of shares to buy (can use formulas)
-    score_filter:
-      min: 60
-      description: Only enter positions with a composite score above 60 to ensure strong trend
     entry_filter:
-      formula: close[0] > ema_20[0] && adx_14[0] > 20
       description: Market condition filter - entries only when True
-    order_type:
-      type: limit
-      description: "limit or market - determines how entry orders are executed"
+      formula: close[0] > ema_20[0] && adx_14[0] > 20
     limit_price:
-      formula: close[0] * 0.99
       description: Limit order price (only used if order_type is limit)
+      formula: close[0] * 0.99
+    max_daily_orders:
+      description: Maximum buy orders allowed per day
+      formula: 2
+    order_type:
+      description: limit or market - determines how entry orders are executed
+      type: limit
+    position_size:
+      description: Number of shares to buy (can use formulas)
+      formula: 1000 / close[0]
+    score_filter:
+      description: Only enter positions with a composite score above 60 to ensure
+        strong trend
+      min: 60
+
+
+exit:
+  enabled: true
+  parameters:
+    condition:
+      description: Exit condition formula - SELL when True (e.g., sha_10_red[0] ==
+        1)
+      formula: 'False'
+    holding_period:
+      description: Maximum holding period in days
+      formula: 12
+    stop:
+      description: Stop loss level - required for risk management
+      formula: close[0] - atr_14[0] * 1.3
+      type: fix
+    take_profit:
+      description: Take profit target (set to 'False' to disable)
+      formula: close[0] + atr_14[0] * 2.6
+    time_stop:
+      description: Cancel unfilled entry orders after N days
+      formula: 1
 
 order:
   enabled: true
   parameters:
-    position_sizing:
-      type: capital
-      formula: 2000 
-      description: Fixed €2,000 per position
-    max_daily_orders:
-      formula: 2
-      description: Allow up to 3 orders per day
-    max_positions:
-      formula: 5
-      description: 5 positions max at any time
+    notify:
+      enabled: true
     fees:
-      formula: 0.001
       description: Estimated fees as a percentage of trade value
-    slippage:
       formula: 0.001
+    max_daily_orders:
+      description: Allow up to 3 orders per day
+      formula: 2
+    max_positions:
+      description: 5 positions max at any time
+      formula: 5
+    position_sizing:
+      description: "Fixed \u20AC2,000 per position"
+      formula: 2000
+      type: capital
+    slippage:
       description: Estimated slippage as a percentage of trade value
-    
-# Exit configuration - how to close positions
-exit:
+      formula: 0.001
+
+      
+features:
+  alphas:
+    bollinger_bands:
+    - description: Distance to upper band as percentage (positive = below band)
+      formula: (bb_20_upper[0] - close[0]) / close[0]
+      name: bb_distance_upper
+    - description: Distance to lower band as percentage (positive = above band)
+      formula: (close[0] - bb_20_lower[0]) / close[0]
+      name: bb_distance_lower
+    - description: '%B: price position within bands (0=lower, 0.5=middle, 1=upper)'
+      formula: (close[0] - bb_20_lower[0]) / (bb_20_upper[0] - bb_20_lower[0])
+      name: bb_percent_b
+    - description: Bollinger Band width (volatility expansion measure)
+      formula: bb_20_upper[0] - bb_20_lower[0]
+      name: bb_width
+    - description: Band width relative to ATR (normalized volatility)
+      formula: (bb_20_upper[0] - bb_20_lower[0]) / atr_14[0]
+      name: bb_width_ratio
+    - description: Band width as percentage of middle band (SMA)
+      formula: (bb_20_upper[0] - bb_20_lower[0]) / bb_20_middle[0]
+      name: bb_width_pct
+    - description: Band squeeze (tight bands, low volatility <5% of price)
+      formula: (bb_20_upper[0] - bb_20_lower[0]) < (sma_20[0] * 0.05)
+      name: bb_squeeze
+    - description: Band expansion (wide bands, high volatility >15% of price)
+      formula: (bb_20_upper[0] - bb_20_lower[0]) > (sma_20[0] * 0.15)
+      name: bb_expansion
+    - description: Price touching/near upper band (within 10% of band width)
+      formula: close[0] > (bb_20_upper[0] - (bb_20_upper[0] - bb_20_middle[0]) * 0.1)
+      name: bb_upper_touch
+    - description: Price touching/near lower band (within 10% of band width)
+      formula: close[0] < (bb_20_lower[0] + (bb_20_middle[0] - bb_20_lower[0]) * 0.1)
+      name: bb_lower_touch
+    - description: Price breakout above upper band (bullish signal)
+      formula: close[0] > bb_20_upper[0] && close[-1] <= bb_20_upper[-1]
+      name: bb_breakout_above
+    - description: Price breakout below lower band (bearish signal)
+      formula: close[0] < bb_20_lower[0] && close[-1] >= bb_20_lower[-1]
+      name: bb_breakout_below
+    - description: Price above band but declining (mean reversion setup)
+      formula: close[0] > bb_20_upper[0] && close[0] < close[-1]
+      name: bb_mean_reversion_upper
+    - description: Price below band but rising (mean reversion setup)
+      formula: close[0] < bb_20_lower[0] && close[0] > close[-1]
+      name: bb_mean_reversion_lower
+    - description: Band contraction over 5 days (compression before breakout)
+      formula: (bb_20_upper[0] - bb_20_lower[0]) < ((bb_20_upper[-5] - bb_20_lower[-5]))
+      name: bb_volatility_contraction
+    correlations:
+    - description: Volume trend ratio
+      formula: volume[0] / volume[-20]
+      name: corr_volume_trend
+    - description: Intrabar price range
+      formula: high[0] - low[0]
+      name: corr_intrabar_range
+    - description: Upper wick size
+      formula: (high[0] - close[0]) / (high[0] - low[0])
+      name: corr_wick_upper
+    - description: Lower wick size
+      formula: (close[0] - low[0]) / (high[0] - low[0])
+      name: corr_wick_lower
+    delta_volume:
+    - description: Estimated up-volume (buying pressure)
+      formula: volume[0] * (close[0] - open[0]) / (high[0] - low[0] + 0.001)
+      name: dv_up_volume
+    - description: Estimated down-volume (selling pressure)
+      formula: volume[0] * (open[0] - close[0]) / (high[0] - low[0] + 0.001)
+      name: dv_down_volume
+    - description: Delta volume (net buying/selling pressure)
+      formula: dv_up_volume[0] - dv_down_volume[0]
+      name: dv_delta
+    - description: Buying pressure ratio (>1 = more buying)
+      formula: dv_up_volume[0] / (dv_down_volume[0] + 1)
+      name: dv_delta_ratio
+    - description: Cumulative delta (A/D line momentum)
+      formula: ad
+      name: dv_cumulative_delta
+    - description: Close position in range (0=low, 1=high, >0.5 = bullish)
+      formula: (close[0] - low[0]) / (high[0] - low[0])
+      name: dv_close_position
+    - description: 5-day return weighted by volume
+      formula: (close[0] - close[-5]) * (volume[0] + volume[-1] + volume[-2] + volume[-3]
+        + volume[-4]) / 5 / close[0]
+      name: dv_volume_weighted_return
+    mean_reversion:
+    - description: Reversal from 1-day move
+      formula: -1*roc_1
+      name: mr_roc_reversal1
+    - description: Reversal from 5-day move
+      formula: -1*roc_5
+      name: mr_roc_reversal5
+    - description: Reversal from 10-day move
+      formula: -1*roc_10
+      name: mr_roc_reversal10
+    - description: RSI oversold condition
+      formula: rsi_14 < 30
+      name: mr_rsi_oversold
+    - description: RSI overbought condition
+      formula: rsi_14 > 70
+      name: mr_rsi_overbought
+    - description: Price below medium EMA (mean reversion)
+      formula: close[0] < ema_20[0]
+      name: mr_price_below_ema20
+    momentum:
+    - description: 5-day rate of change %
+      formula: roc_5
+      name: mom_roc5
+    - description: 10-day rate of change %
+      formula: roc_10
+      name: mom_roc10
+    - description: 20-day momentum
+      formula: roc_20
+      name: mom_roc20
+    - description: 60-day momentum
+      formula: roc_60
+      name: mom_roc60
+    - description: 120-day momentum
+      formula: roc_120
+      name: mom_roc120
+    - description: 250-day momentum (annual)
+      formula: roc_250
+      name: mom_roc250
+    - description: Medium-term vs long-term momentum spread
+      formula: roc_20 - roc_250
+      name: mom_roc_spread
+    - description: EMA momentum spread
+      formula: ema_10 - ema_20
+      name: mom_ema_spread
+    - description: MACD crossover signal
+      formula: macd_line[0] > macd_signal[0]
+      name: mom_macd
+    - description: Relative strength index (14 period)
+      formula: rsi_14
+      name: mom_rsi14
+    - description: Price above short EMA (10-day)
+      formula: close[0] > ema_10[0]
+      name: mom_price_above_ema10
+    - description: Price above medium EMA (20-day)
+      formula: close[0] > ema_20[0]
+      name: mom_price_above_ema20
+    - description: Short EMA above medium EMA
+      formula: ema_10[0] > ema_20[0]
+      name: mom_ema_uptrend
+    point_of_control:
+    - description: Distance from Point of Control (VWAP) as percentage
+      formula: abs(close[0] - vwap[0]) / vwap[0]
+      name: poc_vwap_distance
+    - description: Price near VWAP support (within 0.5 ATR below)
+      formula: close[0] > vwap[0] - atr_14[0] * 0.5
+      name: poc_vwap_support
+    - description: Price near VWAP resistance (within 0.5 ATR above)
+      formula: close[0] < vwap[0] + atr_14[0] * 0.5
+      name: poc_vwap_resistance
+    - description: Price acceptance at current level (0=low, 1=high)
+      formula: (close[0] - low[0]) / (high[0] - low[0])
+      name: poc_price_acceptance
+    - description: POC shift over 10 days (positive = uptrend in volume)
+      formula: vwap[0] - vwap[-10]
+      name: poc_volume_profile_shift
+    - description: Value area width (price range where volume concentrates)
+      formula: (sma_20[0] - sma_50[0]) / sma_50[0]
+      name: poc_value_area_width
+    - description: Price distance from 20-day institutional entry level
+      formula: (close[0] - (high[-20] + low[-20]) / 2) / atr_14[0]
+      name: poc_institutional_level
+    - description: Volume-weighted midpoint between VWAP and close
+      formula: (vwap[0] + close[0]) / 2
+      name: poc_volume_weighted_midpoint
+    - description: Single print setup (high volume, small range at POC)
+      formula: volume[0] > volume_sma_20[0] * 1.5 && (high[0] - low[0]) < atr_14[0]
+        * 0.5
+      name: poc_single_print
+    trend:
+    - description: ADX trend strength (14 period)
+      formula: adx_14
+      name: trend_adx14
+    - description: ADX-20 trend strength
+      formula: adx_20
+      name: trend_adx20
+    - description: Price vs 50-day moving average
+      formula: close[0] - sma_50[0]
+      name: trend_price_sma50
+    - description: Price deviation from 200-day MA
+      formula: (close[0] - sma_200[0]) / close[0]
+      name: trend_price_deviation
+    - description: Short MA vs medium MA slope
+      formula: sma_20[0] - sma_50[0]
+      name: trend_ema_slope
+    volatility:
+    - description: Average true range (14 period)
+      formula: atr_14
+      name: vol_atr14
+    - description: Volatility as % of price
+      formula: atr_14 / close[0]
+      name: vol_atr_pct
+    - description: Volume expansion ratio
+      formula: volume[0] / volume_sma_20[0]
+      name: vol_expansion
+    - description: Bollinger band width
+      formula: bb_20_upper[0] - bb_20_lower[0]
+      name: vol_bb_width
+    - description: '%B Bollinger band position (0-1)'
+      formula: (close[0] - bb_20_lower[0]) / (bb_20_upper[0] - bb_20_lower[0])
+      name: vol_bb_percent
+    volume:
+    - description: On-Balance Volume - cumulative volume flow indicator
+      formula: obv
+      name: vol_obv
+    - description: OBV smoothed with 10-day EMA for trend confirmation
+      formula: obv_ema_10
+      name: vol_obv_ema10
+    - description: Volume Weighted Average Price - volume-weighted price level
+      formula: vwap
+      name: vol_vwap
+    - description: Price deviation from VWAP as percentage
+      formula: (close[0] - vwap[0]) / vwap[0]
+      name: vol_vwap_deviation
+    - description: Price trading above VWAP (bullish volume signal)
+      formula: close[0] > vwap[0]
+      name: vol_price_above_vwap
+    - description: Money Flow Index - RSI weighted by volume
+      formula: mfi_14
+      name: vol_mfi14
+    volume_bubbles:
+    - description: Current volume relative to 20-day average
+      formula: volume[0] / volume_sma_20[0]
+      name: vb_volume_expansion
+    - description: Bubble intensity (>0.5 = strong spike)
+      formula: (volume[0] - volume_sma_20[0]) / volume_sma_20[0]
+      name: vb_bubble_strength
+    - description: Volume bubble with price confirmation (bullish)
+      formula: volume[0] > volume_sma_20[0] * 1.5 && (close[0] > open[0] || close[0] > close[-1])
+      name: vb_bubble_confirmation
+    - description: Volume bubble with price reversal (bearish reversal)
+      formula: volume[0] > volume_sma_20[0] * 1.5 && (close[0] < open[0] || close[0] < close[-1])
+      name: vb_reversal_bubble
+    - description: Volume clustering (multiple high-volume bars)
+      formula: (volume[0] + volume[-1] + volume[-2]) / 3 > volume_sma_20[0] * 1.3
+      name: vb_volume_cluster
+    - description: Climax volume (extreme spike >2x average)
+      formula: volume[0] > volume_sma_20[0] * 2
+      name: vb_climax_volume
+    - description: Volume acceleration (spike momentum)
+      formula: (volume[0] - volume[-1]) / volume[-1]
+      name: vb_volume_thrust
+    - description: Bubble fading (high volume declining)
+      formula: volume[0] < volume[-1] && volume[-1] > volume_sma_20[0] * 1.5
+      name: vb_bubble_fade
+    - description: Volume absorption (high volume absorbed with small wick)
+      formula: volume[0] > volume_sma_20[0] && (high[0] - close[0]) < atr_14[0] * 0.3
+      name: vb_absorption
+    volume_profile:
+    - description: Chaikin Money Flow - volume-weighted momentum accumulation
+      formula: cmf
+      name: vp_cmf
+    - description: Bullish CMF signal (positive money flow)
+      formula: cmf > 0
+      name: vp_cmf_signal
+    - description: Accumulation/Distribution Line - cumulative money flow
+      formula: ad
+      name: vp_ad
+    - description: Volume concentration at daily highs (supply)
+      formula: volume[0] * (high[0] - close[0]) / (high[0] - low[0])
+      name: vp_volume_at_high
+    - description: Volume concentration at daily lows (demand)
+      formula: volume[0] * (close[0] - low[0]) / (high[0] - low[0])
+      name: vp_volume_at_low
+    - description: Demand/Supply ratio from volume distribution
+      formula: vp_volume_at_low[0] / (vp_volume_at_high[0] + 0.001)
+      name: vp_volume_profile_ratio
+    - description: Price-volume correlation strength over 5 days
+      formula: (close[0] - close[-5]) * volume[0] / close[0]
+      name: vp_price_volume_correlation
+    - description: Volume clustering ratio (recent vol vs average)
+      formula: (volume[0] + volume[-1] + volume[-2]) / 3 / volume_sma_20[0]
+      name: vp_volume_cluster
+  enabled: true
+indicators:
+- atr_14
+- rsi_9
+- ema_10
+- ema_20
+- adx_14
+- adx_20
+- macd_12_26
+- obv
+- obv_ema_10
+- vwap
+- mfi_14
+- cmf
+- ad
+- roc_5
+- roc_10
+- roc_20
+- roc_60
+- roc_120
+- roc_250
+- rsi_14
+- sma_20
+- sma_50
+- sma_200
+- bb_20_upper
+- bb_20_middle
+- bb_20_lower
+- volume_sma_20
+- dv_up_volume
+- dv_down_volume
+
+signals:
   enabled: true
   parameters:
-    stop:
-      type: fix  # fix (static price) or trailing (dynamic, follows peak)
-      formula: close[0] - atr_14[0] * 1.3
-      description: Stop loss level - required for risk management
-    take_profit:
-      formula: close[0] + atr_14[0] * 2.6
-      description: Take profit target (set to 'False' to disable)
-    holding_period:
-      formula: 12
-      description: Maximum holding period in days
-    time_stop:
-      formula: 1
-      description: Cancel unfilled entry orders after N days
-    condition:
+    mean_reversion:
+      description: Mean reversion signal formula
       formula: 'False'
-      description: Exit condition formula - SELL when True (e.g., sha_10_red[0] == 1)
-
-# Backtest configuration
+    momentum:
+      description: Momentum signal formula
+      formula: macd_12_26[0] > 0.5
+    trend:
+      description: Trend signal formula
+      formula: close[0] > ema_10[0] && ema_10[0] > ema_20[0]
+    volume_anomaly:
+      description: Volume anomaly signal formula
+      formula: volume[0] > 1000000
+  weights:
+    mean_reversion: 0.0
+    momentum: 0.5
+    trend: 0.35
+    volume_anomaly: 0.15
 backtest:
-  initial_capital: 10000
   description: Starting capital for backtesting
+  initial_capital: 10000
