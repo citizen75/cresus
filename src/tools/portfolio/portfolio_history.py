@@ -112,10 +112,14 @@ class PortfolioHistory:
 
             # Fall back to disk cache
             dh = DataHistory(ticker)
+            # Only the portfolio's actual trading window is ever looked up, so
+            # trim from the oldest transaction date to avoid carrying decades of
+            # irrelevant history through the per-ticker series built below.
+            history_start = first_tx_date.strftime("%Y-%m-%d")
 
             if use_cache_only:
                 # Only use cached data - don't fetch
-                df_all = dh.get_all()
+                df_all = dh.get_all(start_date=history_start)
                 if df_all is not None and not df_all.empty:
                     ticker_history[ticker] = df_all
                     logger.debug(f"  Loaded {len(df_all)} rows for {ticker} (cached)")
@@ -124,10 +128,10 @@ class PortfolioHistory:
                     failed_tickers.append(ticker)
             else:
                 # Fetch fresh data via DataManager
-                result = self.data_manager.fetch_history(ticker, start_date=first_tx_date.strftime("%Y-%m-%d"))
+                result = self.data_manager.fetch_history(ticker, start_date=history_start)
 
                 if result.get("status") == "success":
-                    df_all = dh.get_all()
+                    df_all = dh.get_all(start_date=history_start)
                     if df_all is not None and not df_all.empty:
                         ticker_history[ticker] = df_all
                         logger.debug(f"  Loaded {len(df_all)} rows for {ticker}")
@@ -151,37 +155,32 @@ class PortfolioHistory:
         if not tx_dates:
             return {"status": "error", "message": "No transactions found"}
 
-        # Cache ticker price lookups
-        ticker_price_cache = {}  # {ticker: {date: price}}
-
-        def get_price_on_date(ticker, date):
-            """Get price for ticker on or before date."""
-            if ticker not in ticker_history:
-                return None
-
-            if ticker not in ticker_price_cache:
-                ticker_price_cache[ticker] = {}
-
-            if date not in ticker_price_cache[ticker]:
-                df_ticker = ticker_history[ticker].copy()
-                df_ticker["timestamp"] = pd.to_datetime(df_ticker["timestamp"], errors="coerce")
-                if df_ticker["timestamp"].dt.tz is not None:
-                    df_ticker["timestamp"] = df_ticker["timestamp"].dt.tz_localize(None)
-                prices_before = df_ticker[df_ticker["timestamp"].dt.normalize() <= date]
-                if not prices_before.empty:
-                    ticker_price_cache[ticker][date] = float(prices_before.iloc[-1].get("close", 0))
-                else:
-                    ticker_price_cache[ticker][date] = None
-
-            return ticker_price_cache[ticker].get(date)
-
-        # Get all available price dates (union of all tickers' data)
+        # Get all available price dates (union of all tickers' data), and build
+        # a sorted per-ticker close-price Series for fast forward-fill lookups.
+        # (Previously get_price_on_date copied and re-filtered a ticker's full
+        # history on almost every call - O(days * positions * history_length),
+        # which took minutes for portfolios with years of daily history.)
         available_dates = set()
-        for ticker_data in ticker_history.values():
+        ticker_price_series: Dict[str, pd.Series] = {}
+        for ticker, ticker_data in ticker_history.items():
             ticker_data["timestamp"] = pd.to_datetime(ticker_data["timestamp"], errors="coerce")
             if ticker_data["timestamp"].dt.tz is not None:
                 ticker_data["timestamp"] = ticker_data["timestamp"].dt.tz_localize(None)
-            available_dates.update(ticker_data["timestamp"].dt.normalize().unique())
+            normalized = ticker_data["timestamp"].dt.normalize()
+            available_dates.update(normalized.unique())
+
+            series = pd.Series(ticker_data["close"].values, index=pd.DatetimeIndex(normalized))
+            series = series[series.index.notna()].sort_index()
+            series = series[~series.index.duplicated(keep="last")]
+            ticker_price_series[ticker] = series
+
+        def get_price_on_date(ticker, date):
+            """Get price for ticker on or before date (forward-filled)."""
+            series = ticker_price_series.get(ticker)
+            if series is None or series.empty:
+                return None
+            price = series.asof(date)
+            return float(price) if pd.notna(price) else None
 
         # Also include all transaction dates
         available_dates.update(pd.to_datetime(tx_dates).normalize())

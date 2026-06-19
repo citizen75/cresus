@@ -71,6 +71,24 @@ export function useCurrentPrices(name: string) {
   })
 }
 
+export function usePortfolioWatchlist(name: string, limit?: number) {
+  return useQuery({
+    queryKey: ['portfolio-watchlist', name, limit],
+    queryFn: () => api.getPortfolioWatchlist(name, limit),
+    staleTime: 30_000,
+    enabled: !!name,
+  })
+}
+
+export function usePortfolioOrders(name: string) {
+  return useQuery({
+    queryKey: ['portfolio-orders', name],
+    queryFn: () => api.getPortfolioOrders(name),
+    staleTime: 30_000,
+    enabled: !!name,
+  })
+}
+
 export function useBacktestRuns(strategy?: string) {
   return useQuery({
     queryKey: ['backtest-runs', strategy],

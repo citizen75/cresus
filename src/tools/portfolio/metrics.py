@@ -120,8 +120,12 @@ class PortfolioMetrics(PortfolioManager):
         actual_end_value = cash + open_position_value
 
         # Create history_df for other calculations (daily returns, drawdown, etc.)
+        # use_cache_only avoids a live per-ticker network fetch on every metrics
+        # request (mirrors backtest/agent.py, which already calculates history
+        # this way) - price history should already be populated by the regular
+        # data-fetching jobs, not fetched ad-hoc inside a metrics calculation.
         history = PortfolioHistory(name, initial_capital=start_value, context=self.context)
-        history_result = history.calculate()
+        history_result = history.calculate(use_cache_only=True)
         history_list = history_result.get("history", []) if history_result.get("status") == "success" else []
 
         history_df = pd.DataFrame()  # Initialize empty dataframe
@@ -577,7 +581,18 @@ class PortfolioMetrics(PortfolioManager):
         return float(current_value - entry_value)
 
     def _calculate_position_stats(self, journal_df: pd.DataFrame, start_dt, end_dt) -> Dict[str, float]:
-        """Calculate max and average open positions."""
+        """Calculate max and average open positions.
+
+        For each BUY, the matching exit is the next SELL of the same ticker that
+        occurs after it (mirrors the original per-trade lookup: it does not track
+        which SELL has already been claimed by an earlier BUY of the same ticker).
+        A position counts as open on a calendar day if bought on/before that day
+        and not yet sold on/before that day (sold same-day closes it).
+
+        Implemented as a sweep-line over BUY/SELL events instead of a day x trade
+        nested loop, which made this O(days * trades) and could take minutes on
+        portfolios with thousands of trades spanning years.
+        """
         if journal_df.empty:
             return {"max_open": 0, "avg_open": 0.0, "days_with_positions": 0}
 
@@ -591,49 +606,57 @@ class PortfolioMetrics(PortfolioManager):
         if journal_df.empty:
             return {"max_open": 0, "avg_open": 0.0, "days_with_positions": 0}
 
-        # Create date range
-        date_range = pd.date_range(start_dt, end_dt, freq='D')
-        positions_by_day = {}
+        journal_df['operation'] = journal_df['operation'].astype(str).str.upper()
 
-        for day in date_range:
-            day_date = day.date()
-            open_count = 0
-
-            # Count positions open on this day
-            for _, trade in journal_df.iterrows():
-                buy_date = trade['created_at'].date()
-
-                # Find matching sell date
-                sell_date = None
-                if trade['operation'] == 'BUY':
-                    # Look for corresponding SELL
-                    sell_records = journal_df[
-                        (journal_df['ticker'] == trade['ticker']) &
-                        (journal_df['operation'] == 'SELL') &
-                        (journal_df['created_at'] > trade['created_at'])
-                    ]
-                    if len(sell_records) > 0:
-                        sell_date = sell_records.iloc[0]['created_at'].date()
-
-                # Position is open if bought before/on this day and not sold or sold after this day
-                if trade['operation'] == 'BUY' and buy_date <= day_date:
-                    if sell_date is None or sell_date > day_date:
-                        open_count += 1
-
-            if open_count > 0:
-                positions_by_day[day_date] = open_count
-
-        if not positions_by_day:
+        buys = journal_df[journal_df['operation'] == 'BUY'][['ticker', 'created_at']].sort_values('created_at')
+        if buys.empty:
             return {"max_open": 0, "avg_open": 0.0, "days_with_positions": 0}
 
-        max_open = max(positions_by_day.values())
-        avg_open = sum(positions_by_day.values()) / len(positions_by_day)
-        days_with_positions = len(positions_by_day)
+        sells = journal_df[journal_df['operation'] == 'SELL'][['ticker', 'created_at']].sort_values('created_at')
+        sells = sells.rename(columns={'created_at': 'sell_created_at'})
+
+        # For each BUY, find the next SELL of the same ticker strictly after it.
+        if not sells.empty:
+            matched = pd.merge_asof(
+                buys, sells, left_on='created_at', right_on='sell_created_at', by='ticker',
+                direction='forward', allow_exact_matches=False,
+            )
+            exit_dates = pd.to_datetime(matched['sell_created_at']).dt.normalize()
+        else:
+            exit_dates = pd.Series(pd.NaT, index=buys.index)
+
+        start_day = pd.Timestamp(start_dt).normalize()
+        end_day = pd.Timestamp(end_dt).normalize()
+        buy_days = buys['created_at'].dt.normalize().reset_index(drop=True)
+        exit_dates = exit_dates.reset_index(drop=True)
+
+        # Clamp each open interval to the requested window: [open_from, open_until).
+        open_from = buy_days.clip(lower=start_day)
+        open_until = exit_dates.fillna(end_day + pd.Timedelta(days=1)).clip(upper=end_day + pd.Timedelta(days=1))
+
+        keep = (open_from <= end_day) & (open_until > open_from)
+        open_from = open_from[keep]
+        open_until = open_until[keep]
+
+        if open_from.empty:
+            return {"max_open": 0, "avg_open": 0.0, "days_with_positions": 0}
+
+        # Sweep-line: +1 when a position opens, -1 the day it closes; cumulative
+        # sum over the window gives the open-position count for each day.
+        day_index = pd.date_range(start_day, end_day + pd.Timedelta(days=1), freq='D')
+        delta = pd.Series(0, index=day_index, dtype='int64')
+        delta = delta.add(open_from.value_counts(), fill_value=0)
+        delta = delta.sub(open_until.value_counts(), fill_value=0)
+        daily_open = delta.cumsum().loc[start_day:end_day]
+
+        positions_by_day = daily_open[daily_open > 0]
+        if positions_by_day.empty:
+            return {"max_open": 0, "avg_open": 0.0, "days_with_positions": 0}
 
         return {
-            "max_open": int(max_open),
-            "avg_open": float(round(avg_open, 1)),
-            "days_with_positions": int(days_with_positions)
+            "max_open": int(positions_by_day.max()),
+            "avg_open": float(round(positions_by_day.mean(), 1)),
+            "days_with_positions": int(len(positions_by_day)),
         }
 
     def _calculate_exit_stats(self, completed_trades: pd.DataFrame) -> Dict[str, int]:

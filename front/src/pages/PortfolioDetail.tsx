@@ -1,33 +1,59 @@
-import { useParams, Link, useLocation, useNavigate } from 'react-router-dom'
-import { useState } from 'react'
-import { PortfolioProvider, usePortfolioContext } from '@/context/PortfolioContext'
-import { getApiBaseUrl } from '@/services/api'
-import PortfolioOverview from '@/components/portfolio/PortfolioOverview'
-import StrategyBuilder from '@/components/portfolio/StrategyBuilder'
-import AIWatchlist from '@/components/portfolio/AIWatchlist'
-import OrdersView from '@/components/portfolio/OrdersView'
-import PortfolioBacktest from '@/components/portfolio/PortfolioBacktest'
-import PortfolioSettings from '@/components/portfolio/PortfolioSettings'
+import { useState, useEffect, useRef } from 'react'
+import { useParams, Link } from 'react-router-dom'
+import { usePortfolioDetails, usePortfolioWatchlist, usePortfolioOrders } from '@/hooks/usePortfolio'
+import { api } from '@/services/api'
+import ResultsWidget from '@/components/ResultsWidget'
 import PortfolioHoldingsWidget from '@/components/portfolio/PortfolioHoldingsWidget'
-import { ConversationWidget } from '@/components/ConversationWidget'
+import PortfolioPerformanceWidget from '@/components/portfolio/PortfolioPerformanceWidget'
+import OrdersWidget from '@/components/portfolio/OrdersWidget'
+import TradingChartWidget from '@/components/TradingChartWidget'
 
 const TABS = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'strategy', label: 'Strategy' },
-  { id: 'watchlist', label: 'AI Watchlist' },
-  { id: 'orders', label: 'Orders' },
-  { id: 'backtest', label: 'Backtest' },
-  { id: 'holdings', label: 'Holdings' },
-  { id: 'activity', label: 'Activity' },
-  { id: 'settings', label: 'Settings' },
+  { id: 'watchlist', label: 'Watchlist' },
+  { id: 'positions', label: 'Positions' },
+  { id: 'performance', label: 'Performance' },
 ]
 
-function PortfolioDetailContent() {
-  const { name = 'main' } = useParams()
-  const location = useLocation()
-  const navigate = useNavigate()
-  const { refetch } = usePortfolioContext()
+export default function PortfolioDetail() {
+  const { name = '' } = useParams()
+  const { data: details, isLoading, refetch } = usePortfolioDetails(name)
+  const { data: watchlistData, isLoading: isWatchlistLoading } = usePortfolioWatchlist(name)
+  const { data: ordersData, isLoading: isOrdersLoading } = usePortfolioOrders(name)
+
+  const [activeTab, setActiveTab] = useState<'watchlist' | 'positions' | 'performance'>('watchlist')
+  const [selectedTicker, setSelectedTicker] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortColumn, setSortColumn] = useState<string | null>('ticker')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [historicalData, setHistoricalData] = useState<{ [ticker: string]: any[] }>({})
   const [isRefreshing, setIsRefreshing] = useState(false)
+
+  const watchlist = watchlistData?.watchlist || []
+  const positions = details?.positions || []
+  const strategyName = details?.strategy || name
+  const hasAutoSelectedTab = useRef(false)
+
+  // Default to the first watchlist ticker once data loads, falling back to the
+  // first open position for portfolios with no strategy-generated watchlist
+  // (manual / backtested portfolios typically have positions but no watchlist).
+  useEffect(() => {
+    if (selectedTicker) return
+    if (watchlist.length > 0) {
+      setSelectedTicker(watchlist[0].ticker)
+    } else if (positions.length > 0) {
+      setSelectedTicker(positions[0].ticker)
+    }
+  }, [watchlist, positions, selectedTicker])
+
+  // If this portfolio has no watchlist data, the Watchlist tab is empty by
+  // default - switch to Positions once so real data isn't hidden behind it.
+  useEffect(() => {
+    if (hasAutoSelectedTab.current || isWatchlistLoading || activeTab !== 'watchlist') return
+    hasAutoSelectedTab.current = true
+    if (watchlist.length === 0 && positions.length > 0) {
+      setActiveTab('positions')
+    }
+  }, [isWatchlistLoading, watchlist, positions, activeTab])
 
   const handleRefresh = async () => {
     setIsRefreshing(true)
@@ -38,160 +64,110 @@ function PortfolioDetailContent() {
     }
   }
 
-  // Detect active tab from URL path
-  const getActiveTab = () => {
-    // Check URL for routed tabs
-    if (location.pathname.includes('/strategy')) return 'strategy'
-    if (location.pathname.includes('/watchlist')) return 'watchlist'
-    if (location.pathname.includes('/backtest')) return 'backtest'
-    if (location.pathname.includes('/orders')) return 'orders'
-    if (location.pathname.includes('/holdings')) return 'holdings'
-    if (location.pathname.includes('/transactions')) return 'activity'
-    if (location.pathname.includes('/settings')) return 'settings'
-
-    // Default to overview if no tab path segment found
-    return 'overview'
+  if (isLoading) {
+    return <div className="text-slate-400">Loading portfolio...</div>
   }
-  
-  const activeTab = getActiveTab()
-  
-  const handleTabChange = (tabId: string) => {
-    // Route all tabs through URL
-    if (tabId === 'overview') {
-      navigate(`/portfolios/${encodeURIComponent(name)}`)
-    } else if (tabId === 'strategy') {
-      navigate(`/portfolios/${encodeURIComponent(name)}/strategy`)
-    } else if (tabId === 'watchlist') {
-      navigate(`/portfolios/${encodeURIComponent(name)}/watchlist`)
-    } else if (tabId === 'backtest') {
-      navigate(`/portfolios/${encodeURIComponent(name)}/backtest`)
-    } else if (tabId === 'orders') {
-      navigate(`/portfolios/${encodeURIComponent(name)}/orders`)
-    } else if (tabId === 'holdings') {
-      navigate(`/portfolios/${encodeURIComponent(name)}/holdings`)
-    } else if (tabId === 'activity') {
-      navigate(`/portfolios/${encodeURIComponent(name)}/transactions`)
-    } else if (tabId === 'settings') {
-      navigate(`/portfolios/${encodeURIComponent(name)}/settings`)
-    }
+
+  if (!details) {
+    return <div className="text-slate-400">Portfolio "{name}" not found</div>
   }
 
   return (
-    <div className="flex gap-6 h-[calc(100vh-120px)]">
-      {/* Main Content */}
-      <div className="flex-1 overflow-y-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-start justify-between">
-          <div className="flex items-start gap-4">
-            <Link to="/portfolios" className="text-purple-400 hover:text-purple-300 text-sm">
-              ← Back to portfolios
-            </Link>
-          </div>
-          <div className="flex gap-3">
-            <button className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition text-sm font-medium">
-              Actions
-            </button>
-            <button className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition text-sm font-medium flex items-center gap-2">
-              <span>✨</span> Ask Cresus
-            </button>
-          </div>
-        </div>
-
-        {/* Portfolio Header */}
-        <div className="flex items-start justify-between border-b border-slate-800 pb-4">
-          <div className="flex-1">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-violet-600 rounded-lg flex items-center justify-center">
-                <span className="text-lg">🚀</span>
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <h1 className="text-3xl font-bold text-white capitalize">{name} Portfolio</h1>
-                  <button
-                    onClick={handleRefresh}
-                    disabled={isRefreshing}
-                    className="p-2 text-slate-400 hover:text-white transition disabled:opacity-50"
-                    title="Refresh portfolio data"
-                  >
-                    <span className={`text-xl ${isRefreshing ? 'animate-spin' : ''}`}>🔄</span>
-                  </button>
-                </div>
-                <p className="text-slate-400 text-sm">High growth companies and AI innovators.</p>
-              </div>
-            </div>
-            <div className="mt-2 flex items-center gap-4">
-              <span className="inline-block px-2 py-1 bg-purple-900/30 text-purple-300 text-xs font-medium rounded">Primary</span>
-              <span className="text-slate-500 text-xs flex items-center gap-1">
-                <span className="w-2 h-2 bg-green-400 rounded-full"></span>
-                Updated just now
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Tab Navigation */}
-        <div className="border-b border-slate-800">
-          <div className="flex gap-8 overflow-x-auto">
-            {TABS.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => handleTabChange(tab.id)}
-                className={`px-1 py-4 font-medium text-sm transition border-b-2 whitespace-nowrap ${
-                  activeTab === tab.id
-                    ? 'border-purple-600 text-white'
-                    : 'border-transparent text-slate-400 hover:text-slate-300'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Tab Content */}
+    <div className="flex flex-col h-[calc(100vh-64px)] space-y-6">
+      {/* Header */}
+      <div className="flex items-start justify-between flex-shrink-0">
         <div>
-          {activeTab === 'overview' && <PortfolioOverview name={name} />}
-          {activeTab === 'strategy' && <StrategyBuilder name={name} />}
-          {activeTab === 'watchlist' && <AIWatchlist name={name} />}
-          {activeTab === 'orders' && <OrdersView name={name} />}
-          {activeTab === 'backtest' && <PortfolioBacktest name={name} />}
-          {activeTab === 'holdings' && <PortfolioHoldingsWidget portfolioName={name} />}
-          {activeTab === 'settings' && <PortfolioSettings name={name} />}
-          {activeTab === 'activity' && <div className="text-slate-400 py-12 text-center">Activity tab - Coming soon</div>}
+          <Link to="/portfolios" className="text-purple-400 hover:text-purple-300 text-sm">
+            ← Back to portfolios
+          </Link>
+          <div className="flex items-center gap-3 mt-2">
+            <h1 className="text-3xl font-bold text-white capitalize">{name} Portfolio</h1>
+          </div>
+          <p className="text-slate-400 text-sm mt-1">Strategy: {strategyName}</p>
+        </div>
+        <div className="flex gap-3">
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium text-sm transition disabled:opacity-50"
+          >
+            {isRefreshing ? 'Refreshing...' : '↻ Refresh'}
+          </button>
         </div>
       </div>
 
-      {/* Right Sidebar - Conversations */}
-      <div className="w-96 flex-shrink-0 flex flex-col">
-        <ConversationWidget
-          portfolioName={name}
-          title="Alerts & Chat"
-          subtitle={`${name.charAt(0).toUpperCase() + name.slice(1)} Portfolio`}
-          maxHeight="h-full"
-          onSendMessage={async (message) => {
-            const baseUrl = getApiBaseUrl()
-            const response = await fetch(`${baseUrl}/api/v1/conversations/${encodeURIComponent(name)}/message`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                source: 'user',
-                content: message,
-              }),
-            })
-            if (!response.ok) throw new Error('Failed to send message')
-          }}
+      {/* Top row (~70%) - 2-column 50/50 layout */}
+      <div className="flex gap-6 flex-[7] min-h-0">
+        {/* Left column */}
+        <div className="w-1/2 flex flex-col bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
+          <div className="border-b border-slate-800 flex-shrink-0">
+            <div className="flex gap-6 px-4">
+              {TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as 'watchlist' | 'positions' | 'performance')}
+                  className={`px-1 py-4 font-medium text-sm transition border-b-2 whitespace-nowrap ${
+                    activeTab === tab.id
+                      ? 'border-purple-600 text-white'
+                      : 'border-transparent text-slate-400 hover:text-slate-300'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-hidden">
+            {activeTab === 'watchlist' && (
+              isWatchlistLoading ? (
+                <div className="text-center py-12 text-slate-400">Loading watchlist...</div>
+              ) : (
+                <ResultsWidget
+                  data={watchlist}
+                  searchQuery={searchQuery}
+                  onSearchChange={setSearchQuery}
+                  sortColumn={sortColumn}
+                  onSortChange={setSortColumn}
+                  sortDirection={sortDirection}
+                  onSortDirectionChange={setSortDirection}
+                  historicalData={historicalData}
+                  onSetHistoricalData={setHistoricalData}
+                  onGetHistoricalData={api.getHistoricalData.bind(api)}
+                  onSelectTicker={setSelectedTicker}
+                />
+              )
+            )}
+
+            {activeTab === 'positions' && (
+              <div className="h-full p-4">
+                <PortfolioHoldingsWidget
+                  portfolioName={name}
+                  onSelectTicker={setSelectedTicker}
+                />
+              </div>
+            )}
+
+            {activeTab === 'performance' && (
+              <PortfolioPerformanceWidget portfolioName={name} />
+            )}
+          </div>
+        </div>
+
+        {/* Right column - Chart (always mounted so its controls sidebar is never hidden) */}
+        <div className="w-1/2 flex flex-col bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
+          <TradingChartWidget ticker={selectedTicker || ''} showControls title={selectedTicker || undefined} />
+        </div>
+      </div>
+
+      {/* Bottom row (~30%) - Orders widget */}
+      <div className="flex-[3] min-h-0">
+        <OrdersWidget
+          orders={ordersData?.orders || []}
+          isLoading={isOrdersLoading}
+          currency={details?.currency || 'USD'}
         />
       </div>
     </div>
-  )
-}
-
-export default function PortfolioDetail() {
-  const { name = 'main' } = useParams()
-
-  return (
-    <PortfolioProvider portfolioName={name}>
-      <PortfolioDetailContent />
-    </PortfolioProvider>
   )
 }

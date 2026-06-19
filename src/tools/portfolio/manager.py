@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 import os
+import time
 import yaml
 import json
 import pandas as pd
@@ -49,6 +50,8 @@ class PortfolioManager:
         self.orders_dir.mkdir(parents=True, exist_ok=True)
         self.cache = PortfolioCache(context=self.context)
         self.company_name_cache = {}  # Cache company names by ticker
+        self._details_cache: Dict[str, tuple] = {}  # name -> (expires_at, details)
+        self._DETAILS_CACHE_TTL = 5  # seconds; absorbs bursts of requests for the same page load
 
     def _get_company_name(self, ticker: str) -> str:
         """Get company name for ticker with caching."""
@@ -333,7 +336,21 @@ class PortfolioManager:
         }
 
     def get_portfolio_details(self, name: str) -> Optional[Dict[str, Any]]:
-        """Get portfolio with positions and metadata."""
+        """Get portfolio with positions and metadata.
+
+        Memoized briefly: /allocation, /holdings, and /current-prices each call this,
+        so a short TTL avoids re-running the per-ticker price/company lookup loop
+        multiple times for requests fired together by the same page load.
+        """
+        cached = self._details_cache.get(name)
+        if cached and cached[0] > time.monotonic():
+            return cached[1]
+
+        details = self._compute_portfolio_details(name)
+        self._details_cache[name] = (time.monotonic() + self._DETAILS_CACHE_TTL, details)
+        return details
+
+    def _compute_portfolio_details(self, name: str) -> Optional[Dict[str, Any]]:
         # Load metadata
         metadata = self._get_portfolio_metadata(name)
 
@@ -586,6 +603,7 @@ class PortfolioManager:
 
             # Update cache after successful transaction
             self.update_portfolio_cache(portfolio_name)
+            self._details_cache.pop(portfolio_name, None)
             return {
                 "status": "success",
                 "operation": "buy" if operation_upper == "BUY" else "sell",
@@ -640,6 +658,7 @@ class PortfolioManager:
             journal.update_transaction(transaction_id, updates)
             journal.flush()
             self.update_portfolio_cache(portfolio_name)
+            self._details_cache.pop(portfolio_name, None)
             return {"status": "success", "message": "Transaction updated"}
         except Exception as e:
             return {"status": "error", "message": str(e)}
@@ -651,6 +670,7 @@ class PortfolioManager:
             journal.delete_transaction(transaction_id)
             journal.flush()
             self.update_portfolio_cache(portfolio_name)
+            self._details_cache.pop(portfolio_name, None)
             return {"status": "success", "message": "Transaction deleted"}
         except Exception as e:
             return {"status": "error", "message": str(e)}

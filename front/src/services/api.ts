@@ -141,6 +141,10 @@ class CresusAPI {
     return (await this.client.get(`/portfolios/${name}/watchlist`, { params: { limit } })).data
   }
 
+  async getPortfolioOrders(name: string) {
+    return (await this.client.get(`/portfolios/${name}/orders`)).data
+  }
+
   async getTransactions(portfolioName: string, ticker?: string) {
     const params = ticker ? `?ticker=${ticker}` : ''
     return (await this.client.get(`/portfolios/${portfolioName}/transactions${params}`)).data

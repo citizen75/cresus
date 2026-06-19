@@ -132,6 +132,11 @@ class Fundamental:
 						"name": info.get("longName") or info.get("shortName") or self.ticker,
 						"sector": info.get("sector"),
 						"industry": info.get("industry"),
+						"asset_type": self._get_asset_type(info),
+						"market_cap": info.get("marketCap"),
+						"currency": info.get("currency", "USD"),
+						"description": info.get("description", ""),
+						"website": info.get("website", ""),
 					},
 					"analysts": {
 						"target_price": target_price,
@@ -170,31 +175,25 @@ class Fundamental:
 		return fresh.get("data", {}).get("quotation", {}).get("current_price")
 
 	def get_company_info(self) -> Dict[str, Any]:
-		"""Get company information from yfinance."""
-		try:
-			ticker_obj = yf.Ticker(self.ticker)
-			info = ticker_obj.info or {}
+		"""Get company information from cache or fetch."""
+		cached = self.load()
+		company = cached.get("data", {}).get("company", {}) if cached else {}
 
-			return {
-				"ticker": self.ticker,
-				"company_name": info.get("longName") or info.get("shortName") or self.ticker,
-				"sector": info.get("sector", "Unknown"),
-				"industry": info.get("industry", "Unknown"),
-				"asset_type": self._get_asset_type(info),
-				"market_cap": info.get("marketCap"),
-				"currency": info.get("currency", "USD"),
-				"description": info.get("description", ""),
-				"website": info.get("website", ""),
-			}
-		except Exception as e:
-			logger.warning(f"Error fetching company info for {self.ticker}: {e}")
-			return {
-				"ticker": self.ticker,
-				"company_name": self.ticker,
-				"sector": "Unknown",
-				"industry": "Unknown",
-				"asset_type": "Stock",
-			}
+		if not company.get("name"):
+			fresh = self.fetch()
+			company = fresh.get("data", {}).get("company", {})
+
+		return {
+			"ticker": self.ticker,
+			"company_name": company.get("name") or self.ticker,
+			"sector": company.get("sector") or "Unknown",
+			"industry": company.get("industry") or "Unknown",
+			"asset_type": company.get("asset_type", "Stock"),
+			"market_cap": company.get("market_cap"),
+			"currency": company.get("currency", "USD"),
+			"description": company.get("description", ""),
+			"website": company.get("website", ""),
+		}
 
 	def _get_asset_type(self, info: Dict) -> str:
 		"""Determine asset type from yfinance info."""
