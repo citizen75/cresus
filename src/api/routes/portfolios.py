@@ -207,11 +207,14 @@ async def get_portfolio_history(name: str, fetch: bool = False):
     from pathlib import Path
     import json
     from loguru import logger
+    from tools.portfolio.naming import normalize_portfolio_name
+
+    normalized_name = normalize_portfolio_name(name)
 
     # Try to load from cache file first (unless fetch=true)
     if not fetch:
         db_root = Path(os.path.expanduser("~/.cresus/db"))
-        history_cache = db_root / "portfolios" / name / "history.json"
+        history_cache = db_root / "portfolios" / normalized_name / "history.json"
         logger.info(f"Checking cache: {history_cache}, exists={history_cache.exists()}")
         if history_cache.exists():
             try:
@@ -237,7 +240,7 @@ async def get_portfolio_history(name: str, fetch: bool = False):
         try:
             from pathlib import Path
             db_root = Path(os.path.expanduser("~/.cresus/db"))
-            history_cache = db_root / "portfolios" / name / "history.json"
+            history_cache = db_root / "portfolios" / normalized_name / "history.json"
             with open(history_cache, 'w') as f:
                 json.dump(result, f)
         except Exception:
@@ -333,13 +336,14 @@ async def get_portfolio_strategy(name: str):
 async def get_portfolio_watchlist(name: str, limit: int = 50):
     """Get watchlist for portfolio from its associated strategy."""
     from tools.portfolio.manager import PortfolioManager
+    from tools.portfolio.naming import normalize_portfolio_name
     from pathlib import Path
     from utils.env import get_db_root
     import json
 
     # Get portfolio metadata directly without fetching prices
     db_root = get_db_root()
-    portfolio_dir = db_root / "portfolios" / name
+    portfolio_dir = db_root / "portfolios" / normalize_portfolio_name(name)
     portfolio_json = portfolio_dir / "portfolio.json"
 
     if not portfolio_json.exists():

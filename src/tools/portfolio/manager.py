@@ -12,6 +12,7 @@ from .journal import Journal
 from tools.data import Fundamental, DataHistory
 from .cache import PortfolioCache
 from .portfolio_history import PortfolioHistory
+from .naming import normalize_portfolio_name
 from utils.env import get_db_root, get_config_root
 
 
@@ -67,7 +68,7 @@ class PortfolioManager:
     @staticmethod
     def _normalize_portfolio_name(name: str) -> str:
         """Normalize portfolio name to lowercase with underscores. Must match Journal normalization."""
-        return name.lower().replace(" ", "_")
+        return normalize_portfolio_name(name)
 
     def list_portfolios(self) -> List[Dict[str, Any]]:
         """List all portfolios by scanning folders in portfolios directory."""
@@ -317,6 +318,20 @@ class PortfolioManager:
             "strategy": metadata.get("strategy", name),
         }
 
+    @staticmethod
+    def _build_position_entry(ticker: str, company_name: str, quantity: float, avg_entry_price: float, current_price: float) -> Dict[str, Any]:
+        """Build a position dict (value/gain/gain_pct) from an already-resolved current price."""
+        return {
+            "ticker": ticker,
+            "company_name": company_name,
+            "quantity": quantity,
+            "avg_entry_price": avg_entry_price,
+            "current_price": current_price,
+            "position_value": round(quantity * current_price, 2),
+            "position_gain": round((current_price - avg_entry_price) * quantity, 2),
+            "position_gain_pct": round(((current_price - avg_entry_price) / avg_entry_price * 100), 2) if avg_entry_price > 0 else 0,
+        }
+
     def get_portfolio_details(self, name: str) -> Optional[Dict[str, Any]]:
         """Get portfolio with positions and metadata."""
         # Load metadata
@@ -335,18 +350,8 @@ class PortfolioManager:
                 # Use cached current_price from Fundamental data, fallback to journal data
                 from tools.data import Fundamental
                 current_price = Fundamental(ticker).get_current_price() or float(row.get("current_price", avg_entry_price))
-                pos_value = quantity * current_price
                 company_name = self._get_company_name(ticker)
-                positions.append({
-                    "ticker": ticker,
-                    "company_name": company_name,
-                    "quantity": quantity,
-                    "avg_entry_price": avg_entry_price,
-                    "current_price": current_price,
-                    "position_value": round(pos_value, 2),
-                    "position_gain": round((current_price - avg_entry_price) * quantity, 2),
-                    "position_gain_pct": round(((current_price - avg_entry_price) / avg_entry_price * 100), 2) if avg_entry_price > 0 else 0,
-                })
+                positions.append(self._build_position_entry(ticker, company_name, quantity, avg_entry_price, current_price))
 
         completed = df[df["status"] == "completed"] if not df.empty else pd.DataFrame()
         return {
@@ -388,21 +393,7 @@ class PortfolioManager:
             dh = DataHistory(ticker)
             current_price = dh.get_current_price() or avg_entry_price
             company_name = self._get_company_name(ticker)
-
-            # Calculate unrealized P&L
-            position_gain = round((current_price - avg_entry_price) * quantity, 2)
-            position_gain_pct = round(((current_price - avg_entry_price) / avg_entry_price * 100) if avg_entry_price > 0 else 0, 2)
-
-            positions.append({
-                "ticker": ticker,
-                "company_name": company_name,
-                "quantity": quantity,
-                "avg_entry_price": avg_entry_price,
-                "current_price": current_price,
-                "position_value": round(quantity * current_price, 2),
-                "position_gain": position_gain,
-                "position_gain_pct": position_gain_pct,
-            })
+            positions.append(self._build_position_entry(ticker, company_name, quantity, avg_entry_price, current_price))
         return {"positions": positions, "total_value": sum(p["position_value"] for p in positions)}
 
     def get_portfolio_performance(self, name: str) -> Optional[Dict[str, Any]]:
@@ -547,10 +538,7 @@ class PortfolioManager:
         if result.get("status") == "error":
             return {
                 "portfolio_name": name,
-                "history": [
-                    {"date": "2026-01-01", "value": initial_capital},
-                    {"date": "2026-05-01", "value": initial_capital},
-                ],
+                "error": result.get("message", "Failed to calculate portfolio history"),
             }
 
         return result

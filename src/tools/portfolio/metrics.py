@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, Tuple
+from loguru import logger
 from .manager import PortfolioManager
 
 try:
@@ -33,7 +34,10 @@ class PortfolioMetrics(PortfolioManager):
         
         journal = Journal(name, context=self.context)
         df = journal.load_df()
-        
+
+        if df.empty:
+            return self._empty_metrics(start_date, end_date, start_value)
+
         # Convert dates
         start_dt = pd.to_datetime(start_date) if start_date else None
         end_dt = pd.to_datetime(end_date) if end_date else None
@@ -185,6 +189,11 @@ class PortfolioMetrics(PortfolioManager):
         # Calculate exit type breakdown
         exit_stats = self._calculate_exit_stats(completed_trades)
 
+        sqn = self._calculate_sqn(trades_analysis["trade_pnl"])
+        kelly_criterion = self._calculate_kelly_criterion(
+            trades_analysis["win_rate"], trades_analysis["avg_winning"], trades_analysis["avg_losing"]
+        )
+
         return {
             # Dates and period
             "start_date": actual_start_dt.strftime('%Y-%m-%d %H:%M:%S%z'),
@@ -234,6 +243,8 @@ class PortfolioMetrics(PortfolioManager):
             "calmar_ratio": calmar,
             "omega_ratio": omega,
             "sortino_ratio": sortino,
+            "sqn": sqn,
+            "kelly_criterion_pct": kelly_criterion,
 
             # Exit type breakdown
             "exit_stop_loss": exit_stats["stop_loss"],
@@ -251,7 +262,8 @@ class PortfolioMetrics(PortfolioManager):
                 start_dt = pd.to_datetime(start_date)
                 end_dt = pd.to_datetime(end_date)
                 period_days = (end_dt - start_dt).days
-            except:
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Failed to parse period dates '{start_date}'/'{end_date}': {e}")
                 period_days = 0
         
         return {
@@ -283,6 +295,8 @@ class PortfolioMetrics(PortfolioManager):
             "calmar_ratio": 0.0,
             "omega_ratio": 0.0,
             "sortino_ratio": 0.0,
+            "sqn": 0.0,
+            "kelly_criterion_pct": 0.0,
             "exit_stop_loss": 0,
             "exit_take_profit": 0,
             "exit_expired": 0,
@@ -304,6 +318,7 @@ class PortfolioMetrics(PortfolioManager):
                 "avg_losing_duration": 0.0,
                 "profit_factor": 0.0,
                 "expectancy": 0.0,
+                "trade_pnl": [],
             }
 
         # Calculate P&L per trade
@@ -372,8 +387,9 @@ class PortfolioMetrics(PortfolioManager):
                 "avg_losing_duration": 0.0,
                 "profit_factor": 0.0,
                 "expectancy": 0.0,
+                "trade_pnl": [],
             }
-        
+
         win_count = len(winning_trades)
         loss_count = len(losing_trades)
         total_closed = win_count + loss_count
@@ -403,6 +419,7 @@ class PortfolioMetrics(PortfolioManager):
             "avg_losing_duration": (sum(losing_durations) / len(losing_durations)) if losing_durations else 0.0,
             "profit_factor": profit_factor,
             "expectancy": expectancy,
+            "trade_pnl": trade_pnl,
         }
 
     def _calculate_max_drawdown(self, history_df: pd.DataFrame) -> Tuple[float, timedelta]:
@@ -418,14 +435,10 @@ class PortfolioMetrics(PortfolioManager):
         
         max_dd = np.min(drawdown)
         max_dd_idx = np.argmin(drawdown)
-        
-        # Find duration of max drawdown
-        peak_idx = np.where(cummax == cummax[max_dd_idx])[0]
-        if len(peak_idx) > 0:
-            peak_idx = peak_idx[-1] if max_dd_idx >= np.where(cummax == cummax[max_dd_idx])[0][-1] else peak_idx[0]
-        else:
-            peak_idx = max_dd_idx
-        
+
+        # Peak is simply the highest portfolio value reached on or before the trough
+        peak_idx = int(np.argmax(values[:max_dd_idx + 1]))
+
         # Find recovery point
         recovery_idx = max_dd_idx
         for i in range(max_dd_idx + 1, len(values)):
@@ -448,8 +461,8 @@ class PortfolioMetrics(PortfolioManager):
             try:
                 returns_series = pd.Series(daily_returns / 100)  # Convert from percentage
                 return float(qs.stats.sharpe(returns_series, rf=rf_rate))
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"quantstats sharpe failed, falling back to manual calculation: {e}")
 
         # Fallback to manual calculation
         daily_rf = rf_rate / 252
@@ -469,8 +482,8 @@ class PortfolioMetrics(PortfolioManager):
             try:
                 returns_series = pd.Series(daily_returns / 100)  # Convert from percentage
                 return float(qs.stats.sortino(returns_series, rf=rf_rate))
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"quantstats sortino failed, falling back to manual calculation: {e}")
 
         # Fallback to manual calculation
         daily_rf = rf_rate / 252
@@ -500,8 +513,8 @@ class PortfolioMetrics(PortfolioManager):
             try:
                 returns_series = pd.Series(daily_returns / 100)  # Convert from percentage
                 return float(qs.stats.omega(returns_series, 0.0))
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"quantstats omega failed, falling back to manual calculation: {e}")
 
         # Fallback to manual calculation
         gains = daily_returns[daily_returns > threshold] - threshold
@@ -514,6 +527,26 @@ class PortfolioMetrics(PortfolioManager):
             return 1.0 if sum_gains >= 0 else 0.0
 
         return float(sum_gains / sum_losses) if sum_losses > 0 else 0.0
+
+    def _calculate_sqn(self, trade_pnl: list) -> float:
+        """Calculate System Quality Number: sqrt(N) * mean(trade_pnl) / std(trade_pnl)."""
+        if len(trade_pnl) < 2:
+            return 0.0
+        std = np.std(trade_pnl)
+        if std == 0:
+            return 0.0
+        return float(np.sqrt(len(trade_pnl)) * np.mean(trade_pnl) / std)
+
+    def _calculate_kelly_criterion(self, win_rate_pct: float, avg_winning_pct: float, avg_losing_pct: float) -> float:
+        """Calculate Kelly criterion: W - (1-W)/R, where W is win rate and R is the win/loss ratio."""
+        if avg_losing_pct == 0:
+            return 0.0
+        win_rate = win_rate_pct / 100
+        win_loss_ratio = abs(avg_winning_pct / avg_losing_pct)
+        if win_loss_ratio == 0:
+            return 0.0
+        kelly = win_rate - (1 - win_rate) / win_loss_ratio
+        return float(kelly * 100)
 
     def _calculate_max_exposure(self, trades: pd.DataFrame, history_df: pd.DataFrame, start_value: float) -> float:
         """Calculate maximum gross exposure as percentage of portfolio."""
@@ -649,20 +682,14 @@ class PortfolioMetrics(PortfolioManager):
 
         return exit_type_counts
 
-    def get_daily_metrics(self, name: str):
-        """Get daily metrics for portfolio."""
+    def get_daily_metrics(self, name: str) -> Optional[Dict[str, Any]]:
+        """Get comprehensive performance metrics for a portfolio (full history)."""
         perf = self.get_portfolio_performance(name)
         if not perf:
             return None
 
-        return {
-            **perf,
-            "sharpe_ratio": 1.5,
-            "sortino_ratio": 2.0,
-            "calmar_ratio": 1.0,
-            "max_drawdown_pct": 5.0,
-            "profit_factor": 1.5,
-            "expectancy_pct": 0.5,
-            "sqn": 1.5,
-            "kelly_criterion_pct": 5.0,
-        }
+        metadata = self._get_portfolio_metadata(name)
+        start_value = float(metadata.get("initial_capital", 100000.0))
+
+        backtest_metrics = self.calculate_backtest_metrics(name, start_value=start_value)
+        return {**perf, **backtest_metrics}

@@ -58,7 +58,7 @@ class PortfolioDistribution:
             price = float(row.get("price", 0))
             fees = float(row.get("fees", 0))
             created_at = row.get("created_at", "")
-            exit_date = row.get("exit_date", "") or row.get("status_at", "")
+            exit_date = row.get("status_at", "")
             metadata = row.get("metadata", "")
 
             if operation == "BUY":

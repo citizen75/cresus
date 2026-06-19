@@ -8,6 +8,8 @@ import os
 import uuid
 import json
 
+from .naming import normalize_portfolio_name
+
 
 class Journal:
     """Transaction-based trading journal - CSV store for individual transactions."""
@@ -19,7 +21,7 @@ class Journal:
 
     def __init__(self, name: str = "default", context: Optional[Dict[str, Any]] = None):
         # Normalize portfolio name to lowercase snake_case
-        normalized_name = self._normalize_name(name)
+        normalized_name = normalize_portfolio_name(name)
 
         # Store context for caching
         self.context = context
@@ -45,17 +47,6 @@ class Journal:
         self.filepath.parent.mkdir(parents=True, exist_ok=True)
         self.name = normalized_name
         self._ensure_base_structure()
-
-    @staticmethod
-    def _normalize_name(name: str) -> str:
-        """Normalize portfolio name to lowercase snake_case.
-
-        Examples:
-            "Momentum cac" → "momentum_cac"
-            "PEA Gilles" → "pea_gilles"
-            "momentum_cac" → "momentum_cac"
-        """
-        return name.lower().replace(" ", "_")
 
     def _ensure_base_structure(self) -> None:
         """Ensure journal file exists with correct columns."""

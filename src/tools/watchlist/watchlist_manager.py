@@ -49,8 +49,11 @@ class WatchlistManager:
 			self.watchlist_dir = Path(backtest_dir) / "watchlist"
 			self.filepath = self.watchlist_dir / f"{strategy_name}.csv"
 		elif portfolio_name:
-			# Use portfolio directory
-			self.watchlist_dir = db_root / "portfolios" / portfolio_name
+			# Use portfolio directory (normalized to match Journal/Orders/PortfolioManager,
+			# otherwise a display name like "Nathalie PEA" creates a separate ghost folder
+			# next to the canonical "nathalie_pea" one)
+			from tools.portfolio.naming import normalize_portfolio_name
+			self.watchlist_dir = db_root / "portfolios" / normalize_portfolio_name(portfolio_name)
 			self.filepath = self.watchlist_dir / "watchlist.csv"
 		else:
 			# Use normal watchlist directory
