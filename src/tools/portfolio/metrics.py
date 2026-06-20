@@ -38,25 +38,25 @@ class PortfolioMetrics(PortfolioManager):
         if df.empty:
             return self._empty_metrics(start_date, end_date, start_value)
 
-        # Convert dates
-        start_dt = pd.to_datetime(start_date) if start_date else None
-        end_dt = pd.to_datetime(end_date) if end_date else None
-        
-        # Determine actual date range first
-        if start_dt:
-            actual_start_dt = start_dt
-        else:
-            actual_start_dt = pd.to_datetime(df['created_at'].min()) if not df.empty else pd.Timestamp.now()
-
-        if end_dt:
-            actual_end_dt = end_dt
-        else:
-            actual_end_dt = pd.to_datetime(df['created_at'].max()) if not df.empty else pd.Timestamp.now()
-
-        # Calculate portfolio value directly from journal (more reliable than PortfolioHistory)
+        # Convert dates - coerce first so a single malformed row (e.g. a typo'd
+        # year) becomes NaT instead of crashing, and so min/max are computed
+        # chronologically rather than as a lexicographic string comparison.
         df['created_at'] = pd.to_datetime(df['created_at'], errors='coerce')
         df['price'] = pd.to_numeric(df['price'], errors='coerce')
         df['quantity'] = pd.to_numeric(df['quantity'], errors='coerce')
+
+        if df['created_at'].notna().any():
+            journal_min_dt = df['created_at'].min()
+            journal_max_dt = df['created_at'].max()
+        else:
+            journal_min_dt = journal_max_dt = pd.Timestamp.now()
+
+        start_dt = pd.to_datetime(start_date) if start_date else None
+        end_dt = pd.to_datetime(end_date) if end_date else None
+
+        # Determine actual date range first
+        actual_start_dt = start_dt if start_dt else journal_min_dt
+        actual_end_dt = end_dt if end_dt else journal_max_dt
 
         # Filter to date range
         df_range = df[(df['created_at'] >= actual_start_dt) & (df['created_at'] <= actual_end_dt)].copy()
@@ -601,8 +601,10 @@ class PortfolioMetrics(PortfolioManager):
         journal_df['created_at'] = pd.to_datetime(journal_df['created_at'], errors='coerce')
         journal_df['status_at'] = pd.to_datetime(journal_df['status_at'], errors='coerce')
 
-        # Filter to completed trades only
-        journal_df = journal_df[journal_df['status'] == 'completed'].copy()
+        # Filter to completed trades only, dropping rows with an unparseable
+        # date - they can't be placed on the timeline and would otherwise
+        # crash merge_asof below (it rejects null merge keys).
+        journal_df = journal_df[(journal_df['status'] == 'completed') & journal_df['created_at'].notna()].copy()
         if journal_df.empty:
             return {"max_open": 0, "avg_open": 0.0, "days_with_positions": 0}
 
