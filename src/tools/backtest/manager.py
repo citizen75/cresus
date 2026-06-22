@@ -10,6 +10,7 @@ from datetime import datetime, date
 from typing import Any, Dict, List, Optional
 import pandas as pd
 from utils.env import get_db_root
+from tools.data.core import DataHistory
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,163 @@ class BacktestManager:
 		self.db_root = get_db_root()
 		self.backtests_dir = self.db_root / "backtests"
 		self.logger = logger
+
+	# ------------------------------------------------------------------
+	# Path safety
+	# ------------------------------------------------------------------
+
+	def _resolve_strategy_dir(self, strategy_name: str) -> Optional[Path]:
+		"""Resolve a strategy's backtests directory, refusing to escape backtests_dir.
+
+		strategy_name ultimately comes from API path parameters, so this guards
+		against path traversal (e.g. '../../etc') resolving outside the intended
+		backtests directory.
+		"""
+		try:
+			base = self.backtests_dir.resolve()
+			candidate = (self.backtests_dir / strategy_name).resolve()
+			candidate.relative_to(base)
+			return candidate
+		except (ValueError, OSError):
+			self.logger.warning(f"Rejected unsafe strategy path: strategy={strategy_name!r}")
+			return None
+
+	def _resolve_backtest_dir(self, strategy_name: str, backtest_id: str) -> Optional[Path]:
+		"""Resolve the on-disk directory for a backtest, refusing to escape backtests_dir."""
+		strategy_dir = self._resolve_strategy_dir(strategy_name)
+		if strategy_dir is None:
+			return None
+		try:
+			base = self.backtests_dir.resolve()
+			candidate = (strategy_dir / backtest_id).resolve()
+			candidate.relative_to(base)
+			return candidate
+		except (ValueError, OSError):
+			self.logger.warning(
+				f"Rejected unsafe backtest path: strategy={strategy_name!r} backtest_id={backtest_id!r}"
+			)
+			return None
+
+	# ------------------------------------------------------------------
+	# Shared helpers
+	# ------------------------------------------------------------------
+
+	def _read_json_safe(self, filepath: Path) -> Optional[Dict[str, Any]]:
+		"""Read a JSON file, tolerating bare NaN tokens emitted by older writers.
+
+		Returns None if the file doesn't exist or can't be parsed.
+		"""
+		if not filepath.exists():
+			return None
+		try:
+			text = filepath.read_text()
+			text = re.sub(r"\bNaN\b", "null", text)
+			return json.loads(text)
+		except Exception as e:
+			self.logger.debug(f"Failed to read {filepath}: {e}")
+			return None
+
+	def _get_initial_capital(self, metrics: Optional[Dict[str, Any]]) -> float:
+		"""Single source of truth for the default starting-capital fallback."""
+		if metrics:
+			value = metrics.get("start_value")
+			if value is not None:
+				try:
+					return float(value)
+				except (TypeError, ValueError):
+					pass
+		return 10000.0
+
+	def _find_journal_file(self, backtest_dir: Path) -> Optional[Path]:
+		"""Find the portfolio journal CSV for a backtest.
+
+		Supports all formats produced over time:
+		  1. portfolios/journal.csv
+		  2. portfolios/*_journal.csv (legacy flat naming)
+		  3. portfolios/<portfolio_name>/journal.csv (current format)
+		"""
+		portfolios_dir = backtest_dir / "portfolios"
+		if not portfolios_dir.exists():
+			return None
+
+		candidates = list(portfolios_dir.glob("journal.csv"))
+		if not candidates:
+			candidates = list(portfolios_dir.glob("*_journal.csv"))
+		if not candidates:
+			candidates = list(portfolios_dir.glob("*/journal.csv"))
+		if not candidates:
+			return None
+
+		if len(candidates) > 1:
+			self.logger.warning(
+				f"Multiple journal files found under {portfolios_dir}, using "
+				f"{candidates[0].name} (ignoring {len(candidates) - 1} other(s)) - "
+				f"multi-portfolio backtests aren't fully supported yet"
+			)
+		return candidates[0]
+
+	def _apply_peak_drawdown(
+		self, points: List[Dict[str, Any]], initial_value: float
+	) -> List[Dict[str, Any]]:
+		"""Annotate {date, value} points with a running-peak drawdown_pct (<= 0).
+
+		Single canonical implementation shared by _compute_equity_curve, the
+		final-point correction in get_backtest, and get_portfolio_history, so the
+		three don't drift out of sync with slightly different peak-tracking logic.
+		"""
+		peak = initial_value
+		annotated = []
+		for point in points:
+			value = point["value"]
+			if value > peak:
+				peak = value
+			drawdown_pct = ((value - peak) / peak * 100) if peak > 0 else 0.0
+			annotated.append({**point, "drawdown_pct": float(drawdown_pct)})
+		return annotated
+
+	def _reconcile_curve_with_metrics(
+		self, equity_curve: List[Dict[str, Any]], metrics: Dict[str, Any]
+	) -> List[Dict[str, Any]]:
+		"""Force the curve's final point to agree with metrics.json's authoritative
+		end_value, so any consumer of the curve always matches the Key Metrics panel.
+
+		Shared by get_backtest and get_portfolio_history - both expose an equity
+		curve, and previously only get_backtest applied this correction, so the two
+		endpoints could silently disagree once a backtest finished.
+		"""
+		if not equity_curve:
+			return equity_curve
+
+		end_value = metrics.get("end_value")
+		end_date = metrics.get("end_date")
+		if not end_value or not end_date:
+			return equity_curve
+
+		# Parse end_date (may be "2025-12-15 00:00:00" format)
+		end_date_str = end_date.split()[0] if isinstance(end_date, str) else str(end_date)
+		last_point_date = equity_curve[-1].get("date")
+
+		if last_point_date and last_point_date < end_date_str:
+			# Last trading day is before the requested end_date - append the
+			# authoritative final value as its own point
+			equity_curve.append({"date": end_date_str, "value": float(end_value)})
+		else:
+			# Last trading day is on or after end_date (e.g. an order placed on the
+			# final day settles on the next trading day, which can spill into the
+			# following year) - overwrite that last point with the authoritative
+			# end_value so the chart always agrees with the Key Metrics panel.
+			equity_curve[-1]["value"] = float(end_value)
+
+		# Re-derive drawdown_pct for the (possibly appended/overwritten) curve
+		initial_capital = self._get_initial_capital(metrics)
+		return self._apply_peak_drawdown(
+			[{"date": p["date"], "value": p["value"]} for p in equity_curve],
+			initial_capital,
+		)
+
+	# ------------------------------------------------------------------
+	# Listing / retrieval
+	# ------------------------------------------------------------------
 
 	def list_backtests(self, strategy_name: Optional[str] = None) -> List[Dict[str, Any]]:
 		"""List all backtests, optionally filtered by strategy.
@@ -39,7 +197,8 @@ class BacktestManager:
 
 		# Determine directories to scan
 		if strategy_name:
-			strategy_dirs = [self.backtests_dir / strategy_name]
+			resolved = self._resolve_strategy_dir(strategy_name)
+			strategy_dirs = [resolved] if resolved else []
 		else:
 			strategy_dirs = [d for d in self.backtests_dir.iterdir() if d.is_dir()]
 
@@ -71,9 +230,8 @@ class BacktestManager:
 		Returns:
 			Detailed backtest data with metrics, positions, equity curve, trades
 		"""
-		backtest_dir = self.backtests_dir / strategy_name / backtest_id
-
-		if not backtest_dir.exists():
+		backtest_dir = self._resolve_backtest_dir(strategy_name, backtest_id)
+		if backtest_dir is None or not backtest_dir.exists():
 			return {"status": "error", "message": "Backtest not found"}
 
 		result = self._load_backtest_summary(strategy_name, backtest_id)
@@ -88,19 +246,15 @@ class BacktestManager:
 			}
 
 		# Load full metrics from metrics.json, or calculate from portfolio history
-		metrics_file = backtest_dir / "metrics.json"
-		if metrics_file.exists():
-			try:
-				with open(metrics_file) as f:
-					text = f.read()
-					# Replace NaN with null for JSON compatibility
-					text = re.sub(r"\bNaN\b", "null", text)
-					metrics = json.loads(text)
-					result["portfolio_metrics"] = metrics
-					# Also merge top-level metrics for backwards compatibility
-					result.update(metrics)
-			except Exception as e:
-				self.logger.warning(f"Failed to load metrics from {metrics_file}: {e}")
+		metrics_data = self._read_json_safe(backtest_dir / "metrics.json")
+		if metrics_data:
+			result["portfolio_metrics"] = metrics_data
+			# Also merge top-level metrics for backwards compatibility, but never let
+			# metrics.json clobber this record's own identity fields if a future
+			# metrics schema happens to add a colliding key name.
+			identity = {k: result.get(k) for k in ("backtest_id", "strategy_name", "created_at")}
+			result.update(metrics_data)
+			result.update(identity)
 		else:
 			# For older backtests without metrics.json, calculate from portfolio history
 			history_result = self.get_portfolio_history(strategy_name, backtest_id)
@@ -108,9 +262,14 @@ class BacktestManager:
 				history = history_result.get("history", [])
 				if history:
 					final_point = history[-1]
-					metrics = {
+					most_negative_drawdown = min(
+						(h.get("drawdown_pct", 0) for h in history), default=0
+					)
+					metrics_data = {
 						"total_return_pct": final_point.get("return_pct", 0),
-						"max_drawdown_pct": min(h.get("drawdown_pct", 0) for h in history),
+						# drawdown_pct on history points is <= 0 (running-peak convention);
+						# max_drawdown_pct is reported elsewhere as a positive magnitude.
+						"max_drawdown_pct": abs(most_negative_drawdown),
 						"sharpe_ratio": 0,  # Would need volatility calculation
 						"sortino_ratio": 0,
 						"calmar_ratio": 0,
@@ -118,43 +277,18 @@ class BacktestManager:
 						"win_rate_pct": result.get("win_rate_pct", 0),
 						"profit_factor": 0,
 					}
-					result["portfolio_metrics"] = metrics
-					result.update(metrics)
+					result["portfolio_metrics"] = metrics_data
+					result.update(metrics_data)
 
-		# Load portfolios.json for positions and portfolio data
-		portfolios_file = backtest_dir / "portfolios.json"
-		if portfolios_file.exists():
-			portfolios = self._load_portfolios_json(portfolios_file)
-			if portfolios and "portfolios" in portfolios:
-				portfolio_data = next(iter(portfolios["portfolios"].values()), {})
-				result["positions"] = portfolio_data.get("positions", {}).get("data", [])
+		# Currently-open positions, computed by replaying the journal. portfolios.json's
+		# current schema doesn't carry a per-position breakdown.
+		result["positions"] = self._compute_open_positions(strategy_name, backtest_id)
 
-		# Compute equity curve from journal
-		equity_curve = self._compute_equity_curve(strategy_name, backtest_id)
+		# Compute equity curve from journal, daily mark-to-market
+		metrics_for_curve = result.get("portfolio_metrics") or {}
+		equity_curve = self._compute_equity_curve(strategy_name, backtest_id, metrics=metrics_for_curve)
 		if equity_curve:
-			# Add final value from metrics if available and different from last transaction date
-			metrics = result.get("portfolio_metrics", {})
-			end_value = metrics.get("end_value")
-			end_date = metrics.get("end_date")
-
-			if end_value and end_date and equity_curve:
-				last_point_date = equity_curve[-1].get("date")
-				# Only add final point if it's on a different date than the last transaction
-				if last_point_date and last_point_date < end_date:
-					# Parse end_date (may be "2025-12-15 00:00:00" format)
-					end_date_str = end_date.split()[0] if isinstance(end_date, str) else str(end_date)
-
-					# Calculate final drawdown from peak
-					peak = max(p["value"] for p in equity_curve)
-					final_drawdown = ((float(end_value) - peak) / peak * 100) if peak > 0 else 0.0
-
-					equity_curve.append({
-						"date": end_date_str,
-						"value": float(end_value),
-						"drawdown_pct": final_drawdown,
-					})
-
-			result["equity_curve"] = equity_curve
+			result["equity_curve"] = self._reconcile_curve_with_metrics(equity_curve, metrics_for_curve)
 
 		# Load trades from journal CSV
 		trades = self._load_journal_trades(strategy_name, backtest_id)
@@ -205,7 +339,9 @@ class BacktestManager:
 		Returns:
 			Status dict
 		"""
-		backtest_dir = self.backtests_dir / strategy_name / backtest_id
+		backtest_dir = self._resolve_backtest_dir(strategy_name, backtest_id)
+		if backtest_dir is None:
+			return {"status": "error", "message": "Invalid strategy_name or backtest_id"}
 
 		if not backtest_dir.exists():
 			return {"status": "error", "message": "Backtest not found"}
@@ -241,7 +377,7 @@ class BacktestManager:
 		try:
 			# Use provided backtest_id or generate a new one
 			if not backtest_id:
-				backtest_id = f"{date.today().strftime('%Y%m%d_%H%M%S')}_{str(uuid.uuid4())[:8]}"
+				backtest_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{str(uuid.uuid4())[:8]}"
 
 			# Create directory
 			dir_result = self.create_backtest_dir(strategy_name, backtest_id)
@@ -287,8 +423,11 @@ class BacktestManager:
 		Returns:
 			Dict with status and backtest_dir path
 		"""
+		backtest_dir = self._resolve_backtest_dir(strategy_name, backtest_id)
+		if backtest_dir is None:
+			return {"status": "error", "message": "Invalid strategy_name or backtest_id"}
+
 		try:
-			backtest_dir = self.backtests_dir / strategy_name / backtest_id
 			backtest_dir.mkdir(parents=True, exist_ok=True)
 
 			# Create subdirectories
@@ -315,10 +454,13 @@ class BacktestManager:
 		Returns:
 			Status dict
 		"""
+		backtest_dir = self._resolve_backtest_dir(strategy_name, backtest_id)
+		if backtest_dir is None:
+			return {"status": "error", "message": "Invalid strategy_name or backtest_id"}
+
 		try:
 			import yaml
 
-			backtest_dir = self.backtests_dir / strategy_name / backtest_id
 			strategy_file = backtest_dir / f"{strategy_name}.yml"
 
 			with open(strategy_file, "w") as f:
@@ -343,8 +485,11 @@ class BacktestManager:
 		Returns:
 			Status dict
 		"""
+		backtest_dir = self._resolve_backtest_dir(strategy_name, backtest_id)
+		if backtest_dir is None:
+			return {"status": "error", "message": "Invalid strategy_name or backtest_id"}
+
 		try:
-			backtest_dir = self.backtests_dir / strategy_name / backtest_id
 			metrics_file = backtest_dir / "metrics.json"
 
 			# Handle NaN values
@@ -373,66 +518,55 @@ class BacktestManager:
 		Returns:
 			Metrics dict or empty dict if not found
 		"""
-		backtest_dir = self.backtests_dir / strategy_name / backtest_id
-		metrics_file = backtest_dir / "metrics.json"
-
-		if not metrics_file.exists():
+		backtest_dir = self._resolve_backtest_dir(strategy_name, backtest_id)
+		if backtest_dir is None:
 			return {}
 
-		try:
-			with open(metrics_file, "r") as f:
-				text = f.read()
-				# Replace NaN with null for JSON compatibility
-				text = re.sub(r"\bNaN\b", "null", text)
-				return json.loads(text)
-		except Exception:
-			return {}
+		return self._read_json_safe(backtest_dir / "metrics.json") or {}
 
 	def _load_backtest_summary(self, strategy_name: str, backtest_id: str) -> Optional[Dict[str, Any]]:
 		"""Load summary data for a single backtest."""
-		backtest_dir = self.backtests_dir / strategy_name / backtest_id
-
-		if not backtest_dir.exists():
+		backtest_dir = self._resolve_backtest_dir(strategy_name, backtest_id)
+		if backtest_dir is None or not backtest_dir.exists():
 			return None
 
 		# Parse created_at from backtest_id
 		created_at = self._parse_created_at(backtest_id)
 
 		# Try to load metrics from metrics.json first (new format)
-		metrics_file = backtest_dir / "metrics.json"
-		if metrics_file.exists():
-			try:
-				with open(metrics_file) as f:
-					text = f.read()
-					text = re.sub(r"\bNaN\b", "null", text)
-					metrics = json.loads(text)
-					return {
-						"backtest_id": backtest_id,
-						"strategy_name": strategy_name,
-						"created_at": created_at,
-						"start_date": metrics.get("start_date"),
-						"end_date": metrics.get("end_date"),
-						"total_return_pct": metrics.get("total_return_pct", 0),
-						"max_drawdown_pct": metrics.get("max_drawdown_pct", 0),
-						"sharpe_ratio": metrics.get("sharpe_ratio", 0),
-						"total_trades": metrics.get("total_trades", 0),
-						"win_rate_pct": metrics.get("win_rate_pct", 0),
-					}
-			except Exception as e:
-				logger.warning(f"Failed to load metrics.json for {backtest_id}: {e}")
+		metrics = self._read_json_safe(backtest_dir / "metrics.json")
+		if metrics:
+			return {
+				"backtest_id": backtest_id,
+				"strategy_name": strategy_name,
+				"created_at": created_at,
+				"start_date": metrics.get("start_date"),
+				"end_date": metrics.get("end_date"),
+				"total_return_pct": metrics.get("total_return_pct", 0),
+				"max_drawdown_pct": metrics.get("max_drawdown_pct", 0),
+				"sharpe_ratio": metrics.get("sharpe_ratio", 0),
+				"total_trades": metrics.get("total_trades", 0),
+				"win_rate_pct": metrics.get("win_rate_pct", 0),
+			}
 
-		# Fallback to portfolios.json (old format)
+		# Fallback to portfolios.json (old format). Current portfolios.json schema is
+		# a flat cash/positions-value summary with no per-backtest metrics breakdown,
+		# so this is only meaningful for genuinely old backtests that predate
+		# metrics.json and still carry a "metrics" key under their portfolio entry.
 		portfolios_file = backtest_dir / "portfolios.json"
 		if not portfolios_file.exists():
 			return None
 
-		portfolios = self._load_portfolios_json(portfolios_file)
+		portfolios = self._read_json_safe(portfolios_file)
 		if not portfolios or "portfolios" not in portfolios:
 			return None
 
-		# Extract metrics from first portfolio
 		portfolio_data = next(iter(portfolios["portfolios"].values()), {})
-		metrics = portfolio_data.get("metrics", {})
+		legacy_metrics = portfolio_data.get("metrics")
+		if not legacy_metrics:
+			# No metrics.json and no legacy metrics breakdown - nothing authoritative
+			# to report, rather than fabricating an all-zero summary.
+			return None
 
 		return {
 			"backtest_id": backtest_id,
@@ -440,11 +574,11 @@ class BacktestManager:
 			"created_at": created_at,
 			"start_date": portfolios.get("start_date"),
 			"end_date": portfolios.get("end_date"),
-			"total_return_pct": metrics.get("total_return_pct", 0),
-			"max_drawdown_pct": metrics.get("max_drawdown_pct", 0),
-			"sharpe_ratio": metrics.get("sharpe_ratio", 0),
-			"total_trades": metrics.get("total_trades", 0),
-			"win_rate_pct": metrics.get("win_rate_pct", 0),
+			"total_return_pct": legacy_metrics.get("total_return_pct", 0),
+			"max_drawdown_pct": legacy_metrics.get("max_drawdown_pct", 0),
+			"sharpe_ratio": legacy_metrics.get("sharpe_ratio", 0),
+			"total_trades": legacy_metrics.get("total_trades", 0),
+			"win_rate_pct": legacy_metrics.get("win_rate_pct", 0),
 		}
 
 	def _parse_created_at(self, backtest_id: str) -> str:
@@ -472,8 +606,8 @@ class BacktestManager:
 
 				dt = datetime(year, month, day, hour, minute, second)
 				return dt.isoformat()
-		except Exception:
-			pass
+		except Exception as e:
+			self.logger.debug(f"Failed to parse created_at from backtest_id {backtest_id!r}: {e}")
 
 		return ""
 
@@ -486,154 +620,215 @@ class BacktestManager:
 		Returns:
 			Parsed JSON dict, or None if error
 		"""
-		try:
-			with open(filepath, "r") as f:
-				text = f.read()
+		return self._read_json_safe(filepath)
 
-			# Replace NaN with null for JSON compatibility
-			text = re.sub(r"\bNaN\b", "null", text)
-			return json.loads(text)
-		except Exception:
-			return None
+	# ------------------------------------------------------------------
+	# Equity curve / positions
+	# ------------------------------------------------------------------
 
-	def _compute_equity_curve(self, strategy_name: str, backtest_id: str) -> Optional[List[Dict[str, Any]]]:
-		"""Compute equity curve from journal CSV with drawdown.
+	def _compute_equity_curve(
+		self,
+		strategy_name: str,
+		backtest_id: str,
+		metrics: Optional[Dict[str, Any]] = None,
+	) -> Optional[List[Dict[str, Any]]]:
+		"""Compute a daily, mark-to-market equity curve from the journal CSV.
+
+		Produces one point per trading day in range (not just days a transaction
+		happened), valuing open positions at that day's actual close price from the
+		local price cache (falling back to cost basis for any ticker without cached
+		price history), so the chart reflects real day-to-day P&L drift instead of a
+		flat line between trades.
 
 		Args:
 			strategy_name: Strategy name
 			backtest_id: Backtest ID
+			metrics: Already-loaded metrics.json contents, to avoid re-reading the
+				file when the caller already has it
 
 		Returns:
 			List of {date, value, drawdown_pct} dicts
 		"""
-		backtest_dir = self.backtests_dir / strategy_name / backtest_id
-
-		# Load initial capital from metrics.json if available
-		initial_capital = 10000.0  # default
-		metrics_file = backtest_dir / "metrics.json"
-		if metrics_file.exists():
-			try:
-				with open(metrics_file) as f:
-					text = f.read()
-					text = re.sub(r"\bNaN\b", "null", text)
-					metrics = json.loads(text)
-					initial_capital = metrics.get("start_value", 10000.0)
-			except Exception:
-				pass
-
-		# Find journal CSV
-		portfolios_dir = backtest_dir / "portfolios"
-		if not portfolios_dir.exists():
+		backtest_dir = self._resolve_backtest_dir(strategy_name, backtest_id)
+		if backtest_dir is None:
 			return None
 
-		# Look for journal in multiple locations:
-		# 1. Root level: portfolios/journal.csv (current format)
-		# 2. Root level: portfolios/*_journal.csv (legacy format)
-		# 3. Subdirectories: portfolios/*/journal.csv (alternative format)
-		journal_files = list(portfolios_dir.glob("journal.csv"))
-		if not journal_files:
-			journal_files = list(portfolios_dir.glob("*_journal.csv"))
-		if not journal_files:
-			journal_files = list(portfolios_dir.glob("*/journal.csv"))
-		if not journal_files:
-			return None
+		if metrics is None:
+			metrics = self._read_json_safe(backtest_dir / "metrics.json") or {}
+		initial_capital = self._get_initial_capital(metrics)
 
-		journal_file = journal_files[0]
+		journal_file = self._find_journal_file(backtest_dir)
+		if journal_file is None:
+			return None
 
 		try:
 			df = pd.read_csv(journal_file)
+			if df.empty:
+				return []
 
-			# Parse dates
+			df["created_at"] = pd.to_datetime(df["created_at"])
+			df["operation"] = df["operation"].astype(str).str.upper()
+			df["ticker"] = df["ticker"].astype(str).str.upper()
+			df = df.sort_values("created_at")
+			df["trade_date"] = df["created_at"].dt.date
+
+			journal_start = df["trade_date"].min()
+			journal_end = df["trade_date"].max()
+
+			# Day axis bound: extend through the backtest's configured end_date (a
+			# settlement can land a day or two after the last journal entry), so the
+			# curve's last point lines up with the authoritative end_value correction
+			# applied by _reconcile_curve_with_metrics.
+			end_bound = journal_end
+			end_date_cfg = metrics.get("end_date")
+			if end_date_cfg:
+				try:
+					end_bound = max(end_bound, pd.to_datetime(end_date_cfg).date())
+				except (ValueError, TypeError):
+					pass
+
+			# Load cached price history for every traded ticker, building a
+			# forward-filled close-price lookup across the full day axis.
+			tickers = sorted(t for t in df["ticker"].unique() if t)
+			price_series_by_ticker: Dict[str, pd.Series] = {}
+			all_price_dates = set()
+			for ticker in tickers:
+				hist = DataHistory(ticker).load_all()
+				if hist.empty or "timestamp" not in hist.columns or "close" not in hist.columns:
+					continue
+				hist = hist.dropna(subset=["close"])
+				if hist.empty:
+					continue
+				hist_dates = pd.to_datetime(hist["timestamp"]).dt.date
+				series = pd.Series(hist["close"].to_numpy(), index=hist_dates)
+				series = series[~series.index.duplicated(keep="last")].sort_index()
+				price_series_by_ticker[ticker] = series
+				all_price_dates.update(series.index)
+
+			trading_days = sorted(d for d in all_price_dates if journal_start <= d <= end_bound)
+			if not trading_days:
+				# No cached price history available for any traded ticker - fall back
+				# to transaction days only (cost-basis valuation throughout).
+				trading_days = sorted(df["trade_date"].unique())
+
+			price_table = pd.DataFrame(index=pd.Index(trading_days))
+			for ticker, series in price_series_by_ticker.items():
+				price_table[ticker] = series.reindex(price_table.index).ffill()
+
+			# Vectorized running cash: one groupby instead of re-masking the whole
+			# dataframe for every day.
+			buys_by_day = df.loc[df["operation"] == "BUY"].groupby("trade_date")["amount"].sum()
+			sells_by_day = df.loc[df["operation"] == "SELL"].groupby("trade_date")["amount"].sum()
+			cum_buys = buys_by_day.reindex(trading_days, fill_value=0.0).cumsum()
+			cum_sells = sells_by_day.reindex(trading_days, fill_value=0.0).cumsum()
+
+			# Walk transactions once (grouped by day, not re-filtered per day) to
+			# maintain per-ticker open qty/cost-basis - used as the mark-to-market
+			# fallback when a ticker's price history isn't cached locally.
+			txns_by_day = {trade_date: group for trade_date, group in df.groupby("trade_date")}
+			positions: Dict[str, Dict[str, float]] = {}
+			daily_equity = []
+
+			for i, day in enumerate(trading_days):
+				day_txns = txns_by_day.get(day)
+				if day_txns is not None:
+					for _, txn in day_txns.iterrows():
+						ticker = txn["ticker"]
+						qty = float(txn["quantity"])
+						amount = float(txn["amount"])
+						if txn["operation"] == "BUY":
+							pos = positions.setdefault(ticker, {"qty": 0.0, "cost": 0.0})
+							pos["qty"] += qty
+							pos["cost"] += amount
+						elif txn["operation"] == "SELL":
+							pos = positions.get(ticker)
+							if pos and pos["qty"] > 0:
+								avg_cost = pos["cost"] / pos["qty"]
+								pos["qty"] -= qty
+								pos["cost"] -= qty * avg_cost
+								if pos["qty"] <= 0:
+									pos["qty"] = 0.0
+									pos["cost"] = 0.0
+
+				cash = initial_capital - cum_buys.iloc[i] + cum_sells.iloc[i]
+
+				position_value = 0.0
+				for ticker, pos in positions.items():
+					if pos["qty"] <= 0:
+						continue
+					price = None
+					if ticker in price_table.columns:
+						cell = price_table.at[day, ticker]
+						if pd.notna(cell):
+							price = float(cell)
+					position_value += pos["qty"] * price if price is not None else pos["cost"]
+
+				daily_equity.append({"date": str(day), "value": float(cash + position_value)})
+
+			return self._apply_peak_drawdown(daily_equity, initial_capital)
+
+		except Exception as e:
+			self.logger.debug(f"Error computing equity curve for {strategy_name}/{backtest_id}: {e}")
+			return None
+
+	def _compute_open_positions(self, strategy_name: str, backtest_id: str) -> List[Dict[str, Any]]:
+		"""Compute currently-open positions by replaying the journal.
+
+		portfolios.json's current schema no longer carries a per-position
+		breakdown, so this is derived directly from the transaction log instead.
+		"""
+		backtest_dir = self._resolve_backtest_dir(strategy_name, backtest_id)
+		if backtest_dir is None:
+			return []
+
+		journal_file = self._find_journal_file(backtest_dir)
+		if journal_file is None:
+			return []
+
+		try:
+			df = pd.read_csv(journal_file)
+			if df.empty:
+				return []
+
+			df["operation"] = df["operation"].astype(str).str.upper()
+			df["ticker"] = df["ticker"].astype(str).str.upper()
 			df["created_at"] = pd.to_datetime(df["created_at"])
 			df = df.sort_values("created_at")
 
-			# Calculate equity by tracking:
-			# 1. Cash (initial capital - buys + sells)
-			# 2. Position costs and sales
-			# 3. Realized P&L on closed positions
-			daily_equity = []
-			peak_equity = initial_capital
+			positions: Dict[str, Dict[str, float]] = {}
+			for _, txn in df.iterrows():
+				ticker = txn["ticker"]
+				qty = float(txn["quantity"])
+				amount = float(txn["amount"])
+				if txn["operation"] == "BUY":
+					pos = positions.setdefault(ticker, {"qty": 0.0, "cost": 0.0})
+					pos["qty"] += qty
+					pos["cost"] += amount
+				elif txn["operation"] == "SELL":
+					pos = positions.get(ticker)
+					if pos and pos["qty"] > 0:
+						avg_cost = pos["cost"] / pos["qty"]
+						pos["qty"] -= qty
+						pos["cost"] -= qty * avg_cost
+						if pos["qty"] <= 0:
+							pos["qty"] = 0.0
+							pos["cost"] = 0.0
 
-			# Get unique dates (trading days only - when transactions occurred)
-			trading_dates = sorted(df["created_at"].dt.date.unique())
-
-			# Pre-calculate cumulative sums for efficiency
-			cumulative_buys = {}
-			cumulative_sells = {}
-			for date in trading_dates:
-				buys_mask = (df["created_at"].dt.date <= date) & (df["operation"] == "BUY")
-				sells_mask = (df["created_at"].dt.date <= date) & (df["operation"] == "SELL")
-				cumulative_buys[date] = df.loc[buys_mask, "amount"].sum()
-				cumulative_sells[date] = df.loc[sells_mask, "amount"].sum()
-
-			# Track state across dates
-			positions = {}  # ticker -> {qty, cost}
-			total_realized_pnl = 0.0
-
-			for trade_date in trading_dates:
-				# Get transactions for this date
-				day_txns = df[df["created_at"].dt.date == trade_date]
-
-				# Process each transaction for the day
-				for _, txn in day_txns.iterrows():
-					ticker = str(txn["ticker"]).upper()
-					operation = str(txn["operation"]).upper()
-					qty = int(txn["quantity"])
-					price = float(txn["price"])
-					amount = float(txn["amount"])
-
-					if operation == "BUY":
-						if ticker not in positions:
-							positions[ticker] = {"qty": 0, "cost": 0.0}
-						positions[ticker]["qty"] += qty
-						positions[ticker]["cost"] += amount
-					elif operation == "SELL":
-						if ticker in positions and positions[ticker]["qty"] > 0:
-							# Calculate realized P&L for this sale
-							avg_cost = positions[ticker]["cost"] / positions[ticker]["qty"] if positions[ticker]["qty"] > 0 else 0
-							realized_pnl = (price - avg_cost) * qty
-							total_realized_pnl += realized_pnl
-
-							# Update position
-							positions[ticker]["qty"] -= qty
-							positions[ticker]["cost"] -= qty * avg_cost
-
-							# Clean up closed positions
-							if positions[ticker]["qty"] <= 0:
-								positions[ticker]["qty"] = 0
-								positions[ticker]["cost"] = 0.0
-
-				# Calculate current equity using pre-calculated sums
-				cash = initial_capital - cumulative_buys[trade_date] + cumulative_sells[trade_date]
-
-				# Position value = cost of open positions
-				position_value = sum(pos["cost"] for pos in positions.values())
-
-				# Total equity = cash + position_value + realized_pnl
-				equity = cash + position_value + total_realized_pnl
-
-				# Track peak for drawdown
-				if equity > peak_equity:
-					peak_equity = equity
-
-				drawdown_pct = ((equity - peak_equity) / peak_equity * 100) if peak_equity > 0 else 0.0
-
-				daily_equity.append({
-					"date": str(trade_date),
-					"value": float(equity),
-					"drawdown_pct": float(drawdown_pct),
-				})
-
-			# Convert all numpy types to Python types for JSON serialization
-			return [{
-				"date": point["date"],
-				"value": float(point["value"]),
-				"drawdown_pct": float(point["drawdown_pct"]),
-			} for point in daily_equity]
+			open_positions = []
+			for ticker, pos in positions.items():
+				if pos["qty"] > 0:
+					avg_cost = pos["cost"] / pos["qty"]
+					open_positions.append({
+						"ticker": ticker,
+						"quantity": pos["qty"],
+						"avg_cost": round(avg_cost, 4),
+						"cost_basis": round(pos["cost"], 2),
+					})
+			return open_positions
 
 		except Exception as e:
-			self.logger.debug(f"Error computing equity curve: {e}")
-			return None
+			self.logger.debug(f"Failed to compute open positions for {strategy_name}/{backtest_id}: {e}")
+			return []
 
 	def _load_journal_trades(
 		self, strategy_name: str, backtest_id: str
@@ -647,18 +842,13 @@ class BacktestManager:
 		Returns:
 			List of trade dicts with status_at renamed to exit_date
 		"""
-		backtest_dir = self.backtests_dir / strategy_name / backtest_id
-
-		# Find journal CSV
-		portfolios_dir = backtest_dir / "portfolios"
-		if not portfolios_dir.exists():
+		backtest_dir = self._resolve_backtest_dir(strategy_name, backtest_id)
+		if backtest_dir is None:
 			return None
 
-		journal_files = list(portfolios_dir.glob("*_journal.csv"))
-		if not journal_files:
+		journal_file = self._find_journal_file(backtest_dir)
+		if journal_file is None:
 			return None
-
-		journal_file = journal_files[0]
 
 		try:
 			df = pd.read_csv(journal_file)
@@ -666,9 +856,9 @@ class BacktestManager:
 			if "status_at" in df.columns:
 				df = df.rename(columns={"status_at": "exit_date"})
 			# Convert to list of dicts
-			trades = df.to_dict(orient="records")
-			return trades
-		except Exception:
+			return df.to_dict(orient="records")
+		except Exception as e:
+			self.logger.debug(f"Failed to load journal trades from {journal_file}: {e}")
 			return None
 
 	def get_portfolio_history(self, strategy_name: str, backtest_id: str) -> Dict[str, Any]:
@@ -681,13 +871,15 @@ class BacktestManager:
 		Returns:
 			Historical data with daily equity values, returns, and drawdown
 		"""
-		backtest_dir = self.backtests_dir / strategy_name / backtest_id
-
-		if not backtest_dir.exists():
+		backtest_dir = self._resolve_backtest_dir(strategy_name, backtest_id)
+		if backtest_dir is None or not backtest_dir.exists():
 			return {"status": "error", "message": "Backtest not found"}
 
+		metrics = self._read_json_safe(backtest_dir / "metrics.json") or {}
+		initial_capital = self._get_initial_capital(metrics)
+
 		# Load equity curve (already calculated by BacktestAgent)
-		equity_curve = self._compute_equity_curve(strategy_name, backtest_id)
+		equity_curve = self._compute_equity_curve(strategy_name, backtest_id, metrics=metrics)
 		if not equity_curve:
 			# Return empty history while backtest is in progress
 			return {
@@ -697,39 +889,24 @@ class BacktestManager:
 				"message": "Backtest in progress - data not available yet"
 			}
 
-		# Get initial capital from metrics.json
-		initial_capital = 10000.0  # default
-		metrics_file = backtest_dir / "metrics.json"
-		if metrics_file.exists():
-			try:
-				import re
-				with open(metrics_file) as f:
-					text = f.read()
-					text = re.sub(r"\bNaN\b", "null", text)
-					metrics = json.loads(text)
-					initial_capital = metrics.get("start_value", 10000.0)
-			except Exception:
-				pass
+		# Once the backtest has finished (metrics.json exists), agree with the same
+		# authoritative end_value get_backtest's equity_curve is corrected against -
+		# otherwise this endpoint could report a different final return/drawdown.
+		equity_curve = self._reconcile_curve_with_metrics(equity_curve, metrics)
 
-		# Calculate metrics at each point in time
+		# _compute_equity_curve / _reconcile_curve_with_metrics already annotated
+		# drawdown_pct via the shared running-peak helper - reuse it instead of
+		# recomputing peak tracking again.
 		history = []
-		peak_value = initial_capital
 		max_drawdown = 0.0
-
-		for i, point in enumerate(equity_curve):
+		for point in equity_curve:
 			current_value = point["value"]
-
-			# Track peak (running maximum)
-			if current_value > peak_value:
-				peak_value = current_value
-
-			# Calculate cumulative return
-			cumulative_return = ((current_value - initial_capital) / initial_capital) * 100
-
-			# Calculate drawdown from peak (will be negative when below peak)
-			drawdown = ((current_value - peak_value) / peak_value) * 100 if peak_value > 0 else 0
-
-			# Track maximum drawdown (most negative value)
+			cumulative_return = (
+				((current_value - initial_capital) / initial_capital) * 100
+				if initial_capital
+				else 0.0
+			)
+			drawdown = point.get("drawdown_pct", 0.0)
 			if drawdown < max_drawdown:
 				max_drawdown = drawdown
 

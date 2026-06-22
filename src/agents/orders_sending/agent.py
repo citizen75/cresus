@@ -151,6 +151,7 @@ class OrdersSendingAgent(Agent):
                 take_profit=order.get("take_profit"),
                 limit_price=order.get("limit_price"),
                 trailing_stop_distance=order.get("trailing_stop_distance"),
+                trailing_stop_pct=order.get("trailing_stop_pct"),
                 execution_method=order.get("execution_method", "market"),
                 scale_count=order.get("scale_count", 1),
                 risk_amount=order.get("risk_amount"),

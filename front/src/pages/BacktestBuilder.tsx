@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { api } from '@/services/api'
 
 export default function BacktestBuilder() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
 
-  const [strategy, setStrategy] = useState('')
+  const [strategy, setStrategy] = useState(searchParams.get('strategy') || '')
   const [strategies, setStrategies] = useState<string[]>([])
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')

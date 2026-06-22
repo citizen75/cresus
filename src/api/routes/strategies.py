@@ -16,9 +16,15 @@ class StrategyUpdate(BaseModel):
 	exit: Dict[str, Any] = None
 	watchlist: Dict[str, Any] = None
 	signals: Dict[str, Any] = None
-	
+
 	class Config:
 		extra = "allow"  # Allow additional fields
+
+
+class StrategyCreate(BaseModel):
+	"""Strategy creation request model."""
+	name: str
+	universe: Optional[str] = None
 
 
 def _get_strategies_dir() -> Path:
@@ -79,6 +85,25 @@ async def get_strategy(name: str):
 		raise HTTPException(status_code=404, detail=result.get("message"))
 
 	return {"strategy": result.get("data")}
+
+
+@router.post("")
+async def create_strategy(create: StrategyCreate):
+	"""Create a new strategy from the `init/templates/strategy.yml` template."""
+	from cli.commands.strategy import StrategyCommands
+
+	project_root = Path(os.environ.get("CRESUS_PROJECT_ROOT", "."))
+	strategy_commands = StrategyCommands(project_root)
+
+	try:
+		result = strategy_commands.create(create.name, create.universe)
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=f"Failed to create strategy: {str(e)}")
+
+	if result.get("status") != "success":
+		raise HTTPException(status_code=400, detail=result.get("message"))
+
+	return result
 
 
 @router.put("/{name}")

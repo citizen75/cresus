@@ -1,7 +1,8 @@
 """BacktestAgent for orchestrating multi-phase backtesting flows."""
 
+import time
 from datetime import date, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 try:
 	from tqdm import tqdm
@@ -15,11 +16,17 @@ from core.flow import Flow
 from agents.strategy.agent import StrategyAgent
 from agents.data.agent import DataAgent
 from agents.watchlist_alphas.agent import WatchlistAlphasAgent
+from agents.research.agent import ResearchAgent
 from tools.portfolio.journal import Journal
 from tools.portfolio.orders import Orders
 from tools.backtest.manager import BacktestManager
 from tools.portfolio.metrics import PortfolioMetrics
 from gateway.websockets.manager import get_websocket_manager
+
+# Each backtest phase is now a plain Agent (MarketPrepAgent/MarketProcessAgent/
+# MarketCloseAgent) rather than a Flow, but both expose a duck-type-compatible
+# .context attribute and .process(input_data) method, so either is accepted here.
+PhasePipeline = Union[Flow, Agent]
 
 
 def _parse_date(value: Any) -> Optional[date]:
@@ -84,12 +91,18 @@ def _get_data_date_range(data_history: Dict) -> Optional[tuple]:
 class BacktestAgent(Agent):
 	"""Agent for orchestrating multi-phase backtest loops.
 
-	Implements a structured backtesting framework with three phases per trading day:
-	1. Pre-market: generate signals/decisions using data up to current_date
-	2. Market: execute trades on next trading day at next_date prices
-	3. Post-market: update portfolio and metrics after close
+	Fully self-sufficient: process() loads/validates the strategy, auto-wires the
+	three phase agents (unless overridden via set_premarket_flow/set_market_flow/
+	set_postmarket_flow, e.g. for tests), runs the day loop, then computes final
+	metrics, runs ResearchAgent, and saves results to the backtest directory.
 
-	Flows are optional - the agent continues if flows are not set.
+	Implements a structured backtesting framework with three phases per trading day:
+	1. Pre-market (MarketPrepAgent by default): generate signals/decisions using data up to current_date
+	2. Market (MarketProcessAgent by default): execute trades on next trading day at next_date prices
+	3. Post-market (MarketCloseAgent by default): expire stale orders and update metrics after close
+
+	Phases can be overridden via set_premarket_flow/set_market_flow/set_postmarket_flow
+	(e.g. for tests, or alternate engines) - both Agent and Flow instances are accepted.
 	"""
 
 	def __init__(self, name: str = "backtest", context: Optional[AgentContext] = None, websocket: bool = True):
@@ -101,32 +114,32 @@ class BacktestAgent(Agent):
 			websocket: Enable WebSocket broadcasts and real-time metrics (default: True)
 		"""
 		super().__init__(name, context)
-		self.pre_market_flow: Optional[Flow] = None
-		self.market_flow: Optional[Flow] = None
-		self.post_market_flow: Optional[Flow] = None
+		self.pre_market_flow: Optional[PhasePipeline] = None
+		self.market_flow: Optional[PhasePipeline] = None
+		self.post_market_flow: Optional[PhasePipeline] = None
 		self.websocket_enabled = websocket
 
-	def set_premarket_flow(self, flow: Flow) -> None:
-		"""Set the pre-market flow.
+	def set_premarket_flow(self, flow: PhasePipeline) -> None:
+		"""Set the pre-market phase (typically a MarketPrepAgent).
 
 		Args:
-			flow: Flow to execute in pre-market phase
+			flow: Agent or Flow to execute in pre-market phase
 		"""
 		self.pre_market_flow = flow
 
-	def set_market_flow(self, flow: Flow) -> None:
-		"""Set the market flow.
+	def set_market_flow(self, flow: PhasePipeline) -> None:
+		"""Set the market phase (typically a MarketProcessAgent).
 
 		Args:
-			flow: Flow to execute in market phase
+			flow: Agent or Flow to execute in market phase
 		"""
 		self.market_flow = flow
 
-	def set_postmarket_flow(self, flow: Flow) -> None:
-		"""Set the post-market flow.
+	def set_postmarket_flow(self, flow: PhasePipeline) -> None:
+		"""Set the post-market phase (typically a MarketCloseAgent).
 
 		Args:
-			flow: Flow to execute in post-market phase
+			flow: Agent or Flow to execute in post-market phase
 		"""
 		self.post_market_flow = flow
 
@@ -246,7 +259,10 @@ class BacktestAgent(Agent):
 					if gross_loss > 0:
 						result["profit_factor"] = float(gross_profit / gross_loss)
 					elif gross_profit > 0:
-						result["profit_factor"] = float('inf')
+						# No losing trades yet: matches the no-losses convention in
+						# tools/portfolio/metrics.py. float('inf') would serialize to
+						# non-standard JSON ("Infinity") and break WebSocket consumers.
+						result["profit_factor"] = 1.0
 
 			# Try to calculate portfolio value from history (with error handling)
 			try:
@@ -275,7 +291,7 @@ class BacktestAgent(Agent):
 
 			return result
 		except Exception as e:
-			self.logger.error(f"Failed to calculate daily metrics for {portfolio_name} on {current_date}: {str(e)}", exc_info=True)
+			self.logger.exception(f"Failed to calculate daily metrics for {portfolio_name} on {current_date}: {str(e)}")
 			return {"date": current_date.isoformat()}
 
 	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -287,6 +303,9 @@ class BacktestAgent(Agent):
 				- start_date (optional): Start date as string YYYY-MM-DD or date object
 				- end_date (optional): End date as string YYYY-MM-DD or date object (default: today)
 				- lookback_days (optional): Days back from end_date if start_date not provided (default: 365)
+				- portfolio_name (optional): Portfolio to run against (default: strategy_name)
+				- backtest_id (optional): Pre-generated backtest ID (e.g. for WebSocket registration
+				  before this call starts)
 
 		Returns:
 			Response dict with status, input, and output containing backtest summary
@@ -311,7 +330,7 @@ class BacktestAgent(Agent):
 		self.logger.info(f"Backtest {strategy_name} from {start_date} to {end_date}")
 
 		# Initialize backtest using BacktestManager
-		# Use backtest_id from input if provided (e.g., from BacktestFlow)
+		# Use backtest_id from input if provided (e.g., pre-generated by an API caller)
 		backtest_id_input = input_data.get("backtest_id")
 		backtest_manager = BacktestManager()
 		init_result = backtest_manager.initialize_backtest(strategy_name, start_date, end_date, lookback_days, backtest_id_input)
@@ -333,21 +352,28 @@ class BacktestAgent(Agent):
 		self.context.set("backtest", backtest)
 		self.context.set("backtest_dir", backtest_dir)
 
+		# Invalidate blacklist cache to ensure fresh ticker filtering for this run
+		from tools.universe.blacklist import invalidate_blacklist_cache
+		invalidate_blacklist_cache()
+
 		# Load tickers via StrategyAgent
 		strategy_agent = StrategyAgent(f"strategy[{strategy_name}]", self.context)
 		strategy_result = strategy_agent.run(input_data)
+		self.agents_executed.append(strategy_agent.name)
 		if strategy_result.get("status") == "error":
 			return strategy_result
 
 		# Load data history via DataAgent
 		data_agent = DataAgent(f"data[{strategy_name}]", self.context)
 		data_result = data_agent.run({})
+		self.agents_executed.append(data_agent.name)
 		if data_result.get("status") == "error":
 			return data_result
 
 		# Calculate alphas via WatchlistAlphasAgent
 		alphas_agent = WatchlistAlphasAgent(f"alphas[{strategy_name}]", self.context)
 		alphas_result = alphas_agent.run({})
+		self.agents_executed.append(alphas_agent.name)
 		if alphas_result.get("status") == "error":
 			self.logger.warning(f"Alphas calculation failed: {alphas_result.get('message')}")
 			# Continue anyway - alphas are optional
@@ -404,7 +430,6 @@ class BacktestAgent(Agent):
 			}
 
 		self.logger.info(f"Found {len(trading_days)} trading days")
-		backtest["total_trading_days"] = len(trading_days)
 
 		# Pre-slice data by date for efficient access (avoid filtering on each iteration)
 		day_data_cache = self._create_day_data_cache(data_history)
@@ -417,27 +442,55 @@ class BacktestAgent(Agent):
 				self.logger.debug(f"BacktestAgent: First date {first_date} has {len(day_data_cache[first_date])} tickers")
 
 		# Main backtest loop: pre_market → [increment] → market → post_market
-		portfolio_name = self.context.get("portfolio_name") or "default"
+		# Derive portfolio name from strategy if not provided (matches portfolio naming convention)
+		portfolio_name = input_data.get("portfolio_name") or self.context.get("portfolio_name") or strategy_name
+		self.context.set("portfolio_name", portfolio_name)
 
-		# Include last trading day if we have data for the next day to execute trades
-		trading_days_to_process = trading_days[:-1]
+		# Auto-wire default phase agents if the caller didn't inject their own via
+		# set_premarket_flow/set_market_flow/set_postmarket_flow (e.g. for tests)
+		if self.pre_market_flow is None:
+			from agents.market_prep.agent import MarketPrepAgent
+			self.pre_market_flow = MarketPrepAgent(strategy_name, context=self.context)
+		if self.market_flow is None:
+			from agents.market_process.agent import MarketProcessAgent
+			self.market_flow = MarketProcessAgent(context=self.context)
+		if self.post_market_flow is None:
+			from agents.market_close.agent import MarketCloseAgent
+			self.post_market_flow = MarketCloseAgent(strategy_name, context=self.context)
 
-		# Check if we can process the final day (need data for next day)
-		if len(trading_days) > 0:
+		# Wait for at least one WebSocket connection before starting, so the frontend
+		# has time to connect and receive real-time progress updates.
+		if self.websocket_enabled:
+			ws_manager = get_websocket_manager()
+			wait_start = time.time()
+			while time.time() - wait_start < 10:
+				if ws_manager.get_connection_count(backtest_id) > 0:
+					self.logger.info("WebSocket client connected, starting backtest")
+					break
+				time.sleep(0.1)
+			else:
+				self.logger.info("No WebSocket client connected after 10s, starting backtest anyway")
+
+		# Include last trading day if we have data for the next day to execute trades:
+		# check for any data after the last trading day and, if found, append it as a
+		# synthetic next_date before computing trading_days_to_process/total_trading_days
+		# below, so both reflect the actual (possibly extended) list exactly once.
+		if trading_days:
 			last_day = trading_days[-1]
-			# Look for any data after the last day
 			future_dates = [d for d in day_data_cache.keys() if d > last_day]
 			if future_dates:
-				# Add the first future date as a synthetic next_date
 				next_available_date = min(future_dates)
 				trading_days.append(next_available_date)
-				trading_days_to_process = trading_days[:-1]
 				self.logger.info(f"Including final trading day {last_day} (using {next_available_date} for execution)")
 
-		# Get initial capital from strategy config
+		trading_days_to_process = trading_days[:-1]
+		backtest["total_trading_days"] = len(trading_days)
+
+		# Get initial capital/currency from strategy config
 		strategy_config = self.context.get("strategy_config") or {}
 		initial_capital = strategy_config.get("backtest", {}).get("initial_capital", 100000.0)
-		self.logger.info(f"Using initial capital: ${initial_capital:.2f}")
+		currency = strategy_config.get("backtest", {}).get("currency") or strategy_config.get("currency", "EUR")
+		self.logger.info(f"Using initial capital: ${initial_capital:.2f} {currency}")
 
 		# Initialize portfolio with correct initial_capital before backtest loop
 		from tools.portfolio import PortfolioManager
@@ -450,7 +503,7 @@ class BacktestAgent(Agent):
 				create_result = pm.create_portfolio(
 					name=portfolio_name,
 					portfolio_type="paper",
-					currency="EUR",
+					currency=currency,
 					description=f"Backtest for {strategy_name}",
 					initial_capital=initial_capital
 				)
@@ -475,13 +528,11 @@ class BacktestAgent(Agent):
 			self.context.set("current_date", current_date)
 			# Slice data_history to current_date so watchlist changes daily
 			self._set_data_history_for_date(data_history, current_date)
-			if self.pre_market_flow:
-				self.pre_market_flow.context = self.context
-				self.pre_market_flow.process({
-					"date": current_date.isoformat(),
-					"strategy_name": strategy_name,
-					"portfolio_name": portfolio_name,
-				})
+			self._run_phase(self.pre_market_flow, "Pre-market", {
+				"date": current_date.isoformat(),
+				"strategy_name": strategy_name,
+				"portfolio_name": portfolio_name,
+			}, current_date)
 
 			# Increment to next trading day
 			self.context.set("current_date", next_date)
@@ -492,22 +543,18 @@ class BacktestAgent(Agent):
 			self.context.set("next_day_data", next_day_data)
 
 			# Market phase: execute on next_date prices with pre-loaded data
-			if self.market_flow:
-				self.market_flow.context = self.context
-				self.market_flow.process({
-					"date": next_date.isoformat(),
-					"strategy_name": strategy_name,
-					"portfolio_name": portfolio_name,
-				})
+			self._run_phase(self.market_flow, "Market", {
+				"date": next_date.isoformat(),
+				"strategy_name": strategy_name,
+				"portfolio_name": portfolio_name,
+			}, next_date)
 
 			# Post-market phase: update after close
-			if self.post_market_flow:
-				self.post_market_flow.context = self.context
-				self.post_market_flow.process({
-					"date": next_date.isoformat(),
-					"strategy_name": strategy_name,
-					"portfolio_name": portfolio_name,
-				})
+			self._run_phase(self.post_market_flow, "Post-market", {
+				"date": next_date.isoformat(),
+				"strategy_name": strategy_name,
+				"portfolio_name": portfolio_name,
+			}, next_date)
 
 			# Flush journal and orders to disk at end of day
 			try:
@@ -543,7 +590,7 @@ class BacktestAgent(Agent):
 					)
 					self.logger.debug(f"Broadcast daily_results for {next_date}: day {i+1}/{len(trading_days_to_process)}")
 				except Exception as e:
-					self.logger.error(f"WebSocket broadcast failed: {str(e)}", exc_info=True)
+					self.logger.exception(f"WebSocket broadcast failed: {str(e)}")
 
 		backtest["days_processed"] = len(backtest["daily_results"])
 		self.logger.info(f"Backtest completed: {backtest['days_processed']} days processed")
@@ -559,10 +606,22 @@ class BacktestAgent(Agent):
 		else:
 			self.logger.warning("Strategy config not found in context")
 
-		# Calculate and save metrics
+		# Flush journal and orders one final time (each day already flushes, this is a safety net)
 		try:
-			portfolio_name = self.context.get("portfolio_name") or "default"
-			metrics = PortfolioMetrics()
+			journal = Journal(portfolio_name, context=self.context.__dict__)
+			journal.flush()
+			orders = Orders(portfolio_name, context=self.context.__dict__)
+			orders.flush()
+		except Exception as e:
+			self.logger.warning(f"Failed to flush journal/orders for {portfolio_name}: {str(e)}")
+
+		# Calculate and save metrics
+		# Saved under both "metrics" and "portfolio_metrics" - the latter is what the CLI
+		# and the disk-persisted backtest result (read back via BacktestManager.get_backtest)
+		# read from.
+		metrics_result = {}
+		try:
+			metrics = PortfolioMetrics(context=self.context.__dict__)
 			metrics_result = metrics.calculate_backtest_metrics(
 				portfolio_name,
 				start_date,
@@ -572,6 +631,7 @@ class BacktestAgent(Agent):
 
 			if metrics_result:
 				backtest["metrics"] = metrics_result
+				backtest["portfolio_metrics"] = metrics_result
 				save_metrics_result = backtest_manager.save_metrics(strategy_name, backtest_id, metrics_result)
 				if save_metrics_result.get("status") == "success":
 					self.logger.info(f"Saved metrics to {save_metrics_result.get('file')}")
@@ -580,11 +640,114 @@ class BacktestAgent(Agent):
 		except Exception as e:
 			self.logger.warning(f"Could not calculate metrics: {str(e)}")
 
+		# Final portfolio snapshot
+		try:
+			from tools.portfolio import PortfolioManager
+			pm = PortfolioManager(context=self.context.__dict__)
+			final_portfolio = pm.get_portfolio_summary(portfolio_name)
+			if final_portfolio:
+				backtest["final_portfolio"] = final_portfolio
+		except Exception as e:
+			self.logger.warning(f"Could not get final portfolio summary: {str(e)}")
+
+		# Research agent: identify issues in the resulting journal/orders
+		try:
+			research_agent = ResearchAgent()
+			research_agent.context = self.context
+			research_result = research_agent.process()
+			research_output = research_result.get("output", {})
+			backtest["research"] = {
+				"journal_analysis": research_output.get("journal_analysis", {}),
+				"order_analysis": research_output.get("order_analysis", {}),
+				"identified_issues": research_output.get("identified_issues", []),
+				"severity_level": research_output.get("severity_level", "none"),
+				"issue_count": research_output.get("total_issues", 0),
+			}
+		except Exception as e:
+			self.logger.warning(f"Could not run research agent: {str(e)}")
+
+		# Save execution context (metrics, ticker counts) for debugging/audit
+		try:
+			import json
+			from pathlib import Path
+			context_data = {
+				"backtest_id": backtest_id,
+				"strategy": strategy_name,
+				"start_date": str(start_date),
+				"end_date": str(end_date),
+				"metadata": self.context.get("metadata") or {},
+				"execution_history": self.context.get("execution_history") or [],
+			}
+			context_file = Path(backtest_dir) / "context.json"
+			with open(context_file, 'w') as f:
+				json.dump(context_data, f, indent=2, default=str)
+			self.logger.debug(f"Saved execution context to {context_file}")
+		except Exception as e:
+			self.logger.warning(f"Could not save context.json: {e}")
+
+		# Broadcast completion to WebSocket clients
+		if self.websocket_enabled:
+			try:
+				import asyncio
+				ws_manager = get_websocket_manager()
+
+				async def send_completion():
+					await ws_manager.broadcast_backtest_complete(
+						backtest_id=backtest_id,
+						strategy_name=strategy_name,
+						metrics=metrics_result or {},
+						days_processed=backtest.get("days_processed", 0)
+					)
+
+				asyncio.run(send_completion())
+			except Exception as e:
+				self.logger.warning(f"Could not send WebSocket completion message: {e}")
+
 		return {
 			"status": "success",
 			"input": input_data,
 			"output": backtest,
+			"message": f"Backtest {backtest_id} completed for {strategy_name}",
 		}
+
+	def _run_phase(
+		self,
+		phase: Optional[PhasePipeline],
+		label: str,
+		payload: Dict[str, Any],
+		current_date: date,
+	) -> Dict[str, Any]:
+		"""Run one backtest phase, converting any raised exception into an error dict.
+
+		Phases are called via .process() directly (not .run()), bypassing Agent.run()'s
+		own exception safety net - and not every phase agent guards its own fatal
+		sub-agent failures (MarketPrepAgent does; MarketCloseAgent/MarketProcessAgent
+		don't). Without this, a single bad trading day could raise an uncaught
+		exception here and crash the entire multi-day backtest with no partial
+		results saved.
+
+		Args:
+			phase: The phase agent/flow to run (no-op if None)
+			label: Human-readable phase name for log messages (e.g. "Pre-market")
+			payload: Input dict passed to phase.process()
+			current_date: The trading date this phase is running for (for logging)
+
+		Returns:
+			The phase's response dict, or a synthetic error dict if it raised
+		"""
+		if not phase:
+			return {"status": "success"}
+
+		phase.context = self.context
+		try:
+			result = phase.process(payload)
+		except Exception as e:
+			self.logger.exception(f"{label} phase raised on {current_date}: {e}")
+			return {"status": "error", "message": str(e)}
+
+		if result.get("status") not in (None, "success"):
+			self.logger.warning(f"{label} phase returned non-success on {current_date}: {result.get('message')}")
+		return result
 
 	def _create_day_data_cache(self, data_history: Dict) -> Dict[date, Dict[str, Any]]:
 		"""Create a cache of OHLCV data organized by trading date for fast lookup.
@@ -662,4 +825,4 @@ class BacktestAgent(Agent):
 			sliced_history[ticker] = df[mask].copy()
 
 		self.context.set("data_history", sliced_history)
-		self.logger.debug(f"Sliced data_history to {current_date} for PreMarketFlow")
+		self.logger.debug(f"Sliced data_history to {current_date} for MarketPrepAgent")

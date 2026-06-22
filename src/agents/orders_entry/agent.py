@@ -274,6 +274,7 @@ class OrdersEntryAgent(Agent):
                         notes=f"Order {order_id}: {metadata.get('strategy', 'unknown')}",
                         take_profit=order.get("take_profit"),
                         trailing_stop_distance=order.get("trailing_stop_distance"),
+                        trailing_stop_pct=order.get("trailing_stop_pct"),
                         highest_price=result.filled_price,
                         created_at=created_at_filled,
                         metadata=market_meta or None,

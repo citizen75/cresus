@@ -6,6 +6,7 @@ import ResultsWidget from '@/components/ResultsWidget'
 import PortfolioHoldingsWidget from '@/components/portfolio/PortfolioHoldingsWidget'
 import PortfolioPerformanceWidget from '@/components/portfolio/PortfolioPerformanceWidget'
 import OrdersWidget from '@/components/portfolio/OrdersWidget'
+import TaskListWidget from '@/components/portfolio/TaskListWidget'
 import TradingChartWidget from '@/components/TradingChartWidget'
 
 const TABS = [
@@ -160,13 +161,18 @@ export default function PortfolioDetail() {
         </div>
       </div>
 
-      {/* Bottom row (~30%) - Orders widget */}
-      <div className="flex-[3] min-h-0">
-        <OrdersWidget
-          orders={ordersData?.orders || []}
-          isLoading={isOrdersLoading}
-          currency={details?.currency || 'USD'}
-        />
+      {/* Bottom row (~30%) - Orders widget + portfolio tasks */}
+      <div className="flex gap-6 flex-[3] min-h-0">
+        <div className="w-1/2 min-h-0">
+          <OrdersWidget
+            orders={ordersData?.orders || []}
+            isLoading={isOrdersLoading}
+            currency={details?.currency || 'USD'}
+          />
+        </div>
+        <div className="w-1/2 min-h-0">
+          <TaskListWidget portfolioName={name} />
+        </div>
       </div>
     </div>
   )

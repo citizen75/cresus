@@ -9,12 +9,25 @@ interface Strategy {
   file?: string
 }
 
+interface Universe {
+  id: string
+  name: string
+  count: number
+}
+
 export default function StrategiesList() {
   const [strategies, setStrategies] = useState<Strategy[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+
+  const [showCreate, setShowCreate] = useState(false)
+  const [universes, setUniverses] = useState<Universe[]>([])
+  const [newName, setNewName] = useState('')
+  const [newUniverse, setNewUniverse] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
 
   const loadStrategies = async () => {
     try {
@@ -30,6 +43,38 @@ export default function StrategiesList() {
   useEffect(() => {
     loadStrategies()
   }, [])
+
+  const openCreateModal = async () => {
+    setCreateError(null)
+    setNewName('')
+    setNewUniverse('')
+    setShowCreate(true)
+    try {
+      const result = await api.listAllUniverses()
+      setUniverses(result.universes || [])
+    } catch {
+      setUniverses([])
+    }
+  }
+
+  const handleCreate = async () => {
+    const name = newName.trim()
+    if (!name) {
+      setCreateError('Strategy name is required')
+      return
+    }
+    setCreating(true)
+    setCreateError(null)
+    try {
+      await api.createStrategy(name, newUniverse || undefined)
+      setShowCreate(false)
+      await loadStrategies()
+    } catch (err: any) {
+      setCreateError(err?.response?.data?.detail || (err instanceof Error ? err.message : 'Failed to create strategy'))
+    } finally {
+      setCreating(false)
+    }
+  }
 
   const handleDelete = async (name: string) => {
     setDeleting(true)
@@ -61,9 +106,20 @@ export default function StrategiesList() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-white mb-2">Strategies</h1>
-        <p className="text-slate-400">Manage and configure your trading strategies</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-white mb-2">Strategies</h1>
+          <p className="text-slate-400">Manage and configure your trading strategies</p>
+        </div>
+        <button
+          onClick={openCreateModal}
+          className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          <span>Create Strategy</span>
+        </button>
       </div>
 
       {/* Strategies Grid */}
@@ -147,6 +203,66 @@ export default function StrategiesList() {
       {strategies.length === 0 && (
         <div className="text-center py-12">
           <div className="text-slate-400">No strategies found</div>
+        </div>
+      )}
+
+      {/* Create Strategy Modal */}
+      {showCreate && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-slate-900 border border-slate-700 rounded-lg p-6 max-w-sm w-full">
+            <h3 className="text-lg font-bold text-white mb-4">Create Strategy</h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">Name</label>
+                <input
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="e.g. ta_cac_2"
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">Universe</label>
+                <select
+                  value={newUniverse}
+                  onChange={(e) => setNewUniverse(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white focus:outline-none focus:border-purple-500"
+                >
+                  <option value="">Default (from template)</option>
+                  {universes.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name} ({u.count})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {createError && (
+                <div className="text-red-400 text-sm">{createError}</div>
+              )}
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowCreate(false)}
+                disabled={creating}
+                className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded transition disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreate}
+                disabled={creating}
+                className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded transition disabled:opacity-50"
+              >
+                {creating ? 'Creating...' : 'Create'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

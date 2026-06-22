@@ -12,7 +12,7 @@ if str(src_path) not in sys.path:
 	sys.path.insert(0, str(src_path))
 
 from tools.backtest.manager import BacktestManager
-from flows.backtest import BacktestFlow
+from agents.backtest.agent import BacktestAgent
 from tools.strategy.strategy import StrategyManager
 from tools.portfolio.portfolio_distribution import PortfolioDistribution
 
@@ -29,9 +29,9 @@ def _get_strategy_manager() -> StrategyManager:
 	return StrategyManager()
 
 
-def _get_backtest_flow() -> BacktestFlow:
-	"""Get fresh BacktestFlow instance for each backtest."""
-	return BacktestFlow()
+def _get_backtest_agent() -> BacktestAgent:
+	"""Get fresh BacktestAgent instance for each backtest."""
+	return BacktestAgent()
 
 
 @router.get("")
@@ -58,8 +58,8 @@ async def list_backtests(strategy: Optional[str] = Query(None)) -> Dict[str, Any
 async def run_backtest(body: Dict[str, Any]) -> Dict[str, Any]:
 	"""Run a backtest or live mode execution.
 
-	If start_date and end_date provided: runs historical backtest via BacktestFlow
-	Otherwise: runs live mode (PreMarketFlow) for current watchlist generation
+	If start_date and end_date provided: runs historical backtest via BacktestAgent
+	Otherwise: runs live mode (MarketPrepAgent) for current watchlist generation
 
 	Args:
 		body: {
@@ -90,9 +90,9 @@ async def run_backtest(body: Dict[str, Any]) -> Dict[str, Any]:
 
 		def run_backtest_bg():
 			try:
-				flow = _get_backtest_flow()
-				result = flow.process({
-					"strategy": strategy,
+				agent = _get_backtest_agent()
+				result = agent.process({
+					"strategy_name": strategy,
 					"start_date": start_date,
 					"end_date": end_date,
 					"portfolio_name": portfolio_name,
@@ -102,11 +102,11 @@ async def run_backtest(body: Dict[str, Any]) -> Dict[str, Any]:
 				if result.get("status") != "success":
 					import logging
 					logger = logging.getLogger(__name__)
-					logger.error(f"BacktestFlow for {strategy} failed: {result.get('message')}")
+					logger.error(f"BacktestAgent for {strategy} failed: {result.get('message')}")
 			except Exception as e:
 				import logging
 				logger = logging.getLogger(__name__)
-				logger.error(f"BacktestFlow for {strategy} failed: {str(e)}", exc_info=True)
+				logger.error(f"BacktestAgent for {strategy} failed: {str(e)}", exc_info=True)
 
 		thread = threading.Thread(target=run_backtest_bg, daemon=True)
 		thread.start()
@@ -120,11 +120,11 @@ async def run_backtest(body: Dict[str, Any]) -> Dict[str, Any]:
 			"end_date": end_date,
 		}
 	else:
-		# Live mode (PreMarketFlow)
+		# Live mode (MarketPrepAgent)
 		def run_premarket_bg():
 			try:
-				from flows.premarket import PreMarketFlow
-				flow = PreMarketFlow(strategy)
+				from agents.market_prep.agent import MarketPrepAgent
+				flow = MarketPrepAgent(strategy)
 				result = flow.process({
 					"portfolio_name": portfolio_name,
 					"save_enabled": True,
@@ -133,11 +133,11 @@ async def run_backtest(body: Dict[str, Any]) -> Dict[str, Any]:
 				if result.get("status") != "success":
 					import logging
 					logger = logging.getLogger(__name__)
-					logger.error(f"PreMarketFlow for {strategy} failed: {result.get('message')}")
+					logger.error(f"MarketPrepAgent for {strategy} failed: {result.get('message')}")
 			except Exception as e:
 				import logging
 				logger = logging.getLogger(__name__)
-				logger.error(f"PreMarketFlow for {strategy} failed: {str(e)}", exc_info=True)
+				logger.error(f"MarketPrepAgent for {strategy} failed: {str(e)}", exc_info=True)
 
 		thread = threading.Thread(target=run_premarket_bg, daemon=True)
 		thread.start()

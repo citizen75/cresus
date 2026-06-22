@@ -15,6 +15,8 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional
 import yaml
 
+from tools.strategy.alphas import merge_shared_alphas
+
 # Add parent directories to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent.parent))
 
@@ -185,6 +187,9 @@ class StrategyManager:
 					strategy_data = yaml.safe_load(f)
 				else:
 					strategy_data = json.load(f)
+
+			# No-op unless the strategy opts in via features.shared_alphas: true
+			merge_shared_alphas(strategy_data)
 
 			# Cache in context for reuse
 			self._set_context_value("strategy_config", strategy_data)
@@ -370,20 +375,22 @@ class StrategyManager:
 			yml_files = sorted(self.strategies_dir.glob("*.yml"))
 			json_files = sorted(self.strategies_dir.glob("*.json"))
 
-			# Process YAML files first so they take priority
+			# Process YAML files first so they take priority.
+			# The strategy's identity is its filename stem (that's what load/save/delete
+			# key off of), not the internal `name:` field, which can drift out of sync
+			# if a file gets renamed without updating its contents.
 			for strategy_file in yml_files:
 				try:
 					with open(strategy_file, "r") as f:
 						strategy_data = yaml.safe_load(f)
-						name = strategy_data.get("name")
-						if name:  # Only add if name exists
-							strategies_dict[name] = {
-								"name": name,
-								"description": strategy_data.get("description", "No description"),
-								"source": strategy_data.get("source"),
-								"file": strategy_file.name,
-								"modified": strategy_file.stat().st_mtime,
-							}
+						name = strategy_file.stem
+						strategies_dict[name] = {
+							"name": name,
+							"description": strategy_data.get("description", "No description"),
+							"source": strategy_data.get("source"),
+							"file": strategy_file.name,
+							"modified": strategy_file.stat().st_mtime,
+						}
 				except Exception:
 					# Skip files that can't be parsed
 					continue
@@ -393,8 +400,8 @@ class StrategyManager:
 				try:
 					with open(strategy_file, "r") as f:
 						strategy_data = json.load(f)
-						name = strategy_data.get("name")
-						if name and name not in strategies_dict:  # Only add if name doesn't exist
+						name = strategy_file.stem
+						if name not in strategies_dict:  # Only add if name doesn't exist
 							strategies_dict[name] = {
 								"name": name,
 								"description": strategy_data.get("description", "No description"),
@@ -460,7 +467,7 @@ class StrategyManager:
 
 					if strategy_data.get("source") == source_name:
 						strategies_info.append({
-							"name": strategy_data.get("name"),
+							"name": strategy_file.stem,
 							"description": strategy_data.get("description", "No description"),
 							"source": source_name,
 							"file": strategy_file.name,

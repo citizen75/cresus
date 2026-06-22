@@ -42,7 +42,7 @@ class CheckCashAgent(Agent):
 
 		if sizing_type == "capital" and sizing_formula:
 			try:
-				required_cash = float(sizing_formula) if isinstance(sizing_formula, (int, float)) else float(sizing_formula)
+				required_cash = float(sizing_formula)
 				if available_cash < required_cash:
 					self.logger.warning(f"[CHECK-CASH] Insufficient cash: ${available_cash:.2f} < ${required_cash:.2f}")
 					return {
@@ -54,14 +54,14 @@ class CheckCashAgent(Agent):
 						},
 						"message": f"Insufficient cash: ${available_cash:.2f} < ${required_cash:.2f}"
 					}
-			except (ValueError, TypeError) as e:
-				self.logger.error(f"[CHECK-CASH] Error parsing position sizing: {e}")
-				return {
-					"status": "exit",
-					"input": input_data,
-					"output": {},
-					"message": f"Invalid position sizing formula: {sizing_formula}"
-				}
+			except (ValueError, TypeError):
+				# sizing_formula is a dynamic, per-ticker formula (e.g. referencing an
+				# indicator like "vol_atr_pct[0]") rather than a static literal - this
+				# agent runs once globally with no ticker/row context to evaluate it
+				# against, so there's nothing useful to check here. Skip this early
+				# sanity check rather than exiting; the actual per-ticker sizing in
+				# PositionSizingAgent evaluates the formula properly against real data.
+				self.logger.debug(f"[CHECK-CASH] position_sizing formula is dynamic, not a static literal - skipping early cash check: {sizing_formula}")
 
 		# Check explicit order condition formula
 		order_config = strategy_config.get("order", {}).get("parameters", {})

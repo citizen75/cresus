@@ -23,12 +23,13 @@ class DataManager:
         self.history_dir = self.cache_dir / "history"
         self.fundamentals_dir = self.cache_dir / "fundamentals"
 
-    def fetch_history(self, ticker_or_universe: str, start_date: Optional[str] = None) -> Dict[str, Any]:
+    def fetch_history(self, ticker_or_universe: str, start_date: Optional[str] = None, force: bool = False) -> Dict[str, Any]:
         """Fetch historical data for a ticker or all tickers in a universe.
 
         Args:
             ticker_or_universe: Single ticker symbol (e.g., 'AAPL') or universe name (e.g., 'etf_fr')
             start_date: Optional start date for fetching (YYYY-MM-DD)
+            force: If True, ignore cached data and re-fetch full history from scratch
 
         Returns:
             Dict with status and results
@@ -37,12 +38,12 @@ class DataManager:
             # Check if it's a universe first
             universe = Universe(ticker_or_universe.lower())
             if universe.exists():
-                return self.fetch_universe(ticker_or_universe, start_date)
+                return self.fetch_universe(ticker_or_universe, start_date, force=force)
 
             # Treat as single ticker
             ticker = ticker_or_universe.upper()
             dh = DataHistory(ticker)
-            result = dh.fetch(start_date=start_date, incremental=True)
+            result = dh.fetch(start_date=start_date, incremental=True, force=force)
             if result.get("status") == "success":
                 df = dh.get_all()
                 return {
@@ -138,7 +139,7 @@ class DataManager:
                 "message": str(e),
             }
 
-    def fetch_universe(self, universe_name: str, start_date: str = None) -> Dict[str, Any]:
+    def fetch_universe(self, universe_name: str, start_date: str = None, force: bool = False) -> Dict[str, Any]:
         """Fetch historical data for all tickers in a universe."""
         try:
             universe = Universe(universe_name)
@@ -166,7 +167,7 @@ class DataManager:
             }
 
             for ticker in tickers:
-                result = self.fetch_history(ticker, start_date)
+                result = self.fetch_history(ticker, start_date, force=force)
                 if result.get("status") == "success":
                     results["fetched"] += 1
                 else:
@@ -185,18 +186,35 @@ class DataManager:
                 "message": str(e),
             }
 
-    def fetch_all(self, universe_name: str, start_date: str = None) -> Dict[str, Any]:
-        """Fetch both historical and fundamental data for all tickers in a universe."""
+    def fetch_all(self, universe_name: str, start_date: str = None, force: bool = False) -> Dict[str, Any]:
+        """Fetch both historical and fundamental data for all tickers in a universe,
+        or for a single ticker if universe_name isn't a recognized universe."""
         try:
             import pandas as pd
             from datetime import datetime
 
             universe = Universe(universe_name)
             if not universe.exists():
+                # Fall back to treating it as a single ticker (parity with fetch_history/fetch_fundamental)
+                ticker = universe_name.upper()
+                history_result = self.fetch_history(ticker, start_date, force=force)
+                fundamental_result = self.fetch_fundamental(ticker)
                 return {
-                    "status": "error",
-                    "message": f"Universe '{universe_name}' not found",
-                    "available": Universe.list_universes(),
+                    "status": "success" if history_result.get("status") == "success" else "error",
+                    "universe": None,
+                    "ticker": ticker,
+                    "total": 1,
+                    "history_fetched": 1 if history_result.get("status") == "success" else 0,
+                    "history_failed": 0 if history_result.get("status") == "success" else 1,
+                    "fundamental_fetched": 1 if fundamental_result.get("status") == "success" else 0,
+                    "fundamental_failed": 0 if fundamental_result.get("status") == "success" else 1,
+                    "details": [{
+                        "ticker": ticker,
+                        "history": history_result.get("status"),
+                        "fundamental": fundamental_result.get("status"),
+                    }],
+                    "errors": [],
+                    "message": f"Fetched history ({history_result.get('status')}) and fundamental ({fundamental_result.get('status')}) for {ticker}",
                 }
 
             tickers = universe.get_tickers()
@@ -220,7 +238,7 @@ class DataManager:
 
             for ticker in tickers:
                 # Fetch history
-                history_result = self.fetch_history(ticker, start_date)
+                history_result = self.fetch_history(ticker, start_date, force=force)
                 if history_result.get("status") == "success":
                     results["history_fetched"] += 1
                 else:

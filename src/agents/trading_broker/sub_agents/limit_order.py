@@ -146,6 +146,8 @@ class LimitOrderAgent(Agent):
 
 				stop_loss = order["stop_loss"]
 				take_profit = order["take_profit"]
+				trailing_stop_distance = order.get("trailing_stop_distance")
+				trailing_stop_pct = order.get("trailing_stop_pct")
 
 				# Get market price for the date: use low price for limit BUY fill simulation
 				# (best-case fill during the trading day), falling back to close
@@ -213,6 +215,8 @@ class LimitOrderAgent(Agent):
 						fees=0,
 						stop_loss=stop_loss,
 						take_profit=take_profit,
+						trailing_stop_distance=trailing_stop_distance,
+						trailing_stop_pct=trailing_stop_pct,
 						notes=f"Limit order {order_id[:8]} executed @ {limit_price:.2f}",
 						created_at=execution_time,
 						metadata=market_metadata

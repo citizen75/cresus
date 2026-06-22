@@ -46,7 +46,7 @@ class TradingBroker(Agent):
 	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
 		"""Execute pending BUY orders and manage exits (stop_loss) for a specific date.
 
-		Assumes day data has already been loaded by TransactFlow into context.data_history.
+		Assumes day data has already been loaded by MarketProcessAgent into context.data_history.
 
 		Args:
 			input_data: Input data with:
@@ -59,7 +59,7 @@ class TradingBroker(Agent):
 		if input_data is None:
 			input_data = {}
 
-		# Get parameters from context (set by TransactFlow)
+		# Get parameters from context (set by MarketProcessAgent)
 		portfolio_name = self.context.get("portfolio_name") or "default"
 		trading_date = self.context.get("date")
 

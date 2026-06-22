@@ -11,7 +11,7 @@ class OrdersAgent(Agent):
 	"""Manage order lifecycle and expire pending orders at end of trading day.
 
 	Orders have a 1-day lifetime. Any pending order not executed by end of day
-	is marked as expired. This agent runs in PostMarketFlow to clean up stale orders.
+	is marked as expired. This agent runs inside MarketCloseAgent to clean up stale orders.
 	"""
 
 	def __init__(self, name: str = "OrdersAgent", context: Optional[Any] = None):
@@ -38,27 +38,35 @@ class OrdersAgent(Agent):
 			input_data = {}
 
 		portfolio_name = input_data.get("portfolio_name") or self.context.get("portfolio_name") or "default"
-		trading_date = self.context.get("date")
+		# Prefer date passed explicitly for this call (e.g. BacktestAgent's day loop) over
+		# whatever is already in context, so this agent doesn't implicitly depend on a
+		# preceding step (like MarketProcessAgent) having set context["date"] first.
+		trading_date = input_data.get("date") or self.context.get("date")
 
-		# Get time_stop from strategy config (how long to wait for orders to fill before expiring)
-		# Default 1 day - this is order expiration, separate from position holding_period
+		# Get time_stop from strategy config (how long to wait for orders to fill before expiring).
+		# Default 1 day - this is order expiration, separate from position holding_period.
+		# Use strategy_config already in context if present (e.g. a bot-local config loaded
+		# from bot_dir/strategy.yml that isn't registered in the centralized StrategyManager)
+		# before falling back to a fresh StrategyManager lookup.
 		time_stop = input_data.get("time_stop", 1)
+		strategy_config = self.context.get("strategy_config")
 		strategy_name = self.context.get("strategy_name")
-		if strategy_name:
+		if not strategy_config and strategy_name:
 			try:
 				strategy_manager = StrategyManager()
 				strategy_result = strategy_manager.load_strategy(strategy_name)
 				if strategy_result.get("status") == "success":
-					strategy_data = strategy_result.get("data", {})
-					exit_config = strategy_data.get("exit", {}).get("parameters", {})
-					ts_formula = exit_config.get("time_stop", {}).get("formula")
-					if ts_formula:
-						try:
-							time_stop = int(float(ts_formula))
-						except (ValueError, TypeError):
-							pass
+					strategy_config = strategy_result.get("data", {})
 			except Exception as e:
 				self.logger.debug(f"Could not load strategy config for time_stop: {e}")
+		if strategy_config:
+			exit_config = strategy_config.get("exit", {}).get("parameters", {})
+			ts_formula = exit_config.get("time_stop", {}).get("formula")
+			if ts_formula:
+				try:
+					time_stop = int(float(ts_formula))
+				except (ValueError, TypeError):
+					pass
 
 		if not trading_date:
 			return {

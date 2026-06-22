@@ -16,7 +16,7 @@ class Journal:
 
     BASE_COLUMNS = [
         "id", "created_at", "operation", "ticker", "quantity",
-        "price", "amount", "fees", "stop_loss", "take_profit", "trailing_stop_distance", "highest_price", "status", "status_at", "exit_type", "notes", "metadata"
+        "price", "amount", "fees", "stop_loss", "take_profit", "trailing_stop_distance", "trailing_stop_pct", "highest_price", "status", "status_at", "exit_type", "notes", "metadata"
     ]
 
     def __init__(self, name: str = "default", context: Optional[Dict[str, Any]] = None):
@@ -93,7 +93,8 @@ class Journal:
     def add_transaction(self, operation: str, ticker: str, quantity: int, price: float,
                        fees: float = 0, notes: str = "", created_at: str = None,
                        stop_loss: float = None, take_profit: float = None, highest_price: float = None,
-                       trailing_stop_distance: float = None, exit_type: str = None, status_at: str = None,
+                       trailing_stop_distance: float = None, trailing_stop_pct: float = None,
+                       exit_type: str = None, status_at: str = None,
                        metadata: Optional[Dict[str, Any]] = None) -> str:
         """Add a new transaction to journal.
 
@@ -153,6 +154,7 @@ class Journal:
             "stop_loss": float(stop_loss) if stop_loss else None,
             "take_profit": float(take_profit) if take_profit else None,
             "trailing_stop_distance": float(trailing_stop_distance) if trailing_stop_distance else None,
+            "trailing_stop_pct": float(trailing_stop_pct) if trailing_stop_pct else None,
             "highest_price": float(highest_price) if highest_price else float(price_val),
             "status": "completed",
             "status_at": tx_status_at,
@@ -238,12 +240,14 @@ class Journal:
             stop_loss = None
             take_profit = None
             trailing_stop_distance = None
+            trailing_stop_pct = None
             highest_price = None
             if buy_transactions:
                 most_recent_buy = buy_transactions[-1]
                 stop_loss = most_recent_buy.get("stop_loss")
                 take_profit = most_recent_buy.get("take_profit")
                 trailing_stop_distance = most_recent_buy.get("trailing_stop_distance")
+                trailing_stop_pct = most_recent_buy.get("trailing_stop_pct")
                 highest_price = most_recent_buy.get("highest_price")
 
             result.append({
@@ -255,6 +259,7 @@ class Journal:
                 "stop_loss": float(stop_loss) if stop_loss else None,
                 "take_profit": float(take_profit) if take_profit else None,
                 "trailing_stop_distance": float(trailing_stop_distance) if trailing_stop_distance else None,
+                "trailing_stop_pct": float(trailing_stop_pct) if trailing_stop_pct else None,
                 "highest_price": float(highest_price) if highest_price else round(avg_entry_price, 2),
             })
 

@@ -75,6 +75,7 @@ class OrderConstructionAgent(Agent):
 
 			# Extract trailing stop distance and holding period from config
 			trailing_stop_distance = None
+			trailing_stop_pct = None
 			holding_period = None
 
 			# Calculate trailing_stop_distance if using trailing stop type
@@ -83,8 +84,14 @@ class OrderConstructionAgent(Agent):
 				stop_config = exit_config["stop"]
 				stop_type = stop_config.get("type", "fix") if isinstance(stop_config, dict) else "fix"
 
+				if stop_type == "trailing" and isinstance(stop_config, dict) and stop_config.get("trailing_pct") is not None:
+					# Percentage trail: stop always sits trailing_pct below the highest
+					# price seen so far (recomputed daily by TrailingStopAgent), as
+					# opposed to a fixed dollar distance from entry.
+					trailing_stop_pct = float(stop_config["trailing_pct"])
+
 				# Only calculate trailing_stop_distance for trailing stop type
-				if stop_type == "trailing":
+				elif stop_type == "trailing":
 					# For trailing stops, distance is calculated as: entry_price - stop_level
 					if isinstance(stop_config, dict) and "formula" in stop_config:
 						stop_formula = stop_config.get("formula")
@@ -168,6 +175,7 @@ class OrderConstructionAgent(Agent):
 				"stop_loss": stop_loss,
 				"take_profit": take_profit,
 				"trailing_stop_distance": trailing_stop_distance,
+				"trailing_stop_pct": trailing_stop_pct,
 				"holding_period": holding_period,
 				"risk_amount": order.get("risk_amount"),
 				"risk_reward": risk_reward,

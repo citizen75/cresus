@@ -5,7 +5,7 @@ import yaml
 import subprocess
 import os
 from pathlib import Path
-from typing import Dict, Any, Tuple, List
+from typing import Dict, Any, Tuple, List, Optional
 
 # Add src to path
 src_path = Path(__file__).parent.parent.parent
@@ -14,6 +14,7 @@ if str(src_path) not in sys.path:
 
 from tools.strategy.strategy import StrategyManager
 from tools.strategy.validator import StrategyValidator
+from tools.strategy.versioning import save_strategy_version
 from tools.indicators import IndicatorChecker
 from rich.console import Console
 from rich.table import Table
@@ -637,12 +638,13 @@ class StrategyCommands:
 				self._display_strategy_summary(strategy_data)
 			elif choice == "8":
 				# Save wizard edits first, then open in editor
-				self.strategy_manager.save_strategy(strategy_name, strategy_data)
-				console.print("[green]✓ Wizard changes saved[/green]\n")
+				new_version = save_strategy_version(strategy_name, strategy_data)
+				console.print(f"[green]✓ Wizard changes saved as v{new_version}[/green]\n")
 				return self._edit_in_editor(strategy_name)
 			elif choice == "9":
 				# Validate before saving
-				self.strategy_manager.save_strategy(strategy_name, strategy_data)
+				new_version = save_strategy_version(strategy_name, strategy_data)
+				console.print(f"[dim]Saved as v{new_version}[/dim]")
 				validation = self.strategy_manager.validate_against_template(strategy_name)
 				errors = validation.get("errors", [])
 
@@ -781,6 +783,51 @@ class StrategyCommands:
 		console.print(f"[cyan]Exit:[/cyan] {'enabled' if strategy_data.get('exit', {}).get('enabled') else 'disabled'}")
 		console.print()
 
+	def create(self, strategy_name: str, universe: Optional[str] = None) -> Dict[str, Any]:
+		"""Create a new strategy from the `init/templates/strategy.yml` template.
+
+		Args:
+			strategy_name: Name for the new strategy
+			universe: Optional universe to use instead of the template's default
+
+		Returns:
+			Result dictionary with status and message
+		"""
+		console.print(f"\n[bold cyan]Creating Strategy[/bold cyan]\n")
+
+		existing = self.strategy_manager.load_strategy(strategy_name)
+		if existing.get("status") == "success":
+			console.print(f"[red]✗ Strategy already exists: {strategy_name}[/red]")
+			return {"status": "error", "message": f"Strategy '{strategy_name}' already exists"}
+
+		template_file = self.project_root / "init" / "templates" / "strategy.yml"
+		if not template_file.exists():
+			console.print(f"[red]✗ Template not found: {template_file}[/red]")
+			return {"status": "error", "message": f"Template not found: {template_file}"}
+
+		with open(template_file, "r") as f:
+			template_data = yaml.safe_load(f)
+
+		template_data["name"] = strategy_name
+		if universe:
+			template_data["universe"] = universe
+
+		new_version = save_strategy_version(strategy_name, template_data)
+		file_path = str(self.strategy_manager._get_strategy_file(strategy_name))
+
+		console.print(f"[green]✓ Strategy created: {strategy_name} (v{new_version})[/green]")
+		if universe:
+			console.print(f"[dim]  Universe: {universe}[/dim]")
+		console.print(f"[dim]  Location: {file_path}[/dim]\n")
+
+		return {
+			"status": "success",
+			"message": f"Strategy '{strategy_name}' created",
+			"name": strategy_name,
+			"file": file_path,
+			"version": new_version,
+		}
+
 	def duplicate(self, from_strategy: str, dest_strategy: str) -> Dict[str, Any]:
 		"""Duplicate a strategy with a new name.
 
@@ -814,14 +861,17 @@ class StrategyCommands:
 				"message": f"Destination strategy '{dest_strategy}' already exists",
 			}
 
-		# Update the strategy name in the copied data
+		# Update the strategy name in the copied data; duplicates start their
+		# own version lineage at v1 rather than inheriting the source's version
 		strategy_data["name"] = dest_strategy
+		strategy_data.pop("version", None)
 
 		# Save the duplicated strategy
-		save_result = self.strategy_manager.save_strategy(dest_strategy, strategy_data)
+		new_version = save_strategy_version(dest_strategy, strategy_data)
+		save_result = {"status": "success", "file": str(self.strategy_manager._get_strategy_file(dest_strategy))}
 
 		if save_result.get("status") == "success":
-			console.print(f"[green]✓ Strategy duplicated successfully[/green]")
+			console.print(f"[green]✓ Strategy duplicated successfully (v{new_version})[/green]")
 			console.print(f"[cyan]  From:[/cyan] {from_strategy}")
 			console.print(f"[cyan]  To:  [/cyan] {dest_strategy}")
 			console.print(f"[cyan]  File:[/cyan] {save_result.get('file')}\n")

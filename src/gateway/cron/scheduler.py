@@ -117,13 +117,13 @@ class CronScheduler:
 			params: Flow parameters
 		"""
 		from core.context import AgentContext
-		from flows.premarket import PreMarketFlow
+		from agents.market_prep.agent import MarketPrepAgent
 		from flows.data_fetch import DataFetchFlow
 		from flows.heartbeat import HeartbeatFlow
 
-		# Map flow names to flow classes
+		# Map flow names to flow/agent classes
 		flow_classes = {
-			"premarket": PreMarketFlow,
+			"premarket": MarketPrepAgent,
 			"data_fetch": DataFetchFlow,
 			"heartbeat": HeartbeatFlow,
 		}

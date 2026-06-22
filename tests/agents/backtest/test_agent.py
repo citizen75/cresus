@@ -1,7 +1,9 @@
 """Tests for BacktestAgent."""
 
 import pytest
+import shutil
 import sys
+import uuid
 from pathlib import Path
 from datetime import date, timedelta
 from unittest.mock import Mock, MagicMock, patch
@@ -20,7 +22,7 @@ class TestBacktestAgentInitialization:
 
 	def test_initialization_with_defaults(self):
 		"""Test BacktestAgent initializes with default name."""
-		agent = BacktestAgent()
+		agent = BacktestAgent(websocket=False)
 		assert agent.name == "backtest"
 		assert agent.context is not None
 		assert agent.logger is not None
@@ -38,10 +40,20 @@ class TestBacktestAgentInitialization:
 
 	def test_flows_default_to_none(self):
 		"""Test that flows are None by default."""
-		agent = BacktestAgent()
+		agent = BacktestAgent(websocket=False)
 		assert agent.pre_market_flow is None
 		assert agent.market_flow is None
 		assert agent.post_market_flow is None
+
+	def test_websocket_enabled_by_default(self):
+		"""Test that websocket_enabled defaults to True."""
+		agent = BacktestAgent()
+		assert agent.websocket_enabled is True
+
+	def test_websocket_can_be_disabled(self):
+		"""Test that websocket_enabled can be turned off (skips connection wait/broadcasts)."""
+		agent = BacktestAgent(websocket=False)
+		assert agent.websocket_enabled is False
 
 
 class TestBacktestAgentFlowSetters:
@@ -49,21 +61,21 @@ class TestBacktestAgentFlowSetters:
 
 	def test_set_premarket_flow(self):
 		"""Test setting pre-market flow."""
-		agent = BacktestAgent()
+		agent = BacktestAgent(websocket=False)
 		flow = Mock(spec=Flow)
 		agent.set_premarket_flow(flow)
 		assert agent.pre_market_flow is flow
 
 	def test_set_market_flow(self):
 		"""Test setting market flow."""
-		agent = BacktestAgent()
+		agent = BacktestAgent(websocket=False)
 		flow = Mock(spec=Flow)
 		agent.set_market_flow(flow)
 		assert agent.market_flow is flow
 
 	def test_set_postmarket_flow(self):
 		"""Test setting post-market flow."""
-		agent = BacktestAgent()
+		agent = BacktestAgent(websocket=False)
 		flow = Mock(spec=Flow)
 		agent.set_postmarket_flow(flow)
 		assert agent.post_market_flow is flow
@@ -74,14 +86,14 @@ class TestBacktestAgentProcessInputValidation:
 
 	def test_process_missing_strategy_name(self):
 		"""Test that process returns error when strategy_name is missing."""
-		agent = BacktestAgent()
+		agent = BacktestAgent(websocket=False)
 		result = agent.process({})
 		assert result["status"] == "error"
 		assert "strategy_name is required" in result["message"]
 
 	def test_process_missing_strategy_name_with_none_input(self):
 		"""Test that process returns error when input_data is None."""
-		agent = BacktestAgent()
+		agent = BacktestAgent(websocket=False)
 		result = agent.process(None)
 		assert result["status"] == "error"
 		assert "strategy_name is required" in result["message"]
@@ -92,7 +104,7 @@ class TestBacktestAgentDateResolution:
 
 	def test_process_date_defaults(self):
 		"""Test that dates default correctly (end_date=today, start_date=today-365)."""
-		agent = BacktestAgent()
+		agent = BacktestAgent(websocket=False)
 		today = date.today()
 
 		with patch("agents.backtest.agent.StrategyAgent") as mock_strategy, \
@@ -115,7 +127,7 @@ class TestBacktestAgentDateResolution:
 
 	def test_process_explicit_dates(self):
 		"""Test explicit date input."""
-		agent = BacktestAgent()
+		agent = BacktestAgent(websocket=False)
 		start = "2023-01-01"
 		end = "2023-12-31"
 
@@ -140,7 +152,7 @@ class TestBacktestAgentDateResolution:
 
 	def test_process_custom_lookback_days(self):
 		"""Test custom lookback_days."""
-		agent = BacktestAgent()
+		agent = BacktestAgent(websocket=False)
 		today = date.today()
 
 		with patch("agents.backtest.agent.StrategyAgent") as mock_strategy, \
@@ -167,7 +179,7 @@ class TestBacktestAgentContext:
 
 	def test_process_sets_backtest_context(self):
 		"""Test that process initializes backtest context dict."""
-		agent = BacktestAgent()
+		agent = BacktestAgent(websocket=False)
 
 		with patch("agents.backtest.agent.StrategyAgent") as mock_strategy, \
 			 patch("agents.backtest.agent.DataAgent") as mock_data:
@@ -214,7 +226,7 @@ class TestBacktestAgentLooping:
 
 	def test_process_loops_over_trading_days(self):
 		"""Test that backtest loops over trading days and calls flows."""
-		agent = BacktestAgent()
+		agent = BacktestAgent(websocket=False)
 		pre_market_mock = Mock(spec=Flow)
 		pre_market_mock.context = None
 		pre_market_mock.process = Mock(return_value={"status": "success"})
@@ -255,10 +267,14 @@ class TestBacktestAgentLooping:
 			assert pre_market_mock.process.call_count == 9
 			assert market_mock.process.call_count == 9
 			assert post_market_mock.process.call_count == 9
+			# Explicitly injected phases must not be overridden by auto-wiring
+			assert agent.pre_market_flow is pre_market_mock
+			assert agent.market_flow is market_mock
+			assert agent.post_market_flow is post_market_mock
 
 	def test_process_increments_date(self):
 		"""Test that current_date is incremented between pre_market and market."""
-		agent = BacktestAgent()
+		agent = BacktestAgent(websocket=False)
 
 		dates_seen = {"pre_market": [], "market": []}
 
@@ -305,9 +321,158 @@ class TestBacktestAgentLooping:
 			for pre_date, market_date in zip(dates_seen["pre_market"], dates_seen["market"]):
 				assert market_date > pre_date
 
+	def test_phase_exceptions_do_not_crash_backtest(self):
+		"""A phase raising an exception on a given day (e.g. MarketCloseAgent's
+		fatal=True OrdersAgent call, or MarketProcessAgent calling TradingBroker
+		directly - neither wraps its own fatal failures) must not crash the whole
+		multi-day backtest loop. BacktestAgent's _run_phase() should catch it, log
+		a warning, and continue to the next day."""
+		agent = BacktestAgent(websocket=False)
+
+		pre_calls = {"n": 0}
+
+		def flaky_pre_market(input_data):
+			pre_calls["n"] += 1
+			if pre_calls["n"] == 3:
+				raise RuntimeError("simulated pre-market failure")
+			return {"status": "success"}
+
+		market_calls = {"n": 0}
+
+		def flaky_market(input_data):
+			market_calls["n"] += 1
+			if market_calls["n"] == 5:
+				raise RuntimeError("simulated market failure")
+			return {"status": "success"}
+
+		post_calls = {"n": 0}
+
+		def flaky_post_market(input_data):
+			post_calls["n"] += 1
+			if post_calls["n"] == 8:
+				raise RuntimeError("simulated post-market failure")
+			return {"status": "success"}
+
+		pre_market_mock = Mock(spec=Flow)
+		pre_market_mock.context = None
+		pre_market_mock.process = Mock(side_effect=flaky_pre_market)
+
+		market_mock = Mock(spec=Flow)
+		market_mock.context = None
+		market_mock.process = Mock(side_effect=flaky_market)
+
+		post_market_mock = Mock(spec=Flow)
+		post_market_mock.context = None
+		post_market_mock.process = Mock(side_effect=flaky_post_market)
+
+		agent.set_premarket_flow(pre_market_mock)
+		agent.set_market_flow(market_mock)
+		agent.set_postmarket_flow(post_market_mock)
+
+		start = date(2023, 1, 1)
+		end = date(2023, 1, 10)
+		data_history = self._create_mock_data_history(start, end, 10)
+
+		with patch("agents.backtest.agent.StrategyAgent") as mock_strategy, \
+			 patch("agents.backtest.agent.DataAgent") as mock_data:
+			mock_strategy.return_value.run.return_value = {"status": "success", "output": {}}
+			mock_data.return_value.run.return_value = {"status": "success", "output": {}}
+			agent.context.set("data_history", data_history)
+
+			result = agent.process({
+				"strategy_name": "test",
+				"start_date": start,
+				"end_date": end,
+			})
+
+			assert result["status"] == "success"
+			# All 9 days still attempted on every phase, despite each phase raising once
+			assert pre_market_mock.process.call_count == 9
+			assert market_mock.process.call_count == 9
+			assert post_market_mock.process.call_count == 9
+			assert result["output"]["days_processed"] == 9
+
+	def test_total_trading_days_includes_synthetic_final_day(self):
+		"""total_trading_days must reflect the synthetic final-day inclusion (data
+		available one day past the requested end_date) - it must not be computed
+		before that day gets appended to trading_days."""
+		agent = BacktestAgent(websocket=False)
+		for mock_attr in ("pre_market_flow", "market_flow", "post_market_flow"):
+			mock = Mock(spec=Flow)
+			mock.context = None
+			mock.process = Mock(return_value={"status": "success"})
+			setattr(agent, mock_attr, mock)
+
+		data_start = date(2023, 1, 1)
+		data_end = date(2023, 1, 11)  # one extra day beyond the requested end_date
+		data_history = self._create_mock_data_history(data_start, data_end, 11)
+		requested_end = date(2023, 1, 10)
+
+		with patch("agents.backtest.agent.StrategyAgent") as mock_strategy, \
+			 patch("agents.backtest.agent.DataAgent") as mock_data:
+			mock_strategy.return_value.run.return_value = {"status": "success", "output": {}}
+			mock_data.return_value.run.return_value = {"status": "success", "output": {}}
+			agent.context.set("data_history", data_history)
+
+			result = agent.process({
+				"strategy_name": "test",
+				"start_date": data_start,
+				"end_date": requested_end,
+			})
+
+			assert result["status"] == "success"
+			# 10 requested days + 1 synthetic final day (Jan 11, used for execution) = 11
+			assert result["output"]["total_trading_days"] == 11
+			# the loop processes all but the synthetic final day = 10
+			assert agent.pre_market_flow.process.call_count == 10
+
+	def test_creates_portfolio_with_strategy_currency(self):
+		"""Portfolio currency should come from strategy_config (backtest.currency),
+		defaulting to EUR when unset - it must not be hardcoded to EUR regardless of
+		what the strategy declares."""
+		agent = BacktestAgent(websocket=False)
+		for mock_attr in ("pre_market_flow", "market_flow", "post_market_flow"):
+			mock = Mock(spec=Flow)
+			mock.context = None
+			mock.process = Mock(return_value={"status": "success"})
+			setattr(agent, mock_attr, mock)
+
+		start = date(2023, 1, 1)
+		end = date(2023, 1, 5)
+		data_history = self._create_mock_data_history(start, end, 5)
+		strategy_name = f"test_currency_{uuid.uuid4().hex[:8]}"
+
+		with patch("agents.backtest.agent.StrategyAgent") as mock_strategy, \
+			 patch("agents.backtest.agent.DataAgent") as mock_data:
+			mock_strategy.return_value.run.return_value = {"status": "success", "output": {}}
+			mock_data.return_value.run.return_value = {"status": "success", "output": {}}
+			agent.context.set("data_history", data_history)
+			agent.context.set("strategy_config", {"backtest": {"initial_capital": 5000, "currency": "USD"}})
+
+			try:
+				result = agent.process({
+					"strategy_name": strategy_name,
+					"start_date": start,
+					"end_date": end,
+				})
+				assert result["status"] == "success"
+
+				from tools.portfolio import PortfolioManager
+				pm = PortfolioManager(context=agent.context.__dict__)
+				metadata = pm._get_portfolio_metadata(strategy_name)
+				assert metadata.get("currency") == "USD"
+			finally:
+				from utils.env import get_db_root
+				shutil.rmtree(get_db_root() / "portfolios" / strategy_name, ignore_errors=True)
+				shutil.rmtree(get_db_root() / "backtests" / strategy_name, ignore_errors=True)
+
 	def test_process_no_flows_set(self):
-		"""Test that loop runs without error when no flows are set."""
-		agent = BacktestAgent()
+		"""Test that BacktestAgent auto-wires MarketPrepAgent/MarketProcessAgent/MarketCloseAgent
+		when the caller hasn't injected its own phases via set_premarket_flow/etc."""
+		agent = BacktestAgent(websocket=False)
+		assert agent.pre_market_flow is None
+		assert agent.market_flow is None
+		assert agent.post_market_flow is None
 
 		start = date(2023, 1, 1)
 		end = date(2023, 1, 5)
@@ -328,13 +493,20 @@ class TestBacktestAgentLooping:
 				"end_date": end,
 			})
 
+			from agents.market_prep.agent import MarketPrepAgent
+			from agents.market_process.agent import MarketProcessAgent
+			from agents.market_close.agent import MarketCloseAgent
+			assert isinstance(agent.pre_market_flow, MarketPrepAgent)
+			assert isinstance(agent.market_flow, MarketProcessAgent)
+			assert isinstance(agent.post_market_flow, MarketCloseAgent)
+
 			assert result["status"] == "success"
 			backtest = result["output"]
 			assert backtest["days_processed"] == 4
 
 	def test_process_no_data_returns_error(self):
 		"""Test that process returns error when no trading days found."""
-		agent = BacktestAgent()
+		agent = BacktestAgent(websocket=False)
 
 		with patch("agents.backtest.agent.StrategyAgent") as mock_strategy, \
 			 patch("agents.backtest.agent.DataAgent") as mock_data:
@@ -352,7 +524,7 @@ class TestBacktestAgentLooping:
 
 	def test_process_fills_daily_results(self):
 		"""Test that daily_results are populated with dates."""
-		agent = BacktestAgent()
+		agent = BacktestAgent(websocket=False)
 
 		start = date(2023, 1, 1)
 		end = date(2023, 1, 5)

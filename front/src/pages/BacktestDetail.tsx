@@ -4,7 +4,7 @@ import { LineChart, Line, AreaChart, Area, BarChart, ComposedChart, Bar, XAxis, 
 import { api } from '@/services/api'
 import { useBacktestRun, useBacktestDistribution } from '@/hooks/usePortfolio'
 import { useBacktestWebSocket } from '@/hooks/useBacktestWebSocket'
-import TradingChart from '@/components/TradingChart'
+import TradingChartWidget from '@/components/TradingChartWidget'
 import CardChart from '@/components/CardChart'
 
 export default function BacktestDetail() {
@@ -204,7 +204,7 @@ export default function BacktestDetail() {
   }, [watchlist])
 
   // Distribution data - declare early for dependency arrays
-  const { data: distributionResponse, isLoading: distLoading, error: distError } = useBacktestDistribution(strategy || '', runId || '')
+  const { data: distributionResponse, isLoading: distLoading, error: distError, refetch: refetchDistribution } = useBacktestDistribution(strategy || '', runId || '')
 
   // Debug distribution response
   useEffect(() => {
@@ -264,8 +264,11 @@ export default function BacktestDetail() {
         setRealtimeMetrics(lastMessage.data.metrics)
         setDaysProcessed(lastMessage.data.days_processed || daysProcessed)
         setTotalDays(lastMessage.data.days_processed || daysProcessed)
-        // Refetch backtest data to show full dashboard with tabs
-        setTimeout(() => refetch(), 500)
+        // Refetch backtest data and trade distribution to show full dashboard with tabs
+        setTimeout(() => {
+          refetch()
+          refetchDistribution()
+        }, 500)
       } else if (lastMessage.type === 'daily_results') {
         setIsRunning(true)
         // Extract metrics from daily results (they're in data.results)
@@ -301,7 +304,7 @@ export default function BacktestDetail() {
         setIsRunning(false)
       }
     }
-  }, [lastMessage, totalDays, refetch])
+  }, [lastMessage, totalDays, refetch, refetchDistribution])
   // response has { status, data }, we need the inner data object
   const backtest = response?.data
 
@@ -475,7 +478,9 @@ export default function BacktestDetail() {
   // Use realtimeEquity only while backtest is running, use full equity_curve when complete
   const baseEquity = (isRunning && realtimeEquity.length > 0) ? realtimeEquity : (backtest?.equity_curve || [])
 
-  // Ensure equity data includes drawdown as positive magnitude
+  // Ensure equity data includes drawdown and return_pct (the completed-backtest
+  // equity_curve from the API only has date/value/drawdown_pct, no return_pct)
+  const equityStartValue = baseEquity[0]?.value
   const equity = baseEquity.map((point: any, idx: number) => {
     let drawdown_pct = point.drawdown_pct
 
@@ -485,8 +490,13 @@ export default function BacktestDetail() {
       drawdown_pct = (point.value - peak) / peak * 100
     }
 
+    let return_pct = point.return_pct
+    if ((return_pct === undefined || return_pct === null) && equityStartValue) {
+      return_pct = ((point.value - equityStartValue) / equityStartValue) * 100
+    }
+
     // Always use absolute value (magnitude of drawdown)
-    return { ...point, drawdown_pct: Math.abs(drawdown_pct) }
+    return { ...point, drawdown_pct: Math.abs(drawdown_pct), return_pct }
   })
 
   const MetricRow = ({ label, value, color = 'text-white' }: { label: string; value: string | number; color?: string }) => (
@@ -495,6 +505,13 @@ export default function BacktestDetail() {
       <span className={`font-bold text-sm ${color}`}>{value}</span>
     </div>
   )
+
+  // While a backtest is running, the metrics source is the per-day WebSocket
+  // snapshot, which doesn't carry these aggregate fields (they're only computed
+  // once at the end). Render a placeholder instead of a fabricated "0.00" so it
+  // doesn't look like the backtest finished with a flat/null result.
+  const formatFinalMetric = (value: number | undefined | null, suffix = '') =>
+    value === undefined || value === null ? '—' : `${value.toFixed(2)}${suffix}`
 
   // Calculate monthly returns matrix
   const calculateMonthlyReturns = () => {
@@ -678,27 +695,27 @@ export default function BacktestDetail() {
             <div className="space-y-0">
               <MetricRow
                 label="Total Return"
-                value={`${(metrics.total_return_pct || 0).toFixed(2)}%`}
-                color={(metrics.total_return_pct || 0) >= 0 ? 'text-green-400' : 'text-red-400'}
+                value={formatFinalMetric(metrics.total_return_pct, '%')}
+                color={(metrics.total_return_pct ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}
               />
               <MetricRow
                 label="Sharpe Ratio"
-                value={`${(metrics.sharpe_ratio || 0).toFixed(2)}`}
+                value={formatFinalMetric(metrics.sharpe_ratio)}
                 color="text-purple-400"
               />
               <MetricRow
                 label="Sortino Ratio"
-                value={`${(metrics.sortino_ratio || 0).toFixed(2)}`}
+                value={formatFinalMetric(metrics.sortino_ratio)}
                 color="text-purple-400"
               />
               <MetricRow
                 label="Max Drawdown"
-                value={`${(metrics.max_drawdown_pct || 0).toFixed(2)}%`}
+                value={formatFinalMetric(metrics.max_drawdown_pct, '%')}
                 color="text-red-400"
               />
               <MetricRow
                 label="Calmar Ratio"
-                value={`${(metrics.calmar_ratio || 0).toFixed(2)}`}
+                value={formatFinalMetric(metrics.calmar_ratio)}
               />
               <MetricRow
                 label="Win Rate"
@@ -792,6 +809,14 @@ export default function BacktestDetail() {
                   const distData = distributionResponse.data || distributionResponse
                   const distStats = distData.statistics || {}
                   const distribution = distData.distribution || []
+
+                  if (distribution.length === 0 && Object.keys(distStats).length === 0) {
+                    return (
+                      <div className="bg-slate-900/50 rounded-lg p-6 border border-slate-800 text-center text-slate-400">
+                        {distData.message || 'Backtest in progress - distribution not available yet'}
+                      </div>
+                    )
+                  }
 
                   return (
                     <div className="grid grid-cols-12 gap-4">
@@ -912,6 +937,14 @@ export default function BacktestDetail() {
                       const distData = distributionResponse.data || distributionResponse
                       const distStats = distData.statistics || {}
                       const distribution = distData.distribution || []
+
+                      if (distribution.length === 0 && Object.keys(distStats).length === 0) {
+                        return (
+                          <div className="bg-slate-900/50 rounded-lg p-6 border border-slate-800 text-center text-slate-400">
+                            {distData.message || 'Backtest in progress - distribution not available yet'}
+                          </div>
+                        )
+                      }
 
                       return (
                         <div className="grid grid-cols-12 gap-4">
@@ -1478,6 +1511,7 @@ export default function BacktestDetail() {
                       <th className="text-right py-2 px-2 cursor-pointer hover:text-slate-400" onClick={() => setTransactionSort({ key: 'return_pct', direction: transactionSort.key === 'return_pct' && transactionSort.direction === 'desc' ? 'asc' : 'desc' })}>
                         Gain % {transactionSort.key === 'return_pct' && (transactionSort.direction === 'desc' ? '↓' : '↑')}
                       </th>
+                      <th className="text-center py-2 px-2">Chart</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1503,7 +1537,11 @@ export default function BacktestDetail() {
                       })
 
                       return sortedTrades.map((trade: any, idx: number) => (
-                        <tr key={idx} className="border-b border-slate-800 hover:bg-slate-800/30 transition">
+                        <tr
+                          key={idx}
+                          className="border-b border-slate-800 hover:bg-slate-800/30 transition cursor-pointer"
+                          onClick={() => setChartPosition(trade)}
+                        >
                           <td className="py-2 px-2 text-slate-400">
                             {new Date(trade.entry_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
                           </td>
@@ -1519,6 +1557,18 @@ export default function BacktestDetail() {
                           </td>
                           <td className={`py-2 px-2 text-right font-bold ${trade.return_pct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                             {trade.return_pct.toFixed(2)}%
+                          </td>
+                          <td className="py-2 px-2 text-center">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setChartPosition(trade)
+                              }}
+                              className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition whitespace-nowrap"
+                              title="View price chart"
+                            >
+                              Chart
+                            </button>
                           </td>
                         </tr>
                       ))
@@ -1584,17 +1634,17 @@ export default function BacktestDetail() {
                 try {
                   if (chartPosition.isMultiPosition && chartPosition.positions) {
                     // Multi-position: pass array of positions
-                    return <TradingChart timeframe="1M" title={`${chartPosition.ticker} - All Positions`} ticker={chartPosition.ticker} positions={chartPosition.positions} />
+                    return <TradingChartWidget title={`${chartPosition.ticker} - All Positions`} ticker={chartPosition.ticker} positions={chartPosition.positions} />
                   } else {
                     // Single position: pass entry/exit dates
                     const entryMeta = typeof chartPosition.entry_metadata === 'string' ? JSON.parse(chartPosition.entry_metadata) : chartPosition.entry_metadata
                     const exitMeta = typeof chartPosition.exit_metadata === 'string' ? JSON.parse(chartPosition.exit_metadata) : chartPosition.exit_metadata
                     const entryDate = entryMeta?.timestamp || chartPosition.entry_date
                     const exitDate = exitMeta?.timestamp || chartPosition.exit_date
-                    return <TradingChart timeframe="1M" title={`${chartPosition.ticker} - Position Analysis`} ticker={chartPosition.ticker} entryDate={entryDate} exitDate={exitDate} />
+                    return <TradingChartWidget title={`${chartPosition.ticker} - Position Analysis`} ticker={chartPosition.ticker} entryDate={entryDate} exitDate={exitDate} />
                   }
                 } catch {
-                  return <TradingChart timeframe="1M" title={`${chartPosition.ticker} - Position Analysis`} ticker={chartPosition.ticker} entryDate={chartPosition.entry_date} exitDate={chartPosition.exit_date} />
+                  return <TradingChartWidget title={`${chartPosition.ticker} - Position Analysis`} ticker={chartPosition.ticker} entryDate={chartPosition.entry_date} exitDate={chartPosition.exit_date} />
                 }
               })()}
             </div>

@@ -79,7 +79,16 @@ class StrategyAgent(Agent):
 
 		tickers = input_data.get("tickers", [])
 
-		# If no tickers in input, load from strategy universe or direct tickers
+		# Skip-guard: reuse tickers already resolved on a previous call in this context
+		# (e.g. a prior simulated day in a backtest, where MarketPrepAgent calls this
+		# agent fresh every day) instead of re-reading the universe source from disk
+		# every single time.
+		if not tickers:
+			existing_tickers = self.context.get("tickers")
+			if existing_tickers:
+				tickers = existing_tickers
+
+		# If no tickers in input or context, load from strategy universe or direct tickers
 		if not tickers and strategy_config:
 			universe = strategy_config.get("universe")
 			if universe:

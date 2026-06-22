@@ -181,6 +181,8 @@ class MarketOrderAgent(Agent):
 				entry_price = order["entry_price"]
 				stop_loss = order["stop_loss"]
 				take_profit = order["take_profit"]
+				trailing_stop_distance = order.get("trailing_stop_distance")
+				trailing_stop_pct = order.get("trailing_stop_pct")
 
 				# Get market price for the date (day_data is {ticker: row}, pre-sliced)
 				market_price = get_price(day_data, ticker, "close")
@@ -229,6 +231,8 @@ class MarketOrderAgent(Agent):
 						fees=0,
 						stop_loss=stop_loss,
 						take_profit=take_profit,
+						trailing_stop_distance=trailing_stop_distance,
+						trailing_stop_pct=trailing_stop_pct,
 						notes=f"Market order {order_id} executed",
 						created_at=execution_time,
 						metadata=market_metadata

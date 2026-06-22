@@ -73,8 +73,16 @@ class DataCommands:
 
 	def _handle_fetch(self, parts):
 		"""Handle data fetch command."""
+		# Pull out -force/--force as a flag, wherever it appears, before positional parsing
+		force = False
+		parts = list(parts)
+		for flag in ("-force", "--force"):
+			if flag in parts:
+				parts.remove(flag)
+				force = True
+
 		if len(parts) < 2:
-			console.print("[red]✗[/red] Usage: data fetch <history|fundamental|universe|all|ptf> [args...]")
+			console.print("[red]✗[/red] Usage: data fetch <history|fundamental|universe|all|ptf> [args...] [-force]")
 			return
 
 		data_type = parts[1]
@@ -95,16 +103,16 @@ class DataCommands:
 		start_date = parts[3] if len(parts) > 3 else None
 
 		if data_type == "history":
-			result = self.data_manager.fetch_history(target, start_date)
+			result = self.data_manager.fetch_history(target, start_date, force=force)
 			self._print_result(result)
 		elif data_type == "fundamental":
 			result = self.data_manager.fetch_fundamental(target)
 			self._print_result(result)
 		elif data_type == "universe":
-			result = self.data_manager.fetch_universe(target, start_date)
+			result = self.data_manager.fetch_universe(target, start_date, force=force)
 			self._print_universe_result(result)
 		elif data_type == "all":
-			result = self.data_manager.fetch_all(target, start_date)
+			result = self.data_manager.fetch_all(target, start_date, force=force)
 			self._print_universe_result(result)
 		elif data_type == "ptf":
 			self._handle_fetch_portfolio(target)
@@ -772,7 +780,7 @@ class DataCommands:
 			console.print(f"[red]✗[/red] {result.get('message')}")
 			return
 
-		table = Table(title=f"Data Fetch Results: {result.get('universe')}", box=box.ROUNDED)
+		table = Table(title=f"Data Fetch Results: {result.get('universe') or result.get('ticker')}", box=box.ROUNDED)
 		table.add_column("Ticker", style="cyan")
 		table.add_column("History", style="green")
 		table.add_column("Fundamental", style="green")

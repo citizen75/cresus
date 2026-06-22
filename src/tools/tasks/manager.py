@@ -206,6 +206,7 @@ class TaskManager:
         status: Optional[str] = None,
         priority: Optional[str] = None,
         assignee: Optional[str] = None,
+        portfolio: Optional[str] = None,
         tags: Optional[List[str]] = None,
         limit: int = 100,
         offset: int = 0,
@@ -216,6 +217,7 @@ class TaskManager:
             status: Filter by status
             priority: Filter by priority
             assignee: Filter by assignee
+            portfolio: Filter by portfolio name
             tags: Filter by tags (match any)
             limit: Max results
             offset: Pagination offset
@@ -237,6 +239,10 @@ class TaskManager:
         if assignee:
             query += " AND assignee = ?"
             params.append(assignee)
+
+        if portfolio:
+            query += " AND portfolio = ?"
+            params.append(portfolio)
 
         query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
         params.extend([limit, offset])

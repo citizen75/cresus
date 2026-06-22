@@ -48,8 +48,15 @@ class StopLossAgent(Agent):
 
 			if stop_type == "trailing":
 				trailing_dist = position.get("trailing_stop_distance")
+				trailing_pct = position.get("trailing_stop_pct")
 				highest_price = position.get("highest_price")
-				if trailing_dist is not None and highest_price is not None:
+				if trailing_pct is not None and highest_price is not None:
+					effective = float(highest_price) * (1 - float(trailing_pct))
+					self.logger.debug(
+						f"[STOP] {ticker}: trailing = {float(highest_price):.2f}"
+						f" * (1 - {float(trailing_pct):.4f}) = {effective:.2f}"
+					)
+				elif trailing_dist is not None and highest_price is not None:
 					effective = float(highest_price) - float(trailing_dist)
 					self.logger.debug(
 						f"[STOP] {ticker}: trailing = {float(highest_price):.2f}"

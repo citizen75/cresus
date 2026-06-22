@@ -9,6 +9,15 @@ interface TradingChartWidgetProps {
   showControls?: boolean
   onGetHistoricalData?: (ticker: string, days: number) => Promise<any>
   dataCache?: Map<string, any[]>
+  entryDate?: string
+  exitDate?: string
+  positions?: Array<{
+    entry_date: string
+    exit_date: string
+    entry_price: number
+    exit_price: number
+    pnl?: number
+  }>
 }
 
 export default function TradingChartWidget({
@@ -17,10 +26,13 @@ export default function TradingChartWidget({
   showControls = true,
   onGetHistoricalData,
   dataCache,
+  entryDate,
+  exitDate,
+  positions,
 }: TradingChartWidgetProps) {
   const [timeframe, setTimeframe] = useState('1D')
   const [visibleWindow, setVisibleWindow] = useState<'1M' | '3M' | '6M' | 'YTD' | '1Y' | '2Y'>('1Y')
-  const [selectedIndicators, setSelectedIndicators] = useState<Set<string>>(new Set(['RSI 14', 'MACD']))
+  const [selectedIndicators, setSelectedIndicators] = useState<Set<string>>(new Set())
   const [chartType, setChartType] = useState('Candlestick')
   const [hoverData, setHoverData] = useState<any>(null)
   const [controlsVisible, setControlsVisible] = useState(false)
@@ -119,7 +131,11 @@ export default function TradingChartWidget({
         <div className="flex-1 overflow-hidden">
           <TradingChart
             timeframe={timeframe}
+            title={title}
             ticker={ticker}
+            entryDate={entryDate}
+            exitDate={exitDate}
+            positions={positions}
             selectedIndicators={selectedIndicators}
             visibleWindow={visibleWindow}
             onCursorMove={setHoverData}

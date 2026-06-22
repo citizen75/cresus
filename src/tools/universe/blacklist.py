@@ -1,5 +1,6 @@
 """Blacklist management for filtering out invalid/delisted tickers."""
 
+import threading
 from pathlib import Path
 from typing import Set, Optional
 import pandas as pd
@@ -108,13 +109,25 @@ class Blacklist:
         self._tickers = None  # Invalidate cache
 
 
-# Global singleton instance
+# Global singleton instance, guarded by a lock since callers (e.g. concurrent
+# backtests run in background threads by the API) can read and invalidate it from
+# different threads.
 _blacklist_instance: Optional[Blacklist] = None
+_blacklist_lock = threading.Lock()
 
 
 def get_blacklist() -> Blacklist:
     """Get or create blacklist singleton instance."""
     global _blacklist_instance
-    if _blacklist_instance is None:
-        _blacklist_instance = Blacklist()
-    return _blacklist_instance
+    with _blacklist_lock:
+        if _blacklist_instance is None:
+            _blacklist_instance = Blacklist()
+        return _blacklist_instance
+
+
+def invalidate_blacklist_cache() -> None:
+    """Force the next get_blacklist() call to create a fresh instance (and reload
+    the CSV from disk) instead of reaching into the module's private singleton."""
+    global _blacklist_instance
+    with _blacklist_lock:
+        _blacklist_instance = None

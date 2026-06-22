@@ -12,16 +12,18 @@ class SaveWatchlistAgent(Agent):
 	and persists to CSV via WatchlistManager with optional toggle.
 	"""
 
-	def __init__(self, name: str = "SaveWatchlistAgent", strategy_name: str = "", context: Optional[Any] = None):
+	def __init__(self, name: str = "SaveWatchlistAgent", strategy_name: str = "", context: Optional[Any] = None, bot_dir: Optional[str] = None):
 		"""Initialize save watchlist agent.
 
 		Args:
 			name: Agent name
 			strategy_name: Strategy name for WatchlistManager
 			context: Optional AgentContext for shared state
+			bot_dir: Optional bot directory; saves directly as bot_dir/watchlist.csv
 		"""
 		super().__init__(name, context)
 		self.strategy_name = strategy_name
+		self.bot_dir = bot_dir
 
 	def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
 		"""Save watchlist with OHLCV, signal data, indicators, and order info.
@@ -71,6 +73,9 @@ class SaveWatchlistAgent(Agent):
 		# Get portfolio_name from context if available (for portfolio-specific saving)
 		portfolio_name = self.context.get("portfolio_name") if self.context else None
 
+		# Get bot_dir from constructor arg or context (for bot-local watchlist.csv saving)
+		bot_dir = self.bot_dir or (self.context.get("bot_dir") if self.context else None)
+
 		# Collect orders from entry recommendations
 		orders = self._extract_orders_from_recommendations()
 
@@ -78,8 +83,13 @@ class SaveWatchlistAgent(Agent):
 		indicators = self._extract_indicators_from_context()
 
 		# Use WatchlistManager to handle saving
-		# Priority: backtest_dir > portfolio_name > default
-		watchlist_manager = WatchlistManager(self.strategy_name, backtest_dir=backtest_dir, portfolio_name=portfolio_name if not backtest_dir else None)
+		# Priority: bot_dir > backtest_dir > portfolio_name > default
+		watchlist_manager = WatchlistManager(
+			self.strategy_name,
+			backtest_dir=backtest_dir,
+			portfolio_name=portfolio_name if not backtest_dir and not bot_dir else None,
+			bot_dir=bot_dir,
+		)
 		save_result = watchlist_manager.process(
 			watchlist=watchlist,
 			ticker_scores=ticker_scores,

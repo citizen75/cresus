@@ -217,16 +217,24 @@ class DataAgent(Agent):
 		if indicators_calculated:
 			self.context.set("indicators_calculated", indicators_calculated)
 
-		# Run data quality filtering
-		quality_agent = DataQualityAgent()
-		quality_agent.context = self.context
-		quality_result = quality_agent.process()
-		if quality_result.get("status") == "success":
-			removed_quality = quality_result["output"].get("removed_count", 0)
-			if removed_quality > 0:
-				self.logger.info(f"DataQualityAgent removed {removed_quality} stale tickers: {quality_result['output'].get('removed_tickers', [])}")
+		# Run data quality filtering (live mode only). DataQualityAgent drops any ticker
+		# whose cache isn't exactly as fresh as the single most-recently-updated ticker -
+		# useful in live trading to catch a broken data feed, but meaningless in a backtest
+		# over a fixed historical date range, where it can collapse the whole universe down
+		# to whichever ticker happens to have been re-fetched most recently.
+		is_backtest = self.context.get("backtest_id") is not None
+		if not is_backtest:
+			quality_agent = DataQualityAgent()
+			quality_agent.context = self.context
+			quality_result = quality_agent.process()
+			if quality_result.get("status") == "success":
+				removed_quality = quality_result["output"].get("removed_count", 0)
+				if removed_quality > 0:
+					self.logger.info(f"DataQualityAgent removed {removed_quality} stale tickers: {quality_result['output'].get('removed_tickers', [])}")
+			else:
+				self.logger.warning(f"DataQualityAgent failed: {quality_result.get('message', 'unknown error')}")
 		else:
-			self.logger.warning(f"DataQualityAgent failed: {quality_result.get('message', 'unknown error')}")
+			quality_result = {"status": "skipped", "output": {"filtered_count": len(data_history)}}
 
 		# Run data quantity filtering
 		quantity_agent = DataQuantityAgent()

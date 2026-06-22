@@ -129,9 +129,12 @@ class EntryRRAgent(Agent):
 			exit_config = self.context.get_path("strategy_config.exit.parameters") or {}
 			take_profit_disabled = False
 
-			# Check if take_profit is explicitly disabled
+			# Check if take_profit is explicitly disabled. YAML parses an unquoted
+			# `formula: False` as a Python bool rather than the string 'False', so
+			# coerce to str before calling .strip() - a literal bool here would
+			# otherwise throw and silently drop every ticker's RR calculation.
 			if "take_profit" in exit_config:
-				tp_formula = exit_config["take_profit"].get("formula", "").strip().lower()
+				tp_formula = str(exit_config["take_profit"].get("formula", "")).strip().lower()
 				if tp_formula == 'false':
 					take_profit_disabled = True
 
@@ -149,9 +152,15 @@ class EntryRRAgent(Agent):
 			if "stop" in exit_config:
 				stop_config = exit_config["stop"]
 				if isinstance(stop_config, dict):
-					sl_formula = stop_config.get("formula")
-					if sl_formula:
-						stop_loss = evaluate_numeric_formula(sl_formula, data_context)
+					trailing_pct = stop_config.get("trailing_pct")
+					if stop_config.get("type") == "trailing" and trailing_pct is not None:
+						# Percentage trail: initial stop sits trailing_pct below entry
+						# (current_price doubles as the highest price on day 1).
+						stop_loss = current_price * (1 - float(trailing_pct))
+					else:
+						sl_formula = stop_config.get("formula")
+						if sl_formula:
+							stop_loss = evaluate_numeric_formula(sl_formula, data_context)
 
 			# Try to evaluate take_profit formula from config
 			take_profit = None

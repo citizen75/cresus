@@ -129,6 +129,7 @@ async def list_tasks(
     status: Optional[str] = Query(None),
     priority: Optional[str] = Query(None),
     assignee: Optional[str] = Query(None),
+    portfolio: Optional[str] = Query(None),
     tags: Optional[str] = Query(None),  # Comma-separated
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
@@ -139,6 +140,7 @@ async def list_tasks(
         status: Filter by status
         priority: Filter by priority
         assignee: Filter by assignee
+        portfolio: Filter by portfolio name
         tags: Comma-separated tags to filter by
         limit: Max results
         offset: Pagination offset
@@ -158,6 +160,7 @@ async def list_tasks(
             status=status,
             priority=priority,
             assignee=assignee,
+            portfolio=portfolio,
             tags=tags_list,
             limit=limit,
             offset=offset,

@@ -1,28 +1,29 @@
-import { useParams, Link, useLocation, useNavigate } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import StrategyBuilder from '@/components/portfolio/StrategyBuilder'
 import StrategyBacktests from './StrategyBacktests'
 import { api } from '@/services/api'
 
 const TABS = [
-  { id: 'overview', label: 'Overview' },
+  { id: 'description', label: 'Description' },
+  { id: 'watchlist', label: 'Watchlist' },
+  { id: 'entry', label: 'Entry' },
+  { id: 'exit', label: 'Exit' },
+  { id: 'order', label: 'Orders' },
+  { id: 'signals', label: 'Signals' },
+  { id: 'features', label: 'Features' },
+  { id: 'backtest', label: 'Backtest Config' },
   { id: 'backtests', label: 'Backtests' },
 ]
 
 export default function StrategyDetail() {
-  const { name = '' } = useParams()
-  const location = useLocation()
+  const { name = '', section } = useParams()
   const navigate = useNavigate()
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false)
   const [newStrategyName, setNewStrategyName] = useState(`${name}_copy_1`)
   const [isDuplicating, setIsDuplicating] = useState(false)
 
-  const getActiveTab = () => {
-    if (location.pathname.includes('/backtests')) return 'backtests'
-    return 'overview'
-  }
-
-  const activeTab = getActiveTab()
+  const activeTab = TABS.some((tab) => tab.id === section) ? (section as string) : 'description'
 
   const handleDuplicate = async () => {
     if (!newStrategyName.trim()) return
@@ -45,10 +46,10 @@ export default function StrategyDetail() {
   }
 
   const handleTabChange = (tabId: string) => {
-    if (tabId === 'overview') {
+    if (tabId === 'description') {
       navigate(`/strategies/${encodeURIComponent(name)}`)
-    } else if (tabId === 'backtests') {
-      navigate(`/strategies/${encodeURIComponent(name)}/backtests`)
+    } else {
+      navigate(`/strategies/${encodeURIComponent(name)}/${tabId}`)
     }
   }
 
@@ -105,8 +106,11 @@ export default function StrategyDetail() {
 
       {/* Tab Content */}
       <div>
-        {activeTab === 'overview' && <StrategyBuilder name={name} />}
-        {activeTab === 'backtests' && <StrategyBacktests strategyName={name} />}
+        {activeTab === 'backtests' ? (
+          <StrategyBacktests strategyName={name} />
+        ) : (
+          <StrategyBuilder name={name} section={activeTab} />
+        )}
       </div>
 
       {/* Duplicate Strategy Dialog */}

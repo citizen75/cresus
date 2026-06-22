@@ -83,11 +83,15 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
     )
 
-    # CORS middleware - allow all origins for development
+    # CORS middleware - allow any origin/IP to call this API.
+    # allow_credentials must stay False here: browsers reject a literal "*"
+    # Access-Control-Allow-Origin when credentials are allowed, and this API
+    # doesn't use cookies/credentialed requests (no withCredentials anywhere
+    # in the frontend), so there's nothing gained by enabling it.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
-        allow_credentials=True,
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )

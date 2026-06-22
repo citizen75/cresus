@@ -54,9 +54,11 @@ class TrailingStopAgent(Agent):
 		for _, position in open_positions.iterrows():
 			ticker = str(position.get("ticker", ""))
 			trailing_dist = position.get("trailing_stop_distance")
-			if trailing_dist is None:
+			trailing_pct = position.get("trailing_stop_pct")
+			if trailing_dist is None and trailing_pct is None:
 				continue
-			trailing_dist = float(trailing_dist)
+			trailing_dist = float(trailing_dist) if trailing_dist is not None else None
+			trailing_pct = float(trailing_pct) if trailing_pct is not None else None
 
 			stop_loss = position.get("stop_loss")
 			stop_loss = float(stop_loss) if stop_loss is not None else None
@@ -81,8 +83,13 @@ class TrailingStopAgent(Agent):
 				self.logger.debug(f"[TRAILING] {ticker}: highest_price → {new_highest:.2f}")
 			highest_price = new_highest
 
-			# Move stop up when the new trailing level exceeds the current one
-			new_stop = highest_price - trailing_dist
+			# Move stop up when the new trailing level exceeds the current one.
+			# Percentage trail takes precedence: stop always sits trailing_pct
+			# below the highest price, vs. a fixed dollar distance from entry.
+			if trailing_pct is not None:
+				new_stop = highest_price * (1 - trailing_pct)
+			else:
+				new_stop = highest_price - trailing_dist
 			stop_loss_adjusted = False
 			if stop_loss is None or new_stop > stop_loss:
 				journal.update_position_stop_loss(ticker, new_stop)
@@ -97,6 +104,7 @@ class TrailingStopAgent(Agent):
 				"highest_price": highest_price,
 				"day_high": day_high,
 				"trailing_distance": trailing_dist,
+				"trailing_pct": trailing_pct,
 				"new_stop": new_stop,
 				"stop_loss_adjusted": stop_loss_adjusted,
 			})

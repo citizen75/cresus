@@ -233,10 +233,19 @@ class DataHistory:
 		self,
 		start_date: Optional[str] = None,
 		incremental: bool = True,
+		force: bool = False,
 	) -> Dict[str, Any]:
-		"""Fetch and cache historical OHLCV data from yfinance."""
+		"""Fetch and cache historical OHLCV data from yfinance.
+
+		Args:
+			start_date: Optional explicit start date (YYYY-MM-DD)
+			incremental: If True (default), only re-fetch the last ~10 days plus any
+				new days, instead of the ticker's full history
+			force: If True, ignore cached data and re-fetch the ticker's full history
+				from scratch (existing rows are overwritten with the freshly fetched ones)
+		"""
 		try:
-			logger.info(f"Fetching history for {self.ticker}")
+			logger.info(f"Fetching history for {self.ticker}{' (forced full refresh)' if force else ''}")
 
 			# Check existing data
 			df_existing = self.load_all()
@@ -249,7 +258,9 @@ class DataHistory:
 				last_date = df_existing.index.max()
 
 			# Determine fetch range
-			if start_date:
+			if force:
+				fetch_start = start_date or "2010-01-01"
+			elif start_date:
 				fetch_start = start_date
 			elif incremental and has_data and last_date:
 				last_date_dt = pd.to_datetime(last_date)

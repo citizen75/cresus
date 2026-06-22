@@ -89,6 +89,15 @@ export function usePortfolioOrders(name: string) {
   })
 }
 
+export function usePortfolioTasks(name: string) {
+  return useQuery({
+    queryKey: ['portfolio-tasks', name],
+    queryFn: () => api.listTasks({ portfolio: name }),
+    staleTime: 30_000,
+    enabled: !!name,
+  })
+}
+
 export function useBacktestRuns(strategy?: string) {
   return useQuery({
     queryKey: ['backtest-runs', strategy],

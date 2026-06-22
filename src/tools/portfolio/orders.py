@@ -16,7 +16,7 @@ class Orders:
 
     BASE_COLUMNS = [
         "id", "created_at", "ticker", "quantity", "entry_price", "limit_price",
-        "stop_loss", "take_profit", "trailing_stop_distance", "execution_method", "scale_count",
+        "stop_loss", "take_profit", "trailing_stop_distance", "trailing_stop_pct", "execution_method", "scale_count",
         "risk_amount", "risk_reward", "status", "operation", "expiration_date", "metadata"
     ]
 
@@ -92,6 +92,7 @@ class Orders:
                   stop_loss: Optional[float] = None, take_profit: Optional[float] = None,
                   limit_price: Optional[float] = None,
                   trailing_stop_distance: Optional[float] = None,
+                  trailing_stop_pct: Optional[float] = None,
                   execution_method: str = "market", scale_count: int = 1,
                   risk_amount: Optional[float] = None, risk_reward: Optional[float] = None,
                   metadata: Optional[Dict[str, Any]] = None,
@@ -162,6 +163,7 @@ class Orders:
             "stop_loss": float(stop_loss) if stop_loss is not None else None,
             "take_profit": float(take_profit) if take_profit is not None else None,
             "trailing_stop_distance": float(trailing_stop_distance) if trailing_stop_distance is not None else None,
+            "trailing_stop_pct": float(trailing_stop_pct) if trailing_stop_pct is not None else None,
             "execution_method": execution_method,
             "scale_count": int(scale_count),
             "risk_amount": float(risk_amount) if risk_amount is not None else None,
@@ -401,6 +403,7 @@ class Orders:
             "stop_loss": _to_float(row.get("stop_loss")),
             "take_profit": _to_float(row.get("take_profit")),
             "trailing_stop_distance": _to_float(row.get("trailing_stop_distance")),
+            "trailing_stop_pct": _to_float(row.get("trailing_stop_pct")),
             "execution_method": str(row.get("execution_method", "market")).lower(),
             "operation": str(row.get("operation", "BUY")).upper(),
             "metadata": metadata,

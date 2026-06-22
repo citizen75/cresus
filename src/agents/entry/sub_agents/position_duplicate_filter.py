@@ -4,6 +4,7 @@ from typing import Any, Dict, Optional
 import pandas as pd
 from core.agent import Agent
 from tools.portfolio import PortfolioManager
+from tools.portfolio.orders import Orders
 
 
 class PositionDuplicateFilterAgent(Agent):
@@ -100,6 +101,21 @@ class PositionDuplicateFilterAgent(Agent):
 
 			existing_positions = portfolio_details.get("positions", [])
 			existing_tickers = {pos["ticker"].upper() if isinstance(pos, dict) else pos.ticker.upper() for pos in existing_positions}
+
+		# Also exclude tickers with an already-outstanding pending entry order.
+		# Without this, a ticker whose limit order hasn't filled yet gets a brand
+		# new duplicate order constructed every day (same stale entry/stop/target)
+		# until it eventually fills, stacking multiple legs into one "position".
+		try:
+			orders_mgr = Orders(portfolio_name, context=self.context.__dict__)
+			pending_orders = orders_mgr.get_pending_orders()
+			if not pending_orders.empty and "ticker" in pending_orders.columns:
+				pending_tickers = {str(t).upper() for t in pending_orders["ticker"].dropna()}
+				if pending_tickers:
+					self.logger.debug(f"[ENTRY-DUP-FILTER] {len(pending_tickers)} tickers have pending orders: {pending_tickers}")
+				existing_tickers |= pending_tickers
+		except Exception as e:
+			self.logger.warning(f"[ENTRY-DUP-FILTER] Could not check pending orders: {e}")
 
 		self.logger.debug(f"[ENTRY-DUP-FILTER] Portfolio has {len(existing_tickers)} open positions: {list(existing_tickers)[:5]}{'...' if len(existing_tickers) > 5 else ''}")
 

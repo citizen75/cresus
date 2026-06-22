@@ -1076,6 +1076,8 @@ class CresusCLI(cmd2.Cmd):
 		  strategy duplicate <from_name> <dest_name>   Duplicate a strategy
 		  strategy edit <strategy_name> [--editor]     Edit strategy (wizard mode or $EDITOR)
 		  strategy check <strategy_name> [--fix]       Check strategy configuration and optionally fix issues
+		  strategy tune <strategy_name> [start] [end]  Run the STRATEGY_IMPROVER pipeline
+		      [--trials N] [--walk-forward] [--check-stability] [--force] [--dry-run]
 
 		Examples:
 		  strategy list
@@ -1086,6 +1088,8 @@ class CresusCLI(cmd2.Cmd):
 		  strategy edit etf_pea_trend
 		  strategy edit etf_pea_trend --editor
 		  strategy check single_etf --fix
+		  strategy tune etf_pea_trend --trials 20
+		  strategy tune etf_pea_trend 2026-01-01 2026-06-20 --dry-run
 		"""
 		if not args:
 			table = Table(title="Strategy Management Commands", box=box.ROUNDED)
@@ -1124,7 +1128,12 @@ class CresusCLI(cmd2.Cmd):
 
 			strategy_name = parts[1]
 			universe = parts[2] if len(parts) > 2 else None
-			self._create_strategy(strategy_name, universe)
+			try:
+				result = self.strategy_commands.create(strategy_name, universe)
+				if result.get("status") != "success":
+					console.print(f"[red]Error: {result.get('message', 'Unknown error')}[/red]")
+			except Exception as e:
+				console.print(f"[red]Error: {e}[/red]")
 
 		elif command == "delete":
 			if len(parts) < 2:
@@ -1178,9 +1187,36 @@ class CresusCLI(cmd2.Cmd):
 					console.print(f"[red]Error: {result.get('message', 'Unknown error')}[/red]")
 			except Exception as e:
 				console.print(f"[red]Error: {e}[/red]")
+
+		elif command == "tune":
+			if len(parts) < 2:
+				console.print("[red]✗ Error: strategy_name required[/red]")
+				console.print("[yellow]Usage: strategy tune <strategy_name> [start_date] [end_date] "
+					"[--trials N] [--walk-forward] [--check-stability] [--force] [--dry-run][/yellow]")
+				return
+
+			strategy_name = parts[1]
+			positional = [p for p in parts[2:] if not p.startswith("-")]
+			start_date = positional[0] if len(positional) > 0 else None
+			end_date = positional[1] if len(positional) > 1 else None
+
+			trials = None
+			if "--trials" in parts:
+				idx = parts.index("--trials")
+				if idx + 1 < len(parts):
+					trials = int(parts[idx + 1])
+
+			self._tune_strategy(
+				strategy_name, start_date, end_date, trials,
+				walk_forward="--walk-forward" in parts,
+				check_stability="--check-stability" in parts,
+				force="--force" in parts,
+				dry_run="--dry-run" in parts,
+			)
+
 		else:
 			console.print("[red]✗ Unknown strategy command[/red]")
-			console.print("[yellow]Available commands: list, show, create, delete, duplicate, edit, check[/yellow]")
+			console.print("[yellow]Available commands: list, show, create, delete, duplicate, edit, check, tune[/yellow]")
 
 	def _list_strategies(self):
 		"""List all available strategies."""
@@ -1219,6 +1255,100 @@ class CresusCLI(cmd2.Cmd):
 
 		console.print(table)
 
+	def _tune_strategy(
+		self,
+		strategy_name: str,
+		start_date: Optional[str],
+		end_date: Optional[str],
+		trials: Optional[int],
+		walk_forward: bool,
+		check_stability: bool,
+		force: bool,
+		dry_run: bool,
+	):
+		"""Run the StrategyTuningAgent pipeline and render a stage-by-stage report."""
+		from agents.strategy_tuning.agent import StrategyTuningAgent
+
+		input_data = {
+			"strategy_name": strategy_name,
+			"trials": trials,
+			"walk_forward": walk_forward,
+			"check_stability": check_stability,
+			"force": force,
+			"dry_run": dry_run,
+		}
+		if start_date:
+			input_data["start_date"] = start_date
+		if end_date:
+			input_data["end_date"] = end_date
+
+		console.print(f"\n[bold cyan]Tuning strategy: {strategy_name}[/bold cyan]")
+		result = StrategyTuningAgent(f"StrategyTuning[{strategy_name}]").run(input_data)
+
+		if result.get("status") != "success":
+			console.print(f"[red]✗ Error: {result.get('message', 'Unknown error')}[/red]")
+			return
+
+		output = result.get("output") or {}
+		console.print(f"[dim]Date range: {output.get('date_range')}[/dim]\n")
+
+		for stage_name, stage_report in (output.get("stages") or {}).items():
+			if stage_name == "validation":
+				continue
+			diagnosis = stage_report.get("diagnosis") or {}
+			table = Table(title=f"Stage: {stage_name}", box=box.ROUNDED)
+			table.add_column("Step", style="cyan")
+			table.add_column("Result")
+
+			table.add_row("Diagnosis", diagnosis.get("diagnosis", "—"))
+			if stage_report.get("status"):
+				table.add_row("Status", stage_report["status"])
+			fix_result = stage_report.get("fix")
+			if fix_result:
+				if fix_result.get("no_op"):
+					table.add_row("Fix", f"[yellow]NO-OP[/yellow] — {fix_result.get('note', '')}")
+				else:
+					table.add_row("Fix", f"{fix_result.get('problem')}: {fix_result.get('hypothesis', '')}")
+			optimize_result = stage_report.get("optimize")
+			if optimize_result:
+				table.add_row("Optimize", f"best params: {optimize_result.get('best_params')}")
+			verdict = stage_report.get("validate")
+			if verdict:
+				status_color = "green" if verdict.get("status") == "LOCKED" else "red"
+				table.add_row("Validate", f"[{status_color}]{verdict.get('status')}[/{status_color}]")
+			console.print(table)
+
+		validation = (output.get("stages") or {}).get("validation") or {}
+		oos = validation.get("oos") or {}
+		overfitting = validation.get("overfitting") or {}
+		val_table = Table(title="Stage 5: Full Validation", box=box.ROUNDED)
+		val_table.add_column("Metric", style="cyan")
+		val_table.add_column("Value")
+		val_table.add_row("IS Sharpe", str(oos.get("is_sharpe")))
+		val_table.add_row("OOS Sharpe", str(oos.get("oos_sharpe")))
+		val_table.add_row("Decay ratio", str(oos.get("decay_ratio")))
+		val_table.add_row("OOS verdict", oos.get("verdict", "—"))
+		val_table.add_row("Overfitting risk", overfitting.get("risk_of_overfitting", "—"))
+		if overfitting.get("reasons"):
+			val_table.add_row("Reasons", "; ".join(overfitting["reasons"]))
+		console.print(val_table)
+
+		summary = output.get("iteration_summary") or {}
+		summary_table = Table(title="Iteration Summary", box=box.ROUNDED)
+		summary_table.add_column("Metric", style="cyan")
+		summary_table.add_column("Before")
+		summary_table.add_column("After")
+		before, after = summary.get("metrics_before", {}), summary.get("metrics_after", {})
+		for key in ("total_return_pct", "sharpe_ratio", "max_drawdown_pct", "win_rate_pct", "profit_factor"):
+			summary_table.add_row(key, str(before.get(key)), str(after.get(key)))
+		console.print(summary_table)
+
+		console.print(f"\n[bold]Stages modified:[/bold] {summary.get('stages_modified') or 'none'}")
+		console.print(f"[bold]Risk of overfitting:[/bold] {summary.get('risk_of_overfitting')}")
+		console.print(f"[bold]Save status:[/bold] {output.get('save_status')}")
+		if output.get("saved_version"):
+			console.print(f"[green]✓ Saved as version {output['saved_version']}[/green]")
+
 	def _show_strategy(self, strategy_name: str):
 		"""Display strategy configuration without line wrapping."""
 		from pathlib import Path
@@ -1247,52 +1377,6 @@ class CresusCLI(cmd2.Cmd):
 
 		except Exception as e:
 			console.print(f"[red]✗ Error reading strategy: {e}[/red]")
-
-	def _create_strategy(self, strategy_name: str, universe: Optional[str] = None):
-		"""Create a new strategy from template."""
-		from pathlib import Path
-
-		strategies_dir = Path.home() / ".cresus" / "db" / "strategies"
-		strategy_file = strategies_dir / f"{strategy_name}.yml"
-
-		# Check if strategy already exists
-		if strategy_file.exists():
-			console.print(f"[red]✗ Strategy already exists: {strategy_name}[/red]")
-			return
-
-		# Find template file
-		template_file = self.project_root / "init" / "templates" / "strategy.yml"
-
-		if not template_file.exists():
-			console.print(f"[red]✗ Template not found: {template_file}[/red]")
-			return
-
-		try:
-			# Read template
-			with open(template_file, 'r') as f:
-				template_content = f.read()
-
-			# Replace name in template (name: strategy_name -> name: <strategy_name>)
-			new_content = template_content.replace("name: strategy_name", f"name: {strategy_name}")
-
-			# Replace universe if specified (universe: cac40 -> universe: <universe>)
-			if universe:
-				new_content = new_content.replace("universe: cac40", f"universe: {universe}")
-
-			# Create strategies directory if it doesn't exist
-			strategies_dir.mkdir(parents=True, exist_ok=True)
-
-			# Write new strategy file
-			with open(strategy_file, 'w') as f:
-				f.write(new_content)
-
-			console.print(f"[green]✓ Strategy created: {strategy_name}[/green]")
-			if universe:
-				console.print(f"[dim]  Universe: {universe}[/dim]")
-			console.print(f"[dim]  Location: {strategy_file}[/dim]")
-
-		except Exception as e:
-			console.print(f"[red]✗ Error creating strategy: {e}[/red]")
 
 	def _delete_strategy(self, strategy_name: str):
 		"""Delete a strategy with confirmation."""

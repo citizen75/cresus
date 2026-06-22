@@ -14,7 +14,6 @@ import HoldingsPage from '@/pages/HoldingsPage'
 import TransactionsPage from '@/pages/TransactionsPage'
 import StrategiesList from '@/pages/StrategiesList'
 import StrategyDetail from '@/pages/StrategyDetail'
-import StrategyBacktests from '@/pages/StrategyBacktests'
 import BacktestRuns from '@/pages/BacktestRuns'
 import BacktestBuilder from '@/pages/BacktestBuilder'
 import BacktestDetail from '@/pages/BacktestDetail'
@@ -54,7 +53,7 @@ export default function App() {
           <Route path="/bots/:name" element={<Layout><BotDetail /></Layout>} />
           <Route path="/strategies" element={<Layout><StrategiesList /></Layout>} />
           <Route path="/strategies/:name" element={<Layout><StrategyDetail /></Layout>} />
-          <Route path="/strategies/:name/backtests" element={<Layout><StrategyBacktests /></Layout>} />
+          <Route path="/strategies/:name/:section" element={<Layout><StrategyDetail /></Layout>} />
           <Route path="/backtests" element={<Layout><BacktestRuns /></Layout>} />
           <Route path="/backtests/new" element={<Layout><BacktestBuilder /></Layout>} />
           <Route path="/backtests/compare" element={<Layout><BacktestComparator /></Layout>} />

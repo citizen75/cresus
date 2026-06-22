@@ -11,9 +11,9 @@ if str(src_path) not in sys.path:
 
 from flows.watchlist import WatchlistFlow
 from flows.signals import SignalsFlow
-from flows.premarket import PreMarketFlow
-from flows.transact import TransactFlow
-from flows.backtest import BacktestFlow
+from agents.market_prep.agent import MarketPrepAgent
+from agents.market_process.agent import MarketProcessAgent
+from agents.backtest.agent import BacktestAgent
 from flows.portfolio_analysis import PortfolioAnalysisFlow
 from flows.train_rank import TrainRankFlow
 from tools.strategy.strategy import StrategyManager
@@ -222,7 +222,7 @@ class FlowManager:
 								"error_type": "IndicatorValidation",
 							}
 
-				flow = PreMarketFlow(strategy)
+				flow = MarketPrepAgent(strategy)
 				result = flow.process(input_data or {})
 
 				# Include context if requested
@@ -270,7 +270,7 @@ class FlowManager:
 				if strategy and strategy != "default":
 					flow_input["portfolio_name"] = strategy
 
-				flow = TransactFlow()
+				flow = MarketProcessAgent()
 				result = flow.process(flow_input)
 
 				# Include context if requested
@@ -283,18 +283,18 @@ class FlowManager:
 				return result
 
 			elif workflow_name.lower() == "backtest":
-				# Backtest flow - simulate strategy over a date range
+				# Backtest - simulate strategy over a date range
 				flow_input = input_data or {}
-				flow_input["strategy"] = strategy if strategy and strategy != "default" else flow_input.get("strategy")
+				flow_input["strategy_name"] = strategy if strategy and strategy != "default" else flow_input.get("strategy_name")
 
-				if not flow_input.get("strategy"):
+				if not flow_input.get("strategy_name"):
 					return {
 						"status": "error",
 						"message": "strategy parameter required for backtest"
 					}
 
 				# Load and validate strategy
-				strategy_result = self.strategy_manager.load_strategy(flow_input["strategy"])
+				strategy_result = self.strategy_manager.load_strategy(flow_input["strategy_name"])
 				if strategy_result.get("status") == "success":
 					strategy_data = strategy_result.get("data") or strategy_result
 					validation_result = self._validate_and_report_indicators(strategy_data)
@@ -307,12 +307,12 @@ class FlowManager:
 							self._print_indicator_validation_errors(validation, console)
 							return {
 								"status": "error",
-								"message": f"Strategy '{flow_input['strategy']}' has indicator validation errors. Fix the errors and try again.",
+								"message": f"Strategy '{flow_input['strategy_name']}' has indicator validation errors. Fix the errors and try again.",
 								"validation": validation,
 								"error_type": "IndicatorValidation",
 							}
 
-				flow = BacktestFlow()
+				flow = BacktestAgent()
 				result = flow.process(flow_input)
 
 				# Include context if requested

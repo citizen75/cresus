@@ -102,6 +102,47 @@ class TestStrategyManager:
 		assert result.get("data") == strategy_data
 		assert result.get("name") == "test_strategy"
 
+	def test_load_strategy_without_shared_alphas_flag_is_untouched(self, manager):
+		"""A strategy that doesn't opt in via features.shared_alphas must come back
+		exactly as saved - load_strategy's merge_shared_alphas() call must be a no-op."""
+		strategy_data = {
+			"name": "no_shared_alphas",
+			"indicators": ["rsi_14"],
+			"features": {"enabled": True},
+		}
+		manager.save_strategy("no_shared_alphas", strategy_data)
+		result = manager.load_strategy("no_shared_alphas")
+
+		assert result.get("data") == strategy_data
+
+	def test_load_strategy_with_shared_alphas_flag_merges_catalog(self, manager, monkeypatch):
+		"""A strategy with features.shared_alphas: true gets the shared catalog's
+		indicators/alphas merged in by load_strategy()."""
+		from tools.strategy import alphas as alphas_module
+		import yaml as yaml_module
+
+		fake_catalog = {
+			"indicators": ["atr_14"],
+			"alphas": {"trend": [{"name": "trend_adx14", "formula": "adx_14", "description": "ADX"}]},
+		}
+		catalog_file = manager.strategies_dir.parent / "fake_alphas.yml"
+		with open(catalog_file, "w") as f:
+			yaml_module.dump(fake_catalog, f)
+		monkeypatch.setattr(alphas_module, "_SHARED_ALPHAS_PATH", catalog_file)
+
+		strategy_data = {
+			"name": "with_shared_alphas",
+			"indicators": ["rsi_14"],
+			"features": {"shared_alphas": True},
+		}
+		manager.save_strategy("with_shared_alphas", strategy_data)
+		result = manager.load_strategy("with_shared_alphas")
+
+		assert result.get("status") == "success"
+		data = result.get("data")
+		assert data["indicators"] == ["rsi_14", "atr_14"]
+		assert data["features"]["alphas"]["trend"] == fake_catalog["alphas"]["trend"]
+
 	def test_load_nonexistent_strategy(self, manager):
 		"""Test loading a strategy that doesn't exist."""
 		result = manager.load_strategy("nonexistent")

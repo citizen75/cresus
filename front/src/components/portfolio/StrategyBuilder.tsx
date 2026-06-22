@@ -5,6 +5,7 @@ import YAML from 'js-yaml'
 
 interface StrategyBuilderProps {
   name: string
+  section: string
 }
 
 interface Strategy {
@@ -23,7 +24,18 @@ interface Strategy {
   [key: string]: any
 }
 
-export default function StrategyBuilder({ name }: StrategyBuilderProps) {
+const SECTION_TABS = [
+  { id: 'description', label: 'Description' },
+  { id: 'watchlist', label: 'Watchlist' },
+  { id: 'entry', label: 'Entry' },
+  { id: 'exit', label: 'Exit' },
+  { id: 'order', label: 'Orders' },
+  { id: 'signals', label: 'Signals' },
+  { id: 'features', label: 'Features' },
+  { id: 'backtest', label: 'Backtest Config' },
+]
+
+export default function StrategyBuilder({ name, section }: StrategyBuilderProps) {
   const [strategy, setStrategy] = useState<Strategy | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -141,7 +153,19 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
     return <div className="text-slate-400 py-12 text-center">Strategy not found</div>
   }
 
-  const configSections = ['watchlist', 'signals', 'entry', 'exit', 'backtest']
+  const activeTab = SECTION_TABS.find((tab) => tab.id === section) ?? SECTION_TABS[0]
+  const activeSectionData =
+    activeTab.id === 'description'
+      ? {
+          name: strategy.name,
+          universe: strategy.universe,
+          engine: strategy.engine,
+          description: strategy.description,
+          indicators: strategy.indicators || [],
+          buy_conditions: strategy.buy_conditions,
+          sell_conditions: strategy.sell_conditions,
+        }
+      : (strategy[activeTab.id as keyof Strategy] as Record<string, any> | undefined) ?? null
 
   return (
     <div className="space-y-6">
@@ -165,44 +189,26 @@ export default function StrategyBuilder({ name }: StrategyBuilderProps) {
         <span className="text-green-400">Strategy active</span>
       </div>
 
-      {/* Basic Info */}
-      <DynamicSection
-        title="Basic Info"
-        data={{
-          name: strategy.name,
-          universe: strategy.universe,
-          engine: strategy.engine,
-          description: strategy.description,
-          indicators: strategy.indicators || [],
-          buy_conditions: strategy.buy_conditions,
-          sell_conditions: strategy.sell_conditions,
-        }}
-        onSave={(data) =>
-          handleSaveSection('basic', data).then((success) => {
-            if (!success) throw new Error('Failed to save')
-          })
-        }
-        preferYaml={true}
-      />
-
-      {/* Dynamic Config Sections */}
-      {configSections.map((section) => {
-        const data = strategy[section as keyof Strategy]
-        if (!data) return null
-
-        return (
-          <DynamicSection
-            key={section}
-            title={section.charAt(0).toUpperCase() + section.slice(1)}
-            data={data as Record<string, any>}
-            onSave={(updatedData) =>
-              handleSaveSection(section, updatedData).then((success) => {
+      {/* Active Section */}
+      {activeSectionData ? (
+        <DynamicSection
+          key={activeTab.id}
+          title={activeTab.label}
+          data={activeSectionData}
+          onSave={(updatedData) =>
+            handleSaveSection(activeTab.id === 'description' ? 'basic' : activeTab.id, updatedData).then(
+              (success) => {
                 if (!success) throw new Error('Failed to save')
-              })
-            }
-          />
-        )
-      })}
+              }
+            )
+          }
+          preferYaml={activeTab.id === 'description'}
+        />
+      ) : (
+        <div className="text-slate-400 text-sm py-8 text-center">
+          No {activeTab.label.toLowerCase()} configuration for this strategy.
+        </div>
+      )}
 
       {/* Raw Editor Modal */}
       {isRawMode && (

@@ -10,28 +10,21 @@ from core.context import AgentContext
 from tools.portfolio.manager import PortfolioManager
 from tools.portfolio.orders import Orders
 from tools.universe import Universe
-from tools.watchlist import WatchlistManager
-from agents.data.agent import DataAgent
-from agents.watchlist_alphas.agent import WatchlistAlphasAgent
-from agents.watchlist.agent import WatchListAgent
-from agents.watchlist_ranking.agent import WatchlistRankingAgent
-from agents.watchlist_scoring.agent import WatchlistScoringAgent
-from agents.watchlist_filter.agent import WatchlistFilterAgent
-from agents.watchlist_sorting.agent import WatchlistSortingAgent
-from agents.entry.agent import EntryAgent
-from agents.orders_entry.agent import OrdersEntryAgent
-from agents.orders_exit.agent import OrdersExitAgent
-from agents.orders_sending.agent import OrdersSendingAgent
-from agents.trading_broker.agent import TradingBroker
+from agents.market_prep.agent import MarketPrepAgent
+from agents.market_process.agent import MarketProcessAgent
+from agents.market_close.agent import MarketCloseAgent
 
 
 class BotFinance(Bot):
 	"""Finance bot for algorithmic trading with agent orchestration.
 
 	Workflow steps:
-	  pre_market  — data fetch → alphas → scoring → watchlist filter → ranking → save
-	  in_market   — active trade management via TradingBroker (executes pending orders, manages exits)
-	  post_market — daily analysis and cleanup (placeholder)
+	  pre_market  — delegates to MarketPrepAgent (data → watchlist → ranking → entry/exit orders → save)
+	  in_market   — delegates to MarketProcessAgent (executes pending orders, manages exits via TradingBroker)
+	  post_market — delegates to MarketCloseAgent (expires stale pending orders)
+
+	All three steps run the exact same pipelines backtests use, so live and
+	backtested behavior no longer diverge.
 	"""
 
 	STEP_PRE_MARKET = "pre_market"
@@ -53,30 +46,6 @@ class BotFinance(Bot):
 	@staticmethod
 	def _err(params: Dict[str, Any], message: str) -> Dict[str, Any]:
 		return {"status": STATUS_ERROR, "params": params, "output": {}, "message": message}
-
-	def _run_agent(self, agent, *, fatal: bool = True) -> Dict[str, Any]:
-		"""Run an agent, record it in agents_executed, and handle errors.
-
-		Args:
-			fatal: Raise RuntimeError on failure so the pipeline aborts.
-			       False means log a warning and continue.
-		"""
-		name = getattr(agent, "name", type(agent).__name__)
-		try:
-			self.logger.info(f"[{name}] starting")
-			response = agent.run(input_data={})
-			self.agents_executed.append(name)
-			if response.get("status") != STATUS_SUCCESS and fatal:
-				raise RuntimeError(response.get("message", f"{name} returned non-success"))
-			return response
-		except RuntimeError:
-			raise
-		except Exception as e:
-			self.agents_executed.append(name)
-			if fatal:
-				raise RuntimeError(f"{name} failed: {e}") from e
-			self.logger.warning(f"[{name}] non-fatal error: {e}")
-			return {"status": STATUS_ERROR, "message": str(e), "output": {}}
 
 	# ------------------------------------------------------------------
 	# Initialisation
@@ -197,27 +166,14 @@ class BotFinance(Bot):
 	# ------------------------------------------------------------------
 
 	def _process_pre_market(self, params: Dict[str, Any]) -> Dict[str, Any]:
-		"""data → alphas → ranking → scoring → watchlist → filter → save."""
+		"""Delegate to MarketPrepAgent (the same pipeline backtests use)."""
 		self.logger.info("Starting pre-market workflow")
 		try:
-			self._run_agent(DataAgent(f"DataAgent[{self.strategy_name}]", self.context))
-			self._run_agent(WatchListAgent("WatchListAgent", context=self.context))
-			alphas_resp = self._run_agent(WatchlistAlphasAgent(context=self.context))
-			self._run_agent(WatchlistRankingAgent(context=self.context), fatal=False)
-			self._run_agent(WatchlistScoringAgent("WatchlistScoringAgent", context=self.context), fatal=False)
-			self._run_agent(WatchlistSortingAgent("WatchlistSortingAgent", context=self.context), fatal=False)
-			self._save_watchlist()
-			self._run_agent(OrdersExitAgent("OrdersExitAgent", self.context), fatal=False)
-			self._run_agent(
-				OrdersSendingAgent("OrdersSendingAgentExit", self.context, orders_key="exit_orders", save=True),
-				fatal=False,
-			)
-			self._run_agent(EntryAgent("EntryAgent", self.context), fatal=False)
-			orders_entry_resp = self._run_agent(OrdersEntryAgent("OrdersEntryAgent", self.context), fatal=False)
-			self._run_agent(
-				OrdersSendingAgent("OrdersSendingAgentEntry", self.context, orders_key="executable_orders", save=True),
-				fatal=False,
-			)
+			agent = MarketPrepAgent(self.strategy_name, context=self.context)
+			result = agent.run({"portfolio_name": self.strategy_name})
+			self.agents_executed = agent.agents_executed
+			if result.get("status") != STATUS_SUCCESS:
+				return self._err(params, result.get("message", "Pre-market workflow failed"))
 
 			self.logger.info(f"Pre-market done: {len(self.agents_executed)} agents")
 			return {
@@ -226,10 +182,9 @@ class BotFinance(Bot):
 				"output": {
 					"step": self.STEP_PRE_MARKET,
 					"agents_executed": self.agents_executed,
-					"data_history": self.context.get("data_history") or {},
-					"alphas": alphas_resp.get("output", {}),
-					"watchlist": self.context.get("watchlist") or {},
-					"orders": orders_entry_resp.get("output", {}).get("orders", []),
+					"data_history": result.get("data_history") or {},
+					"watchlist": result.get("watchlist") or {},
+					"orders": result.get("orders") or [],
 					"exit_orders": self.context.get("exit_orders") or [],
 					"timestamp": datetime.now().isoformat(),
 				},
@@ -241,37 +196,28 @@ class BotFinance(Bot):
 			return self._err(params, str(e))
 
 	def _process_in_market(self, params: Dict[str, Any]) -> Dict[str, Any]:
-		"""Active trade management: executes pending orders and manages exits via TradingBroker."""
+		"""Active trade management: delegate to MarketProcessAgent (same pipeline backtests use)."""
 		self.logger.info("Starting in-market workflow")
 		positions = self.portfolio_data.get("positions", [])
 		self.logger.debug(f"In-market cycle: {len(positions)} open positions (pre-execution)")
 
-		self.context.set("date", datetime.now().date())
+		trading_date = datetime.now().date()
+		flow_result = MarketProcessAgent(context=self.context).process({
+			"date": trading_date.isoformat(),
+			"portfolio_name": self.strategy_name,
+			"strategy_name": self.strategy_name,
+		})
+		broker_output = flow_result.get("output", {})
 
-		# Load cached OHLCV per ticker and slice to the latest bar so TradingBroker
-		# can evaluate limit/stop/target prices against real data instead of {}.
-		# data_history is sorted newest-first, so iloc[0] is the latest bar.
-		self._run_agent(DataAgent(f"DataAgent[{self.strategy_name}]", self.context), fatal=False)
-		data_history = self.context.get("data_history") or {}
-		day_data = {
-			ticker: df.iloc[0]
-			for ticker, df in data_history.items()
-			if df is not None and not df.empty
-		}
-		self.context.set("day_data", day_data)
-
-		broker_resp = self._run_agent(TradingBroker("TradingBroker", self.context), fatal=False)
-		broker_output = broker_resp.get("output", {})
-
-		# TradingBroker just refreshed the portfolio cache (new fills, closed exits) -
-		# reload so "positions" reflects post-execution state, not the pre-run snapshot.
+		# MarketProcessAgent/TradingBroker just refreshed the portfolio cache (new fills, closed
+		# exits) - reload so "positions" reflects post-execution state, not the pre-run snapshot.
 		self._load_portfolio()
 		positions = self.portfolio_data.get("positions", [])
 
 		orders_mgr = Orders(self.strategy_name, context=self.context.__dict__)
 		pending_orders = len(orders_mgr.get_pending_orders())
 
-		self.logger.info(f"In-market done: {len(self.agents_executed)} agents, {pending_orders} pending order(s)")
+		self.logger.info(f"In-market done: {pending_orders} pending order(s)")
 		return {
 			"status": STATUS_SUCCESS,
 			"params": params,
@@ -288,53 +234,34 @@ class BotFinance(Bot):
 		}
 
 	def _process_post_market(self, params: Dict[str, Any]) -> Dict[str, Any]:
-		"""Daily analysis and cleanup (placeholder)."""
+		"""Delegate to MarketCloseAgent (same pipeline backtests use): expire stale pending orders."""
 		self.logger.info("Starting post-market workflow")
-		return {
-			"status": STATUS_SUCCESS,
-			"params": params,
-			"output": {
-				"step": self.STEP_POST_MARKET,
-				"trades_analyzed": 0,
-				"pnl_daily": 0.0,
-				"positions_closed": 0,
-				"timestamp": datetime.now().isoformat(),
-			},
-		}
+		try:
+			trading_date = datetime.now().date()
+			self.context.set("date", trading_date)
+			self.context.set("strategy_name", self.strategy_name)
 
-	def _save_watchlist(self) -> None:
-		"""Persist current watchlist to bot_dir/watchlist.csv."""
-		watchlist = self.context.get("watchlist") or {}
-		tickers = list(watchlist.keys()) if isinstance(watchlist, dict) else list(watchlist)
+			agent = MarketCloseAgent(self.strategy_name, context=self.context)
+			result = agent.process({"portfolio_name": self.strategy_name})
+			if result.get("status") != STATUS_SUCCESS:
+				return self._err(params, result.get("message", "Post-market workflow failed"))
 
-		if not tickers:
-			self.logger.warning("No watchlist tickers to save")
-			return
-
-		ticker_scores = self.context.get("ticker_scores") or {}
-		indicators = {}
-		for ticker in tickers:
-			entry: Dict[str, Any] = {}
-			score = (ticker_scores.get(ticker) or {}).get("score")
-			if score is not None:
-				entry["score"] = score
-			ticker_wl = (watchlist.get(ticker) or {}) if isinstance(watchlist, dict) else {}
-			ranking_score = ticker_wl.get("ranking_score")
-			if ranking_score is not None:
-				entry["ranking_score"] = ranking_score
-			rank = ticker_wl.get("rank")
-			if rank is not None:
-				entry["rank"] = rank
-			if entry:
-				indicators[ticker] = entry
-
-		wm = WatchlistManager(self.strategy_name, bot_dir=str(self.bot_dir))
-		result = wm.save(tickers, ticker_scores, self.context.get("data_history") or {}, indicators=indicators)
-
-		if result.get("status") == "success":
-			self.logger.info(f"Watchlist saved: {result['ticker_count']} tickers → {result['file']}")
-		else:
-			self.logger.warning(f"Watchlist save issue: {result.get('message')}")
+			output = result.get("output", {})
+			return {
+				"status": STATUS_SUCCESS,
+				"params": params,
+				"output": {
+					"step": self.STEP_POST_MARKET,
+					"trades_analyzed": 0,
+					"pnl_daily": 0.0,
+					"positions_closed": 0,
+					"expired_count": output.get("expired_count", 0),
+					"timestamp": datetime.now().isoformat(),
+				},
+			}
+		except Exception as e:
+			self.logger.exception("Post-market workflow failed")
+			return self._err(params, str(e))
 
 	# ------------------------------------------------------------------
 	# Entry point

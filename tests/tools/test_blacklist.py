@@ -428,6 +428,21 @@ class TestBlacklistSingleton(unittest.TestCase):
 		finally:
 			blacklist_module._blacklist_instance = original
 
+	def test_invalidate_blacklist_cache_forces_new_instance(self):
+		"""invalidate_blacklist_cache() should make the next get_blacklist() call
+		return a fresh instance instead of the previously cached one."""
+		from tools.universe.blacklist import invalidate_blacklist_cache
+		import tools.universe.blacklist as blacklist_module
+		original = blacklist_module._blacklist_instance
+
+		try:
+			first = get_blacklist()
+			invalidate_blacklist_cache()
+			second = get_blacklist()
+			self.assertIsNot(first, second)
+		finally:
+			blacklist_module._blacklist_instance = original
+
 
 class TestBlacklistErrorHandling(unittest.TestCase):
 	"""Test Blacklist error handling."""

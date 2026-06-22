@@ -51,8 +51,16 @@ class CresusAPI {
     return (await this.client.get('/data/universes')).data
   }
 
+  async listAllUniverses() {
+    return (await this.client.get('/data/universes/list')).data
+  }
+
   async getStrategy(name: string) {
     return (await this.client.get(`/strategies/${name}`)).data
+  }
+
+  async createStrategy(name: string, universe?: string) {
+    return (await this.client.post('/strategies', { name, universe })).data
   }
 
   async updateStrategy(name: string, data: any) {
@@ -444,6 +452,30 @@ class CresusAPI {
 
   async deleteAlertResult(alertName: string, resultId: string) {
     return (await this.client.delete(`/alerts/${alertName}/results/${resultId}`)).data
+  }
+
+  async listTasks(params: { portfolio?: string; status?: string; priority?: string; limit?: number } = {}) {
+    return (await this.client.get('/tasks', { params })).data
+  }
+
+  async createTask(data: {
+    title: string
+    description?: string
+    priority?: string
+    due_date?: string
+    status?: string
+    portfolio?: string
+    ticker?: string
+  }) {
+    return (await this.client.post('/tasks', data)).data
+  }
+
+  async updateTask(taskId: number, data: Record<string, any>) {
+    return (await this.client.put(`/tasks/${taskId}`, data)).data
+  }
+
+  async deleteTask(taskId: number) {
+    return (await this.client.delete(`/tasks/${taskId}`)).data
   }
 
   async getConversationHistory(
