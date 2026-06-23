@@ -119,9 +119,6 @@ class MarketPrepAgent(Agent):
 		alpha_names = self.context.get("alpha_names") or []
 		result["indicators"] = indicators + alpha_names
 
-		data_history = self.context.get("data_history") or {}
-		result["data_history"] = data_history
-
 		if target_date:
 			result["target_date"] = target_date
 

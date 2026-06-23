@@ -182,7 +182,6 @@ class BotFinance(Bot):
 				"output": {
 					"step": self.STEP_PRE_MARKET,
 					"agents_executed": self.agents_executed,
-					"data_history": result.get("data_history") or {},
 					"watchlist": result.get("watchlist") or {},
 					"orders": result.get("orders") or [],
 					"exit_orders": self.context.get("exit_orders") or [],

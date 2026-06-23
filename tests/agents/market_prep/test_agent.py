@@ -138,7 +138,9 @@ class TestMarketPrepAgentProcess:
             for p in patchers:
                 p.stop()
 
-    def test_process_saves_data_history(self):
+    def test_process_does_not_leak_data_history_into_result(self):
+        """data_history (raw DataFrames) must stay in context only - it's not JSON-safe
+        and the API layer (e.g. BotFinance.run()) returns this result dict as-is."""
         patchers = _patch_all_steps()
         try:
             dates = pd.date_range('2026-01-01', periods=10, freq='D')
@@ -150,7 +152,8 @@ class TestMarketPrepAgentProcess:
             context.set("data_history", {"AAPL.PA": test_data})
             agent = MarketPrepAgent("test_strategy", context=context)
             result = agent.process({})
-            assert "AAPL.PA" in result["data_history"]
+            assert "data_history" not in result
+            assert "AAPL.PA" in context.get("data_history")
         finally:
             for p in patchers:
                 p.stop()
@@ -291,7 +294,6 @@ class TestMarketPrepAgentIntegration:
                 "ranking_scores",
                 "ticker_scores",
                 "indicators",
-                "data_history",
                 "orders",
             ]
             for key in essential_keys:
