@@ -160,15 +160,16 @@ async def get_bot_orders(name: str):
 
 @router.get("/{name}/positions")
 async def get_bot_positions(name: str):
-    """Get the bot's open positions, resolved via its underlying strategy portfolio."""
+    """Get the bot's open positions, resolved from its own bot_dir journal."""
     bm = _get_bot_manager()
     bot_config = bm.get_bot(name)
     if bot_config is None:
         raise HTTPException(404, f"Bot '{name}' not found")
 
+    bot_dir = bm.get_bot_dir(name)
     strategy_name = bot_config.get("strategy", name)
-    pm = _get_portfolio_manager()
-    result = pm.get_portfolio_positions(strategy_name)
+    pm = PortfolioManager(context={"bot_dir": str(bot_dir)})
+    result = pm.get_portfolio_positions(name)
     if not result:
         return {"name": name, "strategy": strategy_name, "positions": [], "total_value": 0}
 
