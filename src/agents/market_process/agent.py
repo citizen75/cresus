@@ -18,6 +18,7 @@ from core.agent import Agent
 from agents.trading_broker.agent import TradingBroker
 from agents.data.agent import DataAgent
 from tools.portfolio.orders import Orders
+from tools.portfolio.journal import Journal
 
 
 class MarketProcessAgent(Agent):
@@ -114,6 +115,13 @@ class MarketProcessAgent(Agent):
 		# NOTE: Always run TradingBroker to check for exits, even without pending buy orders
 		trading_broker = TradingBroker("TradingBroker", self.context)
 		result = trading_broker.process(flow_input)
+
+		# Backtests flush via their own day-loop, but live bots call this agent
+		# standalone (BotFinance in_market step) with nothing downstream to flush
+		# the dirty cache afterward - without this, fills/status updates only ever
+		# update the in-memory cache and never reach the orders/journal CSVs on disk.
+		orders_mgr.flush()
+		Journal(portfolio_name, context=self.context.__dict__).flush()
 
 		return result
 
