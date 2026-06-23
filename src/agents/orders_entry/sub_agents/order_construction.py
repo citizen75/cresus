@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 
 from core.agent import Agent
-from tools.formula.numeric_evaluator import evaluate_numeric_formula
+from tools.formula.numeric_evaluator import evaluate_numeric_formula, parse_constant_number
 from tools.strategy.strategy import StrategyManager
 
 
@@ -84,45 +84,45 @@ class OrderConstructionAgent(Agent):
 				stop_config = exit_config["stop"]
 				stop_type = stop_config.get("type", "fix") if isinstance(stop_config, dict) else "fix"
 
-				if stop_type == "trailing" and isinstance(stop_config, dict) and stop_config.get("trailing_pct") is not None:
-					# Percentage trail: stop always sits trailing_pct below the highest
-					# price seen so far (recomputed daily by TrailingStopAgent), as
-					# opposed to a fixed dollar distance from entry.
-					trailing_stop_pct = float(stop_config["trailing_pct"])
+				if stop_type == "trailing":
+					stop_formula = stop_config.get("formula") if isinstance(stop_config, dict) else None
+					plain_pct = parse_constant_number(stop_formula)
 
-				# Only calculate trailing_stop_distance for trailing stop type
-				elif stop_type == "trailing":
-					# For trailing stops, distance is calculated as: entry_price - stop_level
-					if isinstance(stop_config, dict) and "formula" in stop_config:
-						stop_formula = stop_config.get("formula")
-						if stop_formula:
-							# Build evaluation context with entry price and price data from history
-							data_context = {
-								"close": entry_price,
-								"entry": entry_price,
-							}
+					if plain_pct is not None:
+						# A bare number (e.g. `formula: 8`) is a percentage trail: the
+						# stop always sits plain_pct% below the highest price seen so
+						# far (recomputed daily by TrailingStopAgent), as opposed to a
+						# fixed dollar distance from entry.
+						trailing_stop_pct = plain_pct / 100.0
+					elif stop_formula:
+						# For trailing stops, distance is calculated as: entry_price - stop_level
+						# Build evaluation context with entry price and price data from history
+						data_context = {
+							"close": entry_price,
+							"entry": entry_price,
+						}
 
-							# Add high/low/atr from data_history if available
-							if ticker and ticker in data_history:
-								df = data_history[ticker]
-								if len(df) > 0:
-									latest = df.iloc[0]
-									data_context["high"] = float(latest.get("high", entry_price))
-									data_context["low"] = float(latest.get("low", entry_price))
-									data_context["atr_14"] = float(latest.get("atr_14", 0))
-									data_context["atr_20"] = float(latest.get("atr_20", 0))
+						# Add high/low/atr from data_history if available
+						if ticker and ticker in data_history:
+							df = data_history[ticker]
+							if len(df) > 0:
+								latest = df.iloc[0]
+								data_context["high"] = float(latest.get("high", entry_price))
+								data_context["low"] = float(latest.get("low", entry_price))
+								data_context["atr_14"] = float(latest.get("atr_14", 0))
+								data_context["atr_20"] = float(latest.get("atr_20", 0))
 
-							# Try to evaluate the formula
-							try:
-								stop_level = evaluate_numeric_formula(stop_formula, data_context)
-								if stop_level is not None:
-									if not math.isnan(stop_level) and not math.isinf(stop_level):
-										# Formula returns the stop level, distance is difference from entry
-										trailing_stop_distance = entry_price - stop_level
-							except Exception:
-								# Fallback: use stop_loss-based distance if available
-								if stop_loss is not None:
-									trailing_stop_distance = entry_price - stop_loss
+						# Try to evaluate the formula
+						try:
+							stop_level = evaluate_numeric_formula(stop_formula, data_context)
+							if stop_level is not None:
+								if not math.isnan(stop_level) and not math.isinf(stop_level):
+									# Formula returns the stop level, distance is difference from entry
+									trailing_stop_distance = entry_price - stop_level
+						except Exception:
+							# Fallback: use stop_loss-based distance if available
+							if stop_loss is not None:
+								trailing_stop_distance = entry_price - stop_loss
 					elif stop_loss is not None:
 						# Fallback: use stop_loss-based distance
 						trailing_stop_distance = entry_price - stop_loss

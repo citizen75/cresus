@@ -55,7 +55,7 @@ class IndicatorCache:
             if data_hash == cached_hash:
                 # Cache is valid - return all columns except metadata
                 indicators = {col: cache_df[col] for col in cache_df.columns if col != "_data_hash"}
-                logger.info(f"{self.ticker}: Cache hit - using {len(indicators)} cached indicators")
+                logger.debug(f"{self.ticker}: Cache hit - using {len(indicators)} cached indicators")
                 return indicators
             else:
                 logger.debug(f"{self.ticker}: Cache invalidated (data hash mismatch)")
@@ -104,19 +104,27 @@ class IndicatorCache:
 
     @staticmethod
     def _get_data_hash(ohlcv_df: pd.DataFrame) -> str:
-        """Get hash of OHLCV data last row (date, close, volume) to detect changes."""
+        """Get hash of OHLCV data to detect changes.
+
+        Includes the row count and first row alongside the last row: hashing
+        only the last row let a stale, shorter cached indicator Series pass
+        as a "hit" whenever the history window grew by prepending older rows
+        (the most recent row - and therefore the old hash - never changes),
+        merging a too-short Series onto a now-longer DataFrame downstream.
+        """
         try:
             if ohlcv_df.empty:
                 return ""
 
-            # Hash the last row's key fields
-            last_row = ohlcv_df.iloc[-1]
             # Access UPPERCASE column names (after normalization)
-            timestamp = last_row.get('TIMESTAMP', '')
-            close = last_row.get('CLOSE', 0)
-            volume = last_row.get('VOLUME', 0)
+            first_row = ohlcv_df.iloc[0]
+            last_row = ohlcv_df.iloc[-1]
 
-            hash_str = f"{timestamp}:{close}:{volume}"
+            hash_str = (
+                f"{len(ohlcv_df)}:"
+                f"{first_row.get('TIMESTAMP', '')}:"
+                f"{last_row.get('TIMESTAMP', '')}:{last_row.get('CLOSE', 0)}:{last_row.get('VOLUME', 0)}"
+            )
             return hashlib.md5(hash_str.encode()).hexdigest()
         except Exception:
             return ""

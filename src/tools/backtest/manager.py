@@ -666,7 +666,12 @@ class BacktestManager:
 			if df.empty:
 				return []
 
-			df["created_at"] = pd.to_datetime(df["created_at"])
+			# format="mixed": a settlement/spillover transaction past the configured
+			# end_date is written with a plain isoformat() timestamp, while every
+			# regular trading-day transaction uses the day-loop's "YYYY-MM-DD HH:MM:SS"
+			# format - a strict single-format parse raises on whichever rows don't
+			# match the format inferred from the first row.
+			df["created_at"] = pd.to_datetime(df["created_at"], format="mixed")
 			df["operation"] = df["operation"].astype(str).str.upper()
 			df["ticker"] = df["ticker"].astype(str).str.upper()
 			df = df.sort_values("created_at")
@@ -689,21 +694,27 @@ class BacktestManager:
 
 			# Load cached price history for every traded ticker, building a
 			# forward-filled close-price lookup across the full day axis.
-			tickers = sorted(t for t in df["ticker"].unique() if t)
+			tickers = sorted(t for t in df["ticker"].unique() if t and t != "CASH")
 			price_series_by_ticker: Dict[str, pd.Series] = {}
 			all_price_dates = set()
 			for ticker in tickers:
-				hist = DataHistory(ticker).load_all()
-				if hist.empty or "timestamp" not in hist.columns or "close" not in hist.columns:
-					continue
-				hist = hist.dropna(subset=["close"])
-				if hist.empty:
-					continue
-				hist_dates = pd.to_datetime(hist["timestamp"]).dt.date
-				series = pd.Series(hist["close"].to_numpy(), index=hist_dates)
-				series = series[~series.index.duplicated(keep="last")].sort_index()
-				price_series_by_ticker[ticker] = series
-				all_price_dates.update(series.index)
+				# Isolated per-ticker: one missing/corrupt price cache must not blank
+				# out the equity curve for the whole backtest (caught broadly since
+				# DataHistory can hit anything from a missing file to a parse error).
+				try:
+					hist = DataHistory(ticker).load_all()
+					if hist.empty or "timestamp" not in hist.columns or "close" not in hist.columns:
+						continue
+					hist = hist.dropna(subset=["close"])
+					if hist.empty:
+						continue
+					hist_dates = pd.to_datetime(hist["timestamp"]).dt.date
+					series = pd.Series(hist["close"].to_numpy(), index=hist_dates)
+					series = series[~series.index.duplicated(keep="last")].sort_index()
+					price_series_by_ticker[ticker] = series
+					all_price_dates.update(series.index)
+				except Exception as e:
+					self.logger.warning(f"Could not load price history for {ticker}, falling back to cost-basis valuation: {e}")
 
 			trading_days = sorted(d for d in all_price_dates if journal_start <= d <= end_bound)
 			if not trading_days:
@@ -768,7 +779,7 @@ class BacktestManager:
 			return self._apply_peak_drawdown(daily_equity, initial_capital)
 
 		except Exception as e:
-			self.logger.debug(f"Error computing equity curve for {strategy_name}/{backtest_id}: {e}")
+			self.logger.warning(f"Error computing equity curve for {strategy_name}/{backtest_id}: {e}")
 			return None
 
 	def _compute_open_positions(self, strategy_name: str, backtest_id: str) -> List[Dict[str, Any]]:
@@ -792,7 +803,12 @@ class BacktestManager:
 
 			df["operation"] = df["operation"].astype(str).str.upper()
 			df["ticker"] = df["ticker"].astype(str).str.upper()
-			df["created_at"] = pd.to_datetime(df["created_at"])
+			# format="mixed": a settlement/spillover transaction past the configured
+			# end_date is written with a plain isoformat() timestamp, while every
+			# regular trading-day transaction uses the day-loop's "YYYY-MM-DD HH:MM:SS"
+			# format - a strict single-format parse raises on whichever rows don't
+			# match the format inferred from the first row.
+			df["created_at"] = pd.to_datetime(df["created_at"], format="mixed")
 			df = df.sort_values("created_at")
 
 			positions: Dict[str, Dict[str, float]] = {}
@@ -827,7 +843,7 @@ class BacktestManager:
 			return open_positions
 
 		except Exception as e:
-			self.logger.debug(f"Failed to compute open positions for {strategy_name}/{backtest_id}: {e}")
+			self.logger.warning(f"Failed to compute open positions for {strategy_name}/{backtest_id}: {e}")
 			return []
 
 	def _load_journal_trades(

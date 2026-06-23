@@ -46,6 +46,14 @@ class OrdersEntryAgent(Agent):
         if input_data is None:
             input_data = {}
 
+        # Reset every call: OrdersSendingAgent reads "executable_orders" right after this
+        # agent returns, regardless of how it exits below. Without resetting first, a day
+        # with no entries (or a failed cash check) would leave yesterday's list in context,
+        # and OrdersSendingAgent would silently re-submit those same orders again - the
+        # tickers that already filled aren't "pending" anymore so its dedup check never
+        # catches it, producing a fresh duplicate BUY every day until entries is non-empty.
+        self.context.set("executable_orders", [])
+
         entries = self.context.get("entries") or {}
         if not entries:
             return {

@@ -212,8 +212,11 @@ def calculate(
     newly_calculated = {}  # Track newly calculated indicators for caching
 
     for (indicator_name, param_tuple), (ind_name, params) in indicators_to_calc.items():
-        # Check if this indicator is already cached
-        if ind_name in cached_indicators:
+        # Check if this indicator is already cached. Belt-and-suspenders length
+        # check alongside the cache's own hash validation: a cached Series whose
+        # length doesn't match the current data is stale regardless of why, and
+        # must never be merged onto a differently-sized DataFrame downstream.
+        if ind_name in cached_indicators and len(cached_indicators[ind_name]) == len(data):
             calc_results[(indicator_name, param_tuple)] = cached_indicators[ind_name]
             continue
 

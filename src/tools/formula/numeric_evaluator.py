@@ -77,6 +77,27 @@ def evaluate_numeric_formula(formula: str, data: Union[Dict[str, Any], pd.DataFr
 		return None
 
 
+def parse_constant_number(formula: Any) -> Optional[float]:
+	"""Return the value of `formula` if it's a bare numeric literal (e.g. "8" or 8), else None.
+
+	Used to distinguish a plain constant (a percentage, in the trailing-stop case)
+	from a price-relative expression like "close[0] * 0.92" that needs the full
+	DSL evaluator with market data.
+	"""
+	if formula is None:
+		return None
+	if isinstance(formula, bool):
+		return None
+	if isinstance(formula, (int, float)):
+		return float(formula)
+	if isinstance(formula, str):
+		try:
+			return float(formula.strip())
+		except ValueError:
+			return None
+	return None
+
+
 def evaluate_position_size(formula: str, data: Dict[str, Any], max_shares: Optional[int] = None) -> Optional[int]:
 	"""Evaluate position size formula and return integer share count.
 

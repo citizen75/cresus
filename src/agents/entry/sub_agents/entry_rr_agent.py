@@ -3,7 +3,7 @@
 from typing import Any, Dict, Optional
 import pandas as pd
 from core.agent import Agent
-from tools.formula.numeric_evaluator import evaluate_numeric_formula
+from tools.formula.numeric_evaluator import evaluate_numeric_formula, parse_constant_number
 
 
 class EntryRRAgent(Agent):
@@ -152,15 +152,15 @@ class EntryRRAgent(Agent):
 			if "stop" in exit_config:
 				stop_config = exit_config["stop"]
 				if isinstance(stop_config, dict):
-					trailing_pct = stop_config.get("trailing_pct")
-					if stop_config.get("type") == "trailing" and trailing_pct is not None:
-						# Percentage trail: initial stop sits trailing_pct below entry
-						# (current_price doubles as the highest price on day 1).
-						stop_loss = current_price * (1 - float(trailing_pct))
-					else:
-						sl_formula = stop_config.get("formula")
-						if sl_formula:
-							stop_loss = evaluate_numeric_formula(sl_formula, data_context)
+					sl_formula = stop_config.get("formula")
+					plain_pct = parse_constant_number(sl_formula) if stop_config.get("type") == "trailing" else None
+					if plain_pct is not None:
+						# A bare number under type: trailing is a percentage trail:
+						# initial stop sits plain_pct% below entry (current_price
+						# doubles as the highest price on day 1).
+						stop_loss = current_price * (1 - plain_pct / 100.0)
+					elif sl_formula:
+						stop_loss = evaluate_numeric_formula(sl_formula, data_context)
 
 			# Try to evaluate take_profit formula from config
 			take_profit = None

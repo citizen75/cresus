@@ -143,15 +143,15 @@ class PositionSizingAgent(Agent):
 
 					if sizing_type == "capital":
 						# Capital-based sizing: shares = capital / current_price
-						capital = position_sizing_config.get("value")
+						capital = position_sizing_config.get("formula")
 						if capital and capital > 0:
 							shares = capital / current_price
 							sizing_method_used = f"capital ({capital})"
 							self.logger.debug(f"{ticker}: Capital-based sizing: {capital} / {current_price:.2f} = {shares:.0f} shares")
 
 					elif sizing_type == "quantity":
-						# Quantity-based sizing: use value directly as shares
-						shares = position_sizing_config.get("value")
+						# Quantity-based sizing: use formula value directly as shares
+						shares = position_sizing_config.get("formula")
 						if shares and shares > 0:
 							sizing_method_used = f"quantity ({shares})"
 							self.logger.debug(f"{ticker}: Quantity-based sizing: {shares} shares")
