@@ -71,6 +71,15 @@ jobs:
     params:
       method: POST
 
+  # Run pre_market step for every active bot
+  - name: pre_market
+    description: "Run BotFinance pre_market step for all active bots (prepares orders, manages entries)"
+    enabled: true
+    schedule: "0 19 * * 1-5"  # 19:00, Monday-Friday
+    type: job
+    target: "pre_market"
+    params: {}
+
   # Run in_market step for every active bot
   - name: intraday
     description: "Run BotFinance in_market step for all active bots (executes pending orders, manages exits)"
@@ -78,4 +87,13 @@ jobs:
     schedule: "*/35 9-18 * * 1-5"  # Every 35 minutes, 9:00-18:00, Monday-Friday
     type: job
     target: "intraday"
+    params: {}
+
+  # Run post_market step for every active bot
+  - name: post_market
+    description: "Run BotFinance post_market step for all active bots (expires stale pending orders)"
+    enabled: true
+    schedule: "45 18 * * 1-5"  # 18:45, Monday-Friday (after intraday's last run, before pre_market)
+    type: job
+    target: "post_market"
     params: {}

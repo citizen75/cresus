@@ -77,6 +77,11 @@ class OrdersAgent(Agent):
 
 		orders_mgr = Orders(portfolio_name, context=self.context.__dict__)
 		expired_results = self._expire_old_orders(orders_mgr, trading_date, time_stop)
+		# Backtests flush via their own day-loop, but live bots call this agent
+		# standalone (BotFinance post_market step) with nothing downstream to flush
+		# the dirty cache afterward - without this, update_order_status() above only
+		# ever updates the in-memory cache and "expired" never reaches disk.
+		orders_mgr.flush()
 
 		return {
 			"status": "success",
@@ -139,7 +144,11 @@ class OrdersAgent(Agent):
 			for _, order in pending_orders.iterrows():
 				order_id = str(order.get("id", ""))
 				ticker = str(order.get("ticker", ""))
-				quantity = int(order.get("quantity", 0))
+				# load_df() reads the CSV with dtype=object, so quantity arrives as a
+				# string like "55.0" - int() on that raises ValueError, and since this
+				# whole loop sits inside one try/except, a single bad row used to abort
+				# expiration for every other pending order in the same call.
+				quantity = int(float(order.get("quantity") or 0))
 				expiration_date_str = str(order.get("expiration_date", ""))
 				operation = str(order.get("operation", "BUY")).upper()
 

@@ -189,11 +189,13 @@ class CronScheduler:
 		"""
 		from jobs.job_intraday import JobIntraday
 		from jobs.job_pre_market import JobPreMarket
+		from jobs.job_post_market import JobPostMarket
 
 		# Map job names to job classes
 		job_classes = {
 			"intraday": JobIntraday,
 			"pre_market": JobPreMarket,
+			"post_market": JobPostMarket,
 		}
 
 		if job_name not in job_classes:
