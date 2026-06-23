@@ -28,10 +28,12 @@ class Journal:
         self.cache_key = f"_journal_cache_{normalized_name}"
         self.dirty_key = f"_journal_dirty_{normalized_name}"
 
-        # Check if running in backtest context
+        # Check if running in backtest or live-bot context
         backtest_dir = None
         if context:
             backtest_dir = context.get("backtest_dir")
+
+        bot_dir = context.get("bot_dir") if context else None
 
         if backtest_dir:
             # In backtest mode, check for root-level journal first (backtest format)
@@ -39,6 +41,10 @@ class Journal:
             subdir_journal = Path(backtest_dir) / "portfolios" / normalized_name / "journal.csv"
             # Prefer root-level journal if it exists, otherwise use subdirectory
             self.filepath = root_journal if root_journal.exists() else subdir_journal
+        elif bot_dir:
+            # Live bot: journal lives alongside orders.csv in the bot's own directory,
+            # not under db/portfolios/{name}/ (which is for backtests/strategy runs).
+            self.filepath = Path(bot_dir) / "journal.csv"
         else:
             # Use ~/.cresus/db/portfolios/{portfolio_name}/journal.csv
             cresus_home = Path.home() / ".cresus"
