@@ -158,6 +158,21 @@ async def get_bot_orders(name: str):
     return pm.get_portfolio_orders(name, bot_dir=str(bot_dir))
 
 
+@router.delete("/{name}/orders/{order_id}")
+async def delete_bot_order(name: str, order_id: str):
+    """Delete an order from a bot's own orders.csv."""
+    bm = _get_bot_manager()
+    bot_dir = bm.get_bot_dir(name)
+    if not bot_dir.exists():
+        raise HTTPException(404, f"Bot '{name}' not found")
+
+    pm = _get_portfolio_manager()
+    result = pm.delete_order(name, order_id, bot_dir=str(bot_dir))
+    if result.get("status") == "error":
+        raise HTTPException(404, result.get("message"))
+    return result
+
+
 @router.get("/{name}/positions")
 async def get_bot_positions(name: str):
     """Get the bot's open positions, resolved from its own bot_dir journal."""

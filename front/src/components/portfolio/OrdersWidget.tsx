@@ -3,6 +3,7 @@ import { formatCurrency } from '@/utils/currency'
 
 interface Order {
   id: string
+  fullId?: string
   ticker: string
   operation?: string
   shares: number
@@ -21,6 +22,7 @@ interface OrdersWidgetProps {
   orders: Order[]
   isLoading?: boolean
   currency?: string
+  onDeleteOrder?: (order: Order) => void | Promise<void>
 }
 
 const TABS = [
@@ -40,8 +42,21 @@ function getStatusColor(status: string) {
   return 'bg-slate-800/30 text-slate-400'
 }
 
-export default function OrdersWidget({ orders, isLoading = false, currency = 'USD' }: OrdersWidgetProps) {
+export default function OrdersWidget({ orders, isLoading = false, currency = 'USD', onDeleteOrder }: OrdersWidgetProps) {
   const [activeTab, setActiveTab] = useState<TabId>('activity')
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const handleDelete = async (order: Order) => {
+    if (!onDeleteOrder) return
+    setDeletingId(order.id)
+    try {
+      await onDeleteOrder(order)
+    } finally {
+      setDeletingId(null)
+      setDeleteConfirmId(null)
+    }
+  }
 
   const filtered = orders.filter((order) => {
     if (activeTab === 'orders') return order.status.toUpperCase() === 'PENDING'
@@ -96,6 +111,7 @@ export default function OrdersWidget({ orders, isLoading = false, currency = 'US
                 <th className="px-4 py-2 text-right text-slate-400 font-medium">Target</th>
                 <th className="px-4 py-2 text-right text-slate-400 font-medium">R/R</th>
                 <th className="px-4 py-2 text-left text-slate-400 font-medium">Status</th>
+                {onDeleteOrder && <th className="px-4 py-2 text-right text-slate-400 font-medium">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
@@ -120,6 +136,35 @@ export default function OrdersWidget({ orders, isLoading = false, currency = 'US
                       {order.status}
                     </span>
                   </td>
+                  {onDeleteOrder && (
+                    <td className="px-4 py-2 text-right">
+                      {deleteConfirmId === order.id ? (
+                        <span className="inline-flex items-center gap-2">
+                          <button
+                            onClick={() => handleDelete(order)}
+                            disabled={deletingId === order.id}
+                            className="text-xs px-2 py-0.5 rounded bg-red-900/50 text-red-300 hover:bg-red-900/70 disabled:opacity-50"
+                          >
+                            {deletingId === order.id ? 'Deleting...' : 'Confirm'}
+                          </button>
+                          <button
+                            onClick={() => setDeleteConfirmId(null)}
+                            disabled={deletingId === order.id}
+                            className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400 hover:bg-slate-700"
+                          >
+                            Cancel
+                          </button>
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => setDeleteConfirmId(order.id)}
+                          className="text-xs px-2 py-0.5 rounded bg-slate-800/60 text-slate-400 hover:bg-red-900/40 hover:text-red-300 transition"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

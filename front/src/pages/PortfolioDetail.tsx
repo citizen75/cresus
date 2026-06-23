@@ -19,7 +19,12 @@ export default function PortfolioDetail() {
   const { name = '' } = useParams()
   const { data: details, isLoading, refetch } = usePortfolioDetails(name)
   const { data: watchlistData, isLoading: isWatchlistLoading } = usePortfolioWatchlist(name)
-  const { data: ordersData, isLoading: isOrdersLoading } = usePortfolioOrders(name)
+  const { data: ordersData, isLoading: isOrdersLoading, refetch: refetchOrders } = usePortfolioOrders(name)
+
+  const handleDeleteOrder = async (order: { fullId?: string; id: string }) => {
+    await api.deletePortfolioOrder(name, order.fullId || order.id)
+    await refetchOrders()
+  }
 
   const [activeTab, setActiveTab] = useState<'watchlist' | 'positions' | 'performance'>('watchlist')
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null)
@@ -168,6 +173,7 @@ export default function PortfolioDetail() {
             orders={ordersData?.orders || []}
             isLoading={isOrdersLoading}
             currency={details?.currency || 'USD'}
+            onDeleteOrder={handleDeleteOrder}
           />
         </div>
         <div className="w-1/2 min-h-0">

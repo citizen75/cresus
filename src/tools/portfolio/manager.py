@@ -708,6 +708,7 @@ class PortfolioManager:
             for order in all_orders:
                 api_order = {
                     "id": order["id"][:8],
+                    "fullId": order["id"],
                     "ticker": order["ticker"],
                     "operation": order["operation"],
                     "shares": order["quantity"],
@@ -729,6 +730,25 @@ class PortfolioManager:
         except Exception as e:
             logger.error(f"Error fetching orders for {portfolio_name}: {e}")
             return {"orders": [], "count": 0}
+
+    def delete_order(self, portfolio_name: str, order_id: str, bot_dir: Optional[str] = None) -> Dict[str, Any]:
+        """Delete an order from a portfolio's (or bot's) orders store.
+
+        Args:
+            portfolio_name: Portfolio (or bot) name
+            order_id: Full order id (not the 8-char truncated display id)
+            bot_dir: When set, target this bot directory instead of the default store
+        """
+        from tools.portfolio.orders import Orders
+
+        effective_bot_dir = bot_dir or self.bot_dir
+        context = {"bot_dir": effective_bot_dir} if effective_bot_dir else None
+        orders_mgr = Orders(portfolio_name, context=context)
+
+        if not orders_mgr.delete_order(order_id):
+            return {"status": "error", "message": f"Order '{order_id}' not found"}
+
+        return {"status": "success", "message": f"Order '{order_id}' deleted"}
 
     def refresh_portfolio_fundamentals(self, name: str) -> Dict[str, Any]:
         """Refresh prices for all positions."""

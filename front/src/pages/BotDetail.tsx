@@ -18,7 +18,12 @@ export default function BotDetail() {
   const { name = '' } = useParams()
   const { data: bot, isLoading, refetch } = useBot(name)
   const { data: watchlistData, isLoading: isWatchlistLoading } = useBotWatchlist(name)
-  const { data: ordersData, isLoading: isOrdersLoading } = useBotOrders(name)
+  const { data: ordersData, isLoading: isOrdersLoading, refetch: refetchOrders } = useBotOrders(name)
+
+  const handleDeleteOrder = async (order: { fullId?: string; id: string }) => {
+    await api.deleteBotOrder(name, order.fullId || order.id)
+    await refetchOrders()
+  }
 
   const [activeTab, setActiveTab] = useState<'watchlist' | 'positions' | 'performance'>('watchlist')
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null)
@@ -192,7 +197,7 @@ export default function BotDetail() {
 
       {/* Bottom row (~30%) - Orders widget */}
       <div className="flex-[3] min-h-0">
-        <OrdersWidget orders={ordersData?.orders || []} isLoading={isOrdersLoading} />
+        <OrdersWidget orders={ordersData?.orders || []} isLoading={isOrdersLoading} onDeleteOrder={handleDeleteOrder} />
       </div>
     </div>
   )

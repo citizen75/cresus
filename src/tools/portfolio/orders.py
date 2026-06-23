@@ -315,6 +315,28 @@ class Orders:
         self.save(df)
         return True
 
+    def delete_order(self, order_id: str) -> bool:
+        """Permanently remove an order row from the orders store.
+
+        Args:
+            order_id: Order ID
+
+        Returns:
+            True if a matching order was found and deleted, False otherwise
+        """
+        df = self.load_df()
+        if df.empty:
+            return False
+
+        mask = df["id"] == order_id
+        if not mask.any():
+            return False
+
+        df = df[~mask].reset_index(drop=True)
+        self.save(df)
+        self.flush()
+        return True
+
     def mark_executed_for_ticker(self, ticker: str) -> int:
         """Mark all pending orders for a ticker as executed.
 

@@ -163,6 +163,16 @@ async def get_portfolio_orders(name: str):
     return pm.get_portfolio_orders(name)
 
 
+@router.delete("/{name}/orders/{order_id}")
+async def delete_portfolio_order(name: str, order_id: str):
+    """Delete an order from a portfolio's orders store."""
+    pm = _resolve_pm(name)
+    result = pm.delete_order(name, order_id)
+    if result.get("status") == "error":
+        raise HTTPException(404, result.get("message"))
+    return result
+
+
 @router.get("/{name}/metadata")
 async def get_portfolio_metadata(name: str):
     """Get portfolio metadata only (no expensive price lookups)."""

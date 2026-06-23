@@ -153,6 +153,10 @@ class CresusAPI {
     return (await this.client.get(`/portfolios/${name}/orders`)).data
   }
 
+  async deletePortfolioOrder(name: string, orderId: string) {
+    return (await this.client.delete(`/portfolios/${name}/orders/${orderId}`)).data
+  }
+
   async getTransactions(portfolioName: string, ticker?: string) {
     const params = ticker ? `?ticker=${ticker}` : ''
     return (await this.client.get(`/portfolios/${portfolioName}/transactions${params}`)).data
@@ -574,6 +578,10 @@ class CresusAPI {
 
   async getBotOrders(name: string) {
     return (await this.client.get(`/bots/${name}/orders`)).data
+  }
+
+  async deleteBotOrder(name: string, orderId: string) {
+    return (await this.client.delete(`/bots/${name}/orders/${orderId}`)).data
   }
 }
 
