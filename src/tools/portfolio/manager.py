@@ -558,7 +558,7 @@ class PortfolioManager:
         initial_capital = float(metadata.get("initial_capital", 100000.0))
 
         # Use PortfolioHistory to calculate
-        ph = PortfolioHistory(name, initial_capital)
+        ph = PortfolioHistory(name, initial_capital, context=self.context)
         result = ph.calculate(recalculate, use_cache_only=use_cache_only)
 
         if result.get("status") == "error":
@@ -695,7 +695,8 @@ class PortfolioManager:
         from tools.portfolio.orders import Orders
 
         try:
-            context = {"bot_dir": bot_dir} if bot_dir else None
+            effective_bot_dir = bot_dir or self.bot_dir
+            context = {"bot_dir": effective_bot_dir} if effective_bot_dir else None
             orders_mgr = Orders(portfolio_name, context=context)
             all_orders = orders_mgr.to_orders()
 

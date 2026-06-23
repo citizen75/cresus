@@ -11,6 +11,7 @@ import pandas as pd
 from tools.portfolio.manager import PortfolioManager
 from tools.portfolio.metrics import PortfolioMetrics
 from tools.watchlist.watchlist_manager import WatchlistManager
+from tools.bot import BotManager
 
 
 class CreatePortfolioRequest(BaseModel):
@@ -37,6 +38,47 @@ def _get_portfolio_manager() -> PortfolioManager:
 @lru_cache(maxsize=1)
 def _get_metrics() -> PortfolioMetrics:
     return PortfolioMetrics()
+
+
+@lru_cache(maxsize=1)
+def _get_bot_manager() -> BotManager:
+    return BotManager()
+
+
+def _bot_dir_for(name: str) -> Optional[str]:
+    """Resolve `name` to its bot_dir if a bot with that name exists, else None.
+
+    Live bots store their own portfolio.json/journal.csv/orders.csv in an
+    isolated bot_dir, separate from the default db/portfolios/{name}/ location
+    these generic routes otherwise use. A portfolio name and a bot name can
+    collide (a bot's strategy/portfolio is usually named after the bot), so
+    routes that take a plain `name` path param need to disambiguate.
+    """
+    try:
+        bot_dir = _get_bot_manager().get_bot_dir(name)
+        if bot_dir.exists():
+            return str(bot_dir)
+    except Exception:
+        pass
+    return None
+
+
+def _resolve_pm(name: str) -> PortfolioManager:
+    """PortfolioManager scoped to the bot's own directory if `name` is a bot,
+    otherwise the shared default-location instance."""
+    bot_dir = _bot_dir_for(name)
+    if bot_dir:
+        return PortfolioManager(context={"bot_dir": bot_dir})
+    return _get_portfolio_manager()
+
+
+def _resolve_metrics(name: str) -> PortfolioMetrics:
+    """PortfolioMetrics scoped to the bot's own directory if `name` is a bot,
+    otherwise the shared default-location instance."""
+    bot_dir = _bot_dir_for(name)
+    if bot_dir:
+        return PortfolioMetrics(context={"bot_dir": bot_dir})
+    return _get_metrics()
 
 
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
@@ -85,7 +127,7 @@ async def create_portfolio(req: CreatePortfolioRequest):
 @router.put("/{name}")
 async def update_portfolio(name: str, req: UpdatePortfolioRequest):
     """Update portfolio configuration."""
-    pm = _get_portfolio_manager()
+    pm = _resolve_pm(name)
 
     # Prepare update data (only include provided fields)
     update_data = {}
@@ -107,7 +149,7 @@ async def update_portfolio(name: str, req: UpdatePortfolioRequest):
 @router.delete("/{name}")
 async def delete_portfolio(name: str):
     """Delete a portfolio."""
-    pm = _get_portfolio_manager()
+    pm = _resolve_pm(name)
     result = pm.delete_portfolio(name)
     if result.get("status") == "error":
         raise HTTPException(404, result.get("message", "Failed to delete portfolio"))
@@ -117,14 +159,14 @@ async def delete_portfolio(name: str):
 @router.get("/{name}/orders")
 async def get_portfolio_orders(name: str):
     """Get orders for a portfolio (pending, executed, rejected)."""
-    pm = _get_portfolio_manager()
+    pm = _resolve_pm(name)
     return pm.get_portfolio_orders(name)
 
 
 @router.get("/{name}/metadata")
 async def get_portfolio_metadata(name: str):
     """Get portfolio metadata only (no expensive price lookups)."""
-    pm = _get_portfolio_manager()
+    pm = _resolve_pm(name)
     result = pm.get_portfolio_metadata(name)
     if not result:
         raise HTTPException(404, f"Portfolio '{name}' not found")
@@ -134,7 +176,7 @@ async def get_portfolio_metadata(name: str):
 @router.get("/{name}")
 async def get_portfolio_details(name: str):
     """Get portfolio details."""
-    pm = _get_portfolio_manager()
+    pm = _resolve_pm(name)
     result = pm.get_portfolio_details(name)
     if not result:
         raise HTTPException(404, f"Portfolio '{name}' not found")
@@ -144,7 +186,7 @@ async def get_portfolio_details(name: str):
 @router.get("/{name}/positions")
 async def get_portfolio_positions(name: str):
     """Get open positions (read-only)."""
-    pm = _get_portfolio_manager()
+    pm = _resolve_pm(name)
     result = pm.get_portfolio_positions(name)
     if not result:
         raise HTTPException(404, f"Portfolio '{name}' not found")
@@ -154,7 +196,7 @@ async def get_portfolio_positions(name: str):
 @router.get("/{name}/transactions")
 async def get_portfolio_transactions(name: str, ticker: Optional[str] = None):
     """Get all transactions for a portfolio, optionally filtered by ticker."""
-    pm = _get_portfolio_manager()
+    pm = _resolve_pm(name)
     result = pm.get_portfolio_transactions(name, ticker)
 
     return {
@@ -168,7 +210,7 @@ async def get_portfolio_transactions(name: str, ticker: Optional[str] = None):
 @router.get("/{name}/performance")
 async def get_portfolio_performance(name: str):
     """Get performance metrics."""
-    pm = _get_portfolio_manager()
+    pm = _resolve_pm(name)
     result = pm.get_portfolio_performance(name)
     if not result:
         raise HTTPException(404, f"Portfolio '{name}' not found")
@@ -178,7 +220,7 @@ async def get_portfolio_performance(name: str):
 @router.get("/{name}/metrics")
 async def get_portfolio_metrics(name: str):
     """Get comprehensive metrics."""
-    metrics = _get_metrics()
+    metrics = _resolve_metrics(name)
     result = metrics.get_daily_metrics(name)
     if not result:
         raise HTTPException(404, f"Portfolio '{name}' not found")
@@ -188,7 +230,7 @@ async def get_portfolio_metrics(name: str):
 @router.get("/{name}/value")
 async def get_portfolio_value(name: str, use_cache: bool = True):
     """Get current portfolio value."""
-    pm = _get_portfolio_manager()
+    pm = _resolve_pm(name)
     result = pm.calculate_portfolio_value(name, use_cache)
     if "error" in result:
         raise HTTPException(404, result["error"])
@@ -209,12 +251,16 @@ async def get_portfolio_history(name: str, fetch: bool = False):
     from loguru import logger
     from tools.portfolio.naming import normalize_portfolio_name
 
-    normalized_name = normalize_portfolio_name(name)
+    bot_dir = _bot_dir_for(name)
+    if bot_dir:
+        history_cache = Path(bot_dir) / "history.json"
+    else:
+        normalized_name = normalize_portfolio_name(name)
+        db_root = Path(os.path.expanduser("~/.cresus/db"))
+        history_cache = db_root / "portfolios" / normalized_name / "history.json"
 
     # Try to load from cache file first (unless fetch=true)
     if not fetch:
-        db_root = Path(os.path.expanduser("~/.cresus/db"))
-        history_cache = db_root / "portfolios" / normalized_name / "history.json"
         logger.info(f"Checking cache: {history_cache}, exists={history_cache.exists()}")
         if history_cache.exists():
             try:
@@ -230,7 +276,7 @@ async def get_portfolio_history(name: str, fetch: bool = False):
                 pass  # Fall through to calculate if cache is invalid
 
     # Calculate history
-    pm = _get_portfolio_manager()
+    pm = _resolve_pm(name)
     result = pm.calculate_portfolio_history(name, recalculate=False, use_cache_only=not fetch)
     if "error" in result:
         raise HTTPException(404, result["error"])
@@ -238,9 +284,6 @@ async def get_portfolio_history(name: str, fetch: bool = False):
     # Cache the result for future requests (unless fetch=true which means fresh calculation)
     if not fetch and "history" in result:
         try:
-            from pathlib import Path
-            db_root = Path(os.path.expanduser("~/.cresus/db"))
-            history_cache = db_root / "portfolios" / normalized_name / "history.json"
             with open(history_cache, 'w') as f:
                 json.dump(result, f)
         except Exception:
@@ -252,7 +295,7 @@ async def get_portfolio_history(name: str, fetch: bool = False):
 @router.post("/{name}/refresh")
 async def refresh_portfolio(name: str):
     """Refresh portfolio prices."""
-    pm = _get_portfolio_manager()
+    pm = _resolve_pm(name)
     result = pm.refresh_portfolio_fundamentals(name)
     if "error" in result:
         raise HTTPException(404, result["error"])
@@ -266,7 +309,7 @@ async def record_transaction(name: str, data: Dict[str, Any]):
     Operations: BUY, SELL, CASH
     For CASH: ticker should be "CASH", quantity is the amount (positive=deposit, negative=withdrawal)
     """
-    pm = _get_portfolio_manager()
+    pm = _resolve_pm(name)
     result = pm.record_transaction(
         name,
         data.get("operation", ""),
@@ -283,7 +326,7 @@ async def record_transaction(name: str, data: Dict[str, Any]):
 @router.get("/{name}/allocation")
 async def get_portfolio_allocation(name: str):
     """Get portfolio allocation by position weight."""
-    pm = _get_portfolio_manager()
+    pm = _resolve_pm(name)
     result = pm.get_portfolio_allocation(name)
     if not result:
         raise HTTPException(404, f"Portfolio '{name}' not found")
@@ -293,7 +336,7 @@ async def get_portfolio_allocation(name: str):
 @router.get("/{name}/holdings")
 async def get_top_holdings(name: str, limit: int = 10):
     """Get top holdings by weight."""
-    pm = _get_portfolio_manager()
+    pm = _resolve_pm(name)
     result = pm.get_top_holdings(name, limit)
     if not result:
         raise HTTPException(404, f"Portfolio '{name}' not found")
@@ -303,7 +346,7 @@ async def get_top_holdings(name: str, limit: int = 10):
 @router.get("/{name}/strategy")
 async def get_portfolio_strategy(name: str):
     """Get portfolio strategy configuration."""
-    pm = _get_portfolio_manager()
+    pm = _resolve_pm(name)
     details = pm.get_portfolio_details(name)
     if not details:
         raise HTTPException(404, f"Portfolio '{name}' not found")
@@ -335,15 +378,18 @@ async def get_portfolio_strategy(name: str):
 @router.get("/{name}/watchlist")
 async def get_portfolio_watchlist(name: str, limit: int = 50):
     """Get watchlist for portfolio from its associated strategy."""
-    from tools.portfolio.manager import PortfolioManager
     from tools.portfolio.naming import normalize_portfolio_name
     from pathlib import Path
     from utils.env import get_db_root
     import json
 
     # Get portfolio metadata directly without fetching prices
-    db_root = get_db_root()
-    portfolio_dir = db_root / "portfolios" / normalize_portfolio_name(name)
+    bot_dir = _bot_dir_for(name)
+    if bot_dir:
+        portfolio_dir = Path(bot_dir)
+    else:
+        db_root = get_db_root()
+        portfolio_dir = db_root / "portfolios" / normalize_portfolio_name(name)
     portfolio_json = portfolio_dir / "portfolio.json"
 
     if not portfolio_json.exists():
@@ -376,7 +422,7 @@ async def get_portfolio_watchlist(name: str, limit: int = 50):
 @router.get("/{name}/current-prices")
 async def get_current_prices(name: str, response: Response):
     """Get current prices for all positions using cached Fundamental data."""
-    pm = _get_portfolio_manager()
+    pm = _resolve_pm(name)
     details = pm.get_portfolio_details(name)
     if not details:
         raise HTTPException(404, f"Portfolio '{name}' not found")
@@ -447,7 +493,7 @@ async def get_current_prices(name: str, response: Response):
 @router.put("/{name}/transactions/{transaction_id}")
 async def update_transaction(name: str, transaction_id: str, data: Dict[str, Any]):
     """Update a transaction."""
-    pm = _get_portfolio_manager()
+    pm = _resolve_pm(name)
     result = pm.update_transaction(name, transaction_id, data)
 
     if result.get("status") == "error":
@@ -463,7 +509,7 @@ async def update_transaction(name: str, transaction_id: str, data: Dict[str, Any
 @router.delete("/{name}/transactions/{transaction_id}")
 async def delete_transaction(name: str, transaction_id: str):
     """Delete a transaction."""
-    pm = _get_portfolio_manager()
+    pm = _resolve_pm(name)
     result = pm.delete_transaction(name, transaction_id)
 
     if result.get("status") == "error":
@@ -479,7 +525,7 @@ async def delete_transaction(name: str, transaction_id: str):
 @router.get("/{name}/backtest")
 async def get_portfolio_backtest(name: str):
     """Get portfolio backtest results."""
-    pm = _get_portfolio_manager()
+    pm = _resolve_pm(name)
     details = pm.get_portfolio_details(name)
     if not details:
         raise HTTPException(404, f"Portfolio '{name}' not found")
