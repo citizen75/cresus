@@ -31,8 +31,9 @@ class PortfolioManager:
         project_root = Path(os.environ.get("CRESUS_PROJECT_ROOT", os.getcwd()))
         self.context = context or {}
 
-        # Check if running in backtest context
+        # Check if running in backtest or live-bot context
         backtest_dir = self.context.get("backtest_dir")
+        self.bot_dir = self.context.get("bot_dir")
 
         if backtest_dir:
             # Use sandboxed backtest directory
@@ -72,6 +73,18 @@ class PortfolioManager:
     def _normalize_portfolio_name(name: str) -> str:
         """Normalize portfolio name to lowercase with underscores. Must match Journal normalization."""
         return normalize_portfolio_name(name)
+
+    def _portfolio_root(self, name: str) -> Path:
+        """Directory containing this portfolio's portfolio.json.
+
+        Live bots store everything (orders.csv, journal.csv, portfolio.json) directly
+        in their own bot_dir - there's exactly one portfolio per bot, so unlike the
+        default/backtest case there's no extra {name}/ subfolder.
+        """
+        if self.bot_dir:
+            return Path(self.bot_dir)
+        normalized_name = self._normalize_portfolio_name(name)
+        return self.portfolios_dir / normalized_name
 
     def list_portfolios(self) -> List[Dict[str, Any]]:
         """List all portfolios by scanning folders in portfolios directory."""
@@ -210,9 +223,7 @@ class PortfolioManager:
 
     def _get_portfolio_metadata(self, name: str) -> Dict[str, Any]:
         """Load portfolio metadata from portfolio.json file."""
-        # Normalize name to match folder structure
-        normalized_name = self._normalize_portfolio_name(name)
-        portfolio_json = self.portfolios_dir / normalized_name / "portfolio.json"
+        portfolio_json = self._portfolio_root(name) / "portfolio.json"
 
         if portfolio_json.exists():
             try:
@@ -232,9 +243,7 @@ class PortfolioManager:
 
     def _save_portfolio_metadata(self, name: str, metadata: Dict[str, Any]) -> None:
         """Save portfolio metadata to portfolio.json file."""
-        # Normalize name to match folder structure
-        normalized_name = self._normalize_portfolio_name(name)
-        portfolio_json = self.portfolios_dir / normalized_name / "portfolio.json"
+        portfolio_json = self._portfolio_root(name) / "portfolio.json"
         portfolio_json.parent.mkdir(parents=True, exist_ok=True)
 
         with open(portfolio_json, 'w') as f:
