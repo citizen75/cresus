@@ -572,6 +572,7 @@ class CresusCLI(cmd2.Cmd):
 			table.add_row("backtest run <strategy>", "Run backtest on most recent date")
 			table.add_row("backtest run <strategy> <start_date>", "Run backtest from start_date to today")
 			table.add_row("backtest run <strategy> <start_date> <end_date>", "Run backtest for date range (YYYY-MM-DD format)")
+			table.add_row("backtest bot <bot_name> <start_date> <end_date>", "Backtest a bot's own strategy.yml (stored under backtests/bot_<bot_name>/)")
 			table.add_row("backtest purge <strategy>", "Delete all backtest folders, keep only most recent")
 			console.print(table)
 			return
@@ -611,6 +612,16 @@ class CresusCLI(cmd2.Cmd):
 			# Execute as flow command
 			self.do_flow(flow_args)
 
+		elif cmd == "bot":
+			if len(parts) < 2:
+				console.print("[red]✗[/red] Usage: backtest bot <bot_name> [start_date] [end_date]")
+				return
+
+			bot_name = parts[1]
+			start_date = parts[2] if len(parts) > 2 else None
+			end_date = parts[3] if len(parts) > 3 else None
+			self._run_bot_backtest(bot_name, start_date, end_date)
+
 		elif cmd == "purge":
 			if len(parts) < 2:
 				console.print("[red]✗[/red] Usage: backtest purge <strategy_name>")
@@ -621,7 +632,66 @@ class CresusCLI(cmd2.Cmd):
 
 		else:
 			console.print(f"[red]✗[/red] Unknown command: {cmd}")
-			console.print("Try: backtest run|purge")
+			console.print("Try: backtest run|bot|purge")
+
+	def _run_bot_backtest(self, bot_name: str, start_date: Optional[str], end_date: Optional[str]):
+		"""Backtest a bot's own strategy.yml directly, instead of a registered strategy name.
+
+		Pre-loads the bot's strategy.yml into the agent context's "strategy_config" -
+		StrategyAgent (called both directly by BacktestAgent and from inside
+		MarketPrepAgent) skips its by-name lookup whenever strategy_config is already
+		set, so the bot's own copy is used without needing to register it anywhere.
+
+		Results are stored under db/backtests/bot_<bot_name>/ (a synthetic identity),
+		never colliding with a registered strategy's own backtest history even if a
+		strategy of the same name as the bot happens to exist.
+		"""
+		import yaml
+		from tools.bot import BotManager
+		from core.context import AgentContext
+		from agents.backtest.agent import BacktestAgent
+
+		bm = BotManager()
+		bot_config = bm.get_bot(bot_name)
+		if not bot_config:
+			console.print(f"[red]✗[/red] Bot not found: {bot_name}")
+			return
+
+		bot_dir = bm.get_bot_dir(bot_name)
+		strategy_path = bot_dir / "strategy.yml"
+		if not strategy_path.exists():
+			console.print(f"[red]✗[/red] No strategy.yml found for bot '{bot_name}' at {strategy_path}")
+			return
+
+		strategy_config = yaml.safe_load(strategy_path.read_text()) or {}
+		if not strategy_config:
+			console.print(f"[red]✗[/red] strategy.yml for bot '{bot_name}' is empty")
+			return
+
+		synthetic_name = f"bot_{bot_name}"
+
+		context = AgentContext()
+		context.set("strategy_config", strategy_config)
+
+		input_data = {"strategy_name": synthetic_name}
+		if start_date:
+			input_data["start_date"] = start_date
+		if end_date:
+			input_data["end_date"] = end_date
+
+		console.print(f"[cyan]Running backtest for bot '{bot_name}' using {strategy_path}[/cyan]")
+		agent = BacktestAgent(context=context)
+		result = agent.process(input_data)
+
+		if result.get("status") != "success":
+			console.print(f"[red]✗[/red] {result.get('message', 'Backtest failed')}")
+			return
+
+		output = result.get("output", {})
+		console.print(f"[green]✓[/green] {result.get('message')}")
+		console.print(f"[dim]Results stored under: db/backtests/{synthetic_name}/{output.get('backtest_id')}[/dim]")
+
+		self._print_backtest_results(synthetic_name, result)
 
 	def _purge_backtest_folders(self, strategy: str):
 		"""Delete all backtest folders for a strategy, keep only the most recent."""
