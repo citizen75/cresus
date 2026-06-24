@@ -1,9 +1,8 @@
 """Agent to generate momentum signals from indicator formulas."""
 
-from typing import Any, Dict, Optional, List
-import re
+from typing import Any, Dict, Optional
 from core.agent import Agent
-from tools.formula import evaluate
+from tools.formula import evaluate, extract_indicators
 from tools.indicators.indicators import calculate as calculate_indicators
 
 
@@ -94,7 +93,7 @@ class MomentumAgent(Agent):
 				return False
 
 			# Extract indicators from formula
-			indicators = self._extract_indicators(formula)
+			indicators = extract_indicators(formula)
 
 			# Calculate only missing indicators (skip if already in data)
 			if indicators:
@@ -119,20 +118,3 @@ class MomentumAgent(Agent):
 			ticker_str = f" for {ticker}" if ticker else ""
 			self.logger.error(f"Error evaluating momentum formula{ticker_str}: {e}")
 			return False
-
-	def _extract_indicators(self, formula: str) -> List[str]:
-		"""Extract indicator names from formula string.
-
-		Args:
-			formula: Formula string
-
-		Returns:
-			List of unique indicator names
-		"""
-		pattern = r"data\[[\'\"]([^\)\'\"]+)[\'\"]"
-		matches = re.findall(pattern, formula)
-
-		non_indicators = {"close", "open", "high", "low", "volume", "timestamp", "ticker"}
-		indicators = [m for m in matches if m.lower() not in non_indicators]
-
-		return list(set(indicators))
