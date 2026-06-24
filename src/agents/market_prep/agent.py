@@ -59,6 +59,13 @@ class MarketPrepAgent(Agent):
 		is_backtest = self.context.get("backtest_id") is not None
 		if target_date:
 			self.context.set("target_date", target_date)
+			# Also set "date" (read by OrdersEntryAgent/OrdersSendingAgent to stamp
+			# order created_at/expiration). MarketProcessAgent sets this too during the
+			# market phase, but that only happens *after* this pre-market phase runs -
+			# on the backtest's very first day, "date" is still unset here, so orders
+			# fall back to wall-clock created_at and get a real-world expiration date
+			# that never lapses against the simulated timeline, letting them refire.
+			self.context.set("date", target_date)
 
 		try:
 			self._run_sub_agent(StrategyAgent(f"StrategyAgent[{self.strategy_name}]", self.context), fatal=True)

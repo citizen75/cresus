@@ -32,6 +32,12 @@ class EntryAgent(Agent):
         watchlist = self.context.get("watchlist")
         if not watchlist:
             self.logger.info("[ENTRY] Watchlist is empty, no entry analysis")
+            # Clear any "entries" left over from a previous call (e.g. yesterday's
+            # watchlist). Without this, OrdersEntryAgent - which runs unconditionally
+            # every day right after this agent - would re-read yesterday's already
+            # filtered-and-bought entries and place a fresh duplicate order for them,
+            # never having gone through PositionDuplicateFilterAgent today.
+            self.context.set("entries", {})
             return {
                 "status": "success",
                 "input": input_data,
@@ -56,6 +62,12 @@ class EntryAgent(Agent):
             self._run_sub_agent(PositionDuplicateFilterAgent("PositionDuplicateFilterStep"), fatal=False)
             self._run_sub_agent(EntryFilterAgent("EntryFilterStep"), fatal=False)
         except RuntimeError as e:
+            # A fatal step (EntryScoreAgent) failed before PositionDuplicateFilterAgent
+            # got to run. "entries" was already set to the raw, unfiltered watchlist at
+            # the top of this method - leaving it in place would let OrdersEntryAgent
+            # place orders for tickers that already have an open position, since the
+            # one step that checks for that never executed.
+            self.context.set("entries", {})
             return {
                 "status": "error",
                 "input": input_data,
