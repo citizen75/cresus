@@ -177,14 +177,14 @@ export default function BotDetail() {
             {activeTab === 'positions' && (
               <div className="h-full p-4">
                 <PortfolioHoldingsWidget
-                  portfolioName={strategyName}
+                  portfolioName={name}
                   onSelectTicker={setSelectedTicker}
                 />
               </div>
             )}
 
             {activeTab === 'performance' && (
-              <PortfolioPerformanceWidget portfolioName={strategyName} />
+              <PortfolioPerformanceWidget portfolioName={name} />
             )}
           </div>
         </div>
