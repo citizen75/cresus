@@ -11,9 +11,6 @@ deactivated_at: null
 # Bot state: active | inactive
 state: "inactive"
 
-# Strategy reference
-strategy: ""  # Name of the strategy (copied to bot folder as strategy.yml)
-
 # Portfolio configuration
 portfolio:
   initial_capital: 100000

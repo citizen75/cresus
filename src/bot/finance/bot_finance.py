@@ -34,7 +34,10 @@ class BotFinance(Bot):
 
 	def __init__(self, name: str, bot_dir: Path, context: Optional[AgentContext] = None):
 		super().__init__(name, bot_dir, context)
-		self.strategy_name: str = ""
+		# Informational only (which strategy.yml template this bot was created
+		# from) - never used as a portfolio/agent identity. self.name is the
+		# bot's own identity and is what all portfolio/order/journal lookups use.
+		self.strategy_template: str = ""
 		self.strategy_config: Dict[str, Any] = {}
 		self.tickers: List[str] = []
 		self.portfolio_data: Dict[str, Any] = {}
@@ -64,22 +67,17 @@ class BotFinance(Bot):
 			)
 
 		bot_config = yaml.safe_load(config_path.read_text()) or {}
-		self.strategy_name = bot_config.get("strategy", "")
-		if not self.strategy_name:
-			raise ValueError("'strategy' key missing from bot config")
+		self.strategy_template = bot_config.get("strategy", "")
 
 		strategy_path = self.bot_dir / "strategy.yml"
 		if not strategy_path.exists():
-			raise FileNotFoundError(
-				f"Strategy file not found at {strategy_path} "
-				f"(expected strategy: {self.strategy_name})"
-			)
+			raise FileNotFoundError(f"Strategy file not found at {strategy_path}")
 
 		self.strategy_config = yaml.safe_load(strategy_path.read_text()) or {}
 		if not self.strategy_config:
 			raise ValueError(f"Strategy config is empty: {strategy_path}")
 
-		self.logger.debug(f"Configs loaded: bot={self.name}, strategy={self.strategy_name}")
+		self.logger.debug(f"Configs loaded: bot={self.name}")
 
 	def _load_portfolio(self) -> None:
 		"""Load portfolio from PortfolioManager into self.portfolio_data.
@@ -87,10 +85,10 @@ class BotFinance(Bot):
 		Non-fatal: logs a warning and sets safe defaults on failure.
 		"""
 		try:
-			pm = PortfolioManager()
-			metadata = pm.get_portfolio_metadata(self.strategy_name) or {}
-			positions_data = pm.get_portfolio_positions(self.strategy_name) or {}
-			cash = pm.get_portfolio_cash(self.strategy_name)
+			pm = PortfolioManager(context={"bot_dir": str(self.bot_dir)})
+			metadata = pm.get_portfolio_metadata(self.name) or {}
+			positions_data = pm.get_portfolio_positions(self.name) or {}
+			cash = pm.get_portfolio_cash(self.name)
 
 			self.portfolio_data = {
 				"cash": cash,
@@ -142,19 +140,19 @@ class BotFinance(Bot):
 			self.tickers = self._load_tickers()
 
 			if not self.tickers:
-				self.logger.warning(f"No tickers found for strategy '{self.strategy_name}'")
+				self.logger.warning(f"No tickers found for bot '{self.name}'")
 
 			self.context.set("bot_name", self.name)
 			self.context.set("bot_dir", str(self.bot_dir))
-			self.context.set("strategy_name", self.strategy_name)
-			self.context.set("portfolio_name", self.strategy_name)
+			self.context.set("strategy_name", self.name)
+			self.context.set("portfolio_name", self.name)
 			self.context.set("strategy_config", self.strategy_config)
 			self.context.set("portfolio", self.portfolio_data)
 			self.context.set("tickers", self.tickers)
 			self.context.set("timestamp", datetime.now().isoformat())
 
 			self.logger.debug(
-				f"Context ready: strategy={self.strategy_name}, tickers={len(self.tickers)}"
+				f"Context ready: bot={self.name}, tickers={len(self.tickers)}"
 			)
 			return True
 		except Exception as e:
@@ -169,8 +167,8 @@ class BotFinance(Bot):
 		"""Delegate to MarketPrepAgent (the same pipeline backtests use)."""
 		self.logger.info("Starting pre-market workflow")
 		try:
-			agent = MarketPrepAgent(self.strategy_name, context=self.context)
-			result = agent.run({"portfolio_name": self.strategy_name})
+			agent = MarketPrepAgent(self.name, context=self.context)
+			result = agent.run({"portfolio_name": self.name})
 			self.agents_executed = agent.agents_executed
 			if result.get("status") != STATUS_SUCCESS:
 				return self._err(params, result.get("message", "Pre-market workflow failed"))
@@ -203,8 +201,8 @@ class BotFinance(Bot):
 		trading_date = datetime.now().date()
 		flow_result = MarketProcessAgent(context=self.context).process({
 			"date": trading_date.isoformat(),
-			"portfolio_name": self.strategy_name,
-			"strategy_name": self.strategy_name,
+			"portfolio_name": self.name,
+			"strategy_name": self.name,
 		})
 		broker_output = flow_result.get("output", {})
 
@@ -213,7 +211,7 @@ class BotFinance(Bot):
 		self._load_portfolio()
 		positions = self.portfolio_data.get("positions", [])
 
-		orders_mgr = Orders(self.strategy_name, context=self.context.__dict__)
+		orders_mgr = Orders(self.name, context=self.context.__dict__)
 		pending_orders = len(orders_mgr.get_pending_orders())
 
 		self.logger.info(f"In-market done: {pending_orders} pending order(s)")
@@ -238,10 +236,10 @@ class BotFinance(Bot):
 		try:
 			trading_date = datetime.now().date()
 			self.context.set("date", trading_date)
-			self.context.set("strategy_name", self.strategy_name)
+			self.context.set("strategy_name", self.name)
 
-			agent = MarketCloseAgent(self.strategy_name, context=self.context)
-			result = agent.process({"portfolio_name": self.strategy_name})
+			agent = MarketCloseAgent(self.name, context=self.context)
+			result = agent.process({"portfolio_name": self.name})
 			if result.get("status") != STATUS_SUCCESS:
 				return self._err(params, result.get("message", "Post-market workflow failed"))
 

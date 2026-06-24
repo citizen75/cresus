@@ -72,9 +72,11 @@ class BotManager:
 		if config is None:
 			config = self._load_default_template()
 
-		# Set bot name, strategy, and creation time
+		# Set bot name and creation time. Note: no "strategy" field - strategy.yml
+		# (copied below) is the bot's own complete, self-sufficient strategy spec;
+		# storing the template name here previously got misread elsewhere as a
+		# live portfolio identity, causing bots to read/write each other's data.
 		config["name"] = name
-		config["strategy"] = strategy_path  # Set strategy name/path
 		config["created_at"] = datetime.now().isoformat()
 		config["state"] = "inactive"
 
@@ -210,7 +212,6 @@ class BotManager:
 		# Fallback: return minimal default template
 		return {
 			"description": "Bot description",
-			"strategy": "",
 			"portfolio": {
 				"initial_capital": 100000,
 				"risk_per_trade": 0.02,
