@@ -11,6 +11,9 @@ sys.path.insert(0, str(project_root / "src"))
 os.environ.setdefault("CRESUS_PROJECT_ROOT", str(project_root))
 os.chdir(project_root)
 
+from utils.timestamped_stream import install as install_timestamped_streams
+install_timestamped_streams()
+
 from loguru import logger
 from utils.env import (
 	get_api_host,
