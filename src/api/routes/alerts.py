@@ -9,6 +9,7 @@ import math
 
 from tools.alerts import AlertManager, AlertEvaluator, Alert
 from tools.alerts.notifier import AlertNotifier
+from tools.data import Fundamental
 
 router = APIRouter(tags=["alerts"])
 
@@ -32,10 +33,7 @@ def enrich_with_company_names(matches: List[dict]) -> List[dict]:
                 # Check cache first
                 if ticker not in company_cache:
                     try:
-                        import yfinance as yf
-                        info = yf.Ticker(ticker).info
-                        company_name = info.get('longName', info.get('shortName', ticker))
-                        company_cache[ticker] = company_name
+                        company_cache[ticker] = Fundamental(ticker).get_company_info()['company_name']
                     except Exception:
                         company_cache[ticker] = ticker
 

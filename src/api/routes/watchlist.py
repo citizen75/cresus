@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 
 from tools.watchlist.watchlist_manager import WatchlistManager
 from tools.strategy import StrategyManager
+from tools.data import Fundamental
 from pathlib import Path
 import os
 
@@ -19,25 +20,10 @@ def _get_ticker_metadata(ticker: str) -> Dict[str, Any]:
 	name = ''
 
 	try:
-		# Try to get company name and price from yfinance
-		import yfinance as yf
-		try:
-			ticker_info = yf.Ticker(ticker)
-			info = ticker_info.info
-			name = info.get('longName') or info.get('shortName') or ''
-			close_price = info.get('currentPrice') or info.get('regularMarketPrice')
-		except:
-			pass
-
-		# If price not in info, try downloading
-		if close_price is None:
-			try:
-				data = yf.download(ticker, period="1d", progress=False)
-				if not data.empty and 'Close' in data.columns:
-					close_price = float(data['Close'].iloc[-1])
-			except:
-				pass
-	except:
+		fundamental = Fundamental(ticker)
+		name = fundamental.get_company_info().get('company_name') or ''
+		close_price = fundamental.get_current_price()
+	except Exception:
 		pass
 
 	return {

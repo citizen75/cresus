@@ -9,6 +9,11 @@ from datetime import datetime
 from loguru import logger
 from tools.data.financial import FinancialDataManager
 from tools.data.enrichment import TickerIntelligence
+from tools.data import DataHistory
+from tools.data.financedatabase_manager import (
+    get_equities, get_etfs, get_funds, get_indices,
+    get_equities_data, get_etfs_data, get_funds_data, get_indices_data,
+)
 from tools.universe.universe import Universe
 
 # Request/Response models
@@ -186,19 +191,16 @@ async def get_universe_tickers(
 
             # Secondary enrichment from FinanceDatabase
             try:
-                import financedatabase as fd
-
-                # Select correct database based on asset type
+                # Select correct (cached) database based on asset type
                 if asset_type == "etfs":
-                    db = fd.ETFs()
+                    all_data = get_etfs_data()
                 elif asset_type == "funds":
-                    db = fd.Funds()
+                    all_data = get_funds_data()
                 elif asset_type == "indices":
-                    db = fd.Indices()
+                    all_data = get_indices_data()
                 else:
-                    db = fd.Equities()
+                    all_data = get_equities_data()
 
-                all_data = db.select()
                 for ticker in tickers:
                     symbol = ticker.get("symbol", "").upper()
                     if symbol in all_data.index:
@@ -348,9 +350,6 @@ async def fetch_universe_data(
 ):
     """Fetch and cache historical data and fundamentals for all tickers in a universe."""
     try:
-        import yfinance as yf
-        import financedatabase as fd
-
         universe = Universe(universe_id)
         if not universe.exists():
             return {"error": f"Universe '{universe_id}' not found"}, 404
@@ -360,17 +359,15 @@ async def fetch_universe_data(
         if not symbols:
             return {"status": "no_tickers", "universe": universe_id, "count": 0}
 
-        # Select correct database based on asset type
+        # Select correct (cached) database based on asset type
         if asset_type == "etfs":
-            db = fd.ETFs()
+            all_data = get_etfs_data()
         elif asset_type == "funds":
-            db = fd.Funds()
+            all_data = get_funds_data()
         elif asset_type == "indices":
-            db = fd.Indices()
+            all_data = get_indices_data()
         else:
-            db = fd.Equities()
-
-        all_data = db.select()
+            all_data = get_equities_data()
 
         # Fetch data for each ticker
         results = {
@@ -387,8 +384,8 @@ async def fetch_universe_data(
 
                 # Fetch historical data
                 try:
-                    hist = yf.download(symbol, period="365d", progress=False)
-                    if not hist.empty:
+                    hist_result = DataHistory(symbol).fetch()
+                    if hist_result.get("status") == "success":
                         ticker_result["history"] = True
                 except Exception as e:
                     pass
@@ -506,8 +503,6 @@ async def filter_tickers(
     - ?asset_type=etfs → All ETFs (worldwide)
     """
     try:
-        import financedatabase as fd
-
         # Country code to FinanceDatabase country name mapping (for stocks)
         country_name_map = {
             "FR": "France",
@@ -556,13 +551,13 @@ async def filter_tickers(
         asset_type_lower = asset_type.lower() if asset_type else None
 
         if asset_type_lower == "stocks":
-            db = fd.Equities()
+            db = get_equities()
         elif asset_type_lower == "etfs":
-            db = fd.ETFs()
+            db = get_etfs()
         elif asset_type_lower == "funds":
-            db = fd.Funds()
+            db = get_funds()
         elif asset_type_lower == "indices":
-            db = fd.Indices()
+            db = get_indices()
         else:
             return {
                 "countries": countries,
