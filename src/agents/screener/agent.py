@@ -294,8 +294,14 @@ class ScreenerAgent(Agent):
 							pass
 
 				if max_dates:
-					# Use the minimum of the max dates (common date for all tickers)
-					most_recent_date = min(max_dates)
+					# Use the most common max-date across tickers, not the global
+					# minimum: a single delisted/stale ticker whose data stopped
+					# updating years ago would otherwise drag the screening date
+					# for the entire universe back to that ticker's last trading
+					# day, silently presenting stale historical rows as today's
+					# signal for every other (current) ticker.
+					from collections import Counter
+					most_recent_date = Counter(max_dates).most_common(1)[0][0]
 				else:
 					return {
 						"status": "error",
