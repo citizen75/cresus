@@ -3,6 +3,9 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import CardChart from '@/components/CardChart'
 import Scheduler from '@/pages/Scheduler'
 import Logs from '@/pages/Logs'
+import { getApiBaseUrl } from '@/services/api'
+
+const API_BASE = `${getApiBaseUrl()}/api/v1`
 
 interface Universe {
   id: string
@@ -88,7 +91,7 @@ export default function Data() {
   const loadUniverses = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`http://192.168.0.130:6501/api/v1/data/universes/list`)
+      const response = await fetch(`${API_BASE}/data/universes/list`)
       if (response.ok) {
         const data = await response.json()
         setUniverses(data.universes || [])
@@ -115,7 +118,7 @@ export default function Data() {
       }
 
       const response = await fetch(
-        `http://192.168.0.130:6501/api/v1/data/universe/${universe}?asset_type=${assetType}`
+        `${API_BASE}/data/universe/${universe}?asset_type=${assetType}`
       )
       if (response.ok) {
         const data = await response.json()
@@ -137,7 +140,7 @@ export default function Data() {
 
     try {
       setLoading(true)
-      let url = 'http://192.168.0.130:6501/api/v1/data/filter?'
+      let url = `${API_BASE}/data/filter?`
 
       // Add country filter if selected
       if (selectedCountries.length > 0) {
@@ -252,7 +255,7 @@ export default function Data() {
 
     try {
       const response = await fetch(
-        `http://192.168.0.130:6501/api/v1/data/universe/${universeId}/fetch-data?asset_type=${assetType}`,
+        `${API_BASE}/data/universe/${universeId}/fetch-data?asset_type=${assetType}`,
         { method: 'POST' }
       )
 
@@ -324,7 +327,7 @@ export default function Data() {
     try {
       // Load universe to check for existing tickers
       const universeResponse = await fetch(
-        `http://192.168.0.130:6501/api/v1/data/universe/${universeId}`
+        `${API_BASE}/data/universe/${universeId}`
       )
       const universeData = await universeResponse.json()
       const existingSymbols = new Set(
@@ -359,7 +362,7 @@ export default function Data() {
         }))
 
       const response = await fetch(
-        `http://192.168.0.130:6501/api/v1/data/universe/${universeId}/tickers`,
+        `${API_BASE}/data/universe/${universeId}/tickers`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -400,7 +403,7 @@ export default function Data() {
     try {
       const tickersToRemove = Array.from(selectedRows)
       const response = await fetch(
-        `http://192.168.0.130:6501/api/v1/data/universe/${selectedUniverse}/tickers`,
+        `${API_BASE}/data/universe/${selectedUniverse}/tickers`,
         {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
@@ -432,7 +435,7 @@ export default function Data() {
     try {
       // Fetch 1 year of historical data and fundamentals
       const response = await fetch(
-        `http://192.168.0.130:6501/api/v1/data/history/${ticker.symbol}?days=365`
+        `${API_BASE}/data/history/${ticker.symbol}?days=365`
       )
       if (response.ok) {
         const data = await response.json()
@@ -986,7 +989,7 @@ export default function Data() {
             onClick={() => {
               const name = prompt('Enter universe name:')
               if (name) {
-                fetch(`http://192.168.0.130:6501/api/v1/data/universe/${name}`, {
+                fetch(`${API_BASE}/data/universe/${name}`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ tickers: [] }),
@@ -1047,7 +1050,7 @@ export default function Data() {
                             )
                             if (newName && newName !== universe.name) {
                               fetch(
-                                `http://192.168.0.130:6501/api/v1/data/universe/${universe.id}`,
+                                `${API_BASE}/data/universe/${universe.id}`,
                                 {
                                   method: 'PATCH',
                                   headers: { 'Content-Type': 'application/json' },
@@ -1072,7 +1075,7 @@ export default function Data() {
                             e.stopPropagation()
                             if (confirm(`Delete universe "${universe.name}"?`)) {
                               fetch(
-                                `http://192.168.0.130:6501/api/v1/data/universe/${universe.id}`,
+                                `${API_BASE}/data/universe/${universe.id}`,
                                 { method: 'DELETE' }
                               ).then(() => loadUniverses())
                             }

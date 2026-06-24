@@ -8,25 +8,17 @@ from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
 import json
 import os
+import threading
 import warnings
-import sys
-from io import StringIO
 
-# Suppress deprecation warnings BEFORE importing yfinance
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-# Suppress yfinance output during import
-old_stderr = sys.stderr
-sys.stderr = StringIO()
-
-try:
-	import pandas as pd
-	import yfinance as yf
-finally:
-	sys.stderr = old_stderr
+import pandas as pd
 
 from loguru import logger
 from utils.env import get_db_root
+from tools.data.process_pool import run_isolated
+from tools.data.yf_worker import fetch_ticker_history, fetch_ticker_info
 
 # Additional warning filters
 warnings.filterwarnings("ignore", category=pd.errors.PerformanceWarning)
@@ -37,6 +29,34 @@ warnings.filterwarnings("ignore", message=".*YF deprecation.*")
 logger.disable("tools.data.core")
 logger.disable("tools.portfolio.manager")
 logger.disable("tools.portfolio.cache")
+
+
+# Per-ticker locks so concurrent callers (cron jobs and API requests run as
+# threads in the same gateway process) can't race on the same cache file's
+# read-merge-write cycle.
+_cache_locks_guard = threading.Lock()
+_cache_locks: Dict[str, threading.Lock] = {}
+
+
+def _get_cache_lock(key: str) -> threading.Lock:
+	with _cache_locks_guard:
+		lock = _cache_locks.get(key)
+		if lock is None:
+			lock = threading.Lock()
+			_cache_locks[key] = lock
+		return lock
+
+
+def _atomic_write(filepath: Path, write_fn) -> None:
+	"""Write a cache file atomically: write_fn(tmp_path) then os.replace(tmp, filepath).
+
+	Guards against a crash mid-write (this process is known to SIGSEGV via
+	yfinance) leaving a truncated/corrupt cache file that future reads would
+	otherwise silently treat as empty/missing forever.
+	"""
+	tmp_path = filepath.with_suffix(filepath.suffix + ".tmp")
+	write_fn(tmp_path)
+	os.replace(tmp_path, filepath)
 
 
 def _get_project_root() -> Path:
@@ -65,10 +85,13 @@ class Fundamental:
 
 	def fetch(self) -> Dict[str, Any]:
 		"""Fetch latest fundamental data from yfinance and cache it."""
+		with _get_cache_lock(str(self.filepath)):
+			return self._fetch_locked()
+
+	def _fetch_locked(self) -> Dict[str, Any]:
 		try:
 			logger.info(f"Fetching fundamental data for {self.ticker}")
-			ticker_obj = yf.Ticker(self.ticker)
-			info = ticker_obj.info or {}
+			info = run_isolated(fetch_ticker_info, self.ticker) or {}
 
 			# Extract current price with fallback chain
 			current_price = None
@@ -149,8 +172,7 @@ class Fundamental:
 			}
 
 			# Cache it
-			with open(self.filepath, "w") as f:
-				json.dump(data, f)
+			_atomic_write(self.filepath, lambda p: p.write_text(json.dumps(data)))
 
 			logger.info(f"Cached fundamental data for {self.ticker}")
 			return data
@@ -163,10 +185,26 @@ class Fundamental:
 				"message": str(e),
 			}
 
-	def get_current_price(self) -> Optional[float]:
-		"""Get current price from cache or fetch."""
+	def _is_fresh(self, cached: Dict[str, Any], max_age_seconds: float) -> bool:
+		"""Whether a cached payload's timestamp is within max_age_seconds of now."""
+		timestamp = cached.get("timestamp")
+		if not timestamp:
+			return False
+		try:
+			cached_at = datetime.fromisoformat(timestamp)
+		except (TypeError, ValueError):
+			return False
+		return (datetime.now() - cached_at).total_seconds() <= max_age_seconds
+
+	def get_current_price(self, max_age_seconds: float = 1800) -> Optional[float]:
+		"""Get current price from cache if fresh, otherwise fetch.
+
+		Prices feed portfolio valuation and alerts, so a cache hit older than
+		max_age_seconds (default 30min, in line with the intraday cron cadence)
+		is treated as stale and refetched rather than returned as-is.
+		"""
 		cached = self.load()
-		if cached:
+		if cached and self._is_fresh(cached, max_age_seconds):
 			price = cached.get("data", {}).get("quotation", {}).get("current_price")
 			if price:
 				return price
@@ -174,10 +212,14 @@ class Fundamental:
 		fresh = self.fetch()
 		return fresh.get("data", {}).get("quotation", {}).get("current_price")
 
-	def get_company_info(self) -> Dict[str, Any]:
-		"""Get company information from cache or fetch."""
+	def get_company_info(self, max_age_seconds: float = 86400) -> Dict[str, Any]:
+		"""Get company information from cache if fresh, otherwise fetch.
+
+		Sector/name/etc. change rarely, so this defaults to a much longer
+		max_age than get_current_price (default 24h).
+		"""
 		cached = self.load()
-		company = cached.get("data", {}).get("company", {}) if cached else {}
+		company = cached.get("data", {}).get("company", {}) if cached and self._is_fresh(cached, max_age_seconds) else {}
 
 		if not company.get("name"):
 			fresh = self.fetch()
@@ -244,6 +286,15 @@ class DataHistory:
 			force: If True, ignore cached data and re-fetch the ticker's full history
 				from scratch (existing rows are overwritten with the freshly fetched ones)
 		"""
+		with _get_cache_lock(str(self.filepath)):
+			return self._fetch_locked(start_date=start_date, incremental=incremental, force=force)
+
+	def _fetch_locked(
+		self,
+		start_date: Optional[str] = None,
+		incremental: bool = True,
+		force: bool = False,
+	) -> Dict[str, Any]:
 		try:
 			logger.info(f"Fetching history for {self.ticker}{' (forced full refresh)' if force else ''}")
 
@@ -274,8 +325,7 @@ class DataHistory:
 			fetch_end = datetime.now().strftime("%Y-%m-%d")
 
 			logger.info(f"  Fetching {self.ticker} from {fetch_start} to {fetch_end}")
-			ticker_obj = yf.Ticker(self.ticker)
-			df_new = ticker_obj.history(start=fetch_start, interval="1d")
+			df_new = run_isolated(fetch_ticker_history, self.ticker, fetch_start)
 
 			if df_new is None or df_new.empty:
 				logger.warning(f"No data for {self.ticker}")
@@ -328,7 +378,7 @@ class DataHistory:
 				df_combined = df_new
 
 			# Cache
-			df_combined.to_parquet(self.filepath, index=False)
+			_atomic_write(self.filepath, lambda p: df_combined.to_parquet(p, index=False))
 			logger.info(f"Cached {len(df_combined)} rows for {self.ticker}")
 
 			return {

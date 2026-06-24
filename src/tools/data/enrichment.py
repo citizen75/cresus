@@ -1,6 +1,8 @@
 """Unified ticker data enrichment system combining metadata, fundamentals, and market data."""
 
 import logging
+import threading
+import time
 from typing import Dict, Any, Optional
 from pathlib import Path
 import json
@@ -11,6 +13,47 @@ from tools.data.financedatabase_manager import enrich_ticker as fd_enrich_ticker
 from utils.env import get_db_root
 
 logger = logging.getLogger(__name__)
+
+# Process-wide ticker->metadata index, rebuilt at most once per TTL window.
+# Without this, every uncached ticker enrichment re-reads and re-parses every
+# universe CSV from disk just to find the one row it needs - O(universes *
+# tickers) per ticker, instead of O(1) after a single shared index build.
+_UNIVERSE_INDEX_TTL = 300
+_universe_index_lock = threading.Lock()
+_universe_index: Optional[Dict[str, Dict[str, Any]]] = None
+_universe_index_built_at: float = 0.0
+
+
+def _build_universe_index() -> Dict[str, Dict[str, Any]]:
+    index: Dict[str, Dict[str, Any]] = {}
+    for uni_id in Universe.list_universes():
+        try:
+            uni = Universe(uni_id)
+            if not uni.exists():
+                continue
+            for ticker_data in uni.get_tickers_with_metadata():
+                symbol = ticker_data.get("symbol")
+                if symbol:
+                    index.setdefault(symbol.upper(), ticker_data)
+        except Exception as e:
+            # db/universes/ also holds non-universe housekeeping files
+            # (blacklist.csv, *_errors.csv) that don't parse as ticker lists.
+            logger.debug(f"Skipped {uni_id} while building universe index: {e}")
+    return index
+
+
+def _get_universe_index() -> Dict[str, Dict[str, Any]]:
+    global _universe_index, _universe_index_built_at
+    now = time.time()
+    if _universe_index is not None and (now - _universe_index_built_at) < _UNIVERSE_INDEX_TTL:
+        return _universe_index
+
+    with _universe_index_lock:
+        now = time.time()
+        if _universe_index is None or (now - _universe_index_built_at) >= _UNIVERSE_INDEX_TTL:
+            _universe_index = _build_universe_index()
+            _universe_index_built_at = now
+        return _universe_index
 
 
 class TickerIntelligence:
@@ -29,21 +72,9 @@ class TickerIntelligence:
         self.cache_file = self.cache_dir / f"{self.ticker}.json"
 
     def _load_universe_metadata(self) -> Optional[Dict[str, Any]]:
-        """Load ticker metadata from universe files."""
+        """Look up ticker metadata from the shared universe index."""
         try:
-            # Find which universe contains this ticker
-            universes = Universe.list_universes()
-            for uni_id in universes:
-                try:
-                    uni = Universe(uni_id)
-                    if uni.exists():
-                        tickers_data = uni.get_tickers_with_metadata()
-                        for ticker_data in tickers_data:
-                            if ticker_data.get("symbol").upper() == self.ticker:
-                                return ticker_data
-                except Exception:
-                    continue
-            return None
+            return _get_universe_index().get(self.ticker)
         except Exception as e:
             logger.warning(f"Failed to load universe metadata for {self.ticker}: {e}")
             return None

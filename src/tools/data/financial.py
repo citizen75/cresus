@@ -12,12 +12,15 @@ class FinancialDataManager:
 
     def __init__(self):
         self.logger = logger
+        # Kept in sync with the universe files actually shipped under
+        # db/universes/ - there's no naming convention that lets us derive
+        # asset class from a universe id, so this has to be a hand-kept map.
         self.universe_map = {
-            "stocks": ["srd", "cac40", "nasdaq_100", "sp500"],
-            "etfs": ["etf_pea", "etf_fr"],
-            "funds": ["funds_fr"],
-            "indices": ["indices_main"],
-            "currencies": ["forex_major", "forex_exotic"],
+            "stocks": ["srd", "cac40", "nasdaq_100", "nasdaq_tech", "sp_25", "enx_large", "enx_mid", "enx_small", "xetra"],
+            "etfs": ["etf_pea", "etf_fr", "etf_pea_full"],
+            "funds": [],
+            "indices": ["index"],
+            "currencies": [],
         }
 
     def get_asset_categories(self) -> List[Dict[str, str]]:
@@ -59,13 +62,16 @@ class FinancialDataManager:
             "srd": "Euronext SRD (France)",
             "cac40": "CAC 40 Index",
             "nasdaq_100": "NASDAQ 100",
-            "sp500": "S&P 500",
+            "nasdaq_tech": "NASDAQ Tech",
+            "sp_25": "S&P 25",
+            "enx_large": "Euronext Large Cap",
+            "enx_mid": "Euronext Mid Cap",
+            "enx_small": "Euronext Small Cap",
+            "xetra": "Xetra (Germany)",
             "etf_pea": "ETF PEA (France)",
             "etf_fr": "French ETFs",
-            "funds_fr": "French Funds",
-            "indices_main": "Major Indices",
-            "forex_major": "Major Pairs",
-            "forex_exotic": "Exotic Pairs",
+            "etf_pea_full": "ETF PEA (Full)",
+            "index": "Major Indices",
         }
         return names.get(universe_id, universe_id.replace("_", " ").title())
 
@@ -94,12 +100,57 @@ class FinancialDataManager:
             self.logger.error(f"Failed to load tickers for {universe}: {e}")
             return []
 
-    def search_tickers(self, query: str, category: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Search for tickers by symbol or name."""
+    def search_tickers(self, query: str, category: Optional[str] = None, limit: int = 25) -> List[Dict[str, Any]]:
+        """Search for tickers by symbol or name across universes.
+
+        Args:
+            query: Substring to match against ticker symbol or name (case-insensitive)
+            category: Optional category to restrict the search to (see get_asset_categories)
+            limit: Max number of matches to return
+        """
         self.logger.info(f"Searching tickers: {query}")
-        return []
+        query_lower = query.strip().lower()
+        if not query_lower:
+            return []
+
+        universe_ids = self.universe_map.get(category, []) if category else [
+            uid for ids in self.universe_map.values() for uid in ids
+        ]
+
+        seen = set()
+        matches = []
+        for uni_id in universe_ids:
+            try:
+                universe = Universe(uni_id)
+                if not universe.exists():
+                    continue
+                for ticker_data in universe.get_tickers_with_metadata():
+                    symbol = ticker_data.get("symbol", "")
+                    if symbol in seen:
+                        continue
+                    name = ticker_data.get("name", "")
+                    if query_lower in symbol.lower() or query_lower in name.lower():
+                        seen.add(symbol)
+                        matches.append(ticker_data)
+                        if len(matches) >= limit:
+                            return matches
+            except Exception as e:
+                self.logger.warning(f"Failed to search universe {uni_id}: {e}")
+
+        return matches
 
     def get_ticker_info(self, ticker: str) -> Optional[Dict[str, Any]]:
-        """Get detailed information about a ticker."""
+        """Get detailed information about a ticker.
+
+        Combines universe metadata, fundamentals, and FinanceDatabase data
+        via TickerIntelligence.
+        """
         self.logger.info(f"Getting info for {ticker}")
-        return None
+        from tools.data.enrichment import TickerIntelligence
+
+        try:
+            summary = TickerIntelligence(ticker).get_summary()
+            return summary or None
+        except Exception as e:
+            self.logger.warning(f"Failed to get ticker info for {ticker}: {e}")
+            return None

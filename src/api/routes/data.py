@@ -1,6 +1,7 @@
 """Data management API routes."""
 
 from fastapi import APIRouter, Query
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 from typing import List, Optional
 import time
@@ -167,6 +168,10 @@ async def get_universe_tickers(
         enrich: Whether to enrich with fundamentals (sector, industry, price, etc.)
         asset_type: Asset type for enrichment (equities, etfs, funds, indices)
     """
+    return await run_in_threadpool(_sync_get_universe_tickers, universe_id, limit, enrich, asset_type)
+
+
+def _sync_get_universe_tickers(universe_id: str, limit: Optional[int], enrich: bool, asset_type: str):
     try:
         universe = Universe(universe_id)
         if not universe.exists():
@@ -349,6 +354,10 @@ async def fetch_universe_data(
     asset_type: str = Query("equities", description="Asset type (equities, etfs, funds, indices)"),
 ):
     """Fetch and cache historical data and fundamentals for all tickers in a universe."""
+    return await run_in_threadpool(_sync_fetch_universe_data, universe_id, asset_type)
+
+
+def _sync_fetch_universe_data(universe_id: str, asset_type: str):
     try:
         universe = Universe(universe_id)
         if not universe.exists():
@@ -502,6 +511,10 @@ async def filter_tickers(
     - ?countries=FR,DE&asset_type=stocks → French and German stocks
     - ?asset_type=etfs → All ETFs (worldwide)
     """
+    return await run_in_threadpool(_sync_filter_tickers, countries, asset_type, limit, enrich)
+
+
+def _sync_filter_tickers(countries: Optional[str], asset_type: Optional[str], limit: Optional[int], enrich: bool):
     try:
         # Country code to FinanceDatabase country name mapping (for stocks)
         country_name_map = {
@@ -714,15 +727,11 @@ async def get_category_tickers(
     - indices: Index universes
     - currencies: Currency universes
     """
-    category_map = {
-        "stocks": ["srd", "cac40", "nasdaq_100", "sp_25", "enx_large", "enx_mid", "enx_small", "xetra"],
-        "etfs": ["etf_pea", "etf_fr", "etf_pea_full", "etf_pea_test"],
-        "funds": [],  # No fund universes currently
-        "indices": ["index"],
-        "currencies": [],  # No currency universes currently
-    }
+    return await run_in_threadpool(_sync_get_category_tickers, category, limit, enrich)
 
-    universes = category_map.get(category.lower(), [])
+
+def _sync_get_category_tickers(category: str, limit: int, enrich: bool):
+    universes = manager.universe_map.get(category.lower(), [])
     if not universes:
         return {"category": category, "tickers": [], "count": 0}
 
@@ -762,6 +771,10 @@ async def get_enriched_ticker(ticker: str, use_cache: bool = Query(True)):
     - Fundamentals (P/E, earnings, margins, analyst ratings)
     - Market data (price, change, volume)
     """
+    return await run_in_threadpool(_sync_get_enriched_ticker, ticker, use_cache)
+
+
+def _sync_get_enriched_ticker(ticker: str, use_cache: bool):
     try:
         ti = TickerIntelligence(ticker)
         enriched = ti.get_enriched_data(use_cache=use_cache)
@@ -773,6 +786,10 @@ async def get_enriched_ticker(ticker: str, use_cache: bool = Query(True)):
 @router.get("/ticker/{ticker}/summary")
 async def get_ticker_summary(ticker: str):
     """Get summary of key financial metrics for a ticker."""
+    return await run_in_threadpool(_sync_get_ticker_summary, ticker)
+
+
+def _sync_get_ticker_summary(ticker: str):
     try:
         ti = TickerIntelligence(ticker)
         summary = ti.get_summary()
@@ -787,6 +804,10 @@ async def batch_enrich_tickers(request: TickersRequest, use_cache: bool = Query(
 
     Returns complete financial data for multiple tickers.
     """
+    return await run_in_threadpool(_sync_batch_enrich_tickers, request, use_cache)
+
+
+def _sync_batch_enrich_tickers(request: TickersRequest, use_cache: bool):
     try:
         results = TickerIntelligence.batch_enrich(request.tickers, use_cache=use_cache)
         return {
@@ -857,7 +878,7 @@ async def get_all_tickers(limit: int = Query(5000, description="Max number of ti
 @router.get("/tickers/{ticker}")
 async def get_ticker_info(ticker: str):
     """Get detailed information about a ticker."""
-    info = manager.get_ticker_info(ticker)
+    info = await run_in_threadpool(manager.get_ticker_info, ticker)
     if not info:
         return {"error": "Ticker not found"}, 404
     return {"ticker": ticker, "info": info}
@@ -876,6 +897,10 @@ async def get_ticker_history(
         days: Number of days to return
         indicator: Optional indicator (sha_10)
     """
+    return await run_in_threadpool(_sync_get_ticker_history, ticker, days, indicator)
+
+
+def _sync_get_ticker_history(ticker: str, days: int, indicator: Optional[str]):
     try:
         from tools.data.core import DataHistory, Fundamental
         from tools.indicators import calculate
@@ -1023,6 +1048,10 @@ async def get_ticker_fundamental(ticker: str):
     Args:
         ticker: Ticker symbol
     """
+    return await run_in_threadpool(_sync_get_ticker_fundamental, ticker)
+
+
+def _sync_get_ticker_fundamental(ticker: str):
     try:
         from tools.data.core import Fundamental
 

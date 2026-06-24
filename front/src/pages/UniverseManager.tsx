@@ -1,4 +1,7 @@
 import { useState, useEffect } from 'react'
+import { getApiBaseUrl } from '@/services/api'
+
+const API_BASE = `${getApiBaseUrl()}/api/v1`
 
 interface Universe {
   id: string
@@ -43,7 +46,7 @@ export default function UniverseManager() {
   const loadUniverses = async () => {
     try {
       setLoading(true)
-      const response = await fetch('http://192.168.0.130:6501/api/v1/data/universes/list')
+      const response = await fetch(`${API_BASE}/data/universes/list`)
       if (response.ok) {
         const data = await response.json()
         setUniverses(data.universes || [])
@@ -57,7 +60,7 @@ export default function UniverseManager() {
 
   const loadUniverseDetail = async (universeId: string) => {
     try {
-      const response = await fetch(`http://192.168.0.130:6501/api/v1/data/universe/${universeId}`)
+      const response = await fetch(`${API_BASE}/data/universe/${universeId}`)
       if (response.ok) {
         const data = await response.json()
         const detail: UniverseDetail = {
@@ -92,7 +95,7 @@ export default function UniverseManager() {
         setError(`Removed ${duplicateCount} duplicate ticker(s)`)
       }
 
-      const response = await fetch(`http://192.168.0.130:6501/api/v1/data/universe/${newUniverseName}`, {
+      const response = await fetch(`${API_BASE}/data/universe/${newUniverseName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tickers: uniqueTickers }),
@@ -126,7 +129,7 @@ export default function UniverseManager() {
         alert(`Removed ${duplicateCount} duplicate ticker(s)`)
       }
 
-      const response = await fetch(`http://192.168.0.130:6501/api/v1/data/universe/${selectedUniverse.id}`, {
+      const response = await fetch(`${API_BASE}/data/universe/${selectedUniverse.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tickers: uniqueTickers }),
@@ -150,7 +153,7 @@ export default function UniverseManager() {
     if (!confirm(`Delete universe "${universeId}"?`)) return
 
     try {
-      const response = await fetch(`http://192.168.0.130:6501/api/v1/data/universe/${universeId}`, {
+      const response = await fetch(`${API_BASE}/data/universe/${universeId}`, {
         method: 'DELETE',
       })
 
