@@ -27,6 +27,17 @@ def isolated_cresus_home(tmp_path, monkeypatch):
     monkeypatch.delenv("CRESUS_DB_ROOT", raising=False)
     monkeypatch.delenv("CRESUS_CONFIG_ROOT", raising=False)
     monkeypatch.delenv("CRESUS_ENV_FILE", raising=False)
+
+    # tools.logger.manager caches TaskLogger instances in a module-level dict
+    # keyed only by task name, resolved against whatever home was active the
+    # first time a given name was logged. Without clearing it, a later test
+    # reusing the same name (e.g. two tests both running an alert called
+    # "alert_a") would keep writing to the *first* test's tmp directory and
+    # see its accumulated log lines instead of its own.
+    from tools.logger import manager as _logger_manager
+
+    _logger_manager._loggers.clear()
+
     return fake_home
 
 
