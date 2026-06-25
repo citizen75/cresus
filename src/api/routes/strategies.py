@@ -177,17 +177,22 @@ async def duplicate_strategy(name: str, new_name: Optional[str] = Query(None)):
 	strategy = load_result.get("data")
 
 	try:
+		# Use strategy_manager.strategies_dir (~/.cresus/db/strategies), not the
+		# module-level _get_strategies_dir() helper - that one resolves to
+		# <project_root>/db/local/strategies, a different directory than where
+		# strategies actually live, so it never found real collisions and let
+		# duplicate-onto-existing-name silently overwrite the target strategy.
+		strategies_dir = strategy_manager.strategies_dir
+
 		# Generate new name if not provided
 		if not new_name:
 			base_name = name
 			counter = 1
-			strategies_dir = _get_strategies_dir()
 			while (strategies_dir / f"{base_name}_copy_{counter}.yml").exists():
 				counter += 1
 			new_name = f"{base_name}_copy_{counter}"
 		else:
 			# Validate new name doesn't already exist
-			strategies_dir = _get_strategies_dir()
 			if (strategies_dir / f"{new_name}.yml").exists():
 				raise HTTPException(status_code=400, detail=f"Strategy '{new_name}' already exists")
 

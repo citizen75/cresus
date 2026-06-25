@@ -119,6 +119,14 @@ async def get_top_watchlist_tickers(strategy_name: str, n: int = 10):
 		if not top_tickers:
 			raise HTTPException(404, f"Watchlist '{strategy_name}' not found")
 
+		# NaN (e.g. a blank "signals" cell read back from CSV) isn't valid JSON
+		# and crashes the response encoder with "Out of range float values are
+		# not JSON compliant: nan" instead of a clean payload.
+		for record in top_tickers:
+			for key, value in record.items():
+				if isinstance(value, float) and pd.isna(value):
+					record[key] = None
+
 		return {
 			"strategy": strategy_name,
 			"top_tickers": top_tickers,
