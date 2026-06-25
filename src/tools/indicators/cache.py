@@ -87,8 +87,14 @@ class IndicatorCache:
             last_row = ohlcv_df.iloc[-1]
             logger.debug(f"{self.ticker}: Saving cache with hash '{data_hash}' (date={last_row.get('TIMESTAMP', '?')}, close={last_row.get('CLOSE', '?')}, volume={last_row.get('VOLUME', '?')})")
 
-            # Save to cache
-            df.to_parquet(self.cache_filepath, index=False)
+            # Write to a temp file then rename into place. A direct write left a
+            # half-written/corrupted parquet file readable by a concurrent reader
+            # whenever two processes raced on the same ticker (e.g. a stale extra
+            # gateway instance), and pyarrow segfaults outright on malformed
+            # parquet rather than raising a catchable Python exception.
+            tmp_path = self.cache_filepath.with_suffix(".parquet.tmp")
+            df.to_parquet(tmp_path, index=False)
+            tmp_path.replace(self.cache_filepath)
             logger.info(f"{self.ticker}: Saved {len(indicators)} indicators to cache: {list(indicators.keys())}")
         except Exception as e:
             logger.warning(f"{self.ticker}: Error saving indicator cache: {e}")

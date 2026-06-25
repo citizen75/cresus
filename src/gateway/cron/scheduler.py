@@ -59,6 +59,7 @@ class CronScheduler:
 			name=job_config.description or job_config.name,
 			coalesce=True,
 			max_instances=1,
+			replace_existing=True,
 		)
 
 		logger.info(f"Added cron job '{job_config.name}': {job_config.schedule}")
