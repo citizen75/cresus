@@ -149,7 +149,7 @@ class TestPositionSizingAgent(unittest.TestCase):
 		self.assertEqual(result["status"], "success")
 		self.assertIn("No entry recommendations", result["message"])
 
-	@patch("agents.orders_entry.sub_agents.PortfolioManager")
+	@patch("agents.orders_entry.sub_agents.position_sizing.PortfolioManager")
 	@patch("agents.orders_entry.sub_agents.Fundamental")
 	def test_fractional_sizing(self, mock_fundamental, mock_portfolio):
 		"""Test fractional position sizing."""
@@ -295,7 +295,7 @@ class TestRiskGuardAgent(unittest.TestCase):
 		self.assertEqual(result["status"], "success")
 		self.assertIn("No orders to validate", result["message"])
 
-	@patch("agents.orders_entry.sub_agents.PortfolioManager")
+	@patch("agents.orders_entry.sub_agents.risk_guard.PortfolioManager")
 	def test_portfolio_constraints(self, mock_portfolio_class):
 		"""Test portfolio constraint validation."""
 		# Setup mocks

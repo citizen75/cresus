@@ -1,6 +1,6 @@
 """Data management API routes."""
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 from typing import List, Optional
@@ -102,7 +102,7 @@ async def list_all_universes(use_cache: bool = Query(True, description="Use cach
 
         return result
     except Exception as e:
-        return {"error": str(e)}, 500
+        raise HTTPException(500, str(e))
 
 
 @router.get("/universes")
@@ -130,7 +130,7 @@ async def get_tickers(
     try:
         uni = Universe(universe)
         if not uni.exists():
-            return {"error": f"Universe '{universe}' not found"}, 404
+            raise HTTPException(404, f"Universe '{universe}' not found")
 
         tickers = uni.get_tickers_with_metadata()[:limit]
 
@@ -139,8 +139,10 @@ async def get_tickers(
             tickers = TickerIntelligence.batch_enrich_flat(tickers)
 
         return {"category": category, "universe": universe, "tickers": tickers, "count": len(tickers)}
+    except HTTPException:
+        raise
     except Exception as e:
-        return {"error": str(e)}, 400
+        raise HTTPException(400, str(e))
 
 
 @router.get("/search")
@@ -175,7 +177,7 @@ def _sync_get_universe_tickers(universe_id: str, limit: Optional[int], enrich: b
     try:
         universe = Universe(universe_id)
         if not universe.exists():
-            return {"error": f"Universe '{universe_id}' not found"}, 404
+            raise HTTPException(404, f"Universe '{universe_id}' not found")
 
         # Load only ticker symbols (not metadata)
         symbols = universe.get_tickers()
@@ -234,8 +236,10 @@ def _sync_get_universe_tickers(universe_id: str, limit: Optional[int], enrich: b
             "tickers": tickers,
             "count": len(tickers),
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        return {"error": str(e)}, 500
+        raise HTTPException(500, str(e))
 
 
 @router.get("/universe/{universe_id}/info")
@@ -244,10 +248,12 @@ async def get_universe_info(universe_id: str):
     try:
         info = Universe.get_universe_info(universe_id)
         if not info:
-            return {"error": f"Universe '{universe_id}' not found"}, 404
+            raise HTTPException(404, f"Universe '{universe_id}' not found")
         return {"universe": universe_id, "info": info}
+    except HTTPException:
+        raise
     except Exception as e:
-        return {"error": str(e)}, 500
+        raise HTTPException(500, str(e))
 
 
 @router.post("/universe")
@@ -255,9 +261,11 @@ async def create_universe(request: UniverseCreateRequest):
     """Create a new universe with given tickers."""
     try:
         # TODO: Add universe_name to request
-        return {"error": "universe_name required"}, 400
+        raise HTTPException(400, "universe_name required")
+    except HTTPException:
+        raise
     except Exception as e:
-        return {"error": str(e)}, 500
+        raise HTTPException(500, str(e))
 
 
 @router.post("/universe/{universe_id}")
@@ -266,7 +274,7 @@ async def create_universe_with_id(universe_id: str, request: UniverseCreateReque
     try:
         universe = Universe(universe_id)
         if universe.exists():
-            return {"error": f"Universe '{universe_id}' already exists"}, 409
+            raise HTTPException(409, f"Universe '{universe_id}' already exists")
 
         universe.create(request.tickers, request.columns)
         _clear_universe_cache()  # Invalidate cache
@@ -275,8 +283,10 @@ async def create_universe_with_id(universe_id: str, request: UniverseCreateReque
             "universe": universe_id,
             "count": len(request.tickers),
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        return {"error": str(e)}, 400
+        raise HTTPException(400, str(e))
 
 
 @router.put("/universe/{universe_id}")
@@ -285,7 +295,7 @@ async def update_universe(universe_id: str, request: UniverseCreateRequest):
     try:
         universe = Universe(universe_id)
         if not universe.exists():
-            return {"error": f"Universe '{universe_id}' not found"}, 404
+            raise HTTPException(404, f"Universe '{universe_id}' not found")
 
         universe.delete()
         universe.create(request.tickers, request.columns)
@@ -295,8 +305,10 @@ async def update_universe(universe_id: str, request: UniverseCreateRequest):
             "universe": universe_id,
             "count": len(request.tickers),
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        return {"error": str(e)}, 400
+        raise HTTPException(400, str(e))
 
 
 @router.delete("/universe/{universe_id}")
@@ -305,13 +317,15 @@ async def delete_universe(universe_id: str):
     try:
         universe = Universe(universe_id)
         if not universe.exists():
-            return {"error": f"Universe '{universe_id}' not found"}, 404
+            raise HTTPException(404, f"Universe '{universe_id}' not found")
 
         universe.delete()
         _clear_universe_cache()  # Invalidate cache
         return {"status": "deleted", "universe": universe_id}
+    except HTTPException:
+        raise
     except Exception as e:
-        return {"error": str(e)}, 400
+        raise HTTPException(400, str(e))
 
 
 class RenameRequest(BaseModel):
@@ -327,11 +341,11 @@ async def rename_universe(universe_id: str, request: RenameRequest):
 
         old_universe = Universe(universe_id)
         if not old_universe.exists():
-            return {"error": f"Universe '{universe_id}' not found"}, 404
+            raise HTTPException(404, f"Universe '{universe_id}' not found")
 
         new_universe = Universe(request.new_id)
         if new_universe.exists():
-            return {"error": f"Universe '{request.new_id}' already exists"}, 409
+            raise HTTPException(409, f"Universe '{request.new_id}' already exists")
 
         # Rename the file
         old_path = old_universe.filepath
@@ -344,8 +358,10 @@ async def rename_universe(universe_id: str, request: RenameRequest):
             "old_id": universe_id,
             "new_id": request.new_id,
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        return {"error": str(e)}, 400
+        raise HTTPException(400, str(e))
 
 
 @router.post("/universe/{universe_id}/fetch-data")
@@ -361,7 +377,7 @@ def _sync_fetch_universe_data(universe_id: str, asset_type: str):
     try:
         universe = Universe(universe_id)
         if not universe.exists():
-            return {"error": f"Universe '{universe_id}' not found"}, 404
+            raise HTTPException(404, f"Universe '{universe_id}' not found")
 
         # Get all tickers
         symbols = universe.get_tickers()
@@ -419,8 +435,10 @@ def _sync_fetch_universe_data(universe_id: str, asset_type: str):
 
         return results
 
+    except HTTPException:
+        raise
     except Exception as e:
-        return {"error": str(e)}, 500
+        raise HTTPException(500, str(e))
 
 
 @router.post("/universe/{universe_id}/tickers")
@@ -432,7 +450,7 @@ async def add_tickers_to_universe(universe_id: str, request: TickersRequest):
     try:
         universe = Universe(universe_id)
         if not universe.exists():
-            return {"error": f"Universe '{universe_id}' not found"}, 404
+            raise HTTPException(404, f"Universe '{universe_id}' not found")
 
         # If enriched data provided, add tickers with metadata columns
         if hasattr(request, 'enriched') and request.enriched:
@@ -467,8 +485,10 @@ async def add_tickers_to_universe(universe_id: str, request: TickersRequest):
             "count": len(tickers),
             "added": len(request.tickers),
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        return {"error": str(e)}, 400
+        raise HTTPException(400, str(e))
 
 
 @router.delete("/universe/{universe_id}/tickers")
@@ -477,7 +497,7 @@ async def remove_tickers_from_universe(universe_id: str, request: TickersRequest
     try:
         universe = Universe(universe_id)
         if not universe.exists():
-            return {"error": f"Universe '{universe_id}' not found"}, 404
+            raise HTTPException(404, f"Universe '{universe_id}' not found")
 
         universe.remove_tickers(request.tickers)
         tickers = universe.get_tickers()
@@ -488,8 +508,10 @@ async def remove_tickers_from_universe(universe_id: str, request: TickersRequest
             "count": len(tickers),
             "removed": len(request.tickers),
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        return {"error": str(e)}, 400
+        raise HTTPException(400, str(e))
 
 
 @router.get("/filter")
@@ -709,7 +731,7 @@ def _sync_filter_tickers(countries: Optional[str], asset_type: Optional[str], li
         }
 
     except Exception as e:
-        return {"error": str(e)}, 400
+        raise HTTPException(400, str(e))
 
 
 @router.get("/category/{category}")
@@ -759,7 +781,7 @@ def _sync_get_category_tickers(category: str, limit: int, enrich: bool):
             "count": len(all_tickers),
         }
     except Exception as e:
-        return {"error": str(e)}, 400
+        raise HTTPException(400, str(e))
 
 
 @router.get("/ticker/{ticker}/enriched")
@@ -780,7 +802,7 @@ def _sync_get_enriched_ticker(ticker: str, use_cache: bool):
         enriched = ti.get_enriched_data(use_cache=use_cache)
         return enriched
     except Exception as e:
-        return {"error": str(e)}, 400
+        raise HTTPException(400, str(e))
 
 
 @router.get("/ticker/{ticker}/summary")
@@ -795,7 +817,7 @@ def _sync_get_ticker_summary(ticker: str):
         summary = ti.get_summary()
         return summary
     except Exception as e:
-        return {"error": str(e)}, 400
+        raise HTTPException(400, str(e))
 
 
 @router.post("/tickers/enrich")
@@ -815,7 +837,7 @@ def _sync_batch_enrich_tickers(request: TickersRequest, use_cache: bool):
             "enriched": results,
         }
     except Exception as e:
-        return {"error": str(e)}, 400
+        raise HTTPException(400, str(e))
 
 
 @router.get("/tickers/all")
@@ -872,7 +894,7 @@ async def get_all_tickers(limit: int = Query(5000, description="Max number of ti
         }
     except Exception as e:
         logger.error(f"Error getting all tickers: {e}")
-        return {"error": str(e), "tickers": [], "count": 0}, 400
+        raise HTTPException(400, str(e))
 
 
 @router.get("/tickers/{ticker}")
@@ -880,7 +902,7 @@ async def get_ticker_info(ticker: str):
     """Get detailed information about a ticker."""
     info = await run_in_threadpool(manager.get_ticker_info, ticker)
     if not info:
-        return {"error": "Ticker not found"}, 404
+        raise HTTPException(404, "Ticker not found")
     return {"ticker": ticker, "info": info}
 
 

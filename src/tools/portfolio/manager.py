@@ -86,6 +86,17 @@ class PortfolioManager:
         normalized_name = self._normalize_portfolio_name(name)
         return self.portfolios_dir / normalized_name
 
+    def portfolio_exists(self, name: str) -> bool:
+        """Whether `name` resolves to a real portfolio.json on disk.
+
+        Several read methods below (metadata/details/positions/performance)
+        fall back to empty/default values when there's nothing on disk, so
+        they can't tell "exists but empty" apart from "never existed" on
+        their own - callers that need to 404 on a missing portfolio check
+        this first.
+        """
+        return (self._portfolio_root(name) / "portfolio.json").exists()
+
     def list_portfolios(self) -> List[Dict[str, Any]]:
         """List all portfolios by scanning folders in portfolios directory."""
         portfolios = []
@@ -287,6 +298,8 @@ class PortfolioManager:
 
     def delete_portfolio(self, name: str) -> Dict[str, Any]:
         """Delete a portfolio folder and its contents."""
+        if not self.portfolio_exists(name):
+            return {"status": "error", "message": f"Portfolio '{name}' not found"}
         try:
             # Normalize name to match folder structure
             normalized_name = self._normalize_portfolio_name(name)
@@ -305,6 +318,7 @@ class PortfolioManager:
 
             # Remove from cache
             self.cache.delete_portfolio(name)
+            self._details_cache.pop(name, None)
 
             logger.info(f"Deleted portfolio '{name}'")
 
@@ -316,6 +330,8 @@ class PortfolioManager:
 
     def get_portfolio_metadata(self, name: str) -> Optional[Dict[str, Any]]:
         """Get portfolio metadata only (no expensive price lookups)."""
+        if not self.portfolio_exists(name):
+            return None
         metadata = self._get_portfolio_metadata(name)
         if not metadata:
             return None
@@ -360,6 +376,9 @@ class PortfolioManager:
         return details
 
     def _compute_portfolio_details(self, name: str) -> Optional[Dict[str, Any]]:
+        if not self.portfolio_exists(name):
+            return None
+
         # Load metadata
         metadata = self._get_portfolio_metadata(name)
 
@@ -406,6 +425,8 @@ class PortfolioManager:
 
     def get_portfolio_positions(self, name: str) -> Optional[Dict[str, Any]]:
         """Get open positions with company names (uses local cached prices)."""
+        if not self.portfolio_exists(name):
+            return None
         journal = Journal(name, context=self.context)
         open_pos = journal.get_open_positions()
         positions = []
@@ -424,6 +445,8 @@ class PortfolioManager:
 
     def get_portfolio_performance(self, name: str) -> Optional[Dict[str, Any]]:
         """Get performance metrics."""
+        if not self.portfolio_exists(name):
+            return None
         journal = Journal(name, context=self.context)
         df = journal.load_df()
 
@@ -766,6 +789,8 @@ class PortfolioManager:
     def get_portfolio_allocation(self, name: str) -> Optional[Dict[str, Any]]:
         """Get portfolio allocation by position weight."""
         details = self.get_portfolio_details(name)
+        if not details:
+            return None
 
         total_value = details.get("total_value", 0)
         if total_value <= 0:
@@ -793,6 +818,8 @@ class PortfolioManager:
     def get_top_holdings(self, name: str, limit: int = 10) -> Optional[Dict[str, Any]]:
         """Get top holdings by weight."""
         details = self.get_portfolio_details(name)
+        if not details:
+            return None
         perf = self.get_portfolio_performance(name)
 
         from tools.data import DataHistory

@@ -24,6 +24,11 @@ def isolated_cresus_home(tmp_path, monkeypatch):
     fake_home = tmp_path / "home"
     fake_home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: fake_home)
+    # A couple of routes (e.g. portfolios.py's get_portfolio_history) use
+    # os.path.expanduser("~") instead of Path.home() - that reads the HOME
+    # env var directly and isn't affected by patching the Path.home method,
+    # so it has to be redirected separately.
+    monkeypatch.setenv("HOME", str(fake_home))
     monkeypatch.delenv("CRESUS_DB_ROOT", raising=False)
     monkeypatch.delenv("CRESUS_CONFIG_ROOT", raising=False)
     monkeypatch.delenv("CRESUS_ENV_FILE", raising=False)
