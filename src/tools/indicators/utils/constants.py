@@ -68,6 +68,7 @@ INDICATOR_PARAMS = {
     "atr": {"params": ["period"], "defaults": {"period": 14}},
     "bb": {"params": ["period", "std_dev"], "defaults": {"period": 20, "std_dev": 2}},
     "bollinger_bands": {"params": ["period", "std_dev"], "defaults": {"period": 20, "std_dev": 2}},
+    "dc": {"params": ["period"], "defaults": {"period": 20}},  # Donchian Channel
     "parkinson": {"params": ["period"], "defaults": {"period": 14}},
     "garman_klass": {"params": ["period"], "defaults": {"period": 14}},
     "rs": {"params": ["period"], "defaults": {"period": 14}},  # Rogers-Satchell
@@ -109,7 +110,7 @@ INDICATOR_PARAMS = {
 
 # Indicator return types
 RETURN_SINGLE = {"rsi", "macd_line", "macd_signal", "macd_histogram", "obv", "mfi", "cmf", "vwap"}
-RETURN_DICT = {"macd", "bb", "bollinger_bands", "dmi", "pivot", "ha", "sha", "hama", "adx"}  # Return multiple series
+RETURN_DICT = {"macd", "bb", "bollinger_bands", "dc", "dmi", "pivot", "ha", "sha", "hama", "adx"}  # Return multiple series
 
 # Default periods if not specified
 DEFAULT_FAST_PERIOD = 12

@@ -24,12 +24,13 @@ class FormulaParser:
 
     # Known component suffixes for multi-return indicators
     COMPONENT_SUFFIXES = {
-        'upper', 'lower', 'middle',  # Bollinger Bands
+        'upper', 'lower', 'middle', 'mid',  # Bollinger Bands, Donchian Channel
         'line', 'signal', 'histogram',  # MACD
         'plus', 'minus',  # DMI
         'open', 'high', 'low', 'close',  # Heikin Ashi, Smooth Heikin Ashi, HAMA
         'green', 'red', 'bullish',  # Color and pattern indicators
         'up', 'down',  # Wick indicators (SHA without top/bottom wick)
+        'body',  # Candle body size (SHA)
         'trend',  # HAMA trend line
         'force',  # ADX force (trend conviction)
     }

@@ -324,8 +324,43 @@ class TestSmoothHeikinAshiCalculate:
 		"""Test that calculate_smooth returns all required keys."""
 		result = calculate_sha(sample_ohlcv_df, period=14)
 
-		required_keys = {'sha_14_open', 'sha_14_high', 'sha_14_low', 'sha_14_close', 'sha_14_green', 'sha_14_red', 'sha_14'}
+		required_keys = {'sha_14_open', 'sha_14_high', 'sha_14_low', 'sha_14_close', 'sha_14_green', 'sha_14_red', 'sha_14_body', 'sha_14'}
 		assert required_keys.issubset(set(result.keys()))
+
+	def test_sha_body_is_abs_close_minus_open(self, sample_ohlcv_df):
+		"""Test that sha_<period>_body == abs(sha_close - sha_open)."""
+		result = calculate_sha(sample_ohlcv_df, period=14)
+
+		expected = (result['sha_14_close'] - result['sha_14_open']).abs()
+		pd.testing.assert_series_equal(result['sha_14_body'], expected, check_names=False)
+
+	def test_sha_body_is_non_negative(self, sample_ohlcv_df):
+		"""Test that body size is always non-negative."""
+		result = calculate_sha(sample_ohlcv_df, period=14)
+
+		assert (result['sha_14_body'].dropna() >= 0).all()
+
+	def test_sha_body_via_dsl_formula(self, sample_ohlcv_df):
+		"""Test that 'sha_<period>_body' resolves through the calculate() DSL."""
+		df = sample_ohlcv_df.copy()
+		df['Volume'] = 1000000
+		result = calculate(['sha_14_body'], df)
+
+		assert 'sha_14_body' in result
+		assert isinstance(result['sha_14_body'], pd.Series)
+		assert len(result['sha_14_body']) == len(df)
+
+	def test_sha_body_default_period_via_dsl(self, sample_ohlcv_df):
+		"""Test that 'sha_body' (no period) defaults to period 14."""
+		df = sample_ohlcv_df.copy()
+		df['Volume'] = 1000000
+		result = calculate(['sha_body'], df)
+
+		# calculate() keys results by the original formula string, but the
+		# value resolves through the default period (14).
+		assert 'sha_body' in result
+		expected = calculate(['sha_14_body'], df)['sha_14_body']
+		pd.testing.assert_series_equal(result['sha_body'], expected, check_names=False)
 
 	def test_sha_default_period(self, sample_ohlcv_df):
 		"""Test that SHA uses default period of 14."""
@@ -728,6 +763,69 @@ class TestMissingIndicators:
 		assert 'pivot_p' in result or 'pivot_classic' in result or 'pivot' in result
 		key = next(k for k in result.keys() if 'pivot' in k.lower())
 		assert len(result[key]) == len(sample_ohlcv_df)
+
+
+class TestDonchianChannel:
+	"""Donchian Channel (dc_<period>) tests."""
+
+	@pytest.fixture
+	def sample_ohlcv_df(self):
+		"""Create sample OHLCV DataFrame."""
+		dates = pd.date_range('2026-01-01', periods=100, freq='D')
+		return pd.DataFrame({
+			'Open': [100 + i * 0.5 for i in range(100)],
+			'High': [102 + i * 0.5 for i in range(100)],
+			'Low': [99 + i * 0.5 for i in range(100)],
+			'Close': [101 + i * 0.5 for i in range(100)],
+			'Volume': [1000000] * 100,
+		}, index=dates)
+
+	def test_dc_components(self, sample_ohlcv_df):
+		"""dc_<period> alone should expand to upper/mid/lower components."""
+		result = calculate(['dc_20'], sample_ohlcv_df)
+		assert 'dc_20_upper' in result
+		assert 'dc_20_mid' in result
+		assert 'dc_20_lower' in result
+		for key in ('dc_20_upper', 'dc_20_mid', 'dc_20_lower'):
+			assert len(result[key]) == len(sample_ohlcv_df)
+
+	def test_dc_explicit_components(self, sample_ohlcv_df):
+		"""dc_<period>_<upper|lower|mid> should each resolve to a single Series."""
+		result = calculate(['dc_20_upper', 'dc_20_lower', 'dc_20_mid'], sample_ohlcv_df)
+		assert isinstance(result['dc_20_upper'], pd.Series)
+		assert isinstance(result['dc_20_lower'], pd.Series)
+		assert isinstance(result['dc_20_mid'], pd.Series)
+
+	def test_dc_upper_is_highest_high(self, sample_ohlcv_df):
+		"""Upper band must equal the rolling highest high over the period."""
+		result = calculate(['dc_10_upper'], sample_ohlcv_df)
+		expected = sample_ohlcv_df['High'].rolling(window=10, min_periods=1).max().reset_index(drop=True)
+		pd.testing.assert_series_equal(result['dc_10_upper'], expected, check_names=False)
+
+	def test_dc_lower_is_lowest_low(self, sample_ohlcv_df):
+		"""Lower band must equal the rolling lowest low over the period."""
+		result = calculate(['dc_10_lower'], sample_ohlcv_df)
+		expected = sample_ohlcv_df['Low'].rolling(window=10, min_periods=1).min().reset_index(drop=True)
+		pd.testing.assert_series_equal(result['dc_10_lower'], expected, check_names=False)
+
+	def test_dc_mid_is_average_of_bands(self, sample_ohlcv_df):
+		"""Mid band must be the midpoint between upper and lower."""
+		result = calculate(['dc_10_upper', 'dc_10_lower', 'dc_10_mid'], sample_ohlcv_df)
+		expected_mid = (result['dc_10_upper'] + result['dc_10_lower']) / 2
+		pd.testing.assert_series_equal(result['dc_10_mid'], expected_mid, check_names=False)
+
+	def test_dc_band_ordering(self, sample_ohlcv_df):
+		"""Upper >= mid >= lower at every point."""
+		result = calculate(['dc_15_upper', 'dc_15_mid', 'dc_15_lower'], sample_ohlcv_df)
+		assert (result['dc_15_upper'] >= result['dc_15_mid']).all()
+		assert (result['dc_15_mid'] >= result['dc_15_lower']).all()
+
+	def test_dc_default_period(self, sample_ohlcv_df):
+		"""dc with no period suffix should use the default period of 20."""
+		result = calculate(['dc'], sample_ohlcv_df)
+		assert 'dc_20_upper' in result
+		assert 'dc_20_lower' in result
+		assert 'dc_20_mid' in result
 
 
 if __name__ == '__main__':

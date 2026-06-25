@@ -57,7 +57,7 @@ _INDICATOR_REGISTRY: Dict[str, Callable] = {}
 # All indicator modules are in subdirectories:
 #   - momentum/: rsi.py, macd.py, roc.py
 #   - trend/: ema.py, sma.py, adx.py, hama.py, ema_chgpct.py
-#   - volatility/: atr.py, bb*.py, parkinson.py, rogers_satchell.py
+#   - volatility/: atr.py, bb*.py, donchian.py, parkinson.py, rogers_satchell.py
 #   - volume/: ad.py, obv.py, mfi.py, cmf.py, vwap.py, volume_*.py
 #   - support/: levels.py, pivots.py, extremes.py
 #   - change/: change_pct.py, change_log.py
@@ -401,10 +401,11 @@ def _register_all_indicators():
 
     try:
         # Volatility indicators
-        from .volatility import atr, bb, parkinson, rogers_satchell
+        from .volatility import atr, bb, donchian, parkinson, rogers_satchell
         register_indicator("atr", atr.calculate)
         register_indicator("bb", bb.calculate)
         register_indicator("bollinger_bands", bb.calculate)
+        register_indicator("dc", donchian.calculate)
         register_indicator("parkinson", parkinson.calculate)
         register_indicator("rs", rogers_satchell.calculate)
     except ImportError:
@@ -525,14 +526,16 @@ def _register_indicator_modules(indicator_names: set) -> None:
 			pass
 	
 	# Volatility indicators
-	if any(ind in indicator_names for ind in ["atr", "bb", "bollinger_bands", "parkinson", "rs"]):
+	if any(ind in indicator_names for ind in ["atr", "bb", "bollinger_bands", "dc", "parkinson", "rs"]):
 		try:
-			from .volatility import atr, bb, parkinson, rogers_satchell
+			from .volatility import atr, bb, donchian, parkinson, rogers_satchell
 			if "atr" in indicator_names:
 				register_indicator("atr", atr.calculate)
 			if "bb" in indicator_names or "bollinger_bands" in indicator_names:
 				register_indicator("bb", bb.calculate)
 				register_indicator("bollinger_bands", bb.calculate)
+			if "dc" in indicator_names:
+				register_indicator("dc", donchian.calculate)
 			if "parkinson" in indicator_names:
 				register_indicator("parkinson", parkinson.calculate)
 			if "rs" in indicator_names:

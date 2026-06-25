@@ -321,6 +321,37 @@ Lower = Middle - (std_dev × StdDev)
 
 ---
 
+### Donchian Channel (DC)
+**Syntax:** `dc_<period>` or `dc_<period>_<upper|lower|mid>`
+**Parameters:**
+- `period` (int, default=20): Lookback period
+
+**Description:**
+Price channel bounded by the highest high and lowest low over the period. Classic breakout/trend-following channel (Turtle Trading system).
+
+**Formula:**
+```
+Upper = Highest(high, period)
+Lower = Lowest(low, period)
+Mid = (Upper + Lower) / 2
+```
+
+**Output:** Dict with:
+- `dc_<period>`: Donchian Channel (alias for upper)
+- `dc_<period>_upper`: Upper band (highest high)
+- `dc_<period>_mid`: Mid band
+- `dc_<period>_lower`: Lower band (lowest low)
+
+**Interpretation:**
+- Close breaking above upper band: Breakout / new uptrend signal
+- Close breaking below lower band: Breakdown / new downtrend signal
+- Narrow channel: Low volatility, consolidation
+- Wide channel: High volatility, strong trend
+
+**Status:** ✅ Complete, well-tested
+
+---
+
 ### ATR Variants: Parkinson & Rogers-Satchell
 
 **Parkinson Volatility**
@@ -650,6 +681,7 @@ HA_Low = min(Low, HA_Open, HA_Close)
 - `sha_<period>_red`: Bearish (binary)
 - `sha_<period>_up`: ⚠️ Bullish without bottom wick (BROKEN)
 - `sha_<period>_down`: ⚠️ Bearish without top wick (BROKEN)
+- `sha_<period>_body`: Candle body size, `abs(sha_close - sha_open)`
 
 **Description:**
 Heikin Ashi with additional EMA smoothing over N periods.

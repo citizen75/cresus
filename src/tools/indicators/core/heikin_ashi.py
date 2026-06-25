@@ -200,6 +200,7 @@ def calculate_smooth(
             - 'sha_bullish': 1 if sha_close > sha_open (same as green)
             - 'sha_up': 1 if bullish AND sha_low >= sha_open (no bottom wick)
             - 'sha_down': 1 if bearish AND sha_high <= sha_open (no top wick)
+            - 'sha_body': abs(sha_close - sha_open), candle body size
             - 'sha': Smooth HA Close (default)
     """
     # Prefer period parameter (from DSL), fall back to post_smooth_length if period is default
@@ -268,6 +269,9 @@ def calculate_smooth(
     sha_up = ((sha_close_series > sha_open_series) & ((sha_open_series - sha_low_series) < epsilon)).astype(int)
     sha_down = ((sha_close_series < sha_open_series) & ((sha_high_series - sha_open_series) < epsilon)).astype(int)
 
+    # Candle body size (distance between open and close, regardless of direction)
+    sha_body = (sha_close_series - sha_open_series).abs()
+
     # Apply wick removal for candlesticks with no bottom/top wick
     # sha_up: set low = open (no bottom wick)
     # sha_down: set high = open (no top wick)
@@ -288,5 +292,6 @@ def calculate_smooth(
         f"sha{period_suffix}_bullish": sha_bullish,
         f"sha{period_suffix}_up": sha_up,
         f"sha{period_suffix}_down": sha_down,
+        f"sha{period_suffix}_body": sha_body,
         f"sha{period_suffix}": sha_close_series,  # Default to close
     }
