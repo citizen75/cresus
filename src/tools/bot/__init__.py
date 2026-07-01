@@ -87,8 +87,17 @@ class BotManager:
 		strategy_dest = bot_dir / "strategy.yml"
 		shutil.copy2(strategy_file, strategy_dest)
 
+		# Read initial_capital from the strategy file before initializing portfolio
+		initial_capital = 100000.0
+		try:
+			with open(strategy_file) as f:
+				strategy_cfg = yaml.safe_load(f) or {}
+			initial_capital = float(strategy_cfg.get("backtest", {}).get("initial_capital", 100000.0))
+		except Exception:
+			pass
+
 		# Initialize portfolio file
-		self._initialize_portfolio(name)
+		self._initialize_portfolio(name, initial_capital=initial_capital)
 
 		# Initialize journal file
 		self._initialize_journal(name)
@@ -209,22 +218,22 @@ class BotManager:
 			except Exception:
 				return {}
 
-		# Fallback: return minimal default template
+		# Fallback: return minimal default template (initial_capital comes from strategy.yml)
 		return {
 			"description": "Bot description",
 			"portfolio": {
-				"initial_capital": 100000,
 				"risk_per_trade": 0.02,
 				"max_drawdown": 0.20
 			},
 			"watchlist": []
 		}
 
-	def _initialize_portfolio(self, name: str) -> None:
+	def _initialize_portfolio(self, name: str, initial_capital: float = 100000.0) -> None:
 		"""Initialize portfolio file for bot.
 
 		Args:
 			name: Bot name
+			initial_capital: Starting capital from strategy config (backtest.initial_capital)
 		"""
 		bot_dir = self.bots_dir / name
 		portfolio_file = bot_dir / "portfolio.json"
@@ -232,10 +241,10 @@ class BotManager:
 		import json
 		portfolio = {
 			"bot_name": name,
-			"initial_capital": 100000,
-			"cash": 100000,
+			"initial_capital": initial_capital,
+			"cash": initial_capital,
 			"positions": [],
-			"total_value": 100000,
+			"total_value": initial_capital,
 			"pnl": 0.0,
 			"pnl_pct": 0.0,
 			"created_at": datetime.now().isoformat()
