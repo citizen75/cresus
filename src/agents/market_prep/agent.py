@@ -90,7 +90,7 @@ class MarketPrepAgent(Agent):
 				f"SaveWatchlistAgent[{self.strategy_name}]", self.strategy_name,
 				context=self.context, bot_dir=bot_dir,
 			)
-			self._run_sub_agent(save_agent, input_data={"save_enabled": flow_input.get("save_enabled", True)}, fatal=True)
+			self._run_sub_agent(save_agent, input_data={"save_enabled": flow_input.get("save_enabled", True)}, fatal=False)
 
 			self._run_sub_agent(OrdersExitAgent("OrdersExitAgent", self.context), fatal=False)
 			self._run_sub_agent(
