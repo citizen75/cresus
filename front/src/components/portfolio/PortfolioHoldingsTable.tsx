@@ -178,7 +178,7 @@ export function PortfolioHoldingsTable({
       )}
 
       {/* Table */}
-      <div className="overflow-x-auto overflow-y-auto max-h-[600px] rounded border border-slate-800">
+      <div className="overflow-x-auto overflow-y-auto max-h-[800px] rounded border border-slate-800">
         <table className="w-full text-xs">
           <thead className="sticky top-0 bg-slate-800/50 border-b border-slate-700">
             <tr>
