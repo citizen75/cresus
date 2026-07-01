@@ -103,12 +103,24 @@ class ServiceManager:
         try:
             os.kill(pid, signal.SIGTERM)
             self._get_pid_file(service).unlink(missing_ok=True)
-            return {"status": "stopped"}
+            return {"status": "stopped", "pid": pid}
         except ProcessLookupError:
             self._get_pid_file(service).unlink(missing_ok=True)
             return {"status": "not_running"}
         except Exception as e:
             return {"status": "error", "message": str(e)}
+
+    def _wait_for_death(self, pid: int, timeout: float = 15.0) -> bool:
+        """Wait for a process to exit, returns True if it died within timeout."""
+        import time
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            try:
+                os.kill(pid, 0)  # 0 = just check existence
+            except (ProcessLookupError, OSError):
+                return True
+            time.sleep(0.3)
+        return False
 
     def restart(self, service: str, daemon: bool = True) -> Dict[str, Any]:
         """Restart a service (stop and start in daemon mode)."""
@@ -121,9 +133,19 @@ class ServiceManager:
         if stop_result.get("status") == "error":
             return stop_result
 
-        # Start the service in daemon mode
-        import time
-        time.sleep(0.5)  # Brief pause to ensure clean restart
+        # Wait for the old process to fully release its resources (e.g. flock)
+        # before starting a new instance. 0.5s is not enough when APScheduler
+        # shutdown(wait=True) blocks until running jobs complete.
+        pid = stop_result.get("pid")
+        if pid:
+            if not self._wait_for_death(pid, timeout=15.0):
+                # Process didn't die in time — escalate to SIGKILL
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                    self._wait_for_death(pid, timeout=5.0)
+                except (ProcessLookupError, OSError):
+                    pass
+
         return self.start(service, daemon=daemon)
 
     def status(self, service: Optional[str] = None) -> Dict[str, Any]:

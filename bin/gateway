@@ -40,6 +40,17 @@ if env_path.exists():
                 key, value = line.split("=", 1)
                 os.environ.setdefault(key.strip(), value.strip())
 
+import atexit
+
+def _release_lock():
+    try:
+        fcntl.flock(_lock_file, fcntl.LOCK_UN)
+        _lock_file.close()
+    except Exception:
+        pass
+
+atexit.register(_release_lock)
+
 from src.gateway.main import main
 
 if __name__ == "__main__":
