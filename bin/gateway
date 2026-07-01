@@ -25,7 +25,14 @@ _lock_file = open(_lock_path, "w")
 try:
     fcntl.flock(_lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
 except OSError:
-    print(f"Another gateway instance is already running (lock held on {_lock_path}). Exiting.", file=sys.stderr)
+    import os as _os
+    ppid = _os.getppid()
+    try:
+        import subprocess as _sp
+        pname = _sp.check_output(['ps', '-p', str(ppid), '-o', 'comm='], text=True).strip()
+    except Exception:
+        pname = 'unknown'
+    print(f"Another gateway instance is already running (lock held on {_lock_path}). Caller PID={_os.getpid()} PPID={ppid} ({pname}). Exiting.", file=sys.stderr)
     sys.exit(1)
 _lock_file.write(str(os.getpid()))
 _lock_file.flush()
