@@ -9,64 +9,75 @@ from pathlib import Path
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 sys.path.insert(0, os.path.join(project_root, "src"))
-os.chdir(project_root)
-os.environ.setdefault("CRESUS_PROJECT_ROOT", project_root)
 
-# OS-level single-instance guard, independent of how this process was launched
-# (service.py's daemon mode, a bare `python bin/gateway` left running in a
-# detached shell, systemd, etc). Without it, a second gateway can start while
-# an old one is still alive - each runs its own APScheduler, so every cron job
-# fires once per instance and concurrently stampedes the same parquet/CSV
-# caches, which is what corrupted an indicator cache file and segfaulted
-# libparquet, taking the whole process down.
-_lock_path = Path.home() / ".cresus" / "gateway.lock"
-_lock_path.parent.mkdir(parents=True, exist_ok=True)
-_lock_file = open(_lock_path, "w")
-try:
-    fcntl.flock(_lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-except OSError:
-    import os as _os
-    ppid = _os.getppid()
-    try:
-        import subprocess as _sp
-        pname = _sp.check_output(['ps', '-p', str(ppid), '-o', 'comm='], text=True).strip()
-    except Exception:
-        pname = 'unknown'
-    print(f"Another gateway instance is already running (lock held on {_lock_path}). Caller PID={_os.getpid()} PPID={ppid} ({pname}). Exiting.", file=sys.stderr)
-    sys.exit(1)
-_lock_file.write(str(os.getpid()))
-_lock_file.flush()
-
-# Prevent forked/exec'd children from inheriting the lock FD.
-# On Linux, multiprocessing uses fork() by default, so cron job workers
-# inherit all open FDs — including this lock. When the gateway is killed,
-# those orphaned workers keep the flock held, blocking the next start.
-# FD_CLOEXEC closes it on exec(); register_at_fork closes it after fork().
-fcntl.fcntl(_lock_file.fileno(), fcntl.F_SETFD, fcntl.FD_CLOEXEC)
-os.register_at_fork(after_in_child=lambda: _lock_file.close())
-
-# Load .cresus/.env if it exists
-env_path = Path.home() / ".cresus" / ".env"
-if env_path.exists():
-    with open(env_path) as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                key, value = line.split("=", 1)
-                os.environ.setdefault(key.strip(), value.strip())
-
-import atexit
-
-def _release_lock():
-    try:
-        fcntl.flock(_lock_file, fcntl.LOCK_UN)
-        _lock_file.close()
-    except Exception:
-        pass
-
-atexit.register(_release_lock)
-
-from src.gateway.main import main
-
+# Everything below has side effects (locking, env mutation, process exit) that
+# must only happen when this file is run as the real gateway entry point.
+# process_pool.py spawns isolated workers via multiprocessing's `spawn` start
+# method, which re-executes this file inside each worker (runpy.run_path with
+# run_name="__mp_main__") so that objects pickled from __main__ can be
+# resolved. Without this guard, every spawned worker re-ran the flock
+# acquisition below, always lost to the real gateway, printed "already
+# running", and called sys.exit(1) - killing the worker during its own
+# bootstrap before it did any work. That broke the pool on every single
+# isolated call (one per ticker), which is the flood of "Another gateway
+# instance is already running" seen in production.
 if __name__ == "__main__":
+    os.chdir(project_root)
+    os.environ.setdefault("CRESUS_PROJECT_ROOT", project_root)
+
+    # OS-level single-instance guard, independent of how this process was launched
+    # (service.py's daemon mode, a bare `python bin/gateway` left running in a
+    # detached shell, systemd, etc). Without it, a second gateway can start while
+    # an old one is still alive - each runs its own APScheduler, so every cron job
+    # fires once per instance and concurrently stampedes the same parquet/CSV
+    # caches, which is what corrupted an indicator cache file and segfaulted
+    # libparquet, taking the whole process down.
+    _lock_path = Path.home() / ".cresus" / "gateway.lock"
+    _lock_path.parent.mkdir(parents=True, exist_ok=True)
+    _lock_file = open(_lock_path, "w")
+    try:
+        fcntl.flock(_lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        import os as _os
+        ppid = _os.getppid()
+        try:
+            import subprocess as _sp
+            pname = _sp.check_output(['ps', '-p', str(ppid), '-o', 'comm='], text=True).strip()
+        except Exception:
+            pname = 'unknown'
+        print(f"Another gateway instance is already running (lock held on {_lock_path}). Caller PID={_os.getpid()} PPID={ppid} ({pname}). Exiting.", file=sys.stderr)
+        sys.exit(1)
+    _lock_file.write(str(os.getpid()))
+    _lock_file.flush()
+
+    # Prevent forked/exec'd children from inheriting the lock FD.
+    # On Linux, multiprocessing uses fork() by default, so cron job workers
+    # inherit all open FDs — including this lock. When the gateway is killed,
+    # those orphaned workers keep the flock held, blocking the next start.
+    # FD_CLOEXEC closes it on exec(); register_at_fork closes it after fork().
+    fcntl.fcntl(_lock_file.fileno(), fcntl.F_SETFD, fcntl.FD_CLOEXEC)
+    os.register_at_fork(after_in_child=lambda: _lock_file.close())
+
+    # Load .cresus/.env if it exists
+    env_path = Path.home() / ".cresus" / ".env"
+    if env_path.exists():
+        with open(env_path) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    key, value = line.split("=", 1)
+                    os.environ.setdefault(key.strip(), value.strip())
+
+    import atexit
+
+    def _release_lock():
+        try:
+            fcntl.flock(_lock_file, fcntl.LOCK_UN)
+            _lock_file.close()
+        except Exception:
+            pass
+
+    atexit.register(_release_lock)
+
+    from src.gateway.main import main
     main()
